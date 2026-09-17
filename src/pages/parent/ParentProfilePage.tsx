@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ChevronRight, Settings as SettingsIcon } from 'lucide-react'
-import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
+import { useParentChildren } from '@/contexts/ParentChildrenContext'
+import { ParentChildSelector, ParentFamilyContent } from '@/components/parent/ParentFamily'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { IconProfile, IconHowItWorks } from '@/components/icons/TrakIcons'
 
@@ -10,25 +10,7 @@ export default function ParentProfilePage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [childName, setChildName] = useState<string>('')
-
-  useEffect(() => {
-    if (!user) return
-    supabase
-      .from('player_parent_links')
-      .select('player_user_id')
-      .eq('parent_user_id', user.id)
-      .maybeSingle()
-      .then(async ({ data }) => {
-        if (!data?.player_user_id) return
-        const { data: childProfile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('user_id', data.player_user_id)
-          .maybeSingle()
-        if (childProfile?.full_name) setChildName(childProfile.full_name)
-      })
-  }, [user])
+  const { children, selectedChild } = useParentChildren()
 
   return (
     <MobileShell>
@@ -48,10 +30,15 @@ export default function ParentProfilePage() {
           <p className="text-[20px] font-semibold text-white/88 tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.02em' }}>
             {profile?.full_name || 'Parent'}
           </p>
-          <p className="text-[11px] text-white/45 mt-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-            {childName ? `Following ${childName}` : 'No child linked yet'}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Parent account</p>
         </div>
+
+        <ParentChildSelector />
+        <ParentFamilyContent>
+          <p className="text-sm text-muted-foreground pb-3">
+            Following {selectedChild?.name} · {children.length} {children.length === 1 ? 'child' : 'children'} linked
+          </p>
+        </ParentFamilyContent>
 
         {/* Account info */}
         <Section label="ACCOUNT">

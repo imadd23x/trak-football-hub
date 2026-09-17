@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { ArrowLeft, Pencil, Check, X, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
+import { ParentConnections } from '@/components/parent/ParentConnections'
 import { supabase } from '@/integrations/supabase/client'
 import { POSITIONS, COACH_ROLES, AGE_GROUPS } from '@/lib/constants'
 
@@ -75,9 +76,6 @@ export default function Settings() {
   const [playerShirt,   setPlayerShirt]   = useState('')
   const [savingPlayer,  setSavingPlayer]  = useState(false)
 
-  // Parent: linked child name
-  const [childName,     setChildName]     = useState<string | null>(null)
-
   // Player: linked coach + parent names
   const [linkedCoachName,  setLinkedCoachName]  = useState<string | null>(null)
   const [linkedParentName, setLinkedParentName] = useState<string | null>(null)
@@ -107,16 +105,6 @@ export default function Settings() {
           if (!data) return
           setPlayerPos(data.position || '')
           setPlayerShirt(data.shirt_number ? String(data.shirt_number) : '')
-        })
-    }
-    if (profile.role === 'parent') {
-      supabase.from('player_parent_links').select('player_user_id')
-        .eq('parent_user_id', user.id).maybeSingle()
-        .then(async ({ data }) => {
-          if (!data?.player_user_id) return
-          const { data: p } = await supabase.from('profiles')
-            .select('full_name').eq('user_id', data.player_user_id).maybeSingle()
-          setChildName(p?.full_name || null)
         })
     }
     if (profile.role === 'player') {
@@ -450,17 +438,8 @@ export default function Settings() {
 
         {/* Connections — parent */}
         {role === 'parent' && (
-          <Section label="Linked child">
-            <ConnectionRow
-              label="Player"
-              status={childName ? 'connected' : 'none'}
-              name={childName ?? undefined}
-            />
-            {!childName && (
-              <div className="py-3" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                Ask your child to share their invite code and enter it during sign-up to link automatically.
-              </div>
-            )}
+          <Section label="Linked children">
+            <ParentConnections />
           </Section>
         )}
 

@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ParentChildrenProvider } from "@/contexts/ParentChildrenContext";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { ErrorBoundary } from "@/components/trak/ErrorBoundary";
 import { DevSwitcher } from "@/components/trak/DevSwitcher";
@@ -80,6 +81,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <ParentChildrenProvider>
           {import.meta.env.DEV && <DevSwitcher />}
           <Suspense fallback={<RouteFallback />}>
           <Routes>
@@ -148,6 +150,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
           </Suspense>
+          </ParentChildrenProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

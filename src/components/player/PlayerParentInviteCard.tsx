@@ -146,7 +146,10 @@ function PlayerInvitations({ playerUserId, allowCreate }: { playerUserId: string
   }
 
   async function resend(invite: PlayerParentInvite) {
-    if (busyId || invite.status !== 'pending') return
+    // Read the shared guard synchronously as well as disabling the control:
+    // it survives route remounts and closes the gap before React re-renders.
+    if (busyId || invite.status !== 'pending'
+      || queryClient.getQueryData<Record<string, string>>(rotationKey)?.[invite.id]) return
     setBusyId(invite.id)
     setNotice(null)
     setRevealed(null)
@@ -215,7 +218,10 @@ function PlayerInvitations({ playerUserId, allowCreate }: { playerUserId: string
       {(query.isError || (!busyId && Object.keys(blockedTokens).length > 0)) && <div role={query.isError ? 'alert' : 'status'} className="mt-2">
         <p className="text-sm text-muted-foreground">{query.isError
           ? "Couldn't load current invitations. Check your connection and retry."
-          : 'Waiting for an updated invitation link. Retry loading before sharing.'}</p>
+          : 'Waiting for an updated invitation link. Sharing and resending are paused until its status is confirmed.'}</p>
+        {Object.keys(blockedTokens).length > 0 && <p className="text-sm text-muted-foreground mt-2">
+          Retry loading to check for an updated link. If it stays unconfirmed, ask your academy to check this invitation before trying again.
+        </p>}
         <button disabled={!!busyId || query.isFetching} onClick={() => { void refresh() }}
           className="mt-2 min-h-11 rounded-lg border border-border px-3 text-sm text-foreground disabled:opacity-50">Retry loading</button>
       </div>}
@@ -228,13 +234,14 @@ function PlayerInvitations({ playerUserId, allowCreate }: { playerUserId: string
           <p className="text-sm text-foreground break-all">{invite.parent_email}</p>
           <p className="text-xs text-muted-foreground mt-1">
             {accepted ? 'Parent linked' : !pending ? 'Invitation unavailable'
+              : blockedTokens[invite.id] ? 'Resend unconfirmed — check its status before trying again.'
               : !valid ? 'Invitation expired — resend to create a new link.'
                 : `Waiting to join · expires ${new Date(invite.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
           </p>
           {pending && <div className="flex flex-wrap gap-2 mt-3">
             {valid && <button onClick={() => { void share(invite) }} disabled={!canShare}
               className="min-h-11 rounded-lg bg-primary/20 border border-primary/40 px-3 text-sm text-foreground disabled:opacity-50">Share link</button>}
-            <button onClick={() => { void resend(invite) }} disabled={!!busyId || query.isFetching || query.isError}
+            <button onClick={() => { void resend(invite) }} disabled={!!busyId || query.isFetching || query.isError || !!blockedTokens[invite.id]}
               className="min-h-11 rounded-lg border border-border px-3 text-sm text-foreground disabled:opacity-50">
               {busyId === invite.id ? 'Resending…' : 'Resend email'}
             </button>

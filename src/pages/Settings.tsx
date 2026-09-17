@@ -441,7 +441,8 @@ export default function Settings() {
             />
             {(!linkedCoachName || !linkedParentName) && (
               <div className="py-3" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                Share your invite code from your profile to connect with a coach or parent.
+                {!linkedCoachName && 'Ask your coach for their TRK- code and enter it on your Profile to connect. '}
+                {!linkedParentName && 'To add a parent, send them an invite from your Profile.'}
               </div>
             )}
           </Section>
@@ -457,7 +458,8 @@ export default function Settings() {
             />
             {!childName && (
               <div className="py-3" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                Ask your child to share their invite code and enter it during sign-up to link automatically.
+                Ask your child to send you a parent invite from their Profile. The link they send is
+                what connects your account to theirs — there is no code to enter here.
               </div>
             )}
           </Section>

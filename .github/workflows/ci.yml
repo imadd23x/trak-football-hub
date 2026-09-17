@@ -42,6 +42,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Database security regressions
+        run: npm run test:db
+
       # tests/msw and tests/support hold the MSW fidelity contract and the
       # useCase() unknown-id guard — package.json's "test" script only runs
       # src, so these run nowhere else in CI.

@@ -8,7 +8,7 @@ import { BANDS, type BandType } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
 import { trackEvent } from '@/lib/telemetry'
 import CardRevealModal from '@/components/player/CardRevealModal'
-import { toast } from 'sonner'
+import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
 
 const QUOTES = [
   { text: "The more difficult the victory, the greater the happiness in winning.", author: "Pelé" },
@@ -67,41 +67,14 @@ export default function PlayerHome() {
   // until a parent approves. Without this they would sign in to a dashboard
   // that stays permanently empty with no explanation — the same false-empty
   // state the parent screens suffer from.
-  const [inviteToken, setInviteToken] = useState<string | null>(null)
-  const [emailFailed, setEmailFailed] = useState(false)
-
   useEffect(() => {
     if (!user) return
     // `as any`: generated types predate the consent migration.
     ;(supabase.rpc as any)('my_consent_status').then(({ data }: { data: unknown }) => {
       setConsent(data as { required: boolean; invited_parent: string | null } | null)
     })
-    // The share link is the fallback when the automatic email does not land,
-    // and it must always be reachable from here: this is the screen the
-    // player returns to, and an under-15 who cannot get their parent invited
-    // is stuck for good.
-    supabase.rpc('get_player_invites_for_current_user').then(({ data }) => {
-      const pending = (data ?? []).find((i: { status: string }) => i.status === 'pending') as { invite_token?: string } | undefined
-      setInviteToken(pending?.invite_token ?? null)
-    })
-    try { setEmailFailed(Boolean(localStorage.getItem('trak_parent_invite_email_failed'))) } catch { setEmailFailed(true) }
   }, [user])
 
-  const shareInviteLink = async () => {
-    if (!inviteToken) return
-    const url = `${window.location.origin}/parent-invite?token=${inviteToken}`
-    try {
-      if (typeof navigator.share === 'function') {
-        await navigator.share({ title: 'Trak', text: `Please approve my Trak account: ${url}`, url })
-        return
-      }
-      await navigator.clipboard.writeText(url)
-      toast.success('Link copied — send it to your parent')
-    } catch (e: unknown) {
-      if ((e as { name?: string })?.name === 'AbortError') return
-      toast.message(url, { description: 'Copy this link and send it to your parent', duration: 15000 })
-    }
-  }
   const [showReveal, setShowReveal] = useState(false)
   const [newMatchCount, setNewMatchCount] = useState(0)
   const [coachAssessmentNote, setCoachAssessmentNote] = useState<string | null>(null)
@@ -289,23 +262,12 @@ export default function PlayerHome() {
               Waiting for your parent
             </p>
             <p className="text-[12px] text-white/55 mt-1 leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-              {emailFailed
-                ? `We couldn't email ${consent.invited_parent ?? 'your parent'} automatically. Send them the link below and they can approve your account.`
-                : consent.invited_parent
-                  ? `We asked ${consent.invited_parent} to approve your account. Once they do, your coach can start recording your progress and it'll show up here.`
-                  : "Your account needs a parent or guardian's approval before your coach can record anything."}
+              Your account needs a parent or guardian's approval before your coach can record your progress.
             </p>
-            {inviteToken && (
-              <button
-                onClick={shareInviteLink}
-                className="mt-3 w-full rounded-lg bg-primary/20 border border-primary/40 py-2 text-[12px] font-medium text-white/90"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                {emailFailed ? 'Send them the link' : "Didn't arrive? Send them the link"}
-              </button>
-            )}
           </div>
         )}
+
+        {user && <PlayerParentInviteCard playerUserId={user.id} />}
 
         {/* Identity */}
         <div className="py-2.5 pb-4">

@@ -1,4 +1,6 @@
 # Features that still need work
+> **Historical — superseded September 18, 2026.** The "none open" and "exercised live" claims below are outdated. Use [the current pilot plan](pilot-readiness-2026-09-25.md), current source and verification records.
+
 
 Derived from the verified use-case review of the current build. Ordered by how ready each group is
 to be worked on, not by importance.

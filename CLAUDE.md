@@ -2,6 +2,12 @@
 
 Quick orientation for AI agents and new contributors.
 
+## Current work and coordination
+
+Read [the September 25 pilot plan](docs/pilot-readiness-2026-09-25.md) and [the release gate](docs/release/merge-gate.md) first. `docs/pm/STATE.md` and `docs/features-outstanding.md` are historical, not current readiness evidence. Read the actual route and callers before fixing a component; `CoachQuickMatchLog` is currently unrouted.
+
+Use task branches (`parent/`, `coach/`, `player/`, `shared/`), never main. Announce migrations and shared-file changes in #all-trak-football before editing. Imad coordinates merges; his own PRs require Kostas or Tarek's approval. Never apply development SQL to the shared live Supabase project. Use a disposable local database and new migrations; production deployment follows reviewed merges.
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -22,7 +28,7 @@ Quick orientation for AI agents and new contributors.
 | Band config (colors, words) | `src/lib/types.ts` — `BANDS` constant |
 | Supabase client | `src/integrations/supabase/client.ts` |
 | Route definitions | `src/App.tsx` |
-| Route guard (role-based) | `src/components/RouteGuard.tsx` |
+| Route guard (role-based) | `src/components/layout/RouteGuard.tsx` |
 | Shared components | `src/components/trak/` |
 | Navigation bar | `src/components/trak/NavBar.tsx` |
 | Error boundary | `src/components/trak/ErrorBoundary.tsx` |
@@ -32,7 +38,7 @@ Quick orientation for AI agents and new contributors.
 ## Common Patterns
 
 ### Supabase queries
-Always use `.maybeSingle()` (not `.single()`) when a row might not exist — `.single()` throws on no row.
+Use `.maybeSingle()` when zero or one row is expected. Use arrays for one-to-many relationships such as a parent's children. Always inspect query errors; a failed request is not an empty result.
 
 ```tsx
 const { data } = await supabase
@@ -82,10 +88,13 @@ const cfg  = BANDS.find(b => b.word.toLowerCase() === band)
 ## Running Locally
 
 ```bash
-npm install
+npm ci --legacy-peer-deps
 cp .env.example .env   # fill in Supabase URL + anon key
 npm run dev            # http://localhost:8080
-npm test -- --run      # run tests once
+npm test              # source tests, once
+npm run test:harness  # MSW and use-case harness contracts
+npm run typecheck
+npm run uc:check      # enforced use cases block; pending failures are reported
 npm run build          # production build
 ```
 
@@ -97,13 +106,12 @@ Real credentials live in your local Supabase project — never committed.
 ## TDD Workflow
 
 Tests live alongside source in `src/**/__tests__/` and `src/__tests__/`.
-Run `npm test` (watch mode) while making changes.
-CI blocks merges if any test fails or the build errors.
+Run `npm run test:watch` while making changes. Add focused regression coverage for changed security and user journeys.
+CI fails for enforced tests/build errors. Pending use-case failures currently do not block CI; review them explicitly. Branch protection must be independently enabled before CI can enforce a merge gate.
 
 ## Database Migrations
 
-Apply migrations in filename order via Supabase SQL Editor (Supabase CLI not required).
-All migrations use `IF NOT EXISTS` / `IF EXISTS` guards — safe to re-run.
+Create a new migration using the Supabase CLI; never edit existing migration files. Replay migrations in order on a disposable database and test with actual authenticated roles. Do not assume individual historical migrations are safe to rerun. The main CI workflow applies pending migrations and deploys edge functions before the frontend.
 
 Key migrations to be aware of:
 - `20260425000001_security_hardening.sql` — RLS policies + performance indexes

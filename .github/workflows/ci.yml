@@ -7,7 +7,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, 'parent/**', 'shared/**']
   pull_request:
     branches: [main]
 
@@ -60,6 +60,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Parent browser regressions
+        run: npx playwright test --config playwright.pilot.config.ts
+
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -72,6 +78,8 @@ jobs:
   vercel-credentials:
     name: Check Vercel credentials
     runs-on: ubuntu-latest
+    # Forks run regression checks only, even if somebody later adds secrets.
+    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub'
     outputs:
       configured: ${{ steps.check.outputs.configured }}
     steps:
@@ -112,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     # Production only. A pull request must never push migrations to the live
     # database, and there is no second Supabase project to point previews at.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
@@ -189,6 +197,7 @@ jobs:
     # migration must still stop the deployment.
     if: >-
       always() &&
+      github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' &&
       needs.test.result == 'success' &&
       ((github.ref == 'refs/heads/main' && needs.supabase.result == 'success') ||
        (github.ref != 'refs/heads/main' && needs.supabase.result == 'skipped')) &&

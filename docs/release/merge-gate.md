@@ -33,3 +33,12 @@ Verify both deployment jobs and the routed journey on trakfootball.com using des
 Stop the merge queue. Identify which migrations/functions actually applied; do not assume a red job rolled back prior steps. Use reviewed forward migrations to repair schema/permissions. A previous compatible frontend may be restored while retaining security fixes. Never erase migration history or restore an older access-control vulnerability as a rollback shortcut.
 
 The second academy provides isolation test fixtures; it is not a staging environment or backup. Real-child admission additionally requires all gates in the current pilot-readiness document.
+# Fork-first development
+
+All Imad/Codex changes are committed and tested in `imadd23x/trak-football-hub`.
+The canonical source remains `kostasanastasioubusiness-lang/trak-football-hub`.
+Regression tests belong in the same task branch as the fix. Fork CI runs checks
+only: repository identity guards prevent Vercel and Supabase deployment jobs.
+Do not copy production credentials into the fork. After tests pass, open a pull
+request from the fork to the canonical repository. Kostas or Tarek reviews;
+Imad merges after the required checks pass on the current commit.

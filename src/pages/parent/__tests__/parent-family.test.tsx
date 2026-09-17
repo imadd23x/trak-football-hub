@@ -243,6 +243,27 @@ describe('parent loading, empty and error states', () => {
 })
 
 describe('truthful parent ratings', () => {
+  it('includes a newly logged backfilled match among the latest 20 match alerts', async () => {
+    const historicalMatches = Array.from({ length: 20 }, (_, index) => ({
+      ...match(`Fixture ${index + 1}`),
+      match_date: `2026-09-${String(20 - index).padStart(2, '0')}`,
+      created_at: `2026-09-${String(20 - index).padStart(2, '0')}T10:00:00Z`,
+    }))
+    server.use(http.get(endpoint('matches'), () => HttpResponse.json([
+      ...historicalMatches,
+      { ...match('Backfilled'), match_date: '2026-08-01', created_at: '2026-09-21T10:00:00Z' },
+    ])))
+    renderFamily('/parent/alerts')
+    expect(await screen.findByText('vs Backfilled opposition · 0–0')).toBeInTheDocument()
+    const alerts = screen.getAllByText('Match logged')
+    expect(alerts).toHaveLength(20)
+    expect(alerts[0].parentElement).toHaveTextContent('vs Backfilled opposition')
+    expect(screen.queryByText('vs Fixture 20 opposition · 0–0')).not.toBeInTheDocument()
+    // Alerts must not reorder the shared match cache used by the Matches view.
+    await userEvent.click(screen.getByRole('button', { name: 'Matches' }))
+    expect((await screen.findAllByText(/opposition/))[0]).toHaveTextContent('Fixture 1 opposition')
+  })
+
   it('shows zero as Difficult, null as Not rated, and uses the match date', async () => {
     server.use(http.get(endpoint('matches'), () => HttpResponse.json([
       match('Zero', 0), { ...match('Unknown', null), team_score: null, opponent_score: null },

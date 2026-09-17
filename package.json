@@ -20,7 +20,8 @@
     "uc:lock": "node scripts/uc-check.mjs --write-lock",
     "uc:report": "node scripts/uc-report.mjs",
     "prepare": "husky",
-    "test:usecases": "node scripts/uc-check.mjs --stage=ci"
+    "test:usecases": "node scripts/uc-check.mjs --stage=ci",
+    "test:browser": "npm run build && playwright test --config playwright.pilot.config.ts"
   },
   "dependencies": {
     "@axe-core/react": "^4.11.1",

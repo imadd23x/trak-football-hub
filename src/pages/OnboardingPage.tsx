@@ -205,7 +205,6 @@ const PlayerOnboarding = () => {
       const { user, error } = await signUp(email, password, pendingProfile);
       if (error || !user) throw error || new Error('Signup failed');
 
-      localStorage.setItem('trak_pending_profile', JSON.stringify({ ...pendingProfile, _savedAt: Date.now() }));
       setStep(4);
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
@@ -382,7 +381,6 @@ const CoachOnboarding = () => {
       const { user, error } = await signUp(email, password, pendingProfile);
       if (error || !user) throw error || new Error('Signup failed');
 
-      localStorage.setItem('trak_pending_profile', JSON.stringify({ ...pendingProfile, _savedAt: Date.now() }));
       setStep(3);
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
@@ -485,7 +483,6 @@ const ClubOnboarding = () => {
       };
       const { user, error } = await signUp(email, password, pendingProfile);
       if (error || !user) throw error || new Error('Signup failed');
-      localStorage.setItem('trak_pending_profile', JSON.stringify({ ...pendingProfile, _savedAt: Date.now() }));
       setDone(true);
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');

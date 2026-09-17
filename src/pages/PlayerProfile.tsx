@@ -107,7 +107,8 @@ const PlayerProfile = () => {
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    const { error } = await signOut();
+    if (error) return;
     navigate('/');
   };
 

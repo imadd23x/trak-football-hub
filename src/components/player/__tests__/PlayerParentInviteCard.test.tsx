@@ -134,6 +134,42 @@ describe('player parent invitation recovery', () => {
     expect(calls.invoke).toHaveBeenCalledTimes(1)
   })
 
+  it.each(['pending', 'disconnected'])('blocks a second resend after navigating away from a %s first attempt', async outcome => {
+    let serverInvite = invite()
+    let finish!: (value: unknown) => void
+    calls.rpc.mockImplementation(async () => ({ data: [serverInvite, invite('sibling')], error: null }))
+    calls.invoke.mockImplementation(() => outcome === 'disconnected'
+      ? Promise.reject(new Error('Response lost'))
+      : new Promise(resolve => { finish = resolve }))
+    const view = mount()
+    await screen.findByRole('group', { name: 'first@example.test' })
+    fireEvent.click(within(row()).getByRole('button', { name: 'Resend email' }))
+    await waitFor(() => expect(calls.invoke).toHaveBeenCalledTimes(1))
+    view.goToProfile()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Retry loading' })).toBeEnabled())
+
+    const secondAttempt = within(row()).getByRole('button', { name: 'Resend email' })
+    expect(secondAttempt).toBeDisabled()
+    fireEvent.click(secondAttempt)
+    expect(calls.invoke).toHaveBeenCalledTimes(1)
+    expect(within(row()).getByRole('button', { name: 'Share link' })).toBeDisabled()
+    expect(within(row('sibling')).getByRole('button', { name: 'Resend email' })).toBeEnabled()
+    expect(screen.getByText(/ask your academy to check this invitation/i)).toBeInTheDocument()
+
+    // Re-reading the old record cannot authorize a second write.
+    fireEvent.click(screen.getByRole('button', { name: 'Retry loading' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Retry loading' })).toBeEnabled())
+    expect(within(row()).getByRole('button', { name: 'Resend email' })).toBeDisabled()
+
+    serverInvite = fresh()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry loading' }))
+    await waitFor(() => expect(within(row()).getByRole('button', { name: 'Resend email' })).toBeEnabled())
+    if (outcome === 'pending') await act(async () => { finish({ data: { sent: true }, error: null }) })
+    fireEvent.click(within(row()).getByRole('button', { name: 'Share link' }))
+    await waitFor(() => expect(calls.copy).toHaveBeenCalledWith(`${window.location.origin}/parent-invite?token=new-token`))
+    expect(calls.invoke).toHaveBeenCalledTimes(1)
+  })
+
   it('never offers an old revealed token after a failed refresh, and retries loading without resending again', async () => {
     calls.copy.mockRejectedValue(new Error('Clipboard unavailable'))
     calls.rpc.mockResolvedValueOnce({ data: [invite(), invite('sibling')], error: null })

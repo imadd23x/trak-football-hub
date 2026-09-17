@@ -11,7 +11,7 @@ Snapshot: September 18, 2026. Integration includes upstream `7668340`, secure pa
 - `npm run typecheck` and `npm run build`: pass.
 - `npm run lint`: zero errors, 134 warnings remain.
 - `npm run uc:check`: two enforced use cases pass; five pre-existing pending assertions still fail. Exit success is not full use-case coverage.
-- `npm run test:browser`: production-bundle browser regressions with real router/AuthProvider/SDK and synthetic intercepted backend responses. Unknown external requests are blocked and fail the tests. Run `npx playwright install chromium` first; `PW_CHROMIUM_EXECUTABLE` may point to a locally installed compatible Chromium.
+- `npm run test:browser`: four production-bundle browser scenarios pass: multiple-child navigation and failed-load retry; anonymous invitation privacy; wrong-player logout to existing-parent password login and exact-child acceptance; safe expired/foreign-link states. These use the real router/AuthProvider/SDK and synthetic intercepted backend responses. Unknown external requests are blocked and fail the tests. Run `npx playwright install chromium` first; `PW_CHROMIUM_EXECUTABLE` may point to a locally installed compatible Chromium.
 
 The fork CI branches run checks without deployment. Release-gate tests evaluate the actual workflow conditions for upstream/fork, failed tests/backend, missing credentials and PR previews. The source and SQL tests are versioned beside the fixes; no live database or email is required to repeat them.
 

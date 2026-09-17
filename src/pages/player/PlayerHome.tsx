@@ -6,6 +6,7 @@ import { MobileShell, NavBar, BandPill, MetadataLabel } from '@/components/trak'
 import { CardSkeleton, MatchCardSkeleton, Skeleton } from '@/components/trak'
 import { BANDS, type BandType } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
+import { dedupeMatches } from '@/lib/match-dedupe'
 import { trackEvent } from '@/lib/telemetry'
 import CardRevealModal from '@/components/player/CardRevealModal'
 import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
@@ -84,19 +85,7 @@ export default function PlayerHome() {
     supabase.from('matches').select('*').eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
-        // Deduplicate: same opponent + score = same match logged twice.
-        // Keep the row with the highest computed_rating (coach-logged rows often
-        // have better data; seed rows were patched with spread values).
-        const groups = new Map<string, any>()
-        for (const m of (data || [])) {
-          const key = `${(m.opponent || '').toLowerCase()}|${m.team_score}|${m.opponent_score}`
-          const existing = groups.get(key)
-          if (!existing || (m.computed_rating ?? 0) > (existing.computed_rating ?? 0)) {
-            groups.set(key, m)
-          }
-        }
-        const deduped = Array.from(groups.values())
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        const deduped = dedupeMatches(data)
         setMatches(deduped)
         setLoading(false)
 

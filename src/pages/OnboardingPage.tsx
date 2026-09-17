@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
-  EUROPEAN_COUNTRIES, POSITIONS, AGE_GROUPS, COACH_ROLES,
+  NATIONALITIES, POSITIONS, AGE_GROUPS, COACH_ROLES,
   DAYS, MONTHS, YEARS,
 } from '@/lib/constants';
 import { Mail, RefreshCw, ChevronDown } from 'lucide-react';
@@ -249,7 +249,7 @@ const PlayerOnboarding = () => {
           </div>
           <StyledSelect value={nationality} onChange={e => setNationality(e.target.value)}>
             <option value="">Select nationality</option>
-            {EUROPEAN_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {NATIONALITIES.map(c => <option key={c} value={c}>{c}</option>)}
           </StyledSelect>
           <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="bg-card" />
           <Input type="password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
@@ -410,7 +410,7 @@ const CoachOnboarding = () => {
           <Input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="bg-card" />
           <StyledSelect value={nationality} onChange={e => setNationality(e.target.value)}>
             <option value="">Select nationality</option>
-            {EUROPEAN_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {NATIONALITIES.map(c => <option key={c} value={c}>{c}</option>)}
           </StyledSelect>
           <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="bg-card" />
           <Input type="password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />

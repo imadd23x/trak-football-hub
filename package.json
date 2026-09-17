@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "preview": "vite preview",
     "test": "vitest run src",
+    "test:db": "node scripts/test-db.mjs",
     "test:watch": "vitest",
     "test:harness": "vitest run tests/msw tests/support",
     "storybook": "storybook dev -p 6006",
@@ -82,6 +83,7 @@
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.1.1",
+    "@electric-sql/pglite": "0.5.8",
     "@eslint/js": "^9.32.0",
     "@playwright/test": "^1.57.0",
     "@storybook/addon-a11y": "^10.3.5",

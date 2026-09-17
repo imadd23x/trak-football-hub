@@ -9,8 +9,9 @@ import { resolve } from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const securityMigration = '20260917205027_secure_parent_invites.sql';
 const baseline = process.argv.includes('--baseline');
-if (process.argv.slice(2).some(arg => arg !== '--baseline')) {
-  throw new Error('Usage: npm run test:db -- [--baseline]');
+const coachReview = process.argv.includes('--coach-departure-review');
+if ((baseline && coachReview) || process.argv.slice(2).some(arg => !['--baseline', '--coach-departure-review'].includes(arg))) {
+  throw new Error('Usage: npm run test:db -- [--baseline | --coach-departure-review]');
 }
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
@@ -30,8 +31,8 @@ try {
     }
   }
   console.log(`Replayed ${migrations.length} migrations${baseline ? ' (vulnerable baseline; security assertions should fail)' : ' with backfill assertions'}.`);
-  await db.exec(await read('parent_invite_security.sql'));
-  console.log('Parent-invitation role, permission, expiry and replay assertions passed.');
+  await db.exec(await read(coachReview ? 'coach_departure_review.sql' : 'parent_invite_security.sql'));
+  console.log(coachReview ? 'Coach departure review assertions passed.' : 'Parent-invitation role, permission, expiry and replay assertions passed.');
 } catch (error) {
   console.error(error.message);
   if (error.cause?.detail) console.error(error.cause.detail);

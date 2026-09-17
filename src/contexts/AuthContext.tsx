@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { User } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 import { setTelemetryRole, trackSessionOpen } from '@/lib/telemetry';
+import { createOnboardingSession, type OnboardingSession } from '@/lib/onboarding-session';
+import { useQueryClient } from '@tanstack/react-query';
 
 type UserRole = 'player' | 'coach' | 'parent' | 'club';
 const PENDING_PROFILE_KEY = 'trak_pending_profile';
@@ -46,7 +48,7 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string, pendingProfile?: PendingProfileData) => Promise<{ user: User | null; error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -58,7 +60,6 @@ export const useAuth = () => {
   return ctx;
 };
 
-/** Write pending onboarding data from localStorage to Supabase */
 const isValidRole = (value: unknown): value is UserRole => value === 'player' || value === 'coach' || value === 'parent' || value === 'club';
 
 const parsePendingProfile = (value: unknown): PendingProfileData | null => {
@@ -79,21 +80,9 @@ const parsePendingProfile = (value: unknown): PendingProfileData | null => {
   };
 };
 
-const readPendingProfileFromLocalStorage = (): PendingProfileData | null => {
-  const raw = localStorage.getItem(PENDING_PROFILE_KEY);
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw);
-    // Expire onboarding data after 24 hours to avoid stale state
-    if (parsed._savedAt && Date.now() - parsed._savedAt > 86_400_000) {
-      localStorage.removeItem(PENDING_PROFILE_KEY);
-      return null;
-    }
-    return parsePendingProfile(parsed);
-  } catch {
-    return null;
-  }
+const discardLegacyPendingProfile = () => {
+  // This old key had no account owner. Never use it, even if it looks recent.
+  try { localStorage.removeItem(PENDING_PROFILE_KEY); } catch { /* storage unavailable */ }
 };
 
 const readPendingProfileFromMetadata = (user: User): PendingProfileData | null => {
@@ -101,14 +90,20 @@ const readPendingProfileFromMetadata = (user: User): PendingProfileData | null =
   return parsePendingProfile(metadata?.trak_onboarding);
 };
 
-async function writeProfileFromPendingData(userId: string, data: PendingProfileData): Promise<Profile | null> {
+async function writeProfileFromPendingData(
+  account: OnboardingSession,
+  data: PendingProfileData,
+  isCurrent: () => boolean,
+): Promise<Profile | null> {
   // All provisioning happens server-side in ONE atomic SECURITY DEFINER RPC.
   // This fixes: club profile creation (blocked by RLS for direct inserts),
   // player→coach linking, parent→child linking, and partial-failure states.
-  const { data: result, error } = await supabase.rpc('provision_my_profile' as any, {
+  if (!isCurrent()) return null;
+  const { data: result, error } = await account.client.rpc('provision_my_profile' as any, {
     p: data as unknown as Record<string, unknown>,
   });
   if (error) throw error;
+  if (!isCurrent()) return null;
 
   // Surface non-fatal warnings (e.g. unrecognised coach/academy code)
   const warnings = (result as { warnings?: string[] } | null)?.warnings ?? [];
@@ -128,7 +123,7 @@ async function writeProfileFromPendingData(userId: string, data: PendingProfileD
     let sent = false;
     let detail = '';
     try {
-      const { data: result, error } = await supabase.functions.invoke('send-parent-invite');
+      const { data: result, error } = await account.client.functions.invoke('send-parent-invite');
       let body = result as { sent?: boolean; via?: string; reason?: string; detail?: string } | null;
       if (error && !body) {
         // On a non-2xx the body is on the error's response, not in `data`.
@@ -141,6 +136,8 @@ async function writeProfileFromPendingData(userId: string, data: PendingProfileD
       detail = err instanceof Error ? err.message : String(err);
       console.error('[send-parent-invite] network failure', detail);
     }
+
+    if (!isCurrent()) return null;
 
     if (!sent) {
       toast.warning(
@@ -156,89 +153,119 @@ async function writeProfileFromPendingData(userId: string, data: PendingProfileD
     } catch { /* storage unavailable — banner falls back to always showing the link */ }
   }
 
-  const { data: newProfile } = await supabase
+  if (!isCurrent()) return null;
+  const { data: newProfile, error: profileError } = await account.client
     .from('profiles')
     .select('*')
-    .eq('user_id', userId)
+    .eq('user_id', account.user.id)
     .maybeSingle();
+  if (profileError) throw profileError;
+  if (!isCurrent()) return null;
   return (newProfile as unknown as Profile | null);
 }
 
-async function clearPendingProfile() {
-  localStorage.removeItem(PENDING_PROFILE_KEY);
-  // Clear the metadata copy too so provisioning doesn't re-run every session
-  try {
-    await supabase.auth.updateUser({ data: { trak_onboarding: null } });
-  } catch {
-    // Non-critical — provisioning is idempotent if this fails
-  }
-}
-
-async function writePendingProfile(user: User): Promise<Profile | null> {
-  const data = readPendingProfileFromLocalStorage() || readPendingProfileFromMetadata(user);
-  if (!data) return null;
-
-  try {
-    const created = await writeProfileFromPendingData(user.id, data);
-    if (created) await clearPendingProfile();
-    return created;
-  } catch (err: any) {
-    console.error('Failed to write pending profile:', err);
-    toast.error(`Account setup hit a problem: ${err?.message || 'unknown error'}. Pull to refresh or sign in again to retry.`);
-    return null;
-  }
-}
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const activeSession = useRef<Session | null>(null);
+  const generation = useRef(0);
+  const mounted = useRef(false);
+  const hydration = useRef<{ generation: number; promise: Promise<void> } | null>(null);
+  const authTransition = useRef<Promise<unknown> | null>(null);
+  const explicitSignOut = useRef(false);
 
-  const fetchOrCreateProfile = async (currentUser: User) => {
-    // Try to fetch existing profile
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
+  // The SDK removes its shared session after the logout HTTP response. A
+  // concurrent password sign-in can otherwise save B before A deletes it.
+  // Serialize provider-owned transitions, including signup-created sessions.
+  const runAuthTransition = <T,>(operation: () => Promise<T>): Promise<T> => {
+    const previous = authTransition.current;
+    const result = previous ? previous.then(operation, operation) : operation();
+    authTransition.current = result;
+    const finished = () => {
+      if (authTransition.current === result) authTransition.current = null;
+    };
+    void result.then(finished, finished);
+    return result;
+  };
 
-    if (data) {
-      // Repair path: if pending onboarding data was never cleared, a previous
-      // provisioning run failed partway (e.g. profile created but details/org/
-      // links missing). Re-run it — the RPC is idempotent.
-      const pending = readPendingProfileFromLocalStorage() || readPendingProfileFromMetadata(currentUser);
-      if (pending && pending.role === (data as { role: string }).role) {
-        void writePendingProfile(currentUser);
+  const fetchOrCreateProfile = (session: Session, version: number): Promise<void> => {
+    if (hydration.current?.generation === version) return hydration.current.promise;
+    const isCurrent = () => mounted.current && generation.current === version
+      && activeSession.current?.user.id === session.user.id;
+    const promise = (async () => {
+      try {
+        const account = await createOnboardingSession(session);
+        if (!isCurrent()) return;
+        const { data, error } = await account.client
+          .from('profiles').select('*').eq('user_id', account.user.id).maybeSingle();
+        if (error) throw error;
+        if (!isCurrent()) return;
+
+        const existing = data as unknown as Profile | null;
+        setProfile(existing);
+        // Keep an existing account usable during its idempotent repair.
+        if (existing) setLoading(false);
+        const pending = readPendingProfileFromMetadata(account.user);
+        if (pending && (!existing || pending.role === existing.role)) {
+          const created = await writeProfileFromPendingData(account, pending, isCurrent);
+          if (!isCurrent()) return;
+          if (created) {
+            setProfile(created);
+            // Failure here is non-fatal: the next sign-in can repeat the
+            // idempotent repair. This request is bound to this account's JWT.
+            try { await account.clearPendingProfile(); } catch { /* retry next sign-in */ }
+          }
+        }
+      } catch (err) {
+        if (!isCurrent()) return;
+        console.error('Failed to load account profile:', err);
+        const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+        toast.error(`Account setup hit a problem: ${message || 'unknown error'}. Pull to refresh or sign in again to retry.`);
+      } finally {
+        if (isCurrent()) {
+          setLoading(false);
+          hydration.current = null;
+        }
       }
-      setProfile(data as unknown as Profile);
-      return;
-    }
-
-    // No profile — try writing pending data from localStorage or auth metadata
-    const created = await writePendingProfile(currentUser);
-    setProfile(created);
+    })();
+    hydration.current = { generation: version, promise };
+    return promise;
   };
 
   const refreshProfile = async () => {
-    if (user) await fetchOrCreateProfile(user);
+    const session = activeSession.current;
+    if (session) await fetchOrCreateProfile(session, generation.current);
   };
 
   useEffect(() => {
-    const hydrate = async (currentUser: User | null) => {
-      if (!currentUser) {
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        await fetchOrCreateProfile(currentUser);
-      } finally {
-        setLoading(false);
-      }
+    mounted.current = true;
+    discardLegacyPendingProfile();
+    let disposed = false;
+    let receivedAuthEvent = false;
+    let initialized = false;
+    const initialGeneration = generation.current;
+    const acceptSession = (session: Session | null) => {
+      if (disposed) return;
+      const previousUserId = activeSession.current?.user.id;
+      const sameAccount = initialized && activeSession.current?.user.id === session?.user.id;
+      initialized = true;
+      activeSession.current = session;
+      setUser(session?.user ?? null);
+      // Token refresh, tab refocus and metadata changes must not unmount a
+      // coach's unfinished form or start duplicate provisioning operations.
+      if (sameAccount) return;
+      if (previousUserId && previousUserId !== session?.user.id) queryClient.clear();
+      const version = ++generation.current;
+      hydration.current = null;
+      setProfile(null);
+      setLoading(!!session);
+      if (session) void fetchOrCreateProfile(session, version);
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      receivedAuthEvent = true;
       // On the reset password page, suppress all auth redirects so the
       // form stays visible. ResetPassword.tsx handles its own auth events.
       if (window.location.pathname === '/reset-password') {
@@ -252,9 +279,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (window.location.pathname === '/auth/confirm') return;
 
       if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setProfile(null);
-        window.location.replace('/');
+        acceptSession(null);
+        queryClient.clear();
+        discardLegacyPendingProfile();
+        // Explicit callers own navigation. A hard reload here would discard
+        // a queued sign-in and strip the current parent invitation URL.
+        if (!explicitSignOut.current) window.location.replace('/');
         return;
       }
 
@@ -263,27 +293,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      setLoading(true);
-      void hydrate(currentUser);
+      acceptSession(session);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (disposed || receivedAuthEvent || generation.current !== initialGeneration) return;
       // If we're on the reset password page, don't auto-redirect — let
       // the ResetPassword component handle the PASSWORD_RECOVERY event.
       if (window.location.pathname === '/reset-password') {
         setLoading(false);
         return;
       }
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      setLoading(true);
-      void hydrate(currentUser);
+      if (window.location.pathname === '/auth/confirm') {
+        setLoading(false);
+        return;
+      }
+      acceptSession(session);
+    }).catch(() => {
+      if (!disposed && !receivedAuthEvent && generation.current === initialGeneration) setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      disposed = true;
+      mounted.current = false;
+      generation.current += 1;
+      hydration.current = null;
+      subscription.unsubscribe();
+    };
+  }, [queryClient]);
 
   // Pilot instrumentation. One place, so every sign-in path is covered:
   // the role stamps subsequent events, and `app_opened` fires once per
@@ -293,7 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user && profile) trackSessionOpen(user.id, profile.role);
   }, [user?.id, profile?.role]);
 
-  const signUp = async (email: string, password: string, pendingProfile?: PendingProfileData) => {
+  const signUp = (email: string, password: string, pendingProfile?: PendingProfileData) => runAuthTransition(async () => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -308,18 +345,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return { user: data.user, error: error as Error | null };
-  };
+  });
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = (email: string, password: string) => runAuthTransition(async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error as Error | null };
-  };
+  });
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-  };
+  const signOut = () => runAuthTransition(async () => {
+    explicitSignOut.current = true;
+    const version = ++generation.current;
+    hydration.current = null;
+    discardLegacyPendingProfile();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      // The SDK normally delivers SIGNED_OUT before this resolves. Do not
+      // overwrite a newer account if another auth event has already arrived.
+      if (mounted.current && generation.current === version) {
+        activeSession.current = null;
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        queryClient.clear();
+      }
+      return { error: null };
+    } catch (cause) {
+      const error = cause instanceof Error ? cause : new Error('Sign-out failed');
+      if (mounted.current && generation.current === version) {
+        setLoading(false);
+        toast.error('Could not sign out. You are still signed in on this device. Check your connection and try again.');
+      }
+      return { error };
+    } finally {
+      explicitSignOut.current = false;
+    }
+  });
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, refreshProfile }}>

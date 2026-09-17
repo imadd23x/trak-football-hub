@@ -1,4 +1,6 @@
 # State: Trak Football
+> **Historical — superseded September 18, 2026.** This May status is not a readiness assessment. Use [the current pilot plan](../pilot-readiness-2026-09-25.md), current source and deployment evidence. Completion claims below are preserved as history only.
+
 Last Updated: 2026-05-26
 
 ## Summary

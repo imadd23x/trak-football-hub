@@ -211,7 +211,8 @@ export default function Settings() {
         toast.error('Could not delete account. Please contact support.')
         return
       }
-      await signOut()
+      const { error: signOutError } = await signOut()
+      if (signOutError) return
       navigate('/', { replace: true })
     } catch (err) {
       console.error('deleteAccount unexpected error:', err)
@@ -541,7 +542,8 @@ export default function Settings() {
         {/* Sign out */}
         <button
           onClick={async () => {
-            await signOut()
+            const { error } = await signOut()
+            if (error) return
             navigate('/', { replace: true })
           }}
           className="w-full py-3 rounded-lg mt-2"

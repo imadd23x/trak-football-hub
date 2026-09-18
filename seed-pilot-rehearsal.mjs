@@ -510,9 +510,14 @@ Sign in with any of these — password ${PW}
 
   Academy join code   ${org.join_code}
 
-Then confirm the scorecard:
+Then confirm the scorecard in the reviewed project's authorized operator SQL
+editor, or through a separate trusted server-side service-role connection:
 
-  SELECT * FROM pilot_scorecard;
+  SELECT * FROM public.pilot_scorecard;
+
+Application anon/authenticated credentials, including a club account, cannot
+read operational reports. Do not put a service key in this script's client or
+in VITE_* configuration. See docs/pilot-runbook.md for S3 verification.
 
 telemetry_events stays EMPTY after this script — it is written by the app, not
 by seeding. Metrics 4, 6 and 7 stay blank until you click through the smoke

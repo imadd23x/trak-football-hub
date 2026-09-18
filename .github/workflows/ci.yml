@@ -47,8 +47,14 @@ jobs:
       - name: Database security regressions
         run: npm run test:db
 
+      - name: Parent migration after deployed reporting migration
+        run: npm run test:db -- --parent-upgrade-review
+
       - name: Academy access and account deletion regressions
         run: npm run test:db -- --coach-departure-review
+
+      - name: Academy repair after current main migrations
+        run: npm run test:db -- --academy-upgrade-review
 
       - name: Disposable database runner safeguards
         run: npm run test:db:runner
@@ -63,6 +69,11 @@ jobs:
 
       - name: Native PostgreSQL replay and concurrent player linking
         run: npm run test:db:concurrency
+        env:
+          TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+
+      - name: Native PostgreSQL academy upgrade after current main
+        run: npm run test:db:native -- --academy-upgrade-review
         env:
           TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
 
@@ -192,7 +203,12 @@ jobs:
         run: supabase migration list --db-url "$DB_URL"
 
       - name: Push migrations
-        run: supabase db push --db-url "$DB_URL"
+        # Reviewed branches may contain an older timestamp than a migration
+        # already deployed from another PR. Include only unapplied migrations;
+        # never rename applied versions or repair history to skip their SQL.
+        run: |
+          supabase db push --db-url "$DB_URL" --include-all --dry-run
+          supabase db push --db-url "$DB_URL" --include-all
 
       # Deploys all four functions. Values come from supabase/config.toml, so
       # that file is the source of truth for verify_jwt \u2014 not the dashboard.

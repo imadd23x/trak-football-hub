@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import { readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { advisorDatabaseUrl, buildReplayPlan, childEnvironment, parseMode, runCommand } from './test-native-db.mjs';
+import { advisorDatabaseUrl, buildReplayPlan, childEnvironment, migrationReplayOrder, parseMode, runCommand } from './test-native-db.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const runnerUrl = new URL('./test-native-db.mjs', import.meta.url).href;
@@ -46,7 +47,7 @@ test('advisor URL names only the private socket and explicit database identity',
   assert.equal(url.searchParams.get('password'), null);
 });
 
-test('full replay includes both backfills and leaves committed deletion fixtures last', async () => {
+test('full replay includes all backfills and leaves committed deletion fixtures last', async () => {
   const { sql, suites } = await buildReplayPlan(root, parseMode([]));
   const index = file => sql.indexOf(`\\echo [stage] ${file}\n`);
   for (const [setup, migration, assertions] of [
@@ -56,11 +57,48 @@ test('full replay includes both backfills and leaves committed deletion fixtures
     assert.ok(index(setup) >= 0 && index(setup) < index(migration));
     assert.ok(index(migration) < index(assertions));
   }
-  for (const suite of ['parent_invite_security.sql', 'coach_departure_review.sql', 'academy_access_security.sql']) {
+  assert.ok(index('pilot_view_backfill_setup.sql') >= 0);
+  assert.ok(index('pilot_view_backfill_setup.sql') < index('20260918070209_restrict_pilot_operational_views.sql'));
+  for (const suite of ['parent_invite_security.sql', 'pilot_view_security.sql', 'coach_departure_review.sql', 'academy_access_security.sql']) {
     assert.ok(suites.includes(suite), `${suite} must run in the full replay`);
   }
   assert.deepEqual(suites.slice(-2), ['account_deletion_setup.sql', 'account_deletion_assertions.sql']);
   assert.ok(index('academy_access_security.sql') < index('account_deletion_setup.sql'));
+});
+
+test('academy upgrade replays every main migration before the unchanged older repair', async () => {
+  const academy = '20260918062345_preserve_academy_access_and_fk_cleanup.sql';
+  const parent = '20260917205027_secure_parent_invites.sql';
+  const pilot = '20260918070209_restrict_pilot_operational_views.sql';
+  const files = (await readdir(join(root, 'supabase/migrations'))).filter(file => file.endsWith('.sql')).sort();
+  const { sql, migrationCount, suites } = await buildReplayPlan(root, parseMode(['--academy-upgrade-review']));
+  const stages = [...sql.matchAll(/^\\echo \[stage\] (.+)$/gm)].map(match => match[1]);
+  const replayed = stages.filter(file => /^\d{14}_/.test(file));
+  assert.equal(migrationCount, files.length);
+  assert.deepEqual([...replayed].sort(), files, 'no migration omitted, duplicated, or replaced');
+  assert.equal(replayed.at(-1), academy);
+  assert.ok(replayed.indexOf('20260918133800_ai_quota_known_functions.sql') < replayed.indexOf(academy));
+  assert.equal(replayed.indexOf(parent), replayed.indexOf(pilot) + 1, 'preserve the deployed report-before-parent upgrade order');
+  for (const [setup, migration, assertions] of [
+    ['parent_invite_backfill_setup.sql', parent, 'parent_invite_backfill_assertions.sql'],
+    ['academy_orphan_backfill_setup.sql', academy, 'academy_orphan_backfill_assertions.sql'],
+  ]) {
+    const index = stages.indexOf(migration);
+    assert.equal(stages[index - 1], setup);
+    assert.equal(stages[index + 1], assertions);
+  }
+  assert.equal(stages[stages.indexOf(pilot) - 1], 'pilot_view_backfill_setup.sql');
+  assert.deepEqual(suites, ['parent_invite_security.sql', 'pilot_view_security.sql',
+    'coach_departure_review.sql', 'academy_access_security.sql',
+    'account_deletion_setup.sql', 'account_deletion_assertions.sql']);
+  assert.match(sql, /deployed main first, then academy repair/);
+});
+
+test('upgrade modes fail if their required historical migrations are missing', () => {
+  assert.throws(() => migrationReplayOrder([], '--parent-upgrade-review'), /requires both original/);
+  assert.throws(() => migrationReplayOrder([
+    '20260917205027_secure_parent_invites.sql', '20260918070209_restrict_pilot_operational_views.sql',
+  ], '--academy-upgrade-review'), /requires the original academy migration/);
 });
 
 test('negative controls exclude the corresponding repair while retaining its failing suite', async () => {

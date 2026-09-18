@@ -9,6 +9,7 @@ Source: [Imad's September 18 Slack plan](https://trakfootball.slack.com/archives
 - September 25 is a phone demonstration with synthetic accounts. Real-child admission is a separate gate below.
 - UAE first, Greece on the same build. Guardian consent is required below 18 in **both** countries as Trak's pilot policy, pending legal review. This supersedes the earlier "Greek behaviour unchanged" wording.
 - For real minors, permit minimal roster setup only before online guardian approval. Development records wait for approval. Academy-collected/offline consent is not in this release. Historical synthetic assessments can demonstrate roster adoption without an exception for real children.
+- Consent is academy-specific: approval for a child at one academy does not authorize another academy. Preserve legacy consent evidence without automatically treating child-wide approval as academy approval. The multiple-guardian withdrawal rule and child-personal-data AI notice/scope remain pending; see the [P2 technical delivery plan](plans/p2-academy-consent.md), which is design only.
 - Imad coordinates and merges releases. Kostas or Tarek must approve Imad's PRs; Imad then merges them. This clarifies the earlier no-self-merge wording.
 - Restore privacy for all existing coach notes. Future feedback is shared only by explicit coach publication; do not automatically copy historical private notes into shared storage. Kostas owns K9; P4 consumes only explicitly shared feedback. AI feedback is invisible to children until a coach approves it.
 - Imad/Codex commits and runs regression checks in `imadd23x/trak-football-hub` before proposing changes to the canonical repository. All coding-agent coordination and review requests go to Slack `#coding-agent-reviews`.
@@ -26,7 +27,7 @@ Source: [Imad's September 18 Slack plan](https://trakfootball.slack.com/archives
 | Tarek | T3–T6 | Worldwide nationality choices, roster adoption without lost history, valid dates, later coach linking |
 | Tarek | T7, T8 | Player error/retry states and safe feedback streaming; deck claims reconciled with the build |
 | Imad | P1 | Verified-recipient parent linking, immutable invitation target, no direct table-write bypass |
-| Imad | P2 | Under-18 consent enforced by the backend, purpose choices/withdrawal honored, guardian identity verified |
+| Imad | P2 | Academy-specific under-18 consent enforced by the backend, purpose choices/withdrawal honored, guardian identity and approved notice verified |
 | Imad | P3, P4 | Multiple children across all parent screens; permitted shared feedback only, no private notes or AI drafts |
 | Imad | P5, P6 | Account-bound onboarding and preserved forms; remove settings that do not change behavior |
 | Imad | P7 | Real-email invitation journeys for new and existing parents, including a second child |
@@ -54,7 +55,7 @@ Use [the merge gate](release/merge-gate.md). No code task is done merely because
 |---|---|
 | U1 | UAE coach adds five synthetic players, assesses three and logs a match; correct facts, errors and timing |
 | U2 | Player adopts an existing roster row with two prior synthetic assessments; no duplicates or missing history |
-| U3 | Ages 17/18 in GR/AE, missing age, consent grant/withdrawal/purposes; direct API bypass attempts denied |
+| U3 | Ages 17/18 in GR/AE, missing age, academy-specific grant/withdrawal/purposes; direct INSERT/UPDATE/RPC bypass attempts denied; legacy ambiguity fails closed |
 | U4 | Existing parent accepts a second child and switches children on Home, Matches, Alerts, Profile, Settings and consent |
 | U5 | Player/parent direct database queries cannot retrieve private notes; shared feedback is visible as permitted |
 | U6 | AI draft cannot be read before approval; coach edits/approves; child reads approved version |
@@ -74,7 +75,7 @@ Demo: U1–U10 together, two academies, four roles and two phones, using clearly
 Before a real child signs up, require all of the following:
 
 - K1/K2/P1 reviewed by Makis, deployed and verified against the live project with synthetic identities.
-- Guardian approval and purpose enforcement for the agreed market/age policy; unresolved DOB cannot bypass it.
+- Academy-specific guardian approval and purpose enforcement for the agreed market/age policy; unresolved DOB/provenance cannot bypass it. Multiple-guardian withdrawal semantics and child-personal-data AI scope/notices must be resolved before enabling affected processing.
 - Suitable signed academy agreement, with controller responsibilities and retention/deletion decisions resolved; privacy/terms match actual hosting, AI and email data flows.
 - Verified account deletion for all roles, including a decision on consent evidence and avatars.
 - Restore rehearsal evidence and duration (Kostas S5), not merely an available backup.

@@ -160,16 +160,30 @@ policy service, and it must not be described as one.
 
 The main CI `test` job runs delivery verification before its application checks
 and before either production job. It rejects direct main pushes with no recorded
-PR result, forced/non-forward pushes, an obsolete release SHA, a PR merged into another base, absent merge
-results and incomplete/wrong changed-file inventory. It uses GitHub's actual
+PR result, forced/non-forward pushes, divergent history, a PR merged into another
+base, absent merge
+results, incomplete/wrong changed-file inventory, and file objects that differ
+from the reviewed PR. It uses GitHub's actual
 `merge_commit_sha`, so ordinary, squash and rebase merges can all be verified.
 The separate closed-PR job also reports delivery failures after a merge.
-Main is reread at the end to reject a change during verification. This is still
-a snapshot; maintain the release lock through deployment and verify live results.
+Main is reread at the end. If a newer ordinary merge has advanced main beyond the
+event revision, before or during verification, the older run reports **superseded**
+and sets `release_eligible=false`; this is not a failed candidate or verified
+delivery. Both production jobs require explicit affirmative eligibility, so a
+superseded run cannot deploy. Forced/non-forward events, resets/divergence and
+unavailable evidence still fail. The current revision must pass its own checks.
 
-File inventory is only a completeness check. Inspect the intended changes and
-run behavior tests on the delivered commit; neither file presence nor commit
-ancestry proves the application is correct. Source CI passing does not prove
+This post-push check detects delivery defects; it cannot prevent the merge itself.
+Eligibility is a snapshot before application checks, not an atomic branch lock.
+Main can still advance afterwards; maintain the human release lock through both
+production jobs and verify live results. Workflow serialization alone does not
+freeze main or authorize rapid consecutive schema releases.
+
+Because the policy requires current main in the candidate, each delivered changed
+file must match the reviewed PR's Git object hash, including squash/rebase results.
+A combined merge requiring different contents must be updated and reviewed first.
+Exact file delivery still does not prove application correctness: run behavior
+tests on the delivered commit. Source CI passing does not prove
 hosted migrations, functions or frontend deployment happened.
 
 Wait for the full workflow before the next schema merge. Current main workflows

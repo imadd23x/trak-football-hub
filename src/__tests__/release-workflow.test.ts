@@ -13,7 +13,8 @@ interface Scenario {
   headRepository?: string
   tests?: string
   backend?: string
-  consentAudit?: string
+  consentAudit?: string | null
+  rosterAudit?: string | null
   credentials?: string
   releaseEligible?: string | null
 }
@@ -27,12 +28,14 @@ function permits(job: string, scenario: Scenario = {}) {
   const needs = {
     test: { result: scenario.tests ?? 'success', outputs: { release_eligible: scenario.releaseEligible === undefined ? 'true' : scenario.releaseEligible } },
     supabase: { result: scenario.backend ?? 'success' },
-    'consent-audit': { result: scenario.consentAudit ?? 'success' },
+    'consent-audit': { result: scenario.consentAudit === undefined ? 'success' : scenario.consentAudit },
+    'roster-audit': { result: scenario.rosterAudit === undefined ? 'success' : scenario.rosterAudit },
     'vercel-credentials': { outputs: { configured: scenario.credentials ?? 'true' } },
   }
   // Evaluate the actual checked-in GitHub expression, not a duplicate gate.
   const expression = workflow.jobs[job].if.replaceAll('needs.vercel-credentials', "needs['vercel-credentials']")
     .replaceAll('needs.consent-audit', "needs['consent-audit']")
+    .replaceAll('needs.roster-audit', "needs['roster-audit']")
   return new Function('github', 'needs', 'always', `return (${expression})`)(github, needs, () => true)
 }
 describe('release workflow regression gates', () => {
@@ -83,6 +86,19 @@ describe('release workflow regression gates', () => {
     expect(permits('deploy', { ...pr, consentAudit: 'failure' })).toBe(false)
     expect(permits('deploy', { ...pr, headRepository: fork })).toBe(false)
     expect(permits('supabase', pr)).toBe(false)
+  })
+  it('requires both audit results across the actual production and preview conditions', () => {
+    const states = ['success', 'failure', 'cancelled', 'skipped', '', null]
+    for (const consentAudit of states) for (const rosterAudit of states) {
+      const bothPassed = consentAudit === 'success' && rosterAudit === 'success'
+      for (const job of ['supabase', 'deploy']) {
+        expect(permits(job, { consentAudit, rosterAudit })).toBe(bothPassed)
+        expect(workflow.jobs[job].needs).toEqual(expect.arrayContaining(['consent-audit', 'roster-audit']))
+      }
+      const preview = { event: 'pull_request', ref: 'refs/pull/25/merge', backend: 'skipped', consentAudit, rosterAudit }
+      expect(permits('deploy', preview)).toBe(bothPassed)
+      expect(permits('supabase', preview)).toBe(false)
+    }
   })
   it('runs checks on task branches and never cancels a main release', () => {
     expect(workflow.on.push.branches).toEqual(expect.arrayContaining(['parent/**', 'shared/**']))

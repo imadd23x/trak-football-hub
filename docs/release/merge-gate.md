@@ -121,8 +121,12 @@ approve its own baseline changes.
 The focused governance change supplies and tests this evaluator. The separate
 [consent/privacy gate](consent-audit.md) now executes its 27 named assertions
 against exact candidate migrations with a measured, proposed debt baseline.
-Feedback/storage and roster-adoption are still not CI gates. Their historical
-counts come from different revisions and engines. Integrate actual runners
+The [roster-adoption gate](../reviews/roster-audit-gate-2026-09-18.md) executes
+21 named assertions with zero accepted debt. Both jobs and their explicit
+production success prerequisites are combined in this fork candidate; canonical
+integration and protection activation are not established by these files.
+Feedback/storage remains dependent on its unmerged feature. Its historical
+counts come from different revisions and engines. Integrate its actual runners
 separately, rerun the exact candidate, preserve
 feedback's native PostgreSQL concurrency test, and repair weak controls before
 accepting a baseline. A missing feedback schema is a dependency, not expected
@@ -136,8 +140,8 @@ that protection is enabled. The September 18 check reported Imad has repository
 write access, not administration. Do not activate or relax settings without
 explicit authorization. An authorized administrator should:
 
-1. Confirm this policy and workflow are on main, **test**, **Merge policy** and
-   **Consent privacy audit**
+1. Confirm this policy and workflow are on main, **test**, **Merge policy**,
+   **Consent privacy audit** and **Roster adoption audit**
    have reported on a fresh PR, and each listed CODEOWNER has repository write
    access. All ownership areas include alternates so authors can obtain review.
    The old check **Base branch still reaches main** is renamed **Merge policy**;

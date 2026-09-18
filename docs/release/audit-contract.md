@@ -1,6 +1,6 @@
 # Explicit audit debt contract
 
-The evaluator at [`scripts/governance/audit-ratchet.mjs`](../../scripts/governance/audit-ratchet.mjs) compares named assertions, not failure counts. The original governance change supplied the contract, CLI and synthetic evaluator tests. The separate [consent/privacy integration](consent-audit.md) now supplies one measured, proposed baseline and its real SQL gate. Roster adoption and feedback remain separate work; neither this evaluator nor an unchanged-debt result establishes pilot readiness.
+The evaluator at [`scripts/governance/audit-ratchet.mjs`](../../scripts/governance/audit-ratchet.mjs) compares named assertions, not failure counts. The original governance change supplied the contract, CLI and synthetic evaluator tests. This fork integration combines the [consent/privacy gate](consent-audit.md) and [roster gate](../reviews/roster-audit-gate-2026-09-18.md), each with independently pinned inputs and a measured proposed baseline. Feedback remains separate work; neither this evaluator nor an unchanged-debt result establishes pilot readiness.
 
 ## Trust boundary
 

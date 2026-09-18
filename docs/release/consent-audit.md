@@ -115,9 +115,10 @@ approval, multi-guardian rules, real notice wording, or admission readiness.
 
 The separate `shared/roster-audit-gate` branch at `b0e3ef9` repairs the roster
 controls and verifies 21 assertions, including seven controls, with deliberate
-runner mutations. Its integration is still pending. Preserve both audit jobs,
-required check names and explicit production success conditions when combining
-the branches. FS7/FS8 require the unmerged T2 contract and FS8's native
+runner mutations. Both audit branches are now combined in the local `shared/audit-gates-integration`
+candidate, preserving both jobs, required check names and explicit production
+success conditions. Canonical integration and hosted protection remain pending;
+see the [combined evidence](../reviews/audit-gates-integration-2026-09-18.md). FS7/FS8 require the unmerged T2 contract and FS8's native
 concurrency runner. Neither other suite is represented as
 passing, skipped or accepted-debt suites in this gate. Integrate them separately
 under the [audit contract](audit-contract.md). Rollback removes this new job and

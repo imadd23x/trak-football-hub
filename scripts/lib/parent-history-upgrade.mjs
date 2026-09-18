@@ -23,7 +23,18 @@ export async function parentHistoryUpgradeOrder(root, candidateFiles) {
     const actual = await readFile(resolve(root, 'supabase/migrations', file), 'utf8');
     if (actual !== expected) throw new Error(`Changed main migration: ${file}`);
   }
-  return [...mainFiles, historyMigration];
+  // Preserve the known PR35-before-PR33 deployment inversion as well as the
+  // complete pinned inventory. A separate parent-upgrade run that applies
+  // history before newer main migrations does not cover this combined order.
+  const parent = '20260917205027_secure_parent_invites.sql';
+  const reports = '20260918070209_restrict_pilot_operational_views.sql';
+  if (!mainFiles.includes(parent) || !mainFiles.includes(reports)) {
+    throw new Error('Pinned main is missing the parent/report upgrade boundary');
+  }
+  const mainOrder = [...mainFiles];
+  mainOrder.splice(mainOrder.indexOf(parent), 1);
+  mainOrder.splice(mainOrder.indexOf(reports) + 1, 0, parent);
+  return [...mainOrder, historyMigration];
 }
 
 export function requireHistoryUpgradeSuiteOutput(suite, result) {

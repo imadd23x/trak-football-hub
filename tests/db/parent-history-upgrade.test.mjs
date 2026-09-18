@@ -46,7 +46,13 @@ test('pinned main inventory precedes history, and unexpected historical changes 
       .trim().split('\n').filter(name => name.endsWith('.sql')).sort();
     const order = await parentHistoryUpgradeOrder(dir, files);
     assert.equal(mainFiles.length, 62);
-    assert.deepEqual(order.slice(0, 62), mainFiles);
+    const expectedMain = [...mainFiles];
+    const parent = '20260917205027_secure_parent_invites.sql';
+    const reports = '20260918070209_restrict_pilot_operational_views.sql';
+    expectedMain.splice(expectedMain.indexOf(parent), 1);
+    expectedMain.splice(expectedMain.indexOf(reports) + 1, 0, parent);
+    assert.deepEqual(order.slice(0, 62), expectedMain);
+    assert.ok(order.indexOf(reports) < order.indexOf(parent));
     assert.equal(order[62], historyMigration);
     assert.equal(order.length, 63);
     await assert.rejects(parentHistoryUpgradeOrder(dir, files.filter(name => name !== mainFiles[0])), /Missing main migration/);

@@ -18,7 +18,7 @@ The parent client currently reads matches with one unbounded request. A syntheti
 
 Run source tests, harness tests, type checking, lint, production build, both migration replay orders, native PostgreSQL role tests and bounded-page query plans, and the parent browser journeys. Use only disposable local databases and synthetic browser HTTP responses. Record failures and observed limits below; local timings do not establish hosted capacity.
 
-Commit and push only to `imadd23x/trak-football-hub` on `parent/P3-match-history`. Existing review heads remain unchanged. Human review and explicit production authorization precede any canonical merge or deployment. Deploy the additive migration before the frontend; verify the two read RPCs, Home totals, an older page and Alerts under an authorized synthetic parent in the target environment when approved.
+Commit and push only to `imadd23x/trak-football-hub`; the current review branch is `parent/P3-history-current`, preserving the original `parent/P3-match-history` evidence. Human review and explicit production authorization precede any canonical merge or deployment. Deploy the additive migration before the frontend; verify the two read RPCs, Home totals, an older page and Alerts under an authorized synthetic parent in the target environment when approved.
 
 Rollback the frontend to the prior release if needed; the unused additive functions/index can remain until a reviewed cleanup migration. Do not weaken RLS or change consent rules to resolve rollout failures.
 
@@ -48,3 +48,115 @@ An initial coalesced cursor expression was correct but PostgreSQL could not use 
 Pages are live reads, not a frozen snapshot: later edits to a match's sorting fields can move it, and deletions can empty a later page. The UI retains Previous navigation and does not claim the child has no history. Newer inserts do not shift an existing cursor. Home summaries are independent queries and can briefly differ from a concurrently changing page. The app retains already visited pages in its identity-scoped query cache but renders only one page.
 
 P2 consent, feedback review findings, pending player checks, deployment approval and hosted role-journey verification remain separate readiness gates. Existing #32/#33/#39 review heads remain unchanged; this branch has no new PR.
+
+## Current-main integration — 17:03 Dubai, September 18
+
+Merge `e17dc16` incorporates the subsequently merged player and truthful-Settings
+work from current main without conflicts or manual application-code resolution.
+The original parent history implementation and migration are unchanged. The
+family browser test now locates the current **Account settings** entry while
+still verifying both linked children; this is the same selector correction
+already isolated in the S4 candidate, not a change to the product.
+
+Fresh checks on the integrated branch:
+
+- Source and harness: **347 tests pass across 30 files**.
+- TypeScript and production build pass. Lint: **0 errors / 134 existing
+  warnings**. The existing large-chunk build warning remains.
+- Fresh and deployed-report-first migration orders: **60 migrations** replay,
+  parent invitation checks pass, **282 report assertions** and **81 parent
+  history assertions** pass in each disposable run.
+- Built-app browser: **6/6 journeys pass in 17.0 seconds**, including 1,001
+  matches across 21 pages, correct full totals, retry without skipping a page,
+  backfilled activity, child switching, a second invitation and reload.
+  External requests are intercepted with synthetic responses; no hosted account
+  or email was used.
+- Use-case gate still exits zero with **2 enforced cases**, but reports **3
+  pending UC-A02 failures** and **15 pending cases without tests**. It is not an
+  all-role acceptance pass.
+- Independent integration review found no lost parent/auth/Settings changes.
+  The native PostgreSQL and PostgREST evidence above belongs to the original
+  unchanged history implementation; those runs were not repeated for this
+  frontend integration.
+
+This is a separate fork review candidate. S4 event/queue and view-inventory
+repairs remain their own branches. The calendar migration/caller and feedback
+blockers still prevent treating a green parent branch as a production release.
+
+## Pinned-main refresh — September 18, 2026
+
+`parent/P3-history-current` starts at `a1e5339`, merges canonical main
+`00910940f596d9fe9a7cd416dc741943d1df2cc9` (`960a83c`), then merges the retained
+coach-history fix `01304a4f26d6c79c7b9be9511463a17ef9382f0e` from #49 (`6febc81`).
+Both merges were automatic. Nullable author projections, null-ID filtering,
+neutral attribution and genuine name-query failure/retry behavior are retained.
+The history migration and all existing SQL suites are byte-identical to the
+reviewed history candidate. No new feature or migration SQL was written.
+
+The added opt-in `--parent-history-upgrade-review` mode validates all 62 migration
+files against immutable Git blobs at main `0091094`, applies those first while
+preserving the known report-before-P1 deployment inversion, checks
+that history RPCs are still absent, then applies the pending
+`20260918112323_parent_match_history.sql` as migration 63. It rejects changed or
+missing main migrations and unexpected additional versions. This is a pinned
+canonical-main schema replay; it is not itself proof of the hosted migration
+inventory. Existing default and P1/report upgrade modes remain available.
+
+CI now runs five Node tests for this mode with full Git history available. The
+tests execute the real in-memory CLI and role suites; temporary copies prove
+that a missing history completion report and a deliberate failing history
+assertion both produce exit 1. Missing/incomplete reports cannot masquerade as
+success. Every temporary fixture is disposable and is removed afterward.
+
+Final review found the first version of the pinned-main helper used filename
+order within main. The separate P1 upgrade mode covered reports-before-P1 but
+placed the history migration before newer main migrations. A regression first
+failed against that helper, then passed after combining both requirements in
+one order: all 62 pinned main migrations, reports before P1, then history last.
+All five tests passed again, including the actual CLI and both negative controls.
+This models the known deployment inversion; it does not reconstruct an
+otherwise unrecorded historical application order from the version ledger.
+
+Fresh local results on the refreshed code:
+
+- Source: **372/372**, including **69** focused parent data/family/retained-history
+  tests. The six retained-history tests initially failed because their previous
+  Home fixture lacked the new summary RPC; only that authenticated, child-checked
+  response fixture was added. Original behavior assertions remain intact.
+- New CLI/negative-control/CI-registration tests: **5/5**. Actual CI-condition tests: **8/8**.
+  MSW/use-case harness: **17/17**. Typecheck and production build pass.
+- Lint: **0 errors / 136 warnings**. Existing large build-chunk warning remains.
+- Default, P1/report upgrade and new pinned-main upgrade replays each pass with
+  **63 migrations**, **81 history assertions** and **282 operational-view
+  assertions**. The new mode also requires all **55 P1 assertion results**.
+- Use-case gate exits 0 with **2 enforced cases passing**; pending UC-A02 still
+  has **3 failures**, and **15 pending cases have no tests**.
+- The first browser attempt built successfully but could not bind preview port
+  4189 under the sandbox (`EPERM`). The authorized Chromium rerun passed
+  **6/6 mobile journeys in 17.5 seconds**, including the 1,001-row history,
+  pagination retry and child switching. All backend HTTP remained synthetic.
+
+Commands: `npm test`, `npm run test:harness`, `npm run typecheck`, `npm run lint`,
+`npm run uc:check`, `npm run test:db`,
+`npm run test:db -- --parent-upgrade-review`,
+`npm run test:db -- --parent-history-upgrade-review`, and
+`node --test tests/db/parent-history-upgrade.test.mjs`.
+Local logs use `/private/tmp/trak-history-current-*.log`; the successful browser
+log is `/private/tmp/trak-parent-history-current-browser.log`.
+
+The coordinator's read-only hosted migration-ledger comparison at
+**2026-09-18 16:16:38 UTC** found exactly the 62 versions in main `0091094`:
+`missing_versions=[]`, `extra_versions=[]`. History `20260918112323` and the
+separate academy migration `20260918062345` were absent. This verifies the
+version set only, not SQL statements, live schema bytes, table data or historical
+application order; it supports the selected upgrade starting point.
+
+The pending migration's version is below main's `20260918133800` high-water mark.
+Before production, refresh against then-current main, obtain exact-head CI
+upgrade evidence and the independent human migration-order exception required by
+PR46; an author's acknowledgement or this local pass is insufficient. #49 must
+be delivered or declared as the outstanding dependency. The migration must reach
+the backend before the frontend calls its RPCs. Earlier native PostgreSQL and
+PostgREST results remain historical evidence for the unchanged SQL, not fresh
+hosted or current-refresh runs. No hosted fixtures, real emails, consent-policy
+changes, parked P2 work, production deployment or live-role verification occurred.

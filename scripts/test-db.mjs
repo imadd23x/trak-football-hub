@@ -11,7 +11,7 @@ const securityMigration = '20260917205027_secure_parent_invites.sql';
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 const args = process.argv.slice(2);
 const mode = args[0] ?? '--all';
-const modes = ['--all', '--baseline', '--pilot-views-review', '--pilot-views-baseline', '--parent-upgrade-review'];
+const modes = ['--all', '--baseline', '--pilot-views-review', '--pilot-views-baseline', '--parent-upgrade-review', '--roster-adoption-review'];
 if (args.length > 1 || !modes.includes(mode)) {
   throw new Error(`Usage: node scripts/test-db.mjs [${modes.join(' | ')}]`);
 }
@@ -50,7 +50,10 @@ try {
   console.log(`Replayed ${migrations.length} migrations${baseline || pilotViewsBaseline
     ? ' (vulnerable baseline; security assertions should fail)'
     : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
-  const suites = baseline ? ['parent_invite_security.sql']
+  // Fails by design where T4 is unfixed, so it stays out of the default list
+  // that CI runs.
+  const suites = mode === '--roster-adoption-review' ? ['roster_adoption.sql']
+    : baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
     : ['parent_invite_security.sql', 'pilot_view_security.sql'];
   for (const suite of suites) {

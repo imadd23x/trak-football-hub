@@ -81,6 +81,11 @@ export default function PlayerHome() {
   const [newMatchCount, setNewMatchCount] = useState(0)
   const [coachAssessmentNote, setCoachAssessmentNote] = useState<string | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
+  // T4 — a player whose coach misspelt their name lands on a fresh roster row
+  // with no history, while the coach's row keeps it, linked to nobody. Nothing
+  // errors, so the empty record reads as correct. This asks the database what
+  // actually happened rather than guessing which row was theirs.
+  const [mayHaveMissedHistory, setMayHaveMissedHistory] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
@@ -264,6 +269,20 @@ export default function PlayerHome() {
           <span className="text-[11px] font-medium tracking-[0.14em] uppercase text-white/20"
             style={{ fontFamily: "'DM Mono', monospace" }}>TRAK</span>
         </div>
+
+        {mayHaveMissedHistory && (
+          <div className="rounded-xl border p-4 my-4" role="status"
+            style={{ borderColor: 'rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)' }}>
+            <p className="text-[13px] text-white/88" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+              Is anything missing?
+            </p>
+            <p className="text-[12px] text-white/55 mt-1 leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+              Your coach may already have you on their list under a slightly different
+              spelling. If you've been assessed before and nothing is showing here, ask
+              them to check the name on your record.
+            </p>
+          </div>
+        )}
 
         {consent?.required && (
           <div className="rounded-xl border border-primary/30 bg-primary/10 p-4 my-4">

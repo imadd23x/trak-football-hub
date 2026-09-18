@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "suite": "consent-privacy",
+  "assertions": [
+    {
+      "id": "control.grant-authorizes",
+      "kind": "control",
+      "description": "real grant RPC authorizes the synthetic minor under the existing contract"
+    },
+    {
+      "id": "control.coach-private-note-visible",
+      "kind": "control",
+      "description": "owner coach can read the nonempty private-note fixture"
+    },
+    {
+      "id": "control.child-assessment-visible",
+      "kind": "control",
+      "description": "linked child can read the assessment while its separate private note is protected"
+    },
+    {
+      "id": "CP1.child-private-note-denied",
+      "kind": "check",
+      "description": "linked child cannot SELECT the historical private assessment note"
+    },
+    {
+      "id": "control.parent-assessment-visible",
+      "kind": "control",
+      "description": "linked parent with visibility enabled reads the existing assessment"
+    },
+    {
+      "id": "control.parent-award-visible",
+      "kind": "control",
+      "description": "linked parent with visibility and recognition enabled reads the existing award"
+    },
+    {
+      "id": "control.parent-match-visible",
+      "kind": "control",
+      "description": "linked parent with visibility enabled reads the existing match"
+    },
+    {
+      "id": "control.parent-private-note-denied",
+      "kind": "control",
+      "description": "linked parent cannot SELECT the private assessment note even with visibility enabled"
+    },
+    {
+      "id": "control.unrelated-assessment-denied",
+      "kind": "control",
+      "description": "unrelated parent cannot read the assessment"
+    },
+    {
+      "id": "control.unrelated-award-denied",
+      "kind": "control",
+      "description": "unrelated parent cannot read the award"
+    },
+    {
+      "id": "control.unrelated-match-denied",
+      "kind": "control",
+      "description": "unrelated parent cannot read the match"
+    },
+    {
+      "id": "control.visibility-choice-recorded",
+      "kind": "control",
+      "description": "real grant RPC records parent visibility as false"
+    },
+    {
+      "id": "CP2.visibility-assessment-denied",
+      "kind": "check",
+      "description": "parent_visibility=false denies parent assessment reads"
+    },
+    {
+      "id": "CP2.visibility-award-denied",
+      "kind": "check",
+      "description": "parent_visibility=false denies parent award reads"
+    },
+    {
+      "id": "CP2.visibility-match-denied",
+      "kind": "check",
+      "description": "parent_visibility=false denies parent match reads"
+    },
+    {
+      "id": "control.recognition-choice-recorded",
+      "kind": "control",
+      "description": "real grant RPC records recognition as false"
+    },
+    {
+      "id": "CP4.recognition-insert-denied",
+      "kind": "check",
+      "description": "recognition=false denies the owning coach direct award INSERT"
+    },
+    {
+      "id": "control.unexpected-write-rolled-back",
+      "kind": "control",
+      "description": "an unexpectedly allowed award write is rolled back by the audit helper"
+    },
+    {
+      "id": "control.restored-match-visible",
+      "kind": "control",
+      "description": "all-true approval restores visibility before withdrawal"
+    },
+    {
+      "id": "control.withdraw-one-consent",
+      "kind": "control",
+      "description": "actual sole-guardian withdrawal closes exactly one active consent"
+    },
+    {
+      "id": "control.withdrawal-requires-consent",
+      "kind": "control",
+      "description": "withdrawal makes the existing consent helper require approval again"
+    },
+    {
+      "id": "control.withdrawal-preserves-link",
+      "kind": "control",
+      "description": "withdrawal preserves the identity link and is not confused with unlinking"
+    },
+    {
+      "id": "CP3.withdrawal-assessment-denied",
+      "kind": "check",
+      "description": "sole-guardian withdrawal denies parent assessment reads"
+    },
+    {
+      "id": "CP3.withdrawal-award-denied",
+      "kind": "check",
+      "description": "sole-guardian withdrawal denies parent award reads"
+    },
+    {
+      "id": "CP3.withdrawal-match-denied",
+      "kind": "check",
+      "description": "sole-guardian withdrawal denies parent match reads"
+    },
+    {
+      "id": "control.consent-evidence-retained",
+      "kind": "control",
+      "description": "four actual grant records remain as evidence after supersession and withdrawal"
+    },
+    {
+      "id": "control.development-records-retained",
+      "kind": "control",
+      "description": "read denials are not achieved by deleting the development records"
+    }
+  ]
+}

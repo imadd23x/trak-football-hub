@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "candidateRevision": "e9789c11da81414ab51eb7c697f2610af80c6d4c",
+  "suites": [
+    {
+      "id": "consent-privacy",
+      "sourceRevision": "e9789c11da81414ab51eb7c697f2610af80c6d4c",
+      "runnerRevision": "e9789c11da81414ab51eb7c697f2610af80c6d4c",
+      "inventoryRevision": "e9789c11da81414ab51eb7c697f2610af80c6d4c",
+      "status": "complete",
+      "assertions": [
+        {
+          "id": "CP1.child-private-note-denied",
+          "kind": "check",
+          "detail": "linked child cannot SELECT the historical private assessment note [visible rows=1]",
+          "status": "fail"
+        },
+        {
+          "id": "CP2.visibility-assessment-denied",
+          "kind": "check",
+          "detail": "parent_visibility=false denies parent assessment reads [visible rows=1]",
+          "status": "fail"
+        },
+        {
+          "id": "CP2.visibility-award-denied",
+          "kind": "check",
+          "detail": "parent_visibility=false denies parent award reads [visible rows=1]",
+          "status": "fail"
+        },
+        {
+          "id": "CP2.visibility-match-denied",
+          "kind": "check",
+          "detail": "parent_visibility=false denies parent match reads [visible rows=1]",
+          "status": "fail"
+        },
+        {
+          "id": "CP3.withdrawal-assessment-denied",
+          "kind": "check",
+          "detail": "sole-guardian withdrawal denies parent assessment reads [visible rows=1]",
+          "status": "fail"
+        },
+        {
+          "id": "CP3.withdrawal-award-denied",
+          "kind": "check",
+          "detail": "sole-guardian withdrawal denies parent award reads [visible rows=1]",
+          "status": "fail"
+        },
+        {
+          "id": "CP3.withdrawal-match-denied",
+          "kind": "check",
+          "detail": "sole-guardian withdrawal denies parent match reads [visible rows=1]",
+          "status": "fail"
+        },
+        {
+          "id": "CP4.recognition-insert-denied",
+          "kind": "check",
+          "detail": "recognition=false denies the owning coach direct award INSERT [INSERT succeeded (rolled back)]",
+          "status": "fail"
+        },
+        {
+          "id": "control.child-assessment-visible",
+          "kind": "control",
+          "detail": "linked child can read the assessment while its separate private note is protected",
+          "status": "pass"
+        },
+        {
+          "id": "control.coach-private-note-visible",
+          "kind": "control",
+          "detail": "owner coach can read the nonempty private-note fixture",
+          "status": "pass"
+        },
+        {
+          "id": "control.consent-evidence-retained",
+          "kind": "control",
+          "detail": "four actual grant records remain as evidence after supersession and withdrawal",
+          "status": "pass"
+        },
+        {
+          "id": "control.development-records-retained",
+          "kind": "control",
+          "detail": "read denials are not achieved by deleting the development records",
+          "status": "pass"
+        },
+        {
+          "id": "control.grant-authorizes",
+          "kind": "control",
+          "detail": "real grant RPC authorizes the synthetic minor under the existing contract",
+          "status": "pass"
+        },
+        {
+          "id": "control.parent-assessment-visible",
+          "kind": "control",
+          "detail": "linked parent with visibility enabled reads the existing assessment",
+          "status": "pass"
+        },
+        {
+          "id": "control.parent-award-visible",
+          "kind": "control",
+          "detail": "linked parent with visibility and recognition enabled reads the existing award",
+          "status": "pass"
+        },
+        {
+          "id": "control.parent-match-visible",
+          "kind": "control",
+          "detail": "linked parent with visibility enabled reads the existing match",
+          "status": "pass"
+        },
+        {
+          "id": "control.parent-private-note-denied",
+          "kind": "control",
+          "detail": "linked parent cannot SELECT the private assessment note even with visibility enabled [visible rows=0]",
+          "status": "pass"
+        },
+        {
+          "id": "control.recognition-choice-recorded",
+          "kind": "control",
+          "detail": "real grant RPC records recognition as false",
+          "status": "pass"
+        },
+        {
+          "id": "control.restored-match-visible",
+          "kind": "control",
+          "detail": "all-true approval restores visibility before withdrawal",
+          "status": "pass"
+        },
+        {
+          "id": "control.unexpected-write-rolled-back",
+          "kind": "control",
+          "detail": "an unexpectedly allowed award write is rolled back by the audit helper",
+          "status": "pass"
+        },
+        {
+          "id": "control.unrelated-assessment-denied",
+          "kind": "control",
+          "detail": "unrelated parent cannot read the assessment [visible rows=0]",
+          "status": "pass"
+        },
+        {
+          "id": "control.unrelated-award-denied",
+          "kind": "control",
+          "detail": "unrelated parent cannot read the award [visible rows=0]",
+          "status": "pass"
+        },
+        {
+          "id": "control.unrelated-match-denied",
+          "kind": "control",
+          "detail": "unrelated parent cannot read the match [visible rows=0]",
+          "status": "pass"
+        },
+        {
+          "id": "control.visibility-choice-recorded",
+          "kind": "control",
+          "detail": "real grant RPC records parent visibility as false",
+          "status": "pass"
+        },
+        {
+          "id": "control.withdraw-one-consent",
+          "kind": "control",
+          "detail": "actual sole-guardian withdrawal closes exactly one active consent",
+          "status": "pass"
+        },
+        {
+          "id": "control.withdrawal-preserves-link",
+          "kind": "control",
+          "detail": "withdrawal preserves the identity link and is not confused with unlinking",
+          "status": "pass"
+        },
+        {
+          "id": "control.withdrawal-requires-consent",
+          "kind": "control",
+          "detail": "withdrawal makes the existing consent helper require approval again",
+          "status": "pass"
+        }
+      ]
+    }
+  ]
+}

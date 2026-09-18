@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "consent-privacy",
+      "sourceRevision": "e9789c11da81414ab51eb7c697f2610af80c6d4c",
+      "runnerRevision": "e9789c11da81414ab51eb7c697f2610af80c6d4c",
+      "inventoryRevision": "e9789c11da81414ab51eb7c697f2610af80c6d4c",
+      "assertions": [
+        {
+          "id": "CP1.child-private-note-denied",
+          "kind": "check",
+          "expected": "fail"
+        },
+        {
+          "id": "CP2.visibility-assessment-denied",
+          "kind": "check",
+          "expected": "fail"
+        },
+        {
+          "id": "CP2.visibility-award-denied",
+          "kind": "check",
+          "expected": "fail"
+        },
+        {
+          "id": "CP2.visibility-match-denied",
+          "kind": "check",
+          "expected": "fail"
+        },
+        {
+          "id": "CP3.withdrawal-assessment-denied",
+          "kind": "check",
+          "expected": "fail"
+        },
+        {
+          "id": "CP3.withdrawal-award-denied",
+          "kind": "check",
+          "expected": "fail"
+        },
+        {
+          "id": "CP3.withdrawal-match-denied",
+          "kind": "check",
+          "expected": "fail"
+        },
+        {
+          "id": "CP4.recognition-insert-denied",
+          "kind": "check",
+          "expected": "fail"
+        },
+        {
+          "id": "control.child-assessment-visible",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.coach-private-note-visible",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.consent-evidence-retained",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.development-records-retained",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.grant-authorizes",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.parent-assessment-visible",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.parent-award-visible",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.parent-match-visible",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.parent-private-note-denied",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.recognition-choice-recorded",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.restored-match-visible",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.unexpected-write-rolled-back",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.unrelated-assessment-denied",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.unrelated-award-denied",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.unrelated-match-denied",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.visibility-choice-recorded",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.withdraw-one-consent",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.withdrawal-preserves-link",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "control.withdrawal-requires-consent",
+          "kind": "control",
+          "expected": "pass"
+        }
+      ]
+    }
+  ]
+}

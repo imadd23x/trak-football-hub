@@ -71,7 +71,17 @@ The importable `evaluateAuditReport(baseline, report, candidateRevision)` return
 
 ## Separate real-audit integration
 
-At governance base `00910940f596d9fe9a7cd416dc741943d1df2cc9`, the three reviewed audit files and native feedback runner are absent from main. Copying historical counts into a baseline would therefore certify no execution. The minimum follow-up is:
+At governance base `00910940f596d9fe9a7cd416dc741943d1df2cc9`, the three reviewed audit files and native feedback runner are absent from main. Copying historical counts into a baseline would therefore certify no execution. The numbered requirements below record the original integration contract.
+
+This combined fork candidate completes the consent and roster portions of items
+1, 2, 6 and 7: explicit inventories, real role-aware SQL execution, pinned
+runners/baselines, discrimination tests, step summaries and both deployment
+prerequisites. The measured results are 27 consent assertions (19 passing
+controls and eight named failures) and 21 passing roster assertions. See the
+[hosted integration evidence](../reviews/audit-gates-integration-2026-09-18.md).
+Independent approval of these pins, canonical delivery and protection activation
+remain pending. Feedback portions of items 1 and 7, plus items 3–5, remain open;
+their missing feature/native runner is not an accepted audit failure.
 
 1. **Port unchanged assertions with explicit IDs and machine-readable results.** Preserve strict terminal failure behavior and disposable-database guards. Every result row, including positive controls, needs an explicit stable ID; finding families such as CP2 are not unique IDs because they contain several checks. Do not infer results from aggregate counts, error text alone, or a process exit code. Emit the complete result inventory before a terminal SQL exception/rollback; the trusted adapter must report fixture, migration, parser, timeout and cleanup failures as suite `error`, not expected debt. Test missing/corrupt output as well as observed failures.
 2. **Consent/privacy:** bring the checked-in `supabase/tests/consent_privacy_review.sql` and its opt-in integration runner from reviewed fork history (audit commit `78f771b`). Historical evidence is 8 failed assertions and 19 passing controls, not a proposed current baseline. It uses actual roles and tests existing purpose/withdrawal/private-note behavior; it does not implement academy-specific consent or the parked zero-consent conversion. Re-run against the exact integration candidate and retain all controls before approving its named debt.
@@ -83,4 +93,16 @@ At governance base `00910940f596d9fe9a7cd416dc741943d1df2cc9`, the three reviewe
 
 The recent U7/U8 suite also needs stronger tests before its green result can support an admission gate: its departure RPC failure fell back to manual state changes, and nonexistent-RPC/missing-actor mutations still passed 11/11. These observations justify runner validation; they are not additional production findings or part of this evaluator's synthetic baseline.
 
-Verification for this contract is the Node test command above. It exercises the evaluator and real CLI with temporary local JSON inputs, including unchanged debt, same-count substitutions, baseline reduction/recurrence, wrong revisions, malformed inventories, skipped/error results, failed controls, duplicates, and summary failures. Rollback removes these three contract/test/document files; no runtime data, application behavior or migration changes are included.
+Verification for the evaluator uses the Node test command above. It exercises
+the real CLI with temporary local JSON inputs, including unchanged debt,
+same-count substitutions, baseline reduction/recurrence, wrong revisions,
+malformed inventories, skipped/error results, failed controls, duplicates and
+summary failures. Integrated runners additionally execute the real SQL and
+their discrimination controls as recorded in the linked evidence.
+
+There are no application or migration changes to roll back. Once the audit
+jobs are active, removing only the evaluator would break both gates. Prefer a
+reviewed forward repair; any authorized rollback must coordinate workflow
+prerequisites and required-check settings and retain the manual release gate.
+It must not expand accepted debt or authorize real-child admission while the
+named privacy failures remain.

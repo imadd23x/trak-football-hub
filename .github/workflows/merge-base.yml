@@ -1,60 +1,87 @@
-name: Merge base
+name: Merge governance
 
-# On 17 September, pull requests #18, #19 and #20 were merged and their code
-# never reached main. They were stacked, and each was merged into its base
-# branch minutes after that base had itself been merged to main. GitHub marks
-# a pull request merged once its commits reach the BASE branch — they did —
-# but that base was no longer on the path to main, so the code went nowhere.
-# Three days of work disappeared behind a green tick and a merged badge, and
-# nothing anywhere reported a problem. What was lost included the consent-gate
-# date-rollover fix and the streaming bug that fed children AI feedback with
-# words missing from the middle.
-#
-# This workflow exists because ci.yml structurally cannot catch it: ci.yml is
-# `pull_request: branches: [main]`, so it does not run at all for a pull
-# request whose base is not main — precisely the case that needs the warning.
-# This one triggers on every base, does nothing else, and finishes in seconds.
-
+# Extends the original non-main-base guard. No production secrets, writes or
+# pull_request_target execution: candidate code runs with a read-only token.
 on:
   pull_request:
     branches: ['**']
+    types: [opened, synchronize, reopened, edited, ready_for_review, closed]
+  pull_request_review:
+    types: [submitted, dismissed, edited]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to recheck against current main
+        required: true
+        type: string
 
 permissions:
   contents: read
+  pull-requests: read
+  actions: read
 
 jobs:
   base-reaches-main:
-    name: Base branch still reaches main
+    name: Merge policy
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.state == 'open'
     runs-on: ubuntu-latest
+    steps:
+      - name: Resolve current candidate and main
+        id: candidate
+        uses: actions/github-script@v7
+        env:
+          REQUESTED_PR: ${{ inputs.pr_number }}
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? Number(process.env.REQUESTED_PR);
+            if (!Number.isSafeInteger(number) || number < 1) throw new Error('Invalid PR number');
+            const args = { owner: context.repo.owner, repo: context.repo.repo };
+            const [{ data: pr }, { data: main }] = await Promise.all([
+              github.rest.pulls.get({ ...args, pull_number: number }),
+              github.rest.repos.getBranch({ ...args, branch: 'main' }),
+            ]);
+            for (const value of [pr.head.sha, main.commit.sha]) {
+              if (!/^[0-9a-f]{40}$/.test(value)) throw new Error('Invalid commit metadata');
+            }
+            if (context.payload.pull_request && context.payload.pull_request.head.sha !== pr.head.sha) {
+              throw new Error('PR head changed since this event; this check cannot certify another revision');
+            }
+            core.setOutput('number', String(number));
+            core.setOutput('head', pr.head.sha);
+            core.setOutput('base', main.commit.sha);
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.candidate.outputs.head }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check dependencies and migration order
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.candidate.outputs.number }}
+          BASE_SHA: ${{ steps.candidate.outputs.base }}
+          HEAD_SHA: ${{ steps.candidate.outputs.head }}
+        run: node scripts/governance/check-pr.mjs --repository "$REPOSITORY" --pr "$PR_NUMBER" --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA"
 
+  delivery:
+    name: Verify merged delivery
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          # Ancestry is the whole question here, so the full history is needed.
+          ref: main
           fetch-depth: 0
-
-      - name: The base branch must still be on the path to main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify actual merge result and changed-file inventory
         env:
-          BASE: ${{ github.base_ref }}
-        run: |
-          set -euo pipefail
-
-          if [ "$BASE" = "main" ]; then
-            echo "Base is main. Merging this pull request puts its commits on main."
-            exit 0
-          fi
-
-          echo "::warning::This pull request targets '$BASE', not main. Merging it moves commits onto '$BASE' only. Nothing reaches main until '$BASE' is itself merged, and GitHub will mark this pull request merged either way."
-
-          if ! git rev-parse --verify --quiet "origin/$BASE" >/dev/null; then
-            echo "::error::Base branch '$BASE' does not exist on the remote. Merging this pull request cannot deliver its commits anywhere. Re-target it onto main."
-            exit 1
-          fi
-
-          if git merge-base --is-ancestor "origin/$BASE" origin/main; then
-            echo "::error::'$BASE' is already fully contained in main and has no commits of its own left. Merging this pull request would put its commits on a branch that is no longer on the path to main, and GitHub would still show it as merged — the code would be silently lost. This is exactly what happened to #18, #19 and #20. Re-target this pull request onto main."
-            exit 1
-          fi
-
-          echo "Base '$BASE' still carries commits that have not reached main, so this stack is intact."
-          echo "Re-target this pull request onto main as soon as '$BASE' merges, or the same failure follows."
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/governance/verify-delivery.mjs --repository "$REPOSITORY" --pr "$PR_NUMBER"

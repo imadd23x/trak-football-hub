@@ -6,7 +6,7 @@ Quick orientation for AI agents and new contributors.
 
 Read [the September 25 pilot plan](docs/pilot-readiness-2026-09-25.md) and [the release gate](docs/release/merge-gate.md) first. `docs/pm/STATE.md` and `docs/features-outstanding.md` are historical, not current readiness evidence. Read the actual route and callers before fixing a component; `CoachQuickMatchLog` is currently unrouted.
 
-Use task branches (`parent/`, `coach/`, `player/`, `shared/`), never main. Announce migrations and shared-file changes in #coding-agent-reviews before editing. Imad coordinates merges; his own PRs require Kostas or Tarek's approval. Never apply development SQL to the shared live Supabase project. Use a disposable local database and new migrations; production deployment follows reviewed merges.
+The [release gate](docs/release/merge-gate.md) is the single source of truth for task branches, coordination, fork-first work, reviews, migration order, audits and production approval. Follow it rather than inferring permission from a green check or a merged badge. The technical guidance below remains applicable.
 
 ## Tech Stack
 

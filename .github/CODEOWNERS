@@ -1,0 +1,23 @@
+# Routing uses repository paths, not task-branch names. Every area has an
+# alternate reviewer; the author cannot approve their own PR. Enforcement
+# requires the separately activated branch-protection configuration.
+* @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/src/pages/parent/ @imadd23x @t-bones29
+/src/components/parent/ @imadd23x @t-bones29
+/src/contexts/Parent* @imadd23x @t-bones29
+/src/lib/parent* @imadd23x @t-bones29
+/src/pages/player/ @t-bones29 @imadd23x
+/src/components/player/ @t-bones29 @imadd23x
+/src/pages/coach/ @kostasanastasioubusiness-lang @imadd23x
+/src/components/coach/ @kostasanastasioubusiness-lang @imadd23x
+/supabase/migrations/ @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/supabase/functions/ @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/src/contexts/AuthContext.tsx @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/.github/ @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/scripts/ @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/tests/governance/ @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/docs/release/ @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/AGENTS.md @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/CLAUDE.md @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/package.json @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/package-lock.json @imadd23x @kostasanastasioubusiness-lang @t-bones29

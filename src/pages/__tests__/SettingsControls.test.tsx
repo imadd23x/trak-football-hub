@@ -21,6 +21,13 @@ vi.mock('@/contexts/AuthContext', () => ({
     refreshProfile: vi.fn(),
   }),
 }))
+vi.mock('@/lib/settings-account', async () => {
+  const { supabase } = await import('@/integrations/supabase/client')
+  return {
+    getSettingsAccount: async (id: string) => ({ user: { id, email: 'settings@example.test' }, client: supabase }),
+    assertSettingsAccount: async () => undefined,
+  }
+})
 vi.mock('@/components/parent/ParentConnections', () => ({
   ParentConnections: () => <p>Linked children component</p>,
 }))
@@ -102,7 +109,7 @@ describe('settings controls reflect supported behavior', () => {
       expect(new URL(request.url).searchParams.get('user_id')).toBe('eq.settings-user')
       requests.push(await request.json())
       return fail ? HttpResponse.json({ message: 'Temporarily unavailable' }, { status: 503 })
-        : new HttpResponse(null, { status: 204 })
+        : HttpResponse.json({ user_id: 'settings-user', full_name: 'Revised Name' })
     }))
     mount()
     fireEvent.click(screen.getByRole('button', { name: 'Settings User' }))

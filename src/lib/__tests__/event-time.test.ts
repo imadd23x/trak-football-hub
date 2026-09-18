@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toInstant, localParts, isTimeTBC, normalizeInstant, calendarFields, displayEventTime } from '../event-time'
+import { toInstant, localParts, isTimeTBC, normalizeInstant, calendarFields, calendarFieldsFromInstant, displayEventTime } from '../event-time'
 
 describe('event time round-trip', () => {
   it('gives back the wall clock the coach typed, whatever zone the run is in', () => {
@@ -192,5 +192,33 @@ describe('calendar columns (PR41 contract)', () => {
   it('reports an untimed legacy row as TBC', () => {
     const iso = toInstant('2026-03-01', null)!
     expect(displayEventTime({ starts_at: iso }).time).toBeNull()
+  })
+})
+
+describe('calendarFieldsFromInstant — the importer path (Imad, PR42 review)', () => {
+  it('derives the calendar day and wall clock from an instant', () => {
+    const iso = toInstant('2026-03-01', '18:00')!
+    expect(calendarFieldsFromInstant(iso)).toEqual({
+      event_date: '2026-03-01',
+      start_time: '18:00:00',
+    })
+  })
+
+  it('reads midnight as time-unknown, the same rule the backfill uses', () => {
+    const iso = toInstant('2026-03-01', null)!
+    expect(calendarFieldsFromInstant(iso)).toEqual({
+      event_date: '2026-03-01',
+      start_time: null,
+    })
+  })
+
+  it('returns null rather than throwing on no instant', () => {
+    expect(calendarFieldsFromInstant(null)).toBeNull()
+  })
+
+  it('round-trips through displayEventTime', () => {
+    const iso = toInstant('2026-12-31', '23:30')!
+    const cols = calendarFieldsFromInstant(iso)!
+    expect(displayEventTime(cols)).toEqual({ date: '2026-12-31', time: '23:30' })
   })
 })

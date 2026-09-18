@@ -186,3 +186,29 @@ export function displayEventTime(row: {
   }
   return { date: '', time: null }
 }
+
+/**
+ * Derive the calendar columns from an instant, for rows that arrive as a
+ * timestamp rather than as fields a coach typed — the schedule importer.
+ *
+ * Midnight is read as "time not known", which is the same convention
+ * 20260918000001's backfill uses (`NULLIF(…::time, '00:00:00')`), so an
+ * imported row and a backfilled one mean the same thing by the same rule.
+ *
+ * The limitation is real and worth stating: a genuine midnight kick-off
+ * imported from a parsed schedule is indistinguishable from an unknown time.
+ * Only the parser emitting an explicit flag fixes that, which is K8's
+ * `parse-schedule` work, not something a caller can infer.
+ */
+export function calendarFieldsFromInstant(iso: string | null): {
+  event_date: string
+  start_time: string | null
+} | null {
+  if (!iso) return null
+  const parts = localParts(iso)
+  if (!parts.date) return null
+  return {
+    event_date: parts.date,
+    start_time: isTimeTBC(iso) ? null : `${parts.time}:00`,
+  }
+}

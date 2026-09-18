@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Eye, EyeOff, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
-import { toInstant, localParts, normalizeInstant, calendarFields, displayEventTime } from '@/lib/event-time'
+import { toInstant, localParts, normalizeInstant, calendarFields, calendarFieldsFromInstant, displayEventTime } from '@/lib/event-time'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { trackEvent } from '@/lib/telemetry'
@@ -292,6 +292,10 @@ export default function CoachSchedule() {
     const { error } = await supabase.from('coach_calendar_events').insert({
       coach_user_id: user.id,
       title: ev.title, event_type: ev.event_type, starts_at: startsAt,
+      // Imported rows need the calendar columns too. Without this every row
+      // the parser creates lands with them NULL after the one-time backfill,
+      // and keeps the untimed/filter ambiguity the columns exist to remove.
+      ...(calendarFieldsFromInstant(startsAt) ?? {}),
       ends_at: endsAt, venue: ev.venue || null,
       opponent: ev.opponent || null, notes: ev.notes || null,
       published: false, source: 'ai_text',
@@ -332,6 +336,7 @@ export default function CoachSchedule() {
       rows.map(({ ev, startsAt, endsAt }) => ({
         coach_user_id: user.id,
         title: ev.title, event_type: ev.event_type, starts_at: startsAt,
+        ...(calendarFieldsFromInstant(startsAt) ?? {}),
         ends_at: endsAt, venue: ev.venue || null,
         opponent: ev.opponent || null, notes: ev.notes || null,
         published: false, source: 'ai_text',

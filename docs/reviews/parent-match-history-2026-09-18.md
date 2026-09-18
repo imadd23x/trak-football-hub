@@ -21,7 +21,7 @@ The parent client currently reads matches with one unbounded request. A syntheti
 
 Run source tests, harness tests, type checking, lint, production build, both migration replay orders, native PostgreSQL role tests and bounded-page query plans, and the parent browser journeys. Use only disposable local databases and synthetic browser HTTP responses. Record failures and observed limits below; local timings do not establish hosted capacity.
 
-Commit and push only to `imadd23x/trak-football-hub` on `parent/P3-match-history`. Existing review heads remain unchanged. Human review and explicit production authorization precede any canonical merge or deployment. Deploy the additive migration before the frontend; verify the two read RPCs, Home totals, an older page and Alerts under an authorized synthetic parent in the target environment when approved.
+Commit and push only to `imadd23x/trak-football-hub`; the current review branch is `parent/P3-history-current`, preserving the original `parent/P3-match-history` evidence. Human review and explicit production authorization precede any canonical merge or deployment. Deploy the additive migration before the frontend; verify the two read RPCs, Home totals, an older page and Alerts under an authorized synthetic parent in the target environment when approved.
 
 Rollback the frontend to the prior release if needed; the unused additive functions/index can remain until a reviewed cleanup migration. Do not weaken RLS or change consent rules to resolve rollout failures.
 
@@ -97,7 +97,8 @@ The history migration and all existing SQL suites are byte-identical to the
 reviewed history candidate. No new feature or migration SQL was written.
 
 The added opt-in `--parent-history-upgrade-review` mode validates all 62 migration
-files against immutable Git blobs at main `0091094`, applies those first, checks
+files against immutable Git blobs at main `0091094`, applies those first while
+preserving the known report-before-P1 deployment inversion, checks
 that history RPCs are still absent, then applies the pending
 `20260918112323_parent_match_history.sql` as migration 63. It rejects changed or
 missing main migrations and unexpected additional versions. This is a pinned
@@ -109,6 +110,15 @@ tests execute the real in-memory CLI and role suites; temporary copies prove
 that a missing history completion report and a deliberate failing history
 assertion both produce exit 1. Missing/incomplete reports cannot masquerade as
 success. Every temporary fixture is disposable and is removed afterward.
+
+Final review found the first version of the pinned-main helper used filename
+order within main. The separate P1 upgrade mode covered reports-before-P1 but
+placed the history migration before newer main migrations. A regression first
+failed against that helper, then passed after combining both requirements in
+one order: all 62 pinned main migrations, reports before P1, then history last.
+All five tests passed again, including the actual CLI and both negative controls.
+This models the known deployment inversion; it does not reconstruct an
+otherwise unrecorded historical application order from the version ledger.
 
 Fresh local results on the refreshed code:
 

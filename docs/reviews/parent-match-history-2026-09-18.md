@@ -137,10 +137,12 @@ Commands: `npm test`, `npm run test:harness`, `npm run typecheck`, `npm run lint
 Local logs use `/private/tmp/trak-history-current-*.log`; the successful browser
 log is `/private/tmp/trak-parent-history-current-browser.log`.
 
-The coordinator's read-only hosted migration-ledger check on September 18
-returned 62 applied versions through `20260918133800`, with the pending history
-version absent. This supports the selected upgrade starting point; it does not
-verify live schema bytes, table data or the historical order of application.
+The coordinator's read-only hosted migration-ledger comparison at
+**2026-09-18 16:16:38 UTC** found exactly the 62 versions in main `0091094`:
+`missing_versions=[]`, `extra_versions=[]`. History `20260918112323` and the
+separate academy migration `20260918062345` were absent. This verifies the
+version set only, not SQL statements, live schema bytes, table data or historical
+application order; it supports the selected upgrade starting point.
 
 The pending migration's version is below main's `20260918133800` high-water mark.
 Before production, refresh against then-current main, obtain exact-head CI

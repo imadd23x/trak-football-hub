@@ -1,3 +1,4 @@
+-- @trak-suite mode=--account-deletion-review in-all=false
 -- U10 — account deletion, for all four roles, on a disposable database.
 --
 -- Synthetic fixtures only. Run after real migrations in a disposable database.

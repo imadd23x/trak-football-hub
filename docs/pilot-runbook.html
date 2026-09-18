@@ -356,7 +356,7 @@ GROUP BY 1, 2 ORDER BY 1;</code></pre>
           <li><span class="who-tag">F</span> Decide UC-05 / UC-12: restore or cut, then rewrite the demo script</li>
           <li><span class="who-tag">F</span> Parental consent wording, DPA with the academy, named data owner — <b>before any child's data exists</b></li>
           <li><span class="who-tag">F</span> Test the deletion path end to end on a throwaway account</li>
-          <li><span class="who-tag">F</span> Seed the throwaway academy: <code>node seed-pilot-rehearsal.mjs</code> — 2 squads, 30 players, 6 weeks of fixtures, matches and assessments, so every <code>pilot_*</code> view returns a real number</li>
+          <li><span class="who-tag">F</span> Preview the synthetic UAE/Greece manifest: <code>npm run demo:plan -- --as-of 2026-09-25</code>. Applying it is a separate reviewed operation; follow <a href="demo-data.md">the current demo guide</a>. Seeded history is not real pilot activity, and telemetry remains empty</li>
           <li><span class="who-tag">F</span> Rehearse all fourteen use cases against it, then <code>SELECT * FROM pilot_scorecard;</code> and confirm nothing is blank that should not be</li>
           <li><span class="who-tag">F</span><span class="who-tag">D</span> Agree the WhatsApp nudge cadence <b>and who sends it</b></li>
         </ul>

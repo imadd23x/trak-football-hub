@@ -44,6 +44,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Deterministic synthetic demo regressions
+        run: npm run test:demo
+
       - name: Database security regressions
         run: npm run test:db
 

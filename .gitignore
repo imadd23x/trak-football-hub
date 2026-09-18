@@ -47,3 +47,6 @@ supabase/.temp/
 # Vercel CLI
 .vercel
 .env*
+
+# Private synthetic demo passwords and local operator locks
+.local/trak-demo-seed/

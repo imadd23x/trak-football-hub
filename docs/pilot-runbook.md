@@ -69,15 +69,19 @@ Negative `avg_bias` means the engine bands **lower** than the coach. A consisten
 
 ## Rehearsal data
 
-```bash
-node seed-pilot-rehearsal.mjs
+The old seed/purge scripts are retired. Use the [synthetic demo guide](demo-data.md):
+
+```sh
+npm run demo:plan -- --as-of 2026-09-25
+npm run test:demo
 ```
 
-Two squads, ~30 players, six weeks of fixtures, matches, assessments and awards under
-`@rehearsal.trak.dev` / "Rehearsal FC". Reset with `--purge`.
-
-`telemetry_events` stays **empty** after seeding — it is written by the app, not the script. That
-is deliberate: metrics 4, 6 and 7 stay blank until you click through the smoke test below.
+Planning is read-only and does not contact Supabase. Applying is a separate,
+explicit-target operation after review. Two synthetic UAE/Greece academies and
+all four roles are included. No consent, private feedback, AI publication,
+telemetry or global pilot configuration is seeded. Do not count fixtures as
+real pilot usage. Use the [current readiness plan](pilot-readiness-2026-09-25.md)
+for admission gates; the older HTML documents are historical references.
 
 ## Smoke test — the gate on week 0
 

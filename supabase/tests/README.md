@@ -24,7 +24,7 @@ Academy orphan-backfill fixtures run immediately before and after the repair mig
 
 ## Native PostgreSQL 17
 
-`npm run test:db:native` repeats the full migration/backfill replay and both suites on PostgreSQL 17 using `initdb`, `pg_ctl` and `psql`. Install PostgreSQL 17 first; the macOS default binary directory is `/opt/homebrew/opt/postgresql@17/bin`. Set `TRAK_TEST_PG_BIN` to another absolute PostgreSQL 17 binary directory when needed. The current runner uses macOS's `/private/tmp` and is a local verification target; CI runs PGlite SQL and the portable runner safeguard tests.
+`npm run test:db:native` repeats the full migration/backfill replay and both suites on PostgreSQL 17 using `initdb`, `pg_ctl` and `psql`. Install PostgreSQL 17 first; the macOS default binary directory is `/opt/homebrew/opt/postgresql@17/bin`. Set `TRAK_TEST_PG_BIN` to another absolute PostgreSQL 17 binary directory when needed. The runner uses `/private/tmp` on macOS and `/tmp` on Linux. CI installs PostgreSQL 17 on Ubuntu 24.04 from the [official PostgreSQL Apt repository](https://www.postgresql.org/download/linux/ubuntu/), then requires the full native replay and concurrent-linking assertions in addition to PGlite and runner safeguard tests.
 
 The runner creates its own private cluster and Unix socket, disables TCP, clears inherited database credentials/settings, and never uses Homebrew's default cluster or a linked Supabase project. It stops and removes its own cluster on success or failure; if shutdown cannot be confirmed it retains the directory and reports failure. Never point this harness at a real database. It accepts no database URL.
 

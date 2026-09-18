@@ -105,17 +105,19 @@ Until those gates pass, use synthetic squads only. Real-academy names, cohort ag
 
 Wrong-child or cross-academy access, unauthorized feedback publication, loss of saved records, and failures of a required role journey block admission. If found after a cohort starts, pause the affected flow/admission and follow the reviewed incident and release process; record the failed expectation, affected scope and verification of the repair. A passing build or test count alone cannot waive a failed gate.
 
-## Evidence checkpoint — September 18
+## Evidence checkpoint — September 18, 16:30 Dubai
 
 The following separates code/review evidence from production evidence. Each row is a dated checkpoint, not a standing claim that all four roles work.
 
 | Work | Evidence / release boundary |
 |---|---|
 | PR35 operational-report access | Merged as `09d22d4`; [production workflow 35332878336](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/actions/runs/35332878336) passed. Its recorded live checks cover the 12 reporting views and sign-in rendering, not all-role acceptance |
-| Parent invitations/onboarding | [PR33](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/33), reviewed candidate `5a14efe`; fork/upstream CI and local regressions pass, human review and production role journeys remain outstanding |
-| Parent settings and family screens | [PR32](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/32) `852c60f` and [PR39](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/39) `e9fbad3`; tested candidates, not deployed completion claims |
+| Parent invitations/onboarding, settings and family screens | PR33, PR32 and PR39 are now merged into main `b9adf1c`, along with PR30/31. [Main run 35343003639](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/actions/runs/35343003639) failed the family browser test on its obsolete Settings label; Supabase and Vercel jobs skipped. Merged does not mean deployed or live-verified |
+| Current integration repair | Fork candidate `cae7471` repairs that locator and the task-branch Vercel event guard on current main. Its [verification record](https://github.com/imadd23x/trak-football-hub/blob/cae7471b5d5b6487eefc21dd8cc4afa3efb37561/docs/reviews/task-branch-preview-guard-2026-09-18.md) records 309 source/harness tests, parent/report SQL and five local browser journeys passing. Production approval/review and coordinated calendar release remain outstanding |
+| Backend/frontend release boundary | Read-only Supabase history records parent migration `20260917205027`. The recent PR30 run failed history validation before applying SQL, PR31/32/33 runs had no jobs, and PR39 skipped deploys. These runs do not identify who applied that migration or verify its exact SQL. PR35 remains the last fully verified CI deployment; do not describe all current backend state as unchanged since then |
 | Parent complete match history | Fork commit `484ad20`, [verification record](https://github.com/imadd23x/trak-football-hub/blob/484ad200df40381dbaffbc64aeaa23c6b4dc635b/docs/reviews/parent-match-history-2026-09-18.md); tests and fork CI pass, no PR/production rollout yet |
 | Coach-approved feedback and parent P4 | [PR40 review at `8a6a58c`](https://github.com/imadd23x/trak-football-hub/blob/5e71cafeb91028e354c5b4b817da323fc7e97b7b/docs/reviews/feedback-current-head-2026-09-18.md) retains failing runtime/storage regressions. Parent shared feedback depends on the repaired contract and P2 |
+| Calendar release | PR41 adds date/time columns, but current CoachSchedule/PlayerHome/parser consumers still require coordinated repair. Do not unblock production solely because the parent locator is fixed; the schema/backfill and legacy/new timed/untimed behavior need joint verification |
 | Real-child admission | Not cleared: effective under-18 academy-specific consent/purpose enforcement, multiple-guardian withdrawal precedence, reviewed notices/agreement, restore proof and live phone/email journeys remain open |
 
 The separately parked consent-test conversion is deferred, not evidence that P2 is complete. Do not count review-only failing audits as green tests. Keep source edits, peer approval, merge, deployment and observable verification as separate stages in each release record.

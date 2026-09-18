@@ -47,6 +47,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Consent calendar timezones
+        run: npm run test:consent-timezones
+
       - name: Database security regressions
         run: npm run test:db
 

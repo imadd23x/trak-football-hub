@@ -45,7 +45,7 @@ const CoachHome = () => {
               {profile.full_name} · {coachDetails?.current_club || '—'}
             </p>
           </div>
-          <button onClick={signOut} className="text-xs text-muted-foreground border border-border rounded-lg px-3 py-1.5 hover:text-foreground transition-colors">
+          <button onClick={() => signOut()} className="text-xs text-muted-foreground border border-border rounded-lg px-3 py-1.5 hover:text-foreground transition-colors">
             Switch Account
           </button>
         </div>

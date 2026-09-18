@@ -103,8 +103,9 @@ CI wiring and the proposed branch-protection file add **Consent privacy audit**
 as a separate required check. Supabase and Deploy explicitly require its
 successful result, including Deploy's `always()` path. Nothing here activates
 hosted protection: an authorized administrator must apply and read back the
-configuration after this workflow reports on a fresh PR. The branch is prepared
-locally; local passing tests are not proof of hosted CI or enforcement.
+configuration after this workflow reports on a fresh PR. Fork CI at `2045b25`
+[passed the actual audit](https://github.com/imadd23x/trak-football-hub/actions/runs/35358713512),
+but that does not establish canonical integration or active hosted protection.
 
 This is a fresh-install SQL replay using the pinned PGlite dependency and the
 existing minimal Supabase test bootstrap, not hosted Auth/PostgREST or native
@@ -112,8 +113,12 @@ PostgreSQL concurrency verification. Existing ordinary security and upgrade
 tests remain wired separately. It does not prove under-18 academy-specific
 approval, multi-guardian rules, real notice wording, or admission readiness.
 
-Roster-adoption controls still need repair; FS7/FS8 require the unmerged T2
-contract and FS8's native concurrency runner. They are not represented as
+The separate `shared/roster-audit-gate` branch at `b0e3ef9` repairs the roster
+controls and verifies 21 assertions, including seven controls, with deliberate
+runner mutations. Its integration is still pending. Preserve both audit jobs,
+required check names and explicit production success conditions when combining
+the branches. FS7/FS8 require the unmerged T2 contract and FS8's native
+concurrency runner. Neither other suite is represented as
 passing, skipped or accepted-debt suites in this gate. Integrate them separately
 under the [audit contract](audit-contract.md). Rollback removes this new job and
 its proposed required check together; it must not silently relax audit debt or

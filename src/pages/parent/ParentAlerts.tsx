@@ -24,7 +24,11 @@ export default function ParentAlerts() {
   const hasError = matches.isError || development.isError
   const loading = matches.isPending || development.isPending
   const alerts: ParentAlert[] = [
-    ...(matches.data ?? []).slice(0, 20).map(match => ({
+    // Activity is ordered by when it was recorded, including backfilled games.
+    // Copy first: the shared query cache remains in match-date order.
+    ...[...(matches.data ?? [])]
+      .sort((a, b) => (Date.parse(b.created_at ?? '') || 0) - (Date.parse(a.created_at ?? '') || 0))
+      .slice(0, 20).map(match => ({
       id: `match-${match.id}`, title: 'Match logged', date: match.created_at,
       description: `vs ${match.opponent || match.competition || 'Unknown'}${match.team_score != null && match.opponent_score != null ? ` · ${match.team_score}–${match.opponent_score}` : ''}`,
     })),

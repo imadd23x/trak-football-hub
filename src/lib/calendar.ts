@@ -22,3 +22,21 @@ export function isRealCalendarDate(year: number, month: number, day: number): bo
   if (day < 1) return false
   return day <= daysInMonth(year, month)
 }
+
+/**
+ * Parse a value for display as a calendar date.
+ *
+ * `new Date('2026-03-01')` is UTC midnight, so west of Greenwich it renders as
+ * 28 February — a match card showing the day before the match. A date-only
+ * string has no timezone and should be read as the local calendar day it
+ * names; anything carrying a time is a real instant and is left alone.
+ */
+export function parseDisplayDate(value: string | null | undefined): Date | null {
+  if (!value) return null
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
+  if (dateOnly) {
+    return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+  }
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}

@@ -8,48 +8,11 @@ import { ParentConnections } from '@/components/parent/ParentConnections'
 import { supabase } from '@/integrations/supabase/client'
 import { POSITIONS, COACH_ROLES, AGE_GROUPS } from '@/lib/constants'
 
-type PassportVisibility = 'coach_only' | 'link'
-
 const nameSchema = z
   .string()
   .trim()
   .min(2, { message: 'Name is too short' })
   .max(80, { message: 'Name must be under 80 characters' })
-
-const STORAGE_KEY = 'trak.settings.v1'
-
-interface LocalSettings {
-  // Player
-  notifyMatchUpdates: boolean
-  notifyCoachFeedback: boolean
-  // Coach
-  notifySquadUpdates: boolean
-  notifyMeetingRequests: boolean
-  // Parent
-  notifyChildMatchUpdates: boolean
-  notifyChildCoachFeedback: boolean
-  passportVisibility: PassportVisibility
-}
-
-const DEFAULTS: LocalSettings = {
-  notifyMatchUpdates: true,
-  notifyCoachFeedback: true,
-  notifySquadUpdates: true,
-  notifyMeetingRequests: true,
-  notifyChildMatchUpdates: true,
-  notifyChildCoachFeedback: true,
-  passportVisibility: 'coach_only',
-}
-
-function loadLocal(): LocalSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULTS
-    return { ...DEFAULTS, ...JSON.parse(raw) }
-  } catch {
-    return DEFAULTS
-  }
-}
 
 export default function Settings() {
   const navigate = useNavigate()
@@ -58,7 +21,6 @@ export default function Settings() {
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [saving, setSaving] = useState(false)
-  const [settings, setSettings] = useState<LocalSettings>(loadLocal)
 
   // Avatar
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -129,11 +91,6 @@ export default function Settings() {
     }
   }, [user, profile])
 
-  const persist = (next: LocalSettings) => {
-    setSettings(next)
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
-  }
-
   const saveName = async () => {
     if (!user || !profile) return
     const parsed = nameSchema.safeParse(nameDraft)
@@ -188,7 +145,7 @@ export default function Settings() {
 
   const deleteAccount = async () => {
     const confirmed = window.confirm(
-      'This permanently deletes all your data and cannot be undone. Are you sure?'
+      'Delete your account? Your sign-in and profile will be removed. Some academy history and consent records may be retained. This cannot be undone.'
     )
     if (!confirmed) return
 
@@ -452,72 +409,6 @@ export default function Settings() {
           </Section>
         )}
 
-        {/* Notifications */}
-        <Section label="Notifications">
-          {role === 'player' && (
-            <>
-              <ToggleRow
-                label="Match updates"
-                value={settings.notifyMatchUpdates}
-                onChange={v => persist({ ...settings, notifyMatchUpdates: v })}
-              />
-              <ToggleRow
-                label="Coach feedback"
-                value={settings.notifyCoachFeedback}
-                onChange={v => persist({ ...settings, notifyCoachFeedback: v })}
-              />
-            </>
-          )}
-          {role === 'coach' && (
-            <>
-              <ToggleRow
-                label="Squad updates"
-                value={settings.notifySquadUpdates}
-                onChange={v => persist({ ...settings, notifySquadUpdates: v })}
-              />
-              <ToggleRow
-                label="Meeting requests"
-                value={settings.notifyMeetingRequests}
-                onChange={v => persist({ ...settings, notifyMeetingRequests: v })}
-              />
-            </>
-          )}
-          {role === 'parent' && (
-            <>
-              <ToggleRow
-                label="Match updates"
-                value={settings.notifyChildMatchUpdates}
-                onChange={v => persist({ ...settings, notifyChildMatchUpdates: v })}
-              />
-              <ToggleRow
-                label="Coach feedback"
-                value={settings.notifyChildCoachFeedback}
-                onChange={v => persist({ ...settings, notifyChildCoachFeedback: v })}
-              />
-            </>
-          )}
-        </Section>
-
-        {/* Privacy — player only */}
-        {role === 'player' && (
-          <Section label="Privacy">
-            <Row
-              label="Who can see my passport"
-              right={
-                <Segmented
-                  value={settings.passportVisibility}
-                  options={[
-                    { value: 'coach_only', label: 'Coach only' },
-                    { value: 'link', label: 'Anyone with link' },
-                  ]}
-                  onChange={v => persist({ ...settings, passportVisibility: v as PassportVisibility })}
-                />
-              }
-              stack
-            />
-          </Section>
-        )}
-
         {/* Sign out */}
         <button
           onClick={async () => {
@@ -613,78 +504,6 @@ function Row({ label, right, stack = false }: { label: string; right: React.Reac
 
 function Value({ children }: { children: React.ReactNode }) {
   return <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>{children}</span>
-}
-
-function ToggleRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <Row
-      label={label}
-      right={
-        <button
-          role="switch"
-          aria-checked={value}
-          onClick={() => onChange(!value)}
-          style={{
-            position: 'relative',
-            width: 38,
-            height: 22,
-            borderRadius: 999,
-            background: value ? '#C8F25A' : 'rgba(255,255,255,0.1)',
-            transition: 'background 150ms ease',
-          }}
-        >
-          <span
-            style={{
-              position: 'absolute',
-              top: 2,
-              left: value ? 18 : 2,
-              width: 18,
-              height: 18,
-              borderRadius: 999,
-              background: value ? '#000' : '#0A0A0B',
-              transition: 'left 150ms ease',
-            }}
-          />
-        </button>
-      }
-    />
-  )
-}
-
-function Segmented({
-  value,
-  options,
-  onChange,
-}: {
-  value: string
-  options: { value: string; label: string }[]
-  onChange: (v: string) => void
-}) {
-  return (
-    <div
-      className="inline-flex p-1 rounded-full"
-      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-    >
-      {options.map(o => {
-        const active = o.value === value
-        return (
-          <button
-            key={o.value}
-            onClick={() => onChange(o.value)}
-            className="px-3 py-1 rounded-full"
-            style={{
-              fontSize: 11,
-              color: active ? '#000' : 'rgba(255,255,255,0.55)',
-              background: active ? '#C8F25A' : 'transparent',
-              transition: 'all 150ms ease',
-            }}
-          >
-            {o.label}
-          </button>
-        )
-      })}
-    </div>
-  )
 }
 
 function ConnectionRow({

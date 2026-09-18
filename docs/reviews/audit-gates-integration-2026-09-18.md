@@ -53,11 +53,16 @@ Audit reports and complete step summaries are local files under
 `/private/tmp/trak-audits-integration-*238221a*`; other check logs use the same
 prefix. No browser rerun or hosted CI is claimed by these local checks.
 
-Reproduce each pinned CLI from the corresponding trusted checkout:
+Reproduce from the current candidate checkout using its actual HEAD. The consent
+runner requires that exact revision and a fresh, unused report path; the temporary
+directory below keeps a new execution separate from recorded evidence. Each runner
+script still comes from its corresponding trusted checkout:
 
 ```sh
-node ../trak-consent-audit-gate/scripts/audits/consent-runner.mjs --candidate-root . --candidate-revision 238221aa7d0f1c95b843d3ec941a295141f16a94 --runner-revision e9789c11da81414ab51eb7c697f2610af80c6d4c --policy-revision 8fcd564ebda05f60b271a4df6d68bed333e1d253 --report /private/tmp/trak-audits-integration-consent-238221a.json
-node ../trak-roster-audit-gate/scripts/audits/roster-adoption.mjs --candidate-root . --candidate-revision 238221aa7d0f1c95b843d3ec941a295141f16a94 --baseline-revision 0b1b039a7b46382a9da4c7fba36da68222365111
+CANDIDATE_SHA="$(git rev-parse HEAD)"
+AUDIT_REPORT_DIR="$(mktemp -d /private/tmp/trak-audit-replay.XXXXXX)"
+node ../trak-consent-audit-gate/scripts/audits/consent-runner.mjs --candidate-root . --candidate-revision "$CANDIDATE_SHA" --runner-revision e9789c11da81414ab51eb7c697f2610af80c6d4c --policy-revision 8fcd564ebda05f60b271a4df6d68bed333e1d253 --report "$AUDIT_REPORT_DIR/consent.json"
+node ../trak-roster-audit-gate/scripts/audits/roster-adoption.mjs --candidate-root . --candidate-revision "$CANDIDATE_SHA" --baseline-revision 0b1b039a7b46382a9da4c7fba36da68222365111
 ```
 
 ## Remaining gates and limits

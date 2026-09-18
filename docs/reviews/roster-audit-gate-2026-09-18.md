@@ -69,8 +69,18 @@ modes both passed with 62 migrations and 282 operational-view assertions.
 Typecheck/build/lint passed; lint retains 136 warnings and build its chunk-size
 warning. `uc:check` exited zero with the existing three pending UC-A02 failures
 visible; that is not a claim that every use case passes. No browser rerun was
-needed for this test-only change. Exact merged-governance rerun evidence will be
-recorded with the final candidate.
+needed for this test-only change.
+
+After merging governance `7a09e24`, source **321/321** and combined governance plus
+runner **87/87** passed. The merge retained exact-blob delivery verification and
+the `release_eligible` output alongside both explicit audit success gates. The
+first combined run found one new workflow-test mock missing the audit dependency;
+the corrected mock now tests failed/cancelled/skipped/missing audit outcomes too.
+Pinned CLI execution on `9bb615765b2bd668060eaab82b44cf2e8362cdd3` passed 21/21 and
+wrote the complete 38-line Step Summary, with zero accepted debt. The final
+baseline checkout pin is `0b1b039a7b46382a9da4c7fba36da68222365111`; runner and
+inventory pins above stay unchanged. These are local results; no fork CI run,
+protection activation, release or hosted verification has occurred here.
 
 ## Limits and unresolved product work
 

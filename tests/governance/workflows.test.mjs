@@ -63,11 +63,12 @@ test('main release verification runs before any production job through the test 
 });
 test('actual production conditions reject superseded or absent eligibility without blocking previews', () => {
   const repository = 'kostasanastasioubusiness-lang/trak-football-hub';
-  function allowed(id, eligibility, { ref = 'refs/heads/main', testResult = 'success', backend = 'success' } = {}) {
+  function allowed(id, eligibility, { ref = 'refs/heads/main', testResult = 'success', backend = 'success', rosterAudit = 'success' } = {}) {
     const job = ci.jobs[id];
     const needs = {
       test: { result: testResult, outputs: { release_eligible: eligibility } },
       supabase: { result: backend },
+      'roster-audit': { result: rosterAudit },
       'vercel-credentials': { result: 'success', outputs: { configured: 'true' } },
     };
     // Jobs without a status function have GitHub's implicit success() gate.
@@ -79,6 +80,9 @@ test('actual production conditions reject superseded or absent eligibility witho
     assert.equal(allowed(id, 'true'), true, `${id}: verified release should deploy`);
     for (const value of ['false', '', undefined]) assert.equal(allowed(id, value), false, `${id}: missing or superseded eligibility must block`);
     assert.equal(allowed(id, 'true', { testResult: 'failure' }), false, `${id}: failed source checks must block`);
+    for (const rosterAudit of ['failure', 'cancelled', 'skipped', null]) {
+      assert.equal(allowed(id, 'true', { rosterAudit }), false, `${id}: unsuccessful roster audit must block`);
+    }
   }
   assert.equal(allowed('deploy', 'true', { backend: 'failure' }), false);
   assert.equal(allowed('deploy', undefined, { ref: 'refs/heads/shared/preview', backend: 'skipped' }), true);

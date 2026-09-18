@@ -17,6 +17,7 @@
     "test:db:runner": "node --test scripts/test-native-db.test.mjs",
     "test:db:concurrency": "node scripts/test-link-concurrency.mjs",
     "test:db:query-plans": "node scripts/test-query-performance.mjs",
+    "test:db:pilot-views": "node scripts/test-db.mjs --pilot-views-review",
     "test:watch": "vitest",
     "test:harness": "vitest run tests/msw tests/support",
     "storybook": "storybook dev -p 6006",

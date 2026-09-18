@@ -162,11 +162,12 @@ export async function runPerformance(args = []) {
       `-c listen_addresses='' -c unix_socket_directories='${socket}' -c unix_socket_permissions=0700 -c port=${port} -c timezone=UTC`, 'start'],
     { timeoutMs: 40_000 });
 
-    const replay = await buildReplayPlan(root, 'all');
+    const replay = await buildReplayPlan(root, '--assessment-upgrade-review');
     await writeFile(join(directory, 'replay.sql'), replay.sql, { mode: 0o600 });
     await command('psql', [...psql, '-f', join(directory, 'replay.sql')], { timeoutMs: 180_000 });
     report.migration_count = replay.migrationCount;
-    console.log('[query-performance] Replayed migrations and sequential suites:', replay.migrationCount);
+    report.replay_mode = '--assessment-upgrade-review';
+    console.log('[query-performance] Replayed main, then academy, then index, and sequential suites:', replay.migrationCount);
     report.counts = JSON.parse((await query(fixtureSql)).stdout.trim());
     assert.equal(report.counts.synthetic_coaches, 20);
     assert.equal(report.counts.synthetic_club_admins, 20);

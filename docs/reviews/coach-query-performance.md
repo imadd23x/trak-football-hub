@@ -2,7 +2,11 @@
 
 The additive coach/date index is implemented for review in `20260918080430_index_coach_assessment_history.sql`. It improves the bounded recent-assessment feed; the unbounded squad/Home analytics histories remain separate work. No production change was made. The [scope and rollout plan](../plans/coach-assessment-index.md) records lock/storage costs and the existing timestamp-tie limitation.
 
-## Native verification of the actual migration
+## Refreshed native verification
+
+The [main/PR34 refresh evidence](query-main-0091094-refresh.md) records the current 64-migration upgrade and fresh replay, including actual authenticated result/policy comparisons. The earlier 61-migration measurements and advisor observation below are historical; they are not a fresh or live result.
+
+## Earlier native verification of the actual migration
 
 September 18, 2026: `node scripts/test-query-performance.mjs` used PostgreSQL 17.11 in a private Unix-socket cluster with no TCP listener. It replayed all 61 migrations and existing sequential security suites, then created 20 synthetic academies/admins/coaches, 600 linked adult players (DOB 2000-01-01), 600 academy-pinned roster rows and 31,100 assessments. Additional sequential-suite fixtures remained: 604 total roster rows and 31,104 assessments. It removed only the new index for the baseline, then applied the actual migration file.
 

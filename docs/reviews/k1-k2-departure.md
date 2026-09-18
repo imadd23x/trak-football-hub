@@ -2,7 +2,11 @@
 
 Reviewed September 18, 2026. The original six findings below describe the initial K1/K2 baseline. Subsequent upstream and fork changes are recorded separately here; this document is **not deployment or pilot approval**. No shared Supabase database was modified during this work.
 
-## Current follow-up
+## Main refresh
+
+The [September 18 refresh onto main `0091094`](academy-main-0091094-refresh.md) records current 63-migration fresh and upgrade replays. The academy migration and original SQL fixtures are unchanged. Counts and advisor observations below describe the earlier snapshots explicitly named here, not the refreshed or live system.
+
+## Earlier follow-up
 
 On upstream `ff9d713` plus the P1 migration, all 58 migrations replay and F2–F5 now pass. The original audit still fails five desired assertions across F1/F6. The new fork migration `20260918062345_preserve_academy_access_and_fk_cleanup.sql` addresses those failures and the linked-roster UPDATE regression introduced in migration `00004`.
 

@@ -178,3 +178,192 @@ test('expired or foreign invitation links produce a safe empty state for the ver
   expect(observed.unexpected).toEqual([]);
   expect(observed.errors).toEqual([]);
 });
+
+// Stateful HTTP boundary only: this exercises the real router, AuthProvider,
+// Supabase SDK and family query cache, not database RLS or email delivery.
+// Both linked players are synthetic adults; consent policy is outside this test.
+async function secondChildFixture(page: Page, context: BrowserContext) {
+  const parent = session(parentId, parentEmail);
+  const children = [
+    { id: alexId, name: 'Alex Adult', born: '2000-01-01', opponent: 'Alex Opposition', club: 'Alex Academy' },
+    { id: zaraId, name: 'Zara Adult', born: '1999-02-02', opponent: 'Zara Opposition', club: 'Zara Academy' },
+  ];
+  const linked = new Set([alexId]);
+  const requests: ObservedRequest[] = [];
+  const claims: ObservedRequest[] = [];
+  const memberships: { ids: string[]; failed: boolean }[] = [];
+  const unexpected: string[] = [];
+  const errors: string[] = [];
+  let failMembership = false;
+  await context.addInitScript(({ key, value }) => localStorage.setItem(key, JSON.stringify(value)), {
+    key: storageKey, value: parent,
+  });
+  page.on('pageerror', error => errors.push(error.message));
+  await context.route('**/*', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.origin === appOrigin) return route.continue();
+    if (url.origin !== backendOrigin) {
+      unexpected.push(request.url());
+      return route.abort();
+    }
+    const json = (data: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
+    const reject = () => {
+      unexpected.push(`${request.method()} ${url.pathname}${url.search}`);
+      return json({ message: 'Unexpected request blocked' }, 500);
+    };
+    const observed: ObservedRequest = {
+      path: url.pathname, method: request.method(), authorization: request.headers().authorization,
+      body: request.postData() ? request.postDataJSON() as unknown : null,
+    };
+    requests.push(observed);
+    if (observed.authorization !== `Bearer ${parent.access_token}`) return reject();
+    if (request.method() === 'GET' && url.pathname === '/auth/v1/user') return json(parent.user);
+    if (request.method() === 'POST') {
+      if (url.pathname === '/rest/v1/telemetry_events') return json(null, 201);
+      if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') return json([]);
+      if (url.pathname === '/rest/v1/rpc/get_my_pending_parent_invites') return json(linked.has(zaraId) ? [] : [{
+        invite_id: zaraInvite, player_user_id: zaraId, player_name: children[1].name,
+        parent_email: parentEmail, expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      }]);
+      if (url.pathname === '/rest/v1/rpc/get_parent_invite_by_token') {
+        if ((observed.body as { p_token?: string }).p_token !== inviteToken) return reject();
+        return json(linked.has(zaraId) ? [] : [{ id: zaraInvite }]);
+      }
+      if (url.pathname === '/rest/v1/rpc/accept_parent_invite') {
+        if ((observed.body as { p_invite_id?: string }).p_invite_id !== zaraInvite) return reject();
+        claims.push(observed);
+        linked.add(zaraId);
+        failMembership = true;
+        return json(zaraId); // Actual RPC returns the linked player's UUID.
+      }
+      return reject();
+    }
+    // No password/profile writes, provisioning, consent, logout or email calls
+    // are permitted. An unexpected request must fail, not silently succeed.
+    if (request.method() !== 'GET') return reject();
+    if (url.pathname === '/rest/v1/player_parent_links') {
+      if (url.searchParams.get('parent_user_id') !== `eq.${parentId}`) return reject();
+      memberships.push({ ids: [...linked], failed: failMembership });
+      return failMembership ? json({ message: 'Synthetic membership refresh failed' }, 503)
+        : json([...linked].map(player_user_id => ({ player_user_id })));
+    }
+    if (url.pathname === '/rest/v1/profiles') {
+      const filter = url.searchParams.get('user_id');
+      if (filter === `eq.${parentId}`) {
+        const profile = { id: parentId, user_id: parentId, role: 'parent', full_name: 'Existing Parent', nationality: null };
+        return json(request.headers().accept?.includes('vnd.pgrst.object') ? profile : [profile]);
+      }
+      const ids = /^in\.\(([^)]+)\)$/.exec(filter ?? '')?.[1].split(',');
+      if (!ids || ids.some(id => !linked.has(id))) return reject();
+      return json(children.filter(child => ids.includes(child.id)).map(child => ({ user_id: child.id, full_name: child.name })));
+    }
+    const child = children.find(candidate => linked.has(candidate.id)
+      && url.searchParams.get(url.pathname.endsWith('/squad_players') ? 'linked_player_id' : 'user_id') === `eq.${candidate.id}`);
+    if (child && url.pathname === '/rest/v1/player_details') {
+      return json([{ position: 'Midfielder', current_club: child.club, age_group: 'Senior' }]);
+    }
+    // No assessment/award data is needed for this membership-recovery journey.
+    if (child && url.pathname === '/rest/v1/squad_players') return json([]);
+    if (child && url.pathname === '/rest/v1/matches') return json([{
+      id: child.id, user_id: child.id, match_date: '2026-09-01', created_at: '2026-09-02T12:00:00Z',
+      opponent: child.opponent, competition: 'Synthetic Adult League', venue: child.club,
+      team_score: 2, opponent_score: 1, computed_rating: 7,
+    }]);
+    return reject();
+  });
+  return {
+    parent, children, requests, claims, memberships, unexpected, errors,
+    restoreMembership: () => { failMembership = false; },
+    linkedIds: () => [...linked],
+  };
+}
+
+test('existing parent accepts a second child, recovers a failed family refresh and keeps both links after reload', async ({ page, context }) => {
+  const observed = await secondChildFixture(page, context);
+  const [alex, zara] = observed.children;
+  await page.goto('/parent/home');
+  await expect(page.getByRole('heading', { name: alex.name, exact: true })).toBeVisible();
+  await expect(page.getByText(alex.opponent, { exact: true })).toBeVisible();
+  await expect(page.getByRole('option')).toHaveCount(1);
+  expect(observed.linkedIds()).toEqual([alexId]);
+
+  const membershipReadsBeforeInvite = observed.memberships.length;
+  await page.goto(`/parent-invite?token=${inviteToken}`);
+  await expect(page.getByRole('button', { name: `Link ${zara.name}`, exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: `Link ${alex.name}`, exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('New password', { exact: true })).toHaveCount(0);
+  await expect.poll(() => observed.memberships.slice(membershipReadsBeforeInvite)
+    .some(read => !read.failed && read.ids.length === 1 && read.ids[0] === alexId)).toBe(true);
+  const beforeClaim = observed.memberships.length;
+  await page.getByRole('button', { name: `Link ${zara.name}`, exact: true }).click();
+  await expect(page).toHaveURL(appOrigin + '/parent/consent');
+  await expect(page.getByText('Nothing to approve', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Go to home', exact: true }).click();
+  const failure = page.getByRole('alert').filter({ hasText: "Couldn't load your linked children." });
+  await expect(failure).toBeVisible({ timeout: 15_000 });
+  expect(observed.memberships.slice(beforeClaim).some(read => read.failed && read.ids.includes(zaraId))).toBe(true);
+  await expect(page.getByText('No child linked yet', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(alex.opponent, { exact: true })).toHaveCount(0);
+  await expect(page.getByText(zara.opponent, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('combobox')).toHaveCount(0);
+
+  observed.restoreMembership();
+  await failure.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('option')).toHaveCount(2);
+  await expect(page.getByText(alex.opponent, { exact: true })).toBeVisible();
+  await page.getByRole('combobox').selectOption(zaraId);
+  await expect(page.getByRole('heading', { name: zara.name, exact: true })).toBeVisible();
+  await expect(page.getByText(zara.opponent, { exact: true })).toBeVisible();
+  await expect(page.getByText(alex.opponent, { exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Matches', exact: true }).click();
+  await expect(page.getByRole('combobox')).toHaveValue(zaraId);
+  await expect(page.getByText(zara.opponent, { exact: true })).toBeVisible();
+  await page.getByRole('combobox').selectOption(alexId);
+  await expect(page.getByText(alex.opponent, { exact: true })).toBeVisible();
+  await expect(page.getByText(zara.opponent, { exact: true })).toHaveCount(0);
+  await page.getByRole('combobox').selectOption(zaraId);
+
+  await page.getByRole('button', { name: 'Alerts', exact: true }).click();
+  await expect(page.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  await page.getByRole('combobox').selectOption(alexId);
+  await expect(page.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  await page.getByRole('combobox').selectOption(zaraId);
+
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await expect(page.getByText(`Following ${zara.name} · 2 children linked`, { exact: true })).toBeVisible();
+  await page.getByRole('combobox').selectOption(alexId);
+  await expect(page.getByText(`Following ${alex.name} · 2 children linked`, { exact: true })).toBeVisible();
+  await page.getByRole('combobox').selectOption(zaraId);
+  // P6 owns the subtitle change; this journey follows the Settings entry in
+  // both independently reviewed branches, then verifies the actual children.
+  await page.getByRole('button', { name: /^SETTINGS / }).click();
+  const connections = page.getByRole('list', { name: 'Linked children', exact: true });
+  await expect(connections.getByText(alex.name, { exact: true })).toHaveCount(1);
+  await expect(connections.getByText(zara.name, { exact: true })).toHaveCount(1);
+  await page.goBack();
+  await page.getByRole('button', { name: 'Matches', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('option')).toHaveCount(2);
+  await page.getByRole('combobox').selectOption(zaraId);
+  await expect(page.getByText(zara.opponent, { exact: true })).toBeVisible();
+  await expect(page.getByText(alex.opponent, { exact: true })).toHaveCount(0);
+
+  expect(observed.linkedIds()).toEqual([alexId, zaraId]);
+  expect(observed.claims).toEqual([{
+    path: '/rest/v1/rpc/accept_parent_invite', method: 'POST',
+    authorization: `Bearer ${observed.parent.access_token}`, body: { p_invite_id: zaraInvite },
+  }]);
+  const allowedPosts = new Set([
+    '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent',
+    '/rest/v1/rpc/get_my_pending_parent_invites', '/rest/v1/rpc/get_parent_invite_by_token',
+    '/rest/v1/rpc/accept_parent_invite',
+  ]);
+  expect(observed.requests.filter(request => request.method !== 'GET')
+    .every(request => request.method === 'POST' && allowedPosts.has(request.path))).toBe(true);
+  expect(observed.unexpected).toEqual([]);
+  expect(observed.errors).toEqual([]);
+});

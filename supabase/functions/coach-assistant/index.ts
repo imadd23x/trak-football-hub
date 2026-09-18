@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+// A chat assistant is used in bursts while planning a session, so this is set
+// well above ordinary use. It is a ceiling on abuse, not a budget.
+const DAILY_CALL_LIMIT = 150;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -100,6 +104,36 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
+    // Authenticate before spending anything. getUser() was called below only
+    // to personalise the prompt — no user meant an empty context block and the
+    // request went to the paid gateway anyway. With verify_jwt off, that made
+    // this an unauthenticated endpoint spending LOVABLE_API_KEY, which is what
+    // supabase/config.toml claimed it was not.
+    //
+    // The platform gate alone would not be enough even when enabled: the
+    // publishable anon key is a validly-signed JWT and ships in the client
+    // bundle, so verify_jwt accepts it. Only getUser() proves a real session.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (profile?.role !== "coach") {
+      return new Response(JSON.stringify({ error: "Coaches only" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { messages, includeSquadContext } = await req.json();
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(JSON.stringify({ error: "messages array required" }), {
@@ -108,10 +142,28 @@ serve(async (req) => {
       });
     }
 
-    // Always fetch the coach's identity (club, age group, role)
+    // Counted after the shape of the request is known to be valid, so a
+    // malformed body does not consume a coach's daily allowance.
+    const { data: allowed, error: quotaError } = await supabase
+      .rpc("claim_ai_call", { p_function_name: "coach-assistant", p_daily_limit: DAILY_CALL_LIMIT });
+
+    if (quotaError) {
+      console.error("quota check failed", quotaError);
+      return new Response(JSON.stringify({ error: "Could not verify your daily allowance" }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ error: `Daily limit of ${DAILY_CALL_LIMIT} assistant messages reached. Try again tomorrow.` }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Identity is already established above; this only adds club context.
     let coachBlock = "";
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    {
       const { data: cd } = await supabase
         .from("coach_details")
         .select("current_club, team, coach_role")

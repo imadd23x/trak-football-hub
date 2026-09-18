@@ -1,0 +1,60 @@
+name: Merge base
+
+# On 17 September, pull requests #18, #19 and #20 were merged and their code
+# never reached main. They were stacked, and each was merged into its base
+# branch minutes after that base had itself been merged to main. GitHub marks
+# a pull request merged once its commits reach the BASE branch — they did —
+# but that base was no longer on the path to main, so the code went nowhere.
+# Three days of work disappeared behind a green tick and a merged badge, and
+# nothing anywhere reported a problem. What was lost included the consent-gate
+# date-rollover fix and the streaming bug that fed children AI feedback with
+# words missing from the middle.
+#
+# This workflow exists because ci.yml structurally cannot catch it: ci.yml is
+# `pull_request: branches: [main]`, so it does not run at all for a pull
+# request whose base is not main — precisely the case that needs the warning.
+# This one triggers on every base, does nothing else, and finishes in seconds.
+
+on:
+  pull_request:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+jobs:
+  base-reaches-main:
+    name: Base branch still reaches main
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Ancestry is the whole question here, so the full history is needed.
+          fetch-depth: 0
+
+      - name: The base branch must still be on the path to main
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          if [ "$BASE" = "main" ]; then
+            echo "Base is main. Merging this pull request puts its commits on main."
+            exit 0
+          fi
+
+          echo "::warning::This pull request targets '$BASE', not main. Merging it moves commits onto '$BASE' only. Nothing reaches main until '$BASE' is itself merged, and GitHub will mark this pull request merged either way."
+
+          if ! git rev-parse --verify --quiet "origin/$BASE" >/dev/null; then
+            echo "::error::Base branch '$BASE' does not exist on the remote. Merging this pull request cannot deliver its commits anywhere. Re-target it onto main."
+            exit 1
+          fi
+
+          if git merge-base --is-ancestor "origin/$BASE" origin/main; then
+            echo "::error::'$BASE' is already fully contained in main and has no commits of its own left. Merging this pull request would put its commits on a branch that is no longer on the path to main, and GitHub would still show it as merged — the code would be silently lost. This is exactly what happened to #18, #19 and #20. Re-target this pull request onto main."
+            exit 1
+          fi
+
+          echo "Base '$BASE' still carries commits that have not reached main, so this stack is intact."
+          echo "Re-target this pull request onto main as soon as '$BASE' merges, or the same failure follows."

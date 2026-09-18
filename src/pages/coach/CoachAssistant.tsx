@@ -143,10 +143,19 @@ export default function CoachAssistant() {
     }
 
     try {
-      // Use the user's session token so the function can load squad context;
-      // fall back to the anon key (the function tolerates it — verify_jwt=false).
+      // The function now requires a real signed-in coach and 401s otherwise
+      // (K8/X4). There used to be a fallback to the anon key here, with a
+      // comment saying the function tolerated it because verify_jwt = false —
+      // that is exactly the hole K8 closed, and the anon key is a validly
+      // signed JWT that proves nothing about who is calling. Sending it now
+      // just earns a 401 and an unhelpful toast, so ask for a session instead.
       const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token || SUPABASE_ANON_KEY
+      const token = session?.access_token
+      if (!token) {
+        toast.error('Your session has expired — sign in again to use the assistant.')
+        setIsLoading(false)
+        return
+      }
 
       const resp = await fetch(`${SUPABASE_FUNCTIONS_URL}/coach-assistant`, {
         method: 'POST',
@@ -162,7 +171,14 @@ export default function CoachAssistant() {
       })
 
       if (!resp.ok) {
-        if (resp.status === 429) toast.error('Rate limit reached, try again shortly.')
+        // The function explains a refusal in the body: a spent daily allowance
+        // is not the same as "try again shortly", and telling a coach to retry
+        // in a moment when the answer is tomorrow is just a wrong instruction.
+        // Prefer the server's sentence; fall back only when there isn't one.
+        const body = await resp.json().catch(() => ({} as { error?: string }))
+        if (body?.error) toast.error(body.error)
+        else if (resp.status === 401) toast.error('Your session has expired — sign in again.')
+        else if (resp.status === 429) toast.error('Rate limit reached, try again shortly.')
         else if (resp.status === 402) toast.error('AI credits exhausted. Add credits in workspace settings.')
         else toast.error('Assistant unavailable')
         setIsLoading(false)

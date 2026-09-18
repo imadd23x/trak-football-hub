@@ -78,6 +78,23 @@ describe('settings controls reflect supported behavior', () => {
     expect(requests).toEqual([expect.objectContaining({ email: 'settings@example.test' })])
   })
 
+  it('explains retained records and makes no deletion request when cancelled', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const deletion = vi.fn(() => HttpResponse.json(null))
+    server.use(http.post(`${SUPABASE_URL}/rest/v1/rpc/delete_my_account`, deletion))
+    try {
+      mount()
+      fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }))
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('academy history and consent records may be retained'))
+      expect(confirm).not.toHaveBeenCalledWith(expect.stringContaining('deletes all your data'))
+      await screen.findByDisplayValue('8')
+      expect(deletion).not.toHaveBeenCalled()
+      expect(state.signOut).not.toHaveBeenCalled()
+    } finally {
+      confirm.mockRestore()
+    }
+  })
+
   it('keeps a failed name save editable and persists only the valid retry to this account', async () => {
     const requests: unknown[] = []
     let fail = true

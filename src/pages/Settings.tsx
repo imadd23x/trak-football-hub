@@ -145,7 +145,7 @@ export default function Settings() {
 
   const deleteAccount = async () => {
     const confirmed = window.confirm(
-      'This permanently deletes all your data and cannot be undone. Are you sure?'
+      'Delete your account? Your sign-in and profile will be removed. Some academy history and consent records may be retained. This cannot be undone.'
     )
     if (!confirmed) return
 

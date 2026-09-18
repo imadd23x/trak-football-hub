@@ -8,6 +8,7 @@ The removed notification switches only wrote `trak.settings.v1` to browser stora
 - Account actions and real role-specific settings remain available. A failed name save retains its draft and can be retried; password recovery targets the signed-in account.
 - The parent profile links to “Account settings” and both linked children remain visible after navigation.
 - No new notification or sharing behavior, schema changes, or migration of obsolete browser values.
+- Account deletion explains that some academy history and consent records may remain, matching the observed implementation instead of promising complete erasure. Cancelling sends no deletion request. Retention policy and cleanup remain separate U10/P8 work.
 
 ## Evidence
 

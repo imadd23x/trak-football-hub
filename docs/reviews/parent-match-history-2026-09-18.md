@@ -1,6 +1,10 @@
 # Parent match history: scope and verification
 
-Status: implemented and locally verified in a separate fork branch based on #39 `e9fbad3`. No production changes and no new PR while the existing review queue is cleared.
+Status: implemented and locally verified in the fork. The original history
+review head `484ad20` is preserved. Branch `parent/P3-history-integration` now
+integrates canonical main `b9adf1c45d468f4987b08c8def4c9ce23eaf4634` and repeats
+the affected parent verification. No production changes and no new PR while
+the existing review queue is cleared.
 
 ## Observed failure
 
@@ -48,3 +52,37 @@ An initial coalesced cursor expression was correct but PostgreSQL could not use 
 Pages are live reads, not a frozen snapshot: later edits to a match's sorting fields can move it, and deletions can empty a later page. The UI retains Previous navigation and does not claim the child has no history. Newer inserts do not shift an existing cursor. Home summaries are independent queries and can briefly differ from a concurrently changing page. The app retains already visited pages in its identity-scoped query cache but renders only one page.
 
 P2 consent, feedback review findings, pending player checks, deployment approval and hosted role-journey verification remain separate readiness gates. Existing #32/#33/#39 review heads remain unchanged; this branch has no new PR.
+
+## Current-main integration — 17:03 Dubai, September 18
+
+Merge `e17dc16` incorporates the subsequently merged player and truthful-Settings
+work from current main without conflicts or manual application-code resolution.
+The original parent history implementation and migration are unchanged. The
+family browser test now locates the current **Account settings** entry while
+still verifying both linked children; this is the same selector correction
+already isolated in the S4 candidate, not a change to the product.
+
+Fresh checks on the integrated branch:
+
+- Source and harness: **347 tests pass across 30 files**.
+- TypeScript and production build pass. Lint: **0 errors / 134 existing
+  warnings**. The existing large-chunk build warning remains.
+- Fresh and deployed-report-first migration orders: **60 migrations** replay,
+  parent invitation checks pass, **282 report assertions** and **81 parent
+  history assertions** pass in each disposable run.
+- Built-app browser: **6/6 journeys pass in 17.0 seconds**, including 1,001
+  matches across 21 pages, correct full totals, retry without skipping a page,
+  backfilled activity, child switching, a second invitation and reload.
+  External requests are intercepted with synthetic responses; no hosted account
+  or email was used.
+- Use-case gate still exits zero with **2 enforced cases**, but reports **3
+  pending UC-A02 failures** and **15 pending cases without tests**. It is not an
+  all-role acceptance pass.
+- Independent integration review found no lost parent/auth/Settings changes.
+  The native PostgreSQL and PostgREST evidence above belongs to the original
+  unchanged history implementation; those runs were not repeated for this
+  frontend integration.
+
+This is a separate fork review candidate. S4 event/queue and view-inventory
+repairs remain their own branches. The calendar migration/caller and feedback
+blockers still prevent treating a green parent branch as a production release.

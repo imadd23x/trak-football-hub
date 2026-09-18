@@ -11,7 +11,18 @@ const securityMigration = '20260917205027_secure_parent_invites.sql';
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 const args = process.argv.slice(2);
 const mode = args[0] ?? '--all';
-const modes = ['--all', '--baseline', '--pilot-views-review', '--pilot-views-baseline', '--parent-upgrade-review'];
+// Player-platform suites. Split by whether they currently pass, because CI
+// runs `npm run test:db`, which is --all: a suite that documents an unfixed
+// defect belongs behind its own flag, or it turns main red for everyone.
+const playerSuites = {
+  '--roster-adoption-review': 'roster_adoption.sql',   // 3 of 6 fail: T4
+  '--academy-isolation-review': 'academy_isolation.sql',
+};
+// player_journey.sql depends on publish_player_feedback and therefore on the
+// unmerged T2 migration; it is registered on that branch, not here.
+const playerSuitesInAll = ['academy_isolation.sql'];
+const modes = ['--all', '--baseline', '--pilot-views-review', '--pilot-views-baseline',
+  '--parent-upgrade-review', ...Object.keys(playerSuites)];
 if (args.length > 1 || !modes.includes(mode)) {
   throw new Error(`Usage: node scripts/test-db.mjs [${modes.join(' | ')}]`);
 }
@@ -50,9 +61,12 @@ try {
   console.log(`Replayed ${migrations.length} migrations${baseline || pilotViewsBaseline
     ? ' (vulnerable baseline; security assertions should fail)'
     : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
-  const suites = baseline ? ['parent_invite_security.sql']
+  const suites = playerSuites[mode] ? [playerSuites[mode]]
+    : baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
-    : ['parent_invite_security.sql', 'pilot_view_security.sql'];
+    // --all runs every suite, so a player-platform regression is caught by the
+    // same command everyone already runs rather than only by a bespoke one.
+    : ['parent_invite_security.sql', 'pilot_view_security.sql', ...playerSuitesInAll];
   for (const suite of suites) {
     const result = await db.exec(await read(suite));
     console.log(`Passed: ${suite}`);

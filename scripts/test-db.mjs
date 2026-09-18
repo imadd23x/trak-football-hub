@@ -11,13 +11,14 @@ const securityMigration = '20260917205027_secure_parent_invites.sql';
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 const args = process.argv.slice(2);
 const mode = args[0] ?? '--all';
-const modes = ['--all', '--baseline', '--pilot-views-review', '--pilot-views-baseline', '--parent-upgrade-review'];
+const modes = ['--all', '--baseline', '--pilot-views-review', '--pilot-views-baseline', '--parent-upgrade-review', '--consent-review'];
 if (args.length > 1 || !modes.includes(mode)) {
   throw new Error(`Usage: node scripts/test-db.mjs [${modes.join(' | ')}]`);
 }
 const baseline = mode === '--baseline';
 const pilotViewsBaseline = mode === '--pilot-views-baseline';
 const parentUpgrade = mode === '--parent-upgrade-review';
+const consentReview = mode === '--consent-review';
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
 try {
@@ -50,8 +51,12 @@ try {
   console.log(`Replayed ${migrations.length} migrations${baseline || pilotViewsBaseline
     ? ' (vulnerable baseline; security assertions should fail)'
     : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
+  // consent_coverage.sql is deliberately absent from --all. It asserts what
+  // must be true before a real child is assessed, and P2 is not closed, so it
+  // fails by design. CI runs --all; a red main would teach people to ignore it.
   const suites = baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
+    : consentReview ? ['consent_coverage.sql']
     : ['parent_invite_security.sql', 'pilot_view_security.sql'];
   for (const suite of suites) {
     const result = await db.exec(await read(suite));

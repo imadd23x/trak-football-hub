@@ -65,9 +65,12 @@ await context.route('**/*',async route=>{
  await expect(page.getByRole('combobox')).toHaveValue(zara);
  await page.getByRole('button',{name:'Profile',exact:true}).click();
  await expect(page.getByText('Following Zara Example · 2 children linked',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'SETTINGS Notifications, privacy, account'}).click();
+ await page.getByRole('button',{name:'SETTINGS Account settings'}).click();
  await expect(page.getByRole('list',{name:'Linked children'})).toContainText('Alex Example');
  await expect(page.getByRole('list',{name:'Linked children'})).toContainText('Zara Example');
+ await expect(page.getByRole('switch')).toHaveCount(0);
+ await expect(page.getByText('Notifications',{exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Send reset email'})).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});
  expect(errors).toEqual([]);
  expect(unexpected).toEqual([]);

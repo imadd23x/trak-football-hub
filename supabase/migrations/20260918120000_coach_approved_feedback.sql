@@ -19,6 +19,12 @@
 -- written under that promise. A status column on one table is one policy edit
 -- away from the same outcome. A missing grant is much harder to undo by
 -- accident.
+--
+-- Revision 2 of this migration closes five holes Imad found by replaying it on
+-- native PostgreSQL 17, which I could not do (no local Postgres). Each is
+-- marked [F-n] below. The two-table shape survived his review — child draft
+-- isolation, foreign-academy reads, guarded RPC denials and sequential
+-- supersession all passed. What failed was enforcement around it.
 
 -- ── 1. Drafts — coach-only, never reachable by a child ──────────────────────
 
@@ -29,7 +35,9 @@ CREATE TABLE IF NOT EXISTS public.ai_feedback_drafts (
   organization_id  uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
   generated_text   text NOT NULL,
   model            text,
-  created_by       uuid NOT NULL,
+  -- [F-2] Provenance cannot be asserted by the client. Defaulted here and
+  -- pinned by the policy's WITH CHECK below.
+  created_by       uuid NOT NULL DEFAULT auth.uid(),
   created_at       timestamptz NOT NULL DEFAULT now()
 );
 
@@ -37,6 +45,13 @@ CREATE INDEX IF NOT EXISTS idx_ai_feedback_drafts_squad_player
   ON public.ai_feedback_drafts (squad_player_id, created_at DESC);
 
 ALTER TABLE public.ai_feedback_drafts ENABLE ROW LEVEL SECURITY;
+
+-- [F-4] This database grants broadly by default, so a new table inherits
+-- privileges nobody asked for — including TRUNCATE for anon. Revoking the
+-- default is not enough on its own; the grants a role should have are stated
+-- explicitly. Same lesson as the operational views in #35.
+REVOKE ALL ON TABLE public.ai_feedback_drafts FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, DELETE ON TABLE public.ai_feedback_drafts TO authenticated;
 
 -- Coaches only, and only for a roster row that is theirs in their academy.
 -- squad_player_is_mine() already excludes departed coaches and enforces the
@@ -46,10 +61,46 @@ CREATE POLICY "Coaches manage drafts for their own roster"
   ON public.ai_feedback_drafts
   FOR ALL TO authenticated
   USING (public.squad_player_is_mine(squad_player_id))
-  WITH CHECK (public.squad_player_is_mine(squad_player_id));
+  WITH CHECK (
+    public.squad_player_is_mine(squad_player_id)
+    -- [F-2] A draft cannot be attributed to another coach.
+    AND created_by = auth.uid()
+  );
 
 -- There is deliberately NO player or parent policy on this table, and none
 -- should be added. If a child needs to see something, it is published.
+
+
+-- [F-2] Academy and assessment provenance are stamped from the roster row,
+-- never taken from the client, and an assessment must belong to the same
+-- player it is being attached to.
+CREATE OR REPLACE FUNCTION public.stamp_feedback_draft_provenance()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+BEGIN
+  SELECT sp.organization_id INTO NEW.organization_id
+  FROM public.squad_players sp WHERE sp.id = NEW.squad_player_id;
+
+  IF NEW.assessment_id IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM public.coach_assessments ca
+       WHERE ca.id = NEW.assessment_id
+         AND ca.squad_player_id = NEW.squad_player_id
+     ) THEN
+    RAISE EXCEPTION 'That assessment does not belong to this player';
+  END IF;
+
+  RETURN NEW;
+END;
+$fn$;
+
+DROP TRIGGER IF EXISTS trg_stamp_feedback_draft_provenance ON public.ai_feedback_drafts;
+CREATE TRIGGER trg_stamp_feedback_draft_provenance
+  BEFORE INSERT OR UPDATE ON public.ai_feedback_drafts
+  FOR EACH ROW EXECUTE FUNCTION public.stamp_feedback_draft_provenance();
 
 
 -- ── 2. Publications — what a child may actually read ────────────────────────
@@ -69,29 +120,49 @@ CREATE TABLE IF NOT EXISTS public.player_feedback (
   superseded_at    timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS idx_player_feedback_current
-  ON public.player_feedback (squad_player_id, published_at DESC)
+-- [F-5] Two coaches publishing at the same moment both computed revision 1 and
+-- left two current rows. A read-then-write cannot be made safe by trying
+-- harder; the database enforces it instead.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_player_feedback_one_current
+  ON public.player_feedback (squad_player_id)
   WHERE superseded_at IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_player_feedback_revision
+  ON public.player_feedback (squad_player_id, revision);
 
 ALTER TABLE public.player_feedback ENABLE ROW LEVEL SECURITY;
 
+-- [F-1] and [F-4] Publication DML goes through publish_player_feedback() and
+-- nowhere else. Previously the coach policy was FOR ALL, so an owning coach
+-- could INSERT straight past the consent and authorship checks, and could
+-- UPDATE or DELETE superseded rows — destroying the audit trail the academy is
+-- told it has. Coaches read; the guarded RPC writes.
+REVOKE ALL ON TABLE public.player_feedback FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.player_feedback TO authenticated;
+
 DROP POLICY IF EXISTS "Coaches manage feedback for their own roster" ON public.player_feedback;
-CREATE POLICY "Coaches manage feedback for their own roster"
+DROP POLICY IF EXISTS "Coaches read feedback for their own roster" ON public.player_feedback;
+CREATE POLICY "Coaches read feedback for their own roster"
   ON public.player_feedback
-  FOR ALL TO authenticated
-  USING (public.squad_player_is_mine(squad_player_id))
-  WITH CHECK (public.squad_player_is_mine(squad_player_id));
+  FOR SELECT TO authenticated
+  USING (public.squad_player_is_mine(squad_player_id));
 
 -- The child reads only the current revision of their own feedback.
 -- An edit supersedes rather than overwrites, so the academy keeps the audit
 -- trail, but the child is shown one current version rather than a history of
 -- what their coach changed their mind about.
+--
+-- [F-3] Consent is checked on read, not only at publication. A sole guardian
+-- who withdraws must stop the child receiving what was published while consent
+-- held — otherwise withdrawal only blocks future feedback, which is not what
+-- withdrawing consent means.
 DROP POLICY IF EXISTS "Players read their own current feedback" ON public.player_feedback;
 CREATE POLICY "Players read their own current feedback"
   ON public.player_feedback
   FOR SELECT TO authenticated
   USING (
     superseded_at IS NULL
+    AND NOT public.squad_player_consent_required(squad_player_id)
     AND EXISTS (
       SELECT 1 FROM public.squad_players sp
       WHERE sp.id = player_feedback.squad_player_id
@@ -151,11 +222,17 @@ BEGIN
     RAISE EXCEPTION 'Parental consent has not been given for this player';
   END IF;
 
+  -- [F-5] Serialise per roster row. The unique indexes make a lost race an
+  -- error rather than a second current revision; this makes the ordinary
+  -- concurrent case wait instead of failing.
+  PERFORM 1 FROM public.squad_players WHERE id = p_squad_player_id FOR UPDATE;
+
   SELECT organization_id INTO v_org
   FROM public.squad_players WHERE id = p_squad_player_id;
 
-  -- Provenance: a draft carries the assessment it was generated from. A
-  -- coach-written publication has no draft and no assessment.
+  -- [F-2] Provenance: a draft carries the assessment it was generated from,
+  -- and the draft must belong to this player. A coach-written publication has
+  -- no draft and no assessment.
   IF p_draft_id IS NOT NULL THEN
     SELECT assessment_id INTO v_assessment
     FROM public.ai_feedback_drafts
@@ -164,6 +241,17 @@ BEGIN
     IF NOT FOUND THEN
       RAISE EXCEPTION 'That draft does not belong to this player';
     END IF;
+  END IF;
+
+  -- [F-2] Even by way of a draft, an assessment from another player cannot be
+  -- attached. The draft trigger enforces this on write; re-checked here so a
+  -- pre-existing row cannot carry a forged reference through publication.
+  IF v_assessment IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM public.coach_assessments ca
+       WHERE ca.id = v_assessment AND ca.squad_player_id = p_squad_player_id
+     ) THEN
+    RAISE EXCEPTION 'That assessment does not belong to this player';
   END IF;
 
   -- Supersede rather than overwrite: the child sees one current version, the

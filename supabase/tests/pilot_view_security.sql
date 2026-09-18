@@ -45,6 +45,64 @@ INSERT INTO pilot_views (name) VALUES
   ('pilot_scorecard'), ('squad_duplicate_candidates'), ('stale_pending_consent');
 GRANT SELECT ON pilot_views TO anon, authenticated, service_role;
 
+-- Every public view currently belongs to the operational-report contract below.
+-- Discover the catalogue rather than trusting a name prefix or a fixed count.
+-- A future client-facing view needs its own explicit access contract and runtime
+-- coverage before this inventory can be extended; do not silently exclude it.
+CREATE FUNCTION pg_temp.require_reviewed_view_inventory() RETURNS void
+LANGUAGE plpgsql AS $test$
+DECLARE unreviewed text;
+BEGIN
+  SELECT string_agg(format('%I.%I (%s)', ns.nspname, relation.relname,
+    CASE relation.relkind WHEN 'm' THEN 'materialized view' ELSE 'view' END),
+    ', ' ORDER BY relation.relname)
+  INTO unreviewed
+  FROM pg_catalog.pg_class relation
+  JOIN pg_catalog.pg_namespace ns ON ns.oid = relation.relnamespace
+  WHERE ns.nspname = 'public' AND relation.relkind IN ('v', 'm')
+    AND NOT EXISTS (SELECT 1 FROM pg_temp.pilot_views covered WHERE covered.name = relation.relname);
+
+  IF unreviewed IS NOT NULL THEN
+    RAISE EXCEPTION USING ERRCODE = 'ZV002',
+      MESSAGE = 'Public views lack an executable access contract', DETAIL = unreviewed;
+  END IF;
+END;
+$test$;
+SELECT pg_temp.require_reviewed_view_inventory();
+SELECT pg_temp.pilot_assert(true, 'all public ordinary/materialized views have an access contract');
+
+-- Persistent negative controls: a newly added view must be detected regardless
+-- of name or kind. Deliberate exceptions roll each synthetic DDL mutation back.
+-- Requiring the exact diagnostic prevents unrelated SQL failures counting as a
+-- successful guard. No fixture view survives its subtransaction.
+DO $test$
+DECLARE probe record; denied boolean; details text; failure text;
+BEGIN
+  FOR probe IN SELECT * FROM (VALUES
+    ('pilot_inventory_probe', 'VIEW'),
+    ('unprefixed_inventory_probe', 'VIEW'),
+    ('materialized_inventory_probe', 'MATERIALIZED VIEW'),
+    ('Future report "quoted"', 'VIEW')
+  ) AS probes(name, kind) LOOP
+    denied := false;
+    failure := NULL;
+    BEGIN
+      EXECUTE format('CREATE %s public.%I AS SELECT 1 AS synthetic_value', probe.kind, probe.name);
+      PERFORM pg_temp.require_reviewed_view_inventory();
+      RAISE EXCEPTION USING ERRCODE = 'ZV003', MESSAGE = 'inventory mutation unexpectedly allowed';
+    EXCEPTION
+      WHEN SQLSTATE 'ZV002' THEN
+        GET STACKED DIAGNOSTICS details = PG_EXCEPTION_DETAIL;
+        denied := position(format('public.%I', probe.name) IN details) > 0;
+        IF NOT denied THEN failure := 'inventory diagnostic did not identify the injected view'; END IF;
+      WHEN OTHERS THEN failure := SQLSTATE || ': ' || SQLERRM;
+    END;
+    INSERT INTO pg_temp.pilot_view_results VALUES
+      ('inventory rejects unreviewed ' || probe.name, denied, failure);
+  END LOOP;
+END;
+$test$;
+
 -- 1 report owner; 2 unrelated coach; 3 player; 4 parent; 5 club administrator;
 -- 6 minor used only for the stale-consent report. All identities are synthetic.
 INSERT INTO auth.users (id, email, email_confirmed_at)

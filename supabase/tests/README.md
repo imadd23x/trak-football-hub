@@ -8,6 +8,25 @@ For the negative control, run `npm run test:db -- --baseline`. It replays the hi
 
 PGlite tests execute PostgreSQL grants, functions, transactions and RLS. They do not verify Supabase Auth HTTP behavior, email delivery, Storage HTTP behavior, concurrent independent database connections or live platform configuration. Those require the browser/email and deployed-role checks in the release plan. Never execute synthetic test fixtures against the shared live project.
 
+## Operational-view inventory
+
+`npm run test:db:pilot-views` checks every ordinary and materialized view in the
+replayed `public` schema against the suite's explicit access contracts before
+running report fixtures. Currently all 12 public views are operator-only reports.
+A new view fails with its qualified name until its intended access has executable
+coverage. Do not silence the guard with a prefix exclusion or register a view
+without meaningful fixtures and actual-role assertions. A future client-facing
+view needs its own reviewed contract; do not give it operator-only semantics just
+to satisfy this suite.
+
+Four persistent catalogue mutations prove detection of a prefixed view, an
+unprefixed view, a materialized view and a quoted identifier. Only the expected
+inventory diagnostic naming the injected object passes; unrelated SQL errors
+fail. Each mutation rolls back inside a subtransaction. Existing nonempty report
+reads, role denials, mutation checks and privilege assertions still run. See the
+[September 18 inventory review](../../docs/reviews/report-view-inventory-2026-09-18.md)
+for the before/after negative control and verification boundaries.
+
 The email handler's mocked-provider tests also cover acceptance, token rotation and expiry while the first email request is in flight. Before an existing-account OTP fallback, it re-reads the same invitation with the caller's JWT and requires the same owner, recipient, token and expiry. A database check cannot atomically cancel an external email delivery: acceptance immediately after the final check, or after provider dispatch, can still leave an unnecessary email in flight. These tests do not establish delivery cancellation or provider-side deduplication.
 
 Accepted invitations stay consumed after a parent deletes their account. `delete_my_account()` removes that parent's links and Auth account but retains invitations issued by the player; P1 refuses to reassign an accepted invitation to a new account using the same email. `create_parent_invite()` returns that accepted row and `resend_parent_invite()` does not reopen it, so recreating the parent account does not restore access through the current public RPCs. This needs a reviewed operator recovery/new-invitation procedure if encountered in the pilot. Do not reopen an accepted invitation solely because a new account controls its former recipient email. The current suite tests rejection of a recycled email; it does not exercise the complete delete-and-recreate recovery workflow.

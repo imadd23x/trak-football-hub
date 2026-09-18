@@ -261,3 +261,48 @@ using the product, which makes them a reputational risk to anything said here.
 
 Everything else on slides 3, 4 and 6 is either true in the build or is a market
 claim outside the code.
+
+---
+
+## Open: the pilot has a success metric it cannot measure
+
+Not a slide claim, but it belongs here, because it is the thing an academy will
+eventually be told the pilot proved.
+
+`docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md` sets the pilot's
+headline measure:
+
+> Q4 metric: ≥60% of athletes log weekly, unprompted.
+
+**Athletes cannot log.** `/player/log` and `/player/logchoose` were removed on
+21 April 2026 by commit `3c12cbb`, an automated commit titled "Changes", with no
+rationale recorded. `PlayerLogForm` (228 lines) and `PlayerLogChoose` (46) went
+with them. The spec is dated 27 July — three months *after* the deletion — and
+still describes athlete logging as a product pillar in two places:
+
+- **P1. The athlete owns the record.**
+- **P4. The loop must close. Coach assesses → athlete sees → athlete logs →
+  coach sees.**
+
+UC-A02 tests it, is Tier 1 and Tier 2, and has failed since the harness existed.
+
+**The database never stopped supporting it.** `matches` still carries "Players
+can insert own matches", along with update, delete and read policies for the
+athlete's own rows, and `logged_by_role` exists to tell a self-log from a
+coach-log. Only the screens went. Restoring is UI work, not an architecture
+change — which makes this a genuine choice rather than a forced one.
+
+Two honest resolutions, and they lead to different pilots:
+
+1. **Coach-logged is the product.** Then P1, P4, UC-A02 and the Q4 metric are
+   all stale and need rewriting, and the pilot needs a different measure of
+   whether it worked — coach habit, which `pilot_scorecard` already tracks.
+2. **Athlete logging is still the product.** Then a Tier 1 capability is missing
+   and the headline metric is measuring a screen that does not exist.
+
+**Status: parked by Tarek on 18 Sept** until the merge queue is clear and `main`
+is green, on the grounds that neither path is safe to start while thirteen PRs
+sit unmerged. Recorded here so the decision is deliberate rather than forgotten.
+
+The spec also still carries, from July: *"Needs restating by Kostas before any
+external conversation."*

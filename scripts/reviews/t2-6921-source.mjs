@@ -2,7 +2,15 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 // Historical review evidence, not a moving-current-head or CI release gate.
-export const candidate = '6921ed989978977f1ff1da75e008c2d69fa1b1f1';
+const reviewedCandidates = [
+  '6921ed989978977f1ff1da75e008c2d69fa1b1f1',
+  'cb3a256a068ede9ef6cd1a424fd2e5a456ba73a6',
+];
+const args = process.argv.slice(2);
+if (args.length && (args.length !== 2 || args[0] !== '--candidate' || !reviewedCandidates.includes(args[1]))) {
+  throw new Error(`Use no arguments for the original review, or --candidate with one exact reviewed SHA: ${reviewedCandidates.join(', ')}`);
+}
+export const candidate = args[1] ?? reviewedCandidates[0];
 export const priorReview = 'bfc1bcd9d02755a538bf2e5a0c8112ab81a7f62f';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 function git(...args) {

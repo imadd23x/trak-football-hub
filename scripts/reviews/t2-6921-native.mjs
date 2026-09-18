@@ -7,7 +7,6 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { candidate, priorReview, candidateMigrations, readCandidate, readPriorReview } from './t2-6921-source.mjs';
 
-if (process.argv.length !== 2) throw new Error('Usage: node scripts/reviews/t2-6921-native.mjs');
 const migrations = candidateMigrations();
 let harness = readPriorReview('scripts/test-feedback-review.mjs');
 const nativeLibrary = readPriorReview('scripts/test-native-db.mjs');

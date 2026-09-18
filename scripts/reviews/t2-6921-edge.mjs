@@ -4,7 +4,6 @@
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { candidate, readCandidate } from './t2-6921-source.mjs';
-if (process.argv.length !== 2) throw new Error('Usage: node scripts/reviews/t2-6921-edge.mjs');
 const original = readCandidate('supabase/functions/player-feedback/index.ts');
 const source = original.replace(/^import \{ serve \} from "https:\/\/deno\.land\/std@0\.168\.0\/http\/server\.ts";\r?\n/m, '')
   .replace(/^import \{ createClient \} from "https:\/\/esm\.sh\/@supabase\/supabase-js@2\.45\.0";\r?\n/m, '');

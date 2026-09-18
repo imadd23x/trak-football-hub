@@ -1,18 +1,21 @@
 # PR40 feedback storage review — September 18, 2026
 
-**Not ready to merge.** The two-table design is a useful publication boundary,
-but the submitted grants, policies and publication transaction do not enforce
-the agreed contract. This branch contains executable review tests, not repairs.
+**Not ready to merge.** PR40 update `60a3ab7884554c5125a145c65e92d7b40987d843`
+fixes the six original findings below. Two additional runtime regressions remain:
+publication after concurrent coach removal, and deletion of published draft
+provenance. This branch contains Tarek's unchanged revisions plus executable
+review tests; it does not contain an independently authored storage repair.
 
-Reviewed canonical PR40 `e824ade90b214f6a0bf124b3a6038304565ac560`, cherry-picked
-as `91195ab` onto the previously verified integration `f1ce2fa`. All 62
-migrations replay with the existing native sequential security suites. No
-hosted database, real accounts, AI provider or HTTP endpoint was accessed.
+The initial canonical revision `e824ade90b214f6a0bf124b3a6038304565ac560`
+was cherry-picked as `91195ab` onto verified integration `f1ce2fa`; the latest
+update was cherry-picked as `1408f60`. All 62 migrations replay with the existing
+native sequential suites. No hosted database, real accounts, AI provider or HTTP
+endpoint was accessed.
 
 ## Reproduce
 
 ```sh
-# Desired security assertions: currently exits 1, with 14 failures / 47 checks.
+# Desired assertions on 60a3ab7: exits 1, with 1 failure / 48 checks.
 npm run test:db -- --feedback-storage-review
 
 # Independent positive regression: seven assertions currently pass.
@@ -32,7 +35,42 @@ The feedback audit remains opt-in and nonzero while the implementation is
 unrepaired. Existing green CI does not prove these new assertions pass. Never
 invert the assertions or accept the failing exit status as release success.
 
-## Reproduced failures
+## Latest update: 60a3ab7
+
+The original 47 sequential assertions now pass. The expectations accept safely
+server-stamped academy IDs and the exact deliberate assessment-validation error;
+arbitrary errors still fail. Adding the published-draft deletion regression
+produces **1/48 failed desired assertions; all 33 controls pass** on both PGlite
+0.5.8 / PostgreSQL 18.3 and native PostgreSQL 17.11. The same final assertions
+against the original unmodified `e824ade` migration fail **15/48**, with all 33
+controls passing, confirming the repaired expectations still catch the old bugs.
+
+Native first-publication concurrency now passes: the second transaction waits,
+revisions are 1 and 2, and exactly one current publication remains. Both intended
+coach/adult reads also pass under restricted default grants. Seven generated
+rating assertions and the existing sequential suites pass. The 12 native runner
+safeguard tests, focused lint, syntax and whitespace checks pass.
+
+| Finding | Reproduced outcome | Required repair |
+| --- | --- | --- |
+| FS7: published draft deletion | The owning coach deletes a referenced draft; `ON DELETE SET NULL` clears the publication's draft identity and removes its generated text/model/source history | Preserve referenced provenance with an enforcing FK or equivalent concurrency-safe restriction; ordinary deletion must not turn AI-assisted history into apparently manual feedback |
+| FS8: departure during publication | An authenticated academy admin executes the real `remove_coach_from_org` and holds its transaction open. The publishing coach passes authority checks against the old visible state, then waits on the roster lock. After removal commits, publication still succeeds: three total revisions, including one unauthorized new publication | Acquire the roster lock before ownership/role/consent checks and evaluate authority after the wait, before publication work |
+
+FS7 accepts permission/RLS denial or SQLSTATE `23503` naming exactly
+`player_feedback_draft_id_fkey`; unrelated errors fail. It does not prescribe
+whether an unused draft can be discarded. A snapshot-only `NOT EXISTS` delete
+policy needs concurrency protection too; do not rely on it alone. An FK change
+must also preserve intended account/roster deletion behavior.
+
+FS8 uses a synthetic adult, independently of the deferred consent-test conversion.
+The runner observes the blocked connection, commits the actual removal, and checks
+both the RPC result and preserved publication rows. A timeout cannot count as a
+successful denial. The final native audit **exits 1** for FS7 and FS8 and confirms
+that its temporary cluster stopped and directory was removed. Green ordinary CI
+does not clear these opt-in failures. P4 remains dependent on their repairs and
+the academy-specific effective-consent contract.
+
+## Original e824ade findings (historical; repaired by 60a3ab7)
 
 | Finding | Observed result | Required repair |
 | --- | --- | --- |

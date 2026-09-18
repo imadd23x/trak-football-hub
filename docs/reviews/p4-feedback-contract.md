@@ -38,3 +38,11 @@ review branch retains these as explicit failing tests, with no application or
 migration repair. P4 remains blocked on the repaired publication and effective
 consent contract; the existence of separate tables is not approval to consume
 their contents.
+
+The subsequent `60a3ab7` revision closes those original findings. The updated
+review now reproduces two remaining failures: deletion of published draft
+provenance (1/48 sequential assertions fails, all 33 controls pass), and a
+publication completing after the real academy-admin coach-removal transaction
+commits. First-publication serialization and restricted-default reads now pass.
+See the linked review for exact local reproduction and the limitations. P4 still
+waits for the remaining storage repairs and academy-specific effective consent.

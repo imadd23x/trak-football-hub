@@ -46,10 +46,11 @@ BEGIN
 END;
 $test$;
 CREATE FUNCTION pg_temp.feedback_expect_write_denied(
-  statement text, finding text, assertion text, zero_rows_is_denial boolean DEFAULT false
+  statement text, finding text, assertion text, zero_rows_is_denial boolean DEFAULT false,
+  expected_message text DEFAULT NULL, expected_constraint text DEFAULT NULL
 )
 RETURNS void LANGUAGE plpgsql AS $test$
-DECLARE changed bigint;
+DECLARE changed bigint; failed_constraint text;
 BEGIN
   BEGIN
     EXECUTE statement;
@@ -68,8 +69,39 @@ BEGIN
       -- The exception rolls back the whole attempted write, including trigger
       -- and nested RPC effects, before the failed assertion is recorded.
       PERFORM pg_temp.feedback_check(false, finding, assertion, 'write succeeded (rolled back)');
+    WHEN SQLSTATE 'P0001' THEN
+      -- A deliberate application denial is valid too; never accept an
+      -- arbitrary exception as proof that the authorization rule worked.
+      PERFORM pg_temp.feedback_check(expected_message IS NOT NULL AND SQLERRM = expected_message,
+        finding, assertion, SQLSTATE || ': ' || SQLERRM);
+    WHEN foreign_key_violation THEN
+      GET STACKED DIAGNOSTICS failed_constraint = CONSTRAINT_NAME;
+      PERFORM pg_temp.feedback_check(expected_constraint IS NOT NULL AND failed_constraint = expected_constraint,
+        finding, assertion, SQLSTATE || ': ' || SQLERRM);
     WHEN OTHERS THEN
       PERFORM pg_temp.feedback_check(false, finding, assertion, SQLSTATE || ': ' || SQLERRM);
+  END;
+END;
+$test$;
+CREATE FUNCTION pg_temp.feedback_expect_canonical_write(statement text, check_statement text, assertion text)
+RETURNS void LANGUAGE plpgsql AS $test$
+DECLARE canonical boolean;
+BEGIN
+  BEGIN
+    EXECUTE statement;
+    EXECUTE check_statement INTO canonical;
+    -- Both rejection and server-stamping the authoritative academy are safe.
+    -- Test the stored result, then undo it even when the implementation passes.
+    RAISE EXCEPTION USING ERRCODE = 'ZF002', MESSAGE = 'rollback canonical-write probe';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      PERFORM pg_temp.feedback_check(true, 'FS2', assertion, 'permission denied');
+    WHEN SQLSTATE 'ZF002' THEN
+      PERFORM pg_temp.feedback_check(canonical, 'FS2', assertion,
+        CASE WHEN canonical THEN 'authoritative provenance stored (rolled back)'
+          ELSE 'foreign provenance stored (rolled back)' END);
+    WHEN OTHERS THEN
+      PERFORM pg_temp.feedback_check(false, 'FS2', assertion, SQLSTATE || ': ' || SQLERRM);
   END;
 END;
 $test$;
@@ -167,6 +199,14 @@ SELECT pg_temp.feedback_check((SELECT count(*) = 1 FROM public.player_feedback
     AND published_text = 'SYNTHETIC APPROVED VERSION TWO'),
   'CONTROL', 'coach-authored revision has no invented draft or assessment provenance');
 
+-- Once a draft has been published, deleting it must not erase provenance.
+-- RLS/ACL denial or this exact FK restriction are safe. This does not require
+-- a particular policy for discarding drafts that were never published.
+SELECT pg_temp.feedback_expect_write_denied(
+  'DELETE FROM public.ai_feedback_drafts WHERE id = pg_temp.feedback_id(400)',
+  'FS7', 'coach cannot erase a published revision draft provenance', true, NULL,
+  'player_feedback_draft_id_fkey');
+
 -- Denied RPCs are positive controls: require an intentional denial, not an
 -- arbitrary constraint/syntax/runtime error. Unexpected successes roll back.
 SELECT pg_temp.feedback_expect_rpc_denied(
@@ -218,11 +258,15 @@ SELECT pg_temp.feedback_expect_write_denied(
 SELECT pg_temp.feedback_expect_write_denied(
   'INSERT INTO public.ai_feedback_drafts (id, squad_player_id, assessment_id, organization_id, generated_text, created_by)
    VALUES (pg_temp.feedback_id(402), pg_temp.feedback_id(100), pg_temp.feedback_id(301), pg_temp.feedback_id(200), ''SYNTHETIC FOREIGN ASSESSMENT'', pg_temp.feedback_id(1))',
-  'FS2', 'own-roster draft cannot reference a foreign player assessment');
-SELECT pg_temp.feedback_expect_write_denied(
+  'FS2', 'own-roster draft cannot reference a foreign player assessment', false,
+  'That assessment does not belong to this player');
+SELECT pg_temp.feedback_expect_canonical_write(
   'INSERT INTO public.ai_feedback_drafts (id, squad_player_id, assessment_id, organization_id, generated_text, created_by)
    VALUES (pg_temp.feedback_id(403), pg_temp.feedback_id(100), pg_temp.feedback_id(300), pg_temp.feedback_id(201), ''SYNTHETIC FOREIGN ORG'', pg_temp.feedback_id(1))',
-  'FS2', 'draft academy must match its roster and assessment');
+  'SELECT count(*) = 1 FROM public.ai_feedback_drafts WHERE id = pg_temp.feedback_id(403)
+    AND organization_id = pg_temp.feedback_id(200) AND assessment_id = pg_temp.feedback_id(300)
+    AND squad_player_id = pg_temp.feedback_id(100) AND created_by = pg_temp.feedback_id(1)',
+  'draft academy must match its roster and assessment');
 SELECT pg_temp.feedback_expect_write_denied(
   'INSERT INTO public.ai_feedback_drafts (id, squad_player_id, assessment_id, organization_id, generated_text, created_by)
    VALUES (pg_temp.feedback_id(404), pg_temp.feedback_id(100), pg_temp.feedback_id(300), pg_temp.feedback_id(200), ''SYNTHETIC FORGED CREATOR'', pg_temp.feedback_id(5))',
@@ -240,7 +284,8 @@ SELECT pg_temp.feedback_expect_write_denied($attempt$
     PERFORM public.publish_player_feedback(pg_temp.feedback_id(100), 'SYNTHETIC POISONED PUBLICATION', pg_temp.feedback_id(405));
   END;
   $attack$;
-$attempt$, 'FS2', 'draft plus publication cannot carry foreign assessment provenance through the real RPC');
+$attempt$, 'FS2', 'draft plus publication cannot carry foreign assessment provenance through the real RPC', false,
+  'That assessment does not belong to this player');
 
 -- Isolation controls test nonempty rows and explicit identities.
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.feedback_id(2), 'role', 'authenticated')::text, true);

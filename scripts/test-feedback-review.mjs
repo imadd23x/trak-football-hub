@@ -218,6 +218,36 @@ try {
     blocked, secondFinishedBeforeFirstCommit, firstIds, secondIds, secondResult, observed })}`);
   if (!passed) failures.push('overlapping_first_publications');
 
+  // Ownership must be checked after a contended row lock resolves. A departing
+  // coach's old snapshot cannot authorize a publication after departure commits.
+  // Use an adult fixture: this is independent of the deferred consent audit.
+  await control.sql(`BEGIN; SET LOCAL ROLE authenticated;
+    SELECT set_config('request.jwt.claims','{"sub":"${uid(3)}","role":"authenticated"}',true);
+    SELECT public.remove_coach_from_org('${uid(1)}');`);
+  let departureResult;
+  const duringDeparture = query(`SET application_name='trak_feedback_departure'; BEGIN; SET LOCAL statement_timeout='15s'; ${coach} ${publish('AFTER DEPARTURE')} COMMIT;`)
+    .then(value => (departureResult = { ok: true, output: value.stdout }), error => (departureResult = { ok: false, error: error.message }));
+  let departureBlocked = false;
+  for (let attempt = 0; attempt < 100 && !departureResult; attempt++) {
+    const status = await query("SELECT count(*) FROM pg_stat_activity WHERE application_name='trak_feedback_departure' AND wait_event_type='Lock';");
+    departureBlocked = Number(status.stdout.trim()) > 0;
+    if (departureBlocked) break;
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
+  await control.sql('COMMIT');
+  await duringDeparture;
+  if (!departureBlocked) throw new Error('Departure schedule did not reach the publication row-lock wait; outcome unproven');
+  const afterDeparture = await query(`SELECT json_build_object(
+    'rows', count(*), 'current', count(*) FILTER (WHERE superseded_at IS NULL),
+    'unauthorized', count(*) FILTER (WHERE published_text='SYNTHETIC AFTER DEPARTURE')
+  ) FROM player_feedback WHERE squad_player_id='${uid(20)}';`);
+  const departureObserved = JSON.parse(afterDeparture.stdout.trim());
+  const departurePassed = !departureResult.ok && departureResult.error.includes('Not your player')
+    && departureObserved.rows === 2 && departureObserved.current === 1 && departureObserved.unauthorized === 0;
+  console.log(`[feedback-review] ${JSON.stringify({ name: 'departure_during_publication_lock', passed: departurePassed,
+    departureBlocked, response: departureResult, observed: departureObserved })}`);
+  if (!departurePassed) failures.push('departure_during_publication_lock');
+
   // Replay with table default grants revoked immediately before PR40, as on a
   // project where new public tables require explicit Data API grants. Existing
   // migrations/defaults are unchanged; the application migration is not edited.

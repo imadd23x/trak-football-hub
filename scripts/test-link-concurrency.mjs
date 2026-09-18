@@ -3,9 +3,9 @@
 // No application connection settings, existing cluster, TCP listener or live DB.
 import { spawn } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildReplayPlan, childEnvironment, runCommand } from './test-native-db.mjs';
+import { buildReplayPlan, childEnvironment, runCommand, temporaryRoot } from './test-native-db.mjs';
 
 const args = process.argv.slice(2);
 if (args.length > 1 || (args.length === 1 && args[0] !== '--historical-link-rpc')) {
@@ -13,9 +13,10 @@ if (args.length > 1 || (args.length === 1 && args[0] !== '--historical-link-rpc'
 }
 const historical = args[0] === '--historical-link-rpc';
 const root = fileURLToPath(new URL('../', import.meta.url));
-const bin = '/opt/homebrew/opt/postgresql@17/bin';
+const bin = process.env.TRAK_TEST_PG_BIN || '/opt/homebrew/opt/postgresql@17/bin';
+if (!isAbsolute(bin)) throw new Error('TRAK_TEST_PG_BIN must be an absolute PostgreSQL 17 binary directory');
 const port = '55441';
-const directory = await mkdtemp('/private/tmp/trak-link-race-');
+const directory = await mkdtemp(join(temporaryRoot, 'trak-link-race-'));
 const data = join(directory, 'data');
 const socket = join(directory, 'socket');
 const env = childEnvironment(bin, directory);

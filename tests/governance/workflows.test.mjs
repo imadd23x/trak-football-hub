@@ -49,6 +49,7 @@ test('consent gate executes independently pinned policy with no hosted credentia
   const candidate = checkouts.find(step => step.with.path === 'candidate');
   const trusted = checkouts.find(step => step.with.path === 'trusted-consent-audit');
   assert.equal(candidate.with.ref, '${{ github.sha }}');
+  assert.equal(trusted.with.repository, 'imadd23x/trak-football-hub');
   assert.match(trusted.with.ref, /^[a-f0-9]{40}$/);
   for (const step of checkouts) { assert.equal(step.with['persist-credentials'], false); assert.equal(step.with['fetch-depth'], 0); }
   const install = audit.steps.find(step => step.name === 'Install trusted audit dependencies');
@@ -71,7 +72,7 @@ test('consent gate executes independently pinned policy with no hosted credentia
   }
   const context = { always: () => true, github: {
     repository: 'kostasanastasioubusiness-lang/trak-football-hub', event_name: 'push', ref: 'refs/heads/main',
-  }, needs: { test: { result: 'success' }, supabase: { result: 'success' },
+  }, needs: { test: { result: 'success', outputs: { release_eligible: 'true' } }, supabase: { result: 'success' },
     'vercel-credentials': { outputs: { configured: 'true' } } } };
   for (const status of ['success', 'failure', 'cancelled', 'skipped', '']) {
     context.needs['consent-audit'] = { result: status };
@@ -102,6 +103,31 @@ test('main release verification runs before any production job through the test 
   assert.ok(ci.jobs.deploy.needs.includes('test'));
   assert.ok(ci.jobs.deploy.needs.includes('supabase'));
   assert.ok(ci.jobs.deploy.if.includes("needs.supabase.result == 'success'"));
+  assert.equal(preflight.id, 'delivery');
+  assert.equal(ci.jobs.test.outputs.release_eligible, '${{ steps.delivery.outputs.release_eligible }}');
+});
+test('actual production conditions reject superseded or absent eligibility without blocking previews', () => {
+  const repository = 'kostasanastasioubusiness-lang/trak-football-hub';
+  function allowed(id, eligibility, { ref = 'refs/heads/main', testResult = 'success', backend = 'success' } = {}) {
+    const job = ci.jobs[id];
+    const needs = {
+      test: { result: testResult, outputs: { release_eligible: eligibility } },
+      supabase: { result: backend },
+      'consent-audit': { result: 'success' },
+      'vercel-credentials': { result: 'success', outputs: { configured: 'true' } },
+    };
+    // Jobs without a status function have GitHub's implicit success() gate.
+    if (!job.if.includes('always()') && job.needs.some(name => needs[name].result !== 'success')) return false;
+    const condition = job.if.replace(/needs\.([a-z][a-z-]*)/g, 'needs["$1"]');
+    return runInNewContext(condition, { needs, github: { repository, event_name: 'push', ref }, always: () => true }, { timeout: 1000 });
+  }
+  for (const id of ['supabase', 'deploy']) {
+    assert.equal(allowed(id, 'true'), true, `${id}: verified release should deploy`);
+    for (const value of ['false', '', undefined]) assert.equal(allowed(id, value), false, `${id}: missing or superseded eligibility must block`);
+    assert.equal(allowed(id, 'true', { testResult: 'failure' }), false, `${id}: failed source checks must block`);
+  }
+  assert.equal(allowed('deploy', 'true', { backend: 'failure' }), false);
+  assert.equal(allowed('deploy', undefined, { ref: 'refs/heads/shared/preview', backend: 'skipped' }), true);
 });
 test('existing source, database, upgrade, browser, harness and build checks remain wired', () => {
   const commands = ci.jobs.test.steps.map(step => step.run);

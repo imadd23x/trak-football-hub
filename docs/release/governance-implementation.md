@@ -12,9 +12,11 @@ setting changes are part of this implementation.
 - Compare migration files with current main. Reject edits/deletions of existing
   migrations. Older additions require exact order evidence and an independent
   approval of this candidate and current base; author acknowledgement alone fails.
-- Verify delivery using GitHub's actual merge result and changed-file inventory.
+- Verify delivery using GitHub's actual merge result and exact reviewed file objects.
   Original-head ancestry is not required for squash/rebase merges. Run source
-checks on the delivered commit before the existing production jobs.
+  checks on the delivered commit before the existing production jobs. An older
+  run superseded by a normal forward merge reports ineligible and skips both
+  production jobs; divergent or unverifiable history still fails.
 - Replace the old inline-Bash extraction tests with executable Node tests of
   the new guard and workflow contract. Main remains valid; every non-main base
   is now rejected, including the formerly warning-only live stack.
@@ -30,7 +32,7 @@ Use temporary Git repositories and synthetic GitHub responses to exercise the
 actual command paths. Prove both rejection and acceptance: real dependency,
 independent branches, already delivered dependency, backdated migration, forged
 or stale acknowledgement, authorized order evidence, ordinary/squash/rebase
-delivery, wrong target, missing changed file, missing API data, and a new audit
+delivery, wrong target, missing changed file, discarded file contents, missing API data, and a new audit
 failure offset by a repaired old failure. Preserve all existing source, harness,
 SQL, browser, typecheck, lint and build checks. Inspect actual fork CI before
 requesting independent review.

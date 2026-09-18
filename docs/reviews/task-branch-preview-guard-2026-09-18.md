@@ -2,7 +2,9 @@
 
 Prepared from canonical main `09d22d408b6633f1ca06d845853adfdca843a463` after
 [Kostas's review](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1789733396375039).
-This candidate is fork-only until reviewed and approved for production. No
+The candidate subsequently integrated current main
+`b9adf1c45d468f4987b08c8def4c9ce23eaf4634`. This candidate is fork-only until
+reviewed and approved for production. No
 existing PR head or deployed workflow has been changed by this branch.
 
 ## Trigger and correction
@@ -53,14 +55,23 @@ node node_modules/eslint/bin/eslint.js .
 ```
 
 - New expectations against the unchanged main workflow: **7 fail / 7 pass**.
-- Repaired workflow: **14/14 pass**, including denied task/develop pushes,
+- Initial repaired workflow: **14/14 pass**, including denied task/develop pushes,
   fork-origin previews, missing credentials, failed/skipped tests, failed backend
   and undeclared event types; legitimate release/preview controls pass.
-- Source and harness suites: **190 pass**.
-- Operational-view SQL: **282 assertions pass**, with all **58 migrations**
-  replayed in the disposable database.
-- App TypeScript and build pass. Lint has **0 errors / 140 existing warnings**;
+- After integrating current main, **16/16 workflow tests** pass, preserving its
+  additional migration-preview/apply guards; **309 source/harness tests** pass.
+- Parent invitation SQL and **282 operational-view assertions** pass, with all
+  **59 migrations** replayed in the disposable database.
+- App TypeScript and build pass. Lint has **0 errors / 134 existing warnings**;
   the existing large-chunk build warning remains. Whitespace checks pass.
+- All **5 parent invitation/family browser journeys pass** in 12 seconds against
+  the local production build with synthetic intercepted HTTP. The current-main
+  family test used the retired Settings label; it now locates “Account settings”
+  and still asserts that both linked children appear in Settings. This repairs
+  the failed journey in main run `35343003639` without changing the application.
+- The use-case gate exits successfully with **2 enforced cases**, but still
+  reports **3 pending UC-A02 failures** and **15 pending cases without tests**.
+  These are existing coverage/contract gaps, not an all-green pilot assertion.
 
 These tests prove the event/target behavior of this workflow file, not GitHub
 branch-protection configuration or a hosted deployment. Other pilot acceptance
@@ -81,6 +92,12 @@ results and forward-fix the narrow condition. Do not restore the broad push
 condition or bypass a failed backend. No database rollback is required for this
 workflow-only repair.
 
+Current main also contains PR30's calendar changes. Before a production release,
+coordinate the PR41 migration and its matching calendar consumers with
+Kostas/Tarek. Repairing CI must not be treated as permission to deploy known
+incompatible calendar behavior. That release dependency is separate from this
+workflow/browser-test repair.
+
 ## Review clarification
 
 PR35 merged at 14:05 Dubai on September 18; its
@@ -91,3 +108,12 @@ finished successfully at 14:08, including migration push. Migration
 restricted metadata observed at 16:09 is consistent with that deployment and
 does not establish manual schema drift. Broader report-inventory test coverage
 and stale rehearsal-document instructions remain separate review findings.
+
+The later PR30 main run `35342876222` failed migration-history validation:
+`20260917205027` was already recorded remotely but absent from that checkout.
+It applied no logged migration and deployed no Edge Functions or Vercel frontend.
+PR31/32/33 runs were cancelled with zero jobs; the PR39 run failed browser tests
+and skipped both deployment jobs. Read-only migration metadata independently
+confirms the parent-invitation history entry; these runs do not establish its
+source or exact deployed SQL. Do not describe the whole current backend as
+unchanged since PR35, or infer cancellation causes from conclusions alone.

@@ -1,0 +1,27 @@
+name: S4 queue probe
+# Experimental fork-only branch; never integrate this workflow.
+on:
+  push:
+    branches: ['probe/S4-release-queue']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A new PR revision may replace its checks. Pushes retain up to 100 pending
+  # runs as well as the running release; cancel-in-progress alone protects
+  # only the running one. The same predicate keeps max + true impossible.
+  queue: ${{ github.event_name == 'pull_request' && 'single' || 'max' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+
+permissions: {}
+
+jobs:
+  queue-probe:
+    if: github.repository == 'imadd23x/trak-football-hub'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Observe serialized execution
+        run: |
+          echo "Synthetic queue observation for $GITHUB_SHA"
+          sleep 90

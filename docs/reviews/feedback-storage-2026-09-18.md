@@ -70,6 +70,40 @@ that its temporary cluster stopped and directory was removed. Green ordinary CI
 does not clear these opt-in failures. P4 remains dependent on their repairs and
 the academy-specific effective-consent contract.
 
+## UI/edge expansion at e7371a7 (source review only)
+
+PR40 subsequently added four frontend/edge files at
+`e7371a7adce53d18e2a42e8e0fbdaabf57f83536`. The storage migration is byte-identical
+to `60a3ab7`, so neither FS7 nor FS8 is repaired. This review branch retains the
+storage snapshot; the following exact-head source findings have not been run as
+browser/provider tests and are not a claim of additional runtime reproduction.
+
+- Reopening and editing a publication loses its assessment association.
+  [CoachReviewFeedback lines 83–94](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/e7371a7adce53d18e2a42e8e0fbdaabf57f83536/src/pages/coach/CoachReviewFeedback.tsx#L83)
+  load text/date but not draft identity. The update passes null `p_draft_id` at
+  line 145; the RPC derives assessment only from a draft. The replacement has
+  null assessment, so the player's assessment-filtered query at line 317 cannot
+  retrieve it and displays the awaiting-coach state.
+- The new route exists in `App.tsx:113`, but there is no navigation to it in
+  `src`. Assessment submission still returns home. Provide a reachable approval
+  entry point and test the routed journey.
+- The review effect at lines 58–60 resets loading/error without clearing draft,
+  draft ID or publication state. Navigating from assessment A to B can retain A's
+  text when B has no publication. Generation responses at 126–127 also lack an
+  account/assessment cancellation check. Bind state and responses to their owner
+  and reject late results before allowing publication.
+- [The edge validation at line 174](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/e7371a7adce53d18e2a42e8e0fbdaabf57f83536/supabase/functions/player-feedback/index.ts#L174)
+  accepts any nonempty `points` array, including `[null]`; coach rendering at
+  line 230 dereferences `point.title`. Validate the full payload before storing
+  it and handle malformed stored responses without crashing.
+
+The existing consent/AI-purpose boundary also remains: generation reads private
+notes and calls the provider without an effective-consent check first. The
+player's DEV branch still generates feedback from notes. These require their own
+decisions/repairs and must not be counted as solved by publication storage.
+Findings were sent in the authorized
+[review channel thread](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1789728982708799).
+
 ## Original e824ade findings (historical; repaired by 60a3ab7)
 
 | Finding | Observed result | Required repair |

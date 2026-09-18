@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import {
 import { Mail, RefreshCw, ChevronDown } from 'lucide-react';
 import { validatePassword, PASSWORD_HINT } from '@/lib/password'
 import { CONSENT_THRESHOLD_AGE, ageFromDateOfBirth } from '@/lib/consent'
+import { isRealCalendarDate, daysInMonth } from '@/lib/calendar'
 
 const StyledSelect = ({ value, onChange, placeholder, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { placeholder?: string }) => (
   <div className="relative">
@@ -151,8 +152,24 @@ const PlayerOnboarding = () => {
 
   // Built once from the three selects, so the age check and the value sent to
   // the database can never disagree.
-  const dateOfBirth = dobDay && dobMonth && dobYear
-    ? `${dobYear}-${String(MONTHS.indexOf(dobMonth) + 1).padStart(2, '0')}-${String(dobDay).padStart(2, '0')}`
+  // Only offer days that exist in the chosen month, so 31 February cannot be
+  // picked in the first place. Falls back to 31 until a month and year are set.
+  const monthIndex = dobMonth ? MONTHS.indexOf(dobMonth) + 1 : 0;
+  const availableDays = (dobMonth && dobYear)
+    ? DAYS.slice(0, daysInMonth(parseInt(dobYear, 10), monthIndex))
+    : DAYS;
+
+  // If the day was chosen before the month, changing to a shorter month can
+  // strand an impossible day in state. Drop it rather than submit it.
+  useEffect(() => {
+    if (dobDay && !availableDays.includes(dobDay)) setDobDay('');
+  }, [dobDay, availableDays]);
+
+  const dobIsReal = !!(dobDay && dobMonth && dobYear) &&
+    isRealCalendarDate(parseInt(dobYear, 10), monthIndex, parseInt(dobDay, 10));
+
+  const dateOfBirth = dobIsReal
+    ? `${dobYear}-${String(monthIndex).padStart(2, '0')}-${String(dobDay).padStart(2, '0')}`
     : null;
   const age = dateOfBirth ? ageFromDateOfBirth(dateOfBirth) : null;
   const needsConsent = age !== null && age < CONSENT_THRESHOLD_AGE;
@@ -160,6 +177,17 @@ const PlayerOnboarding = () => {
   const handleStep1 = () => {
     if (!name || !dobDay || !dobMonth || !dobYear || !nationality || !email || !password || !confirmPassword) {
       toast.error('Please fill in all fields'); return;
+    }
+    // An impossible date used to pass straight through: JavaScript rolls
+    // 31 February over to 3 March rather than failing, so the age the consent
+    // gate uses was never the date entered, and Postgres then rejected the
+    // literal string and stranded signup on an error nobody could act on.
+    if (!dobIsReal) {
+      toast.error(`${dobMonth} ${dobDay} isn't a real date — please check your date of birth`);
+      return;
+    }
+    if (age === null || age < 0 || age > 100) {
+      toast.error('Please check your date of birth'); return;
     }
     if (password !== confirmPassword) {
       toast.error('Passwords do not match'); return;
@@ -236,7 +264,7 @@ const PlayerOnboarding = () => {
           <div className="grid grid-cols-3 gap-2">
             <StyledSelect value={dobDay} onChange={e => setDobDay(e.target.value)}>
               <option value="">Day</option>
-              {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+              {availableDays.map(d => <option key={d} value={d}>{d}</option>)}
             </StyledSelect>
             <StyledSelect value={dobMonth} onChange={e => setDobMonth(e.target.value)}>
               <option value="">Month</option>

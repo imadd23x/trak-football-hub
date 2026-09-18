@@ -1,6 +1,29 @@
 # Coach assessment query performance — synthetic investigation
 
-Investigated integration commit `c5e8832` on September 18, 2026. This is measured local evidence and a proposed change, not an implementation or production performance claim. No application code, migration, live data, or hosted configuration was changed.
+The additive coach/date index is implemented for review in `20260918080430_index_coach_assessment_history.sql`. It improves the bounded recent-assessment feed; the unbounded squad/Home analytics histories remain separate work. No production change was made. The [scope and rollout plan](../plans/coach-assessment-index.md) records lock/storage costs and the existing timestamp-tie limitation.
+
+## Native verification of the actual migration
+
+September 18, 2026: `node scripts/test-query-performance.mjs` used PostgreSQL 17.11 in a private Unix-socket cluster with no TCP listener. It replayed all 61 migrations and existing sequential security suites, then created 20 synthetic academies/admins/coaches, 600 linked adult players (DOB 2000-01-01), 600 academy-pinned roster rows and 31,100 assessments. Additional sequential-suite fixtures remained: 604 total roster rows and 31,104 assessments. It removed only the new index for the baseline, then applied the actual migration file.
+
+| SQL query | Before ms / shared hits | After ms / shared hits |
+|---|---:|---:|
+| Home latest-five, all assessment fields plus player-name join | 71.179 / 23,006 | 2.598 / 2,135 (+2 reads) |
+| Squad full history, 2,600 returned rows | 77.600 / 22,991 | 74.501 / 22,991 |
+| Home full analytics history, 2,600 rows | 70.414 / 22,991 | 72.337 / 22,991 |
+| Proposed latest-per-player, 30 rows (not shipped to callers) | 5.473 / 4,159 | 5.088 / 4,159 |
+
+The new index was present in the actual Home query plan. Its local database build took 8.857 ms and occupied 1,277,952 bytes; neither is a production forecast. Complete result rows, fixture fingerprints and RLS policies were identical before/after. The Home feed returned exactly the expected five newest identities/timestamps with populated player names. All captures ran as the actual authenticated coach; no definer bypass was used.
+
+Five distinct PostgreSQL connections ran the Home query in each phase. Execution intervals overlapped in both phases and every result matched the sequential reference. Observed execution ranges were 90.046–101.571 ms before and 2.917–5.510 ms after. These are concurrent reads for the same synthetic coach on one local machine, not an HTTP load test or supported-user capacity. No elapsed-time threshold is asserted.
+
+A separate native replay of all 61 migrations passed the parent invitation, coach departure, academy access, operational views and account-deletion suites. The Supabase database advisor reported **No issues found**, exit 0, against that private socket. Both clusters were stopped and removed. Native helper tests passed 12/12, release-workflow tests 6/6, and focused lint passed.
+
+Full local evidence: `/private/tmp/trak-query-report-G5LRIx/report.json`. The committed runner reproduces the comparison, and CI uploads its synthetic report as `synthetic-assessment-query-plans` with 14-day retention. Results above use distinct fixture timestamps: date-only queries still have unspecified order at ties. Hosted API plans, network payloads, real-device timing and sustained multi-user capacity remain unverified.
+
+## Original PGlite investigation
+
+The following original investigation used integration `c5e8832`, before the index was implemented, and a smaller identity model without academies. Its numbers should not be mixed with the later academy-linked native measurements above.
 
 ## Finding
 
@@ -61,7 +84,7 @@ ANALYZE public.coach_assessments;
 
 ## Minimal proposed changes and constraints
 
-1. Coordinate with Kostas before a new index migration on `(coach_user_id, created_at DESC)`. It changes no authorization or returned data and directly helps a bounded latest-five/date-ordered feed. Do not remove existing indexes without checking other callers. Index creation/write overhead and native PostgreSQL plans should be checked before release.
+1. The coach/date index proposal was coordinated in #coding-agent-reviews and implemented/verified as described above. It changes no authorization or query scope and directly helps a bounded latest-five/date-ordered feed. Existing indexes remain. Write-maintenance overhead and production lock duration still require release consideration.
 2. Coordinate the squad rating read with K7: expose a bounded latest-per-player result using invoker permissions and the existing squad/date index, then replace only the routed squad history fetch. The tested lateral query preserves the current coach-authored filter, zero scores, newest non-null rating, and unassessed players through a LEFT JOIN. It does not bypass RLS.
 3. K7 may intentionally require the latest academy assessment, including retained history from another coach. That product requirement is broader than this performance-only equivalence. Agree the authorized history scope before creating an RPC; do not silently bake the current author filter into the final API. Preserve departed/transferred-coach denials, parent/player isolation, and deleted-academy history protections in regression tests. If exposed as an RPC, prefer SECURITY INVOKER and identity from auth.uid(), never a trusted caller-supplied coach ID.
 4. Do not replace the Home analytics history with five rows or just one rating per player. Review its calculations and intended history window separately; a server-side aggregate or paginated history needs correctness tests. Tied timestamps also need a deterministic agreed tie-breaker before a new API contract.
@@ -74,4 +97,4 @@ ANALYZE public.coach_assessments;
 
 Full JSON plans, executed SQL, role, existing indexes, counts, and comparison assertions are retained locally at `/private/tmp/trak-query-performance-results.json`. The temporary investigation script `scripts/_query-performance.local.mjs` was removed after preserving this report. This report contains the durable result summary; the temporary JSON is not a required repository artifact.
 
-No native PostgreSQL 17 run, live plan, load/concurrency benchmark, HTTP payload measurement, or whole-application performance claim is included. No fix has been implemented.
+The original PGlite study did not include native, hosted, HTTP or concurrent measurements. The later native evidence above adds a narrowly scoped concurrent-read comparison and verifies the implemented index; it does not establish whole-application performance or resolve the remaining unbounded queries.

@@ -66,6 +66,20 @@ jobs:
         env:
           TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
 
+      - name: Native assessment query plan and result regressions
+        run: npm run test:db:query-plans
+        env:
+          TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+
+      - name: Preserve synthetic query plans
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-assessment-query-plans
+          path: /tmp/trak-query-report-*/report.json
+          if-no-files-found: warn
+          retention-days: 14
+
       # tests/msw and tests/support hold the MSW fidelity contract and the
       # useCase() unknown-id guard — package.json's "test" script only runs
       # src, so these run nowhere else in CI.

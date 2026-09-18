@@ -101,9 +101,14 @@
 <div class="wrap">
 
 <header class="mast">
-  <div class="eyebrow">Week &minus;2 &middot; before the academy sees anything</div>
+  <div class="eyebrow">Historical rehearsal reference &middot; September 18, 2026 notice</div>
   <h1>Rehearsal script</h1>
-  <p class="lede">All fourteen use cases, walked against the seeded rehearsal academy. Roughly 45 minutes. The point is to find what breaks while it is still cheap &mdash; today's smoke test was about instrumentation, not coverage, and it still surfaced two serious bugs.</p>
+  <p class="lede">A historical walkthrough of fourteen use cases against an earlier synthetic rehearsal academy. Keep it as a reference when preparing the current role journeys.</p>
+  <div class="alarm">
+    <h3>The current charter controls this rehearsal</h3>
+    <p>Use the <a href="pilot-readiness-2026-09-25.md">current pilot charter, U1&ndash;U10 verification matrix and admission gates</a>. This archived walkthrough does not establish current readiness: its test-status labels, routes, fixture counts and expected behaviour require reconciliation with the reviewed build. Historical coach notes remain private; only explicitly published, permitted feedback may be shared.</p>
+    <p>Before using any account, confirm the approved destination, deployed commit and current synthetic fixture manifest with the operator. The account mapping below is historical; neither this page nor an S2 code merge proves that those accounts or fixtures exist in the destination. September 25 is a synthetic phone demonstration, not permission to admit real children. Follow the <a href="release/merge-gate.md">release gate</a> and <a href="pilot-runbook.md">operator runbook</a>.</p>
+  </div>
 </header>
 
 <section>
@@ -113,7 +118,8 @@
   </div>
 
   <div class="card">
-    <p class="small">Everything below uses the seeded rehearsal academy. Password for every account: <code>RehearsalTrak123!</code></p>
+    <h3>Historical synthetic account mapping</h3>
+    <p class="small">Obtain the current role-to-account mapping and sign-in credentials from the designated operator through a private handoff. Do not copy credentials into this page, source control or public review messages. Confirm each account against the current target and fixture manifest; the examples and counts below describe the old rehearsal only. A reviewed S2 release requires a separate authorized fixture application and login verification; deployment alone does not create accounts.</p>
     <div class="who-band"><span class="role">Director</span><code>director@rehearsal.trak.dev</code></div>
     <div class="who-band"><span class="role">Coach U15</span><code>coach.u15@rehearsal.trak.dev</code><span class="tiny">16 players, 6 fixtures</span></div>
     <div class="who-band"><span class="role">Coach U17</span><code>coach.u17@rehearsal.trak.dev</code><span class="tiny">second squad</span></div>
@@ -340,22 +346,28 @@
   </div>
 
   <div class="card">
-    <h3>Then confirm nothing is orphaned</h3>
-    <pre>SELECT * FROM squad_duplicate_candidates;
-SELECT * FROM pilot_safeguarding_checks;</pre>
-    <p class="small">Both should return <b>zero rows</b>. The first catches duplicate roster entries from signup, the second catches cross-role leakage. Any row is explained in writing before the pilot continues.</p>
+    <h3>Operator-only reporting checks</h3>
+    <p class="small">After PR35, these operational views are restricted to the reviewed project's authorized operator SQL workflow or a trusted server-side <code>service_role</code> connection. A club account is an application user (<code>authenticated</code>), not <code>service_role</code>. A permission denial with application credentials is expected; it is not a zero-row result or a passed report check. Never put service credentials in the browser or legacy seed/check clients.</p>
+    <p class="small">In the authorized operator SQL editor, verify the querying role and run the read-only checks:</p>
+    <pre>BEGIN READ ONLY;
+SET LOCAL ROLE service_role;
+SELECT current_user;
+SELECT * FROM public.squad_duplicate_candidates;
+SELECT * FROM public.pilot_safeguarding_checks;
+ROLLBACK;</pre>
+    <p class="small">Record the target project, deployed migration, querying role, configured academy/window and observed rows using the <a href="pilot-runbook.md#the-weekly-query">operator runbook</a>. Investigate returned findings. Zero rows cover only these reports' defined checks; they do not prove complete deletion, absence of orphans or cross-role isolation. Verify the current charter's U7&ndash;U10 outcomes separately against the exact synthetic fixture IDs.</p>
   </div>
 </section>
 
 <section>
   <div class="sec-head">
     <div class="eyebrow">After the run</div>
-    <h2>Reset</h2>
+    <h2>Record results and agree cleanup</h2>
   </div>
   <div class="card">
-    <p class="small">The rehearsal run leaves extra players, matches and assessments behind. Before real data arrives:</p>
-    <pre>node seed-pilot-rehearsal.mjs --purge</pre>
-    <p class="small">Then set the pilot window to the real values &mdash; <code>starts_on</code> to the pilot start date and <code>org_id</code> to the academy's own organisation, once the director has created it. Leaving <code>org_id</code> pointing at Rehearsal FC makes every cohort metric wrong.</p>
+    <p class="small">Record the exact build, target, fixture IDs and observed outcomes. Ask the operator which reviewed S2 instructions and manifest apply; S2 availability and fixture application must be confirmed separately for that destination. A successful seed is not evidence of hosted login, email delivery or completed phone journeys.</p>
+    <p class="small">Do not run the old broad purge or use an older seed-script revision to reset the shared project. The S2 replacement has no automatic reset: preserve changed fixtures and arrange any cleanup through a separately reviewed list of exact IDs and dependencies. Retiring old instructions does not delete accounts or revoke their credentials.</p>
+    <p class="small">Before any real pilot, the operator must confirm each academy's agreed dates and S3 measurement configuration, including exclusion of synthetic activity. This historical rehearsal does not authorize changing the shared pilot window or replacing the current admission gates.</p>
   </div>
 </section>
 

@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "roster-adoption",
+      "sourceRevision": "415a796af366e436de3c36c1e2f8a716da14ce0c",
+      "runnerRevision": "415a796af366e436de3c36c1e2f8a716da14ce0c",
+      "inventoryRevision": "415a796af366e436de3c36c1e2f8a716da14ce0c",
+      "assertions": [
+        {
+          "id": "RA-C-ambiguous-read",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-C-ambiguous-role",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-C-exact-read",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-C-exact-role",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-C-fixture",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-C-typo-read",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-C-typo-role",
+          "kind": "control",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-ambiguous-histories",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-ambiguous-identities",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-ambiguous-no-wrong-read",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-ambiguous-own-link",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-exact-history",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-exact-id",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-exact-one-link",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-exact-owner",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-exact-read",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-exact-repeat",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-typo-history",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-typo-identity",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-typo-no-wrong-read",
+          "kind": "check",
+          "expected": "pass"
+        },
+        {
+          "id": "RA-typo-own-link",
+          "kind": "check",
+          "expected": "pass"
+        }
+      ]
+    }
+  ]
+}

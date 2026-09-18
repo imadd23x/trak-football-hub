@@ -76,7 +76,7 @@ export default function ParentHome() {
                     <div className="rounded-xl p-5 mt-2 bg-card border border-border">
                       <div className="flex items-center justify-between gap-2 mb-4">
                         <div>
-                          <p className="text-sm text-foreground">{development?.coachNames[assessment.coach_user_id] || 'Coach'}</p>
+                          <p className="text-sm text-foreground">{(assessment.coach_user_id && development?.coachNames[assessment.coach_user_id]) || 'Coach'}</p>
                           <p className="text-xs text-muted-foreground mt-1">{formatParentDate(assessment.created_at)}</p>
                         </div>
                         <ParentRating rating={assessment.coach_rating} missing="Not assessed" />

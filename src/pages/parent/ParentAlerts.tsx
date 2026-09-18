@@ -31,11 +31,11 @@ export default function ParentAlerts() {
     })),
     ...(development.data?.assessments ?? []).map(assessment => ({
       id: `assessment-${assessment.id}`, title: 'New coach assessment', date: assessment.created_at,
-      description: `by ${development.data?.coachNames[assessment.coach_user_id] || 'Coach'} · ${assessment.coach_rating == null ? 'Not assessed' : scoreToBand(assessment.coach_rating)}`,
+      description: `by ${(assessment.coach_user_id && development.data?.coachNames[assessment.coach_user_id]) || 'Coach'} · ${assessment.coach_rating == null ? 'Not assessed' : scoreToBand(assessment.coach_rating)}`,
     })),
     ...(development.data?.awards ?? []).map(award => ({
       id: `award-${award.id}`, title: formatParentAward(award.award_type), date: award.created_at,
-      description: [award.awarded_for, `by ${development.data?.coachNames[award.coach_user_id] || 'Coach'}`].filter(Boolean).join(' · '),
+      description: [award.awarded_for, `by ${(award.coach_user_id && development.data?.coachNames[award.coach_user_id]) || 'Coach'}`].filter(Boolean).join(' · '),
     })),
   ].sort(compareParentActivity).slice(0, PARENT_ACTIVITY_LIMIT)
   const childId = selectedChild?.id

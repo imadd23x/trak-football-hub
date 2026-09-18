@@ -51,7 +51,37 @@ matrix. Governance tests execute 7×7 audit states and three release-eligibility
 states for both production jobs. Independent review found no integration blocker.
 Audit reports and complete step summaries are local files under
 `/private/tmp/trak-audits-integration-*238221a*`; other check logs use the same
-prefix. No browser rerun or hosted CI is claimed by these local checks.
+prefix. Those local checks did not rerun the browser suite; the hosted execution
+below supplies separate CI and browser evidence.
+
+## Hosted verification
+
+Fork candidate `d48503f304a6d1dde48a7cabfad8897be2b04d87` completed
+[CI run 35365630856](https://github.com/imadd23x/trak-football-hub/actions/runs/35365630856)
+successfully. The job metadata and audit logs were read back from GitHub:
+
+- **Consent privacy audit:** all 27 assertions executed; 19 controls passed,
+  the same eight named failures remained, and the evaluator reported no new
+  violations. A passing debt gate is not a passing privacy audit.
+- **Roster adoption audit:** all 21 assertions passed with zero accepted debt;
+  the separate 11 runner-discrimination tests also passed.
+- **test:** governance, source, both SQL replay orders, harness, use-case
+  evaluator, typecheck, lint, build and browser steps succeeded. The pending
+  use-case limitations above still apply.
+- **Supabase** and **Deploy:** skipped by the fork restriction. No production
+  change or active branch protection follows from this run.
+
+The core PR46 check at `3c2a6e37134fcd76f5f6c747c5df4fd58cd5ee60`
+was separately rechecked: `test` and `Merge policy` are successful. Kostas's
+old blocking review is dismissed; both teammates' latest reviews are comments,
+not formal approvals. Canonical main remains
+`00910940f596d9fe9a7cd416dc741943d1df2cc9`, with protection reported disabled.
+These are September 18 observations, not permanent repository status.
+
+A fresh local rerun at the unchanged integration head passed all **104**
+governance/runner tests; the unchanged core PR46 passed all **75** governance
+tests. This documentation update does not alter either implementation or any
+pinned audit input. CI evidence above belongs to the explicitly named commit.
 
 Reproduce from the current candidate checkout using its actual HEAD. The consent
 runner requires that exact revision and a fresh, unused report path; the temporary
@@ -69,7 +99,7 @@ node ../trak-roster-audit-gate/scripts/audits/roster-adoption.mjs --candidate-ro
 
 PR46 must be approved/delivered before canonical integration, then this candidate
 must contain current main and receive fresh checks and independent review.
-There are no separate open audit PRs to resolve. This is local fork preparation,
+There are no separate open audit PRs to resolve. This is tested fork preparation,
 not hosted protection activation, a production release, or real-child approval.
 The eight named consent failures remain admission blockers; roster has zero
 accepted debt within its limited identity inventory. Feedback FS7/FS8 still need

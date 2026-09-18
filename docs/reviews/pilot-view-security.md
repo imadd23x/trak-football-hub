@@ -1,6 +1,6 @@
 # Operational view access review
 
-Status: implemented and verified in disposable PGlite on September 18, 2026. Not deployed. Native PostgreSQL 17, advisor, fork CI and deployed synthetic-role verification are separate checks; their results must be recorded before release.
+Status: implemented and verified in disposable PGlite and PostgreSQL 17.11 on September 18, 2026. Not deployed. The combined 60-migration replay passes every parent, academy, report and deletion suite; the unchanged Supabase CLI security advisor reports **No issues found**, exit 0. Fork CI and deployed synthetic-role verification are separate checks.
 
 ## Problem and scope
 
@@ -9,6 +9,8 @@ The operational report views were created with owner privileges. Their comments 
 A preceding disposable replay confirmed both anonymous and unrelated authenticated callers could read zero rows from the other coach's base telemetry table, yet read and update/delete that coach's rows through both views. All eight attempted mutations succeeded and were independently checked as the owner, then rolled back. This is executable evidence in a disposable database; it does not claim any production mutation or real-record access occurred.
 
 Current frontend and Edge Function source has no consumers of these views or the two SQL conversion functions. Existing consumers are founder reports in [the pilot runbook](../pilot-runbook.md) and SQL rehearsal checks. An application's `club` role is not the database `service_role` and must not gain access to global operational reports.
+
+A read-only live metadata check confirmed owner-privilege mode and anonymous/authenticated SELECT grants on all 12 views; the ten `pilot_%` views also reported UPDATE/DELETE grants. No real report rows were read and no live mutations were attempted. The isolated review branch is based directly on canonical `ff9d713` and does not require the P1 or academy-access changes.
 
 ## Forward repair
 

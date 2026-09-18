@@ -52,11 +52,12 @@ test('full replay includes both backfills and leaves committed deletion fixtures
   for (const [setup, migration, assertions] of [
     ['parent_invite_backfill_setup.sql', '20260917205027_secure_parent_invites.sql', 'parent_invite_backfill_assertions.sql'],
     ['academy_orphan_backfill_setup.sql', '20260918062345_preserve_academy_access_and_fk_cleanup.sql', 'academy_orphan_backfill_assertions.sql'],
+    ['pilot_view_backfill_setup.sql', '20260918070209_restrict_pilot_operational_views.sql', 'pilot_view_security.sql'],
   ]) {
     assert.ok(index(setup) >= 0 && index(setup) < index(migration));
     assert.ok(index(migration) < index(assertions));
   }
-  for (const suite of ['parent_invite_security.sql', 'coach_departure_review.sql', 'academy_access_security.sql']) {
+  for (const suite of ['parent_invite_security.sql', 'coach_departure_review.sql', 'academy_access_security.sql', 'pilot_view_security.sql']) {
     assert.ok(suites.includes(suite), `${suite} must run in the full replay`);
   }
   assert.deepEqual(suites.slice(-2), ['account_deletion_setup.sql', 'account_deletion_assertions.sql']);

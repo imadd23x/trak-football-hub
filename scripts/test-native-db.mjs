@@ -12,6 +12,7 @@ const socketPort = '55439';
 const outputLimit = 16 * 1024;
 const securityMigration = '20260917205027_secure_parent_invites.sql';
 const academyMigration = '20260918062345_preserve_academy_access_and_fk_cleanup.sql';
+const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 
 export function parseMode(args) {
   if (args.length > 1 || (args.length && !['--baseline', '--coach-departure-baseline'].includes(args[0]))) {
@@ -52,6 +53,7 @@ export async function buildReplayPlan(projectRoot, mode) {
     if (!/^\d{14}_[a-zA-Z0-9_-]+\.sql$/.test(file)) throw new Error(`Unsupported migration filename: ${file}`);
     if (file === securityMigration) fixture('parent_invite_backfill_setup.sql');
     if (file === academyMigration) fixture('academy_orphan_backfill_setup.sql');
+    if (file === pilotViewsMigration) fixture('pilot_view_backfill_setup.sql');
     steps.push({ name: file, path: join(migrationDirectory, file) });
     if (file === securityMigration) fixture('parent_invite_backfill_assertions.sql');
     if (file === academyMigration) fixture('academy_orphan_backfill_assertions.sql');
@@ -59,6 +61,7 @@ export async function buildReplayPlan(projectRoot, mode) {
   const suites = mode === '--baseline' ? ['parent_invite_security.sql'] : [
     ...(mode === 'all' ? ['parent_invite_security.sql'] : []),
     'coach_departure_review.sql', 'academy_access_security.sql',
+    ...(mode === 'all' ? ['pilot_view_security.sql'] : []),
     // These committed fixtures must stay LAST; earlier suites assume a clean DB.
     'account_deletion_setup.sql', 'account_deletion_assertions.sql',
   ];

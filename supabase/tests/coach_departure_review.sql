@@ -1,4 +1,4 @@
--- UNRESOLVED REVIEW: these desired security assertions fail on K1/K2 at 6875968.
+-- Departure security regression: these assertions fail on K1/K2 at 6875968.
 -- Run ONLY through the disposable in-memory harness, never a shared database.
 -- This is separate from the passing parent-invitation suite. It deliberately
 -- reports vulnerable behavior as failure, not as a successful reproduction.
@@ -237,7 +237,7 @@ BEGIN
   INTO failed_count, finding_count, details
   FROM pg_temp.departure_review_failures;
   IF failed_count > 0 THEN
-    RAISE EXCEPTION E'UNRESOLVED coach departure review: % desired assertions failed across % finding IDs.\n%',
+    RAISE EXCEPTION E'Coach departure regression: % desired assertions failed across % finding IDs.\n%',
       failed_count, finding_count, details;
   END IF;
 END;

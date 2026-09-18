@@ -75,8 +75,13 @@ jobs:
   vercel-credentials:
     name: Check Vercel credentials
     runs-on: ubuntu-latest
-    # Forks run regression checks only, even if somebody later adds secrets.
-    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub'
+    # Task-branch pushes and fork PRs run checks without loading deployment
+    # credentials. Only main releases and same-repository PR previews need them.
+    if: >-
+      github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository))
     outputs:
       configured: ${{ steps.check.outputs.configured }}
     steps:
@@ -196,11 +201,12 @@ jobs:
       always() &&
       github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' &&
       needs.test.result == 'success' &&
-      ((github.ref == 'refs/heads/main' && needs.supabase.result == 'success') ||
-       (github.ref != 'refs/heads/main' && needs.supabase.result == 'skipped')) &&
       needs.vercel-credentials.outputs.configured == 'true' &&
-      (github.event_name == 'push' ||
-       github.event.pull_request.head.repo.full_name == github.repository)
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+        needs.supabase.result == 'success') ||
+       (github.event_name == 'pull_request' && github.ref != 'refs/heads/main' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        needs.supabase.result == 'skipped'))
     permissions:
       contents: read
       pull-requests: write

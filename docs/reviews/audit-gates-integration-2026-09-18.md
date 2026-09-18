@@ -30,9 +30,35 @@ governance `3c2a6e37134fcd76f5f6c747c5df4fd58cd5ee60` (PR46).
 
 ## Verification
 
-The merged candidate is committed before running exact-SHA audit CLIs. Results
-will be recorded in the final evidence commit; this initial entry claims no
-completed combined audit execution.
+Executed against committed merge candidate `238221aa7d0f1c95b843d3ec941a295141f16a94`:
+
+| Command / check | Observed result |
+| --- | --- |
+| Pinned consent runner from separate trusted checkout | Pass: 62 migrations; 27 assertions, 19 passing controls and 8 explicitly accepted failures |
+| Pinned roster runner from separate trusted checkout | Pass: 21 assertions, including 7 controls; zero accepted debt |
+| `node --test tests/governance/*.test.mjs tests/audits/roster-adoption.test.mjs` | 104/104 pass |
+| `npm test` | 318/318 pass, 28 files |
+| `npm run test:harness` | 17/17 pass, 4 files |
+| `npm run typecheck` / `npm run build` | Pass; existing build chunk-size warning |
+| `npm run lint` | 0 errors, 136 warnings |
+| `npm run uc:check` | Exit 0: 2 enforced cases pass; pending UC-A02 still has 3 failures, 10 other tested cases pass, 15 pending cases have no tests |
+| `npm run test:db` | Pass: 62 migrations, both backfill fixtures, parent-invite security and 282 operational-view assertions |
+| `npm run test:db -- --parent-upgrade-review` | Pass: 62 migrations with deployed reports preceding parent upgrade; both suites and 282 operational-view assertions |
+| Pin and diff review | Runner/SQL/inventory/baseline/observation bytes unchanged; no app, migration or package changes; whitespace check clean |
+
+The source tests execute the actual workflow expressions for a 6×6 audit-outcome
+matrix. Governance tests execute 7×7 audit states and three release-eligibility
+states for both production jobs. Independent review found no integration blocker.
+Audit reports and complete step summaries are local files under
+`/private/tmp/trak-audits-integration-*238221a*`; other check logs use the same
+prefix. No browser rerun or hosted CI is claimed by these local checks.
+
+Reproduce each pinned CLI from the corresponding trusted checkout:
+
+```sh
+node ../trak-consent-audit-gate/scripts/audits/consent-runner.mjs --candidate-root . --candidate-revision 238221aa7d0f1c95b843d3ec941a295141f16a94 --runner-revision e9789c11da81414ab51eb7c697f2610af80c6d4c --policy-revision 8fcd564ebda05f60b271a4df6d68bed333e1d253 --report /private/tmp/trak-audits-integration-consent-238221a.json
+node ../trak-roster-audit-gate/scripts/audits/roster-adoption.mjs --candidate-root . --candidate-revision 238221aa7d0f1c95b843d3ec941a295141f16a94 --baseline-revision 0b1b039a7b46382a9da4c7fba36da68222365111
+```
 
 ## Remaining gates and limits
 

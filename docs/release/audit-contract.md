@@ -1,6 +1,6 @@
 # Explicit audit debt contract
 
-The evaluator at [`scripts/governance/audit-ratchet.mjs`](../../scripts/governance/audit-ratchet.mjs) compares named assertions, not failure counts. This change supplies the contract, CLI and synthetic evaluator tests. It does **not** supply a Trak debt baseline, execute an SQL audit, register a release gate, or establish pilot readiness. Integration of real audits is a separate branch and review.
+The evaluator at [`scripts/governance/audit-ratchet.mjs`](../../scripts/governance/audit-ratchet.mjs) compares named assertions, not failure counts. The original governance change supplied the contract, CLI and synthetic evaluator tests. The separate [consent/privacy integration](consent-audit.md) now supplies one measured, proposed baseline and its real SQL gate. Roster adoption and feedback remain separate work; neither this evaluator nor an unchanged-debt result establishes pilot readiness.
 
 ## Trust boundary
 

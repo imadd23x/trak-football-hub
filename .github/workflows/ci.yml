@@ -22,6 +22,49 @@ permissions:
   pull-requests: read
 
 jobs:
+  consent-audit:
+    name: Consent privacy audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact candidate SQL
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      # Reviewed runner/baseline are separate Git commits. Candidate edits to
+      # its own JSON or JavaScript do not replace this pinned audit execution.
+      - name: Check out reviewed consent audit policy
+        uses: actions/checkout@v4
+        with:
+          ref: 8fcd564ebda05f60b271a4df6d68bed333e1d253
+          path: trusted-consent-audit
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install trusted audit dependencies
+        working-directory: trusted-consent-audit
+        run: npm ci --legacy-peer-deps --ignore-scripts
+      - name: Run named consent privacy gate
+        working-directory: trusted-consent-audit
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+          RUNNER_REVISION: e9789c11da81414ab51eb7c697f2610af80c6d4c
+          POLICY_REVISION: 8fcd564ebda05f60b271a4df6d68bed333e1d253
+        run: >-
+          node scripts/audits/consent-runner.mjs
+          --candidate-root "$GITHUB_WORKSPACE/candidate"
+          --candidate-revision "$CANDIDATE_SHA"
+          --runner-revision "$RUNNER_REVISION"
+          --policy-revision "$POLICY_REVISION"
+          --report "$RUNNER_TEMP/consent-audit-report.json"
+
   test:
     runs-on: ubuntu-latest
 
@@ -138,11 +181,11 @@ jobs:
   # RPC never reaches production ahead of the migration that creates it.
   supabase:
     name: Supabase
-    needs: [test, vercel-credentials]
+    needs: [test, vercel-credentials, consent-audit]
     runs-on: ubuntu-latest
     # Production only. A pull request must never push migrations to the live
     # database, and there is no second Supabase project to point previews at.
-    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.consent-audit.result == 'success'
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
@@ -214,7 +257,7 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: [test, vercel-credentials, supabase]
+    needs: [test, vercel-credentials, supabase, consent-audit]
     runs-on: ubuntu-latest
     # Skip rather than fail red when the credentials are absent, and on forked
     # pull requests, which cannot read secrets at all.
@@ -226,6 +269,7 @@ jobs:
       always() &&
       github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' &&
       needs.test.result == 'success' &&
+      needs.consent-audit.result == 'success' &&
       ((github.ref == 'refs/heads/main' && needs.supabase.result == 'success') ||
        (github.ref != 'refs/heads/main' && needs.supabase.result == 'skipped')) &&
       needs.vercel-credentials.outputs.configured == 'true' &&

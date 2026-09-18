@@ -13,6 +13,7 @@ interface Scenario {
   headRepository?: string
   tests?: string
   backend?: string
+  consentAudit?: string
   credentials?: string
 }
 function permits(job: string, scenario: Scenario = {}) {
@@ -25,10 +26,12 @@ function permits(job: string, scenario: Scenario = {}) {
   const needs = {
     test: { result: scenario.tests ?? 'success' },
     supabase: { result: scenario.backend ?? 'success' },
+    'consent-audit': { result: scenario.consentAudit ?? 'success' },
     'vercel-credentials': { outputs: { configured: scenario.credentials ?? 'true' } },
   }
   // Evaluate the actual checked-in GitHub expression, not a duplicate gate.
   const expression = workflow.jobs[job].if.replaceAll('needs.vercel-credentials', "needs['vercel-credentials']")
+    .replaceAll('needs.consent-audit', "needs['consent-audit']")
   return new Function('github', 'needs', 'always', `return (${expression})`)(github, needs, () => true)
 }
 describe('release workflow regression gates', () => {
@@ -64,6 +67,8 @@ describe('release workflow regression gates', () => {
     for (const result of ['failure', 'cancelled', 'skipped']) {
       expect(permits('deploy', { tests: result })).toBe(false)
       expect(permits('deploy', { backend: result })).toBe(false)
+      expect(permits('deploy', { consentAudit: result })).toBe(false)
+      expect(permits('supabase', { consentAudit: result })).toBe(false)
     }
     expect(permits('deploy', { credentials: 'false' })).toBe(false)
     expect(workflow.jobs.supabase.needs).toEqual(expect.arrayContaining(['test', 'vercel-credentials']))
@@ -71,6 +76,7 @@ describe('release workflow regression gates', () => {
   it('allows an upstream preview but blocks a fork PR preview and every PR database write', () => {
     const pr = { event: 'pull_request', ref: 'refs/pull/25/merge', backend: 'skipped' }
     expect(permits('deploy', pr)).toBe(true)
+    expect(permits('deploy', { ...pr, consentAudit: 'failure' })).toBe(false)
     expect(permits('deploy', { ...pr, headRepository: fork })).toBe(false)
     expect(permits('supabase', pr)).toBe(false)
   })

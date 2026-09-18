@@ -11,9 +11,9 @@ import { evaluateAuditReport } from '../../scripts/governance/audit-ratchet.mjs'
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const read = path => readFileSync(join(root, path), 'utf8');
 const inventory = JSON.parse(read('scripts/audits/consent-inventory.json'));
-const source = 'fe49465cf118a4b7d7a0a44521a447ff0629d8d7';
 const runner = 'a'.repeat(40);
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+const source = git('rev-parse', 'HEAD').trim();
 const migrations = git('ls-tree', '-r', '--name-only', source, '--', 'supabase/migrations').trim().split('\n')
   .map(path => ({ name: path.split('/').at(-1), sql: git('show', `${source}:${path}`) }));
 const bundle = { candidateRevision: source, runnerRevision: runner, inventory, migrations,
@@ -87,15 +87,15 @@ test('a reported failed control is rejected even with the exact prior eight fail
   assert.ok(evaluation.violations.some(row => row.code === 'failed-control' && row.assertionId === 'control.grant-authorizes'));
 });
 
-test('real 62-migration replay preserves all 27 results; weakened RLS turns the exact control red', async () => {
-  assert.equal(migrations.length, 62);
+test('real current migration replay preserves all 27 results; weakened RLS turns the exact control red', async () => {
+  assert.ok(migrations.length > 0);
   const real = await executeConsentAudit(bundle);
   assert.equal(real.suites[0].status, 'complete', real.suites[0].detail);
-  assert.deepEqual(real.suites[0].assertions.filter(row => row.status === 'fail').map(row => row.id).sort(), [
-    'CP1.child-private-note-denied', 'CP2.visibility-assessment-denied', 'CP2.visibility-award-denied',
-    'CP2.visibility-match-denied', 'CP3.withdrawal-assessment-denied', 'CP3.withdrawal-award-denied',
-    'CP3.withdrawal-match-denied', 'CP4.recognition-insert-denied',
-  ]);
+  assert.equal(real.suites[0].assertions.length, 27);
+  assert.equal(real.suites[0].assertions.filter(row => row.kind === 'control').length, 19);
+  assert.ok(real.suites[0].assertions.filter(row => row.kind === 'control').every(row => row.status === 'pass'));
+  // Behavior repairs should reduce reviewed debt, not fail a test demanding
+  // the old bug. This mutation targets a presently passing isolation control.
   const weakened = await executeConsentAudit({ ...bundle, migrations: [...migrations, {
     name: 'in-memory-test-only-permissive-policy',
     sql: 'CREATE POLICY audit_mutation_private_notes_public ON public.coach_assessment_notes FOR SELECT TO authenticated USING (true)',

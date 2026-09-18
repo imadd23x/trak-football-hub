@@ -113,10 +113,12 @@ gate. When an expected failure is fixed, retain the assertion and reduce its
 accepted debt in an independently reviewed update. Candidate output cannot
 approve its own baseline changes.
 
-The focused governance change supplies and tests this evaluator. It does not
-claim the real consent/privacy, feedback/storage or roster-adoption audits are
-already CI gates. Their historical counts come from different revisions and
-engines. Integrate actual runners separately, rerun the exact candidate, preserve
+The focused governance change supplies and tests this evaluator. The separate
+[consent/privacy gate](consent-audit.md) now executes its 27 named assertions
+against exact candidate migrations with a measured, proposed debt baseline.
+Feedback/storage and roster-adoption are still not CI gates. Their historical
+counts come from different revisions and engines. Integrate actual runners
+separately, rerun the exact candidate, preserve
 feedback's native PostgreSQL concurrency test, and repair weak controls before
 accepting a baseline. A missing feedback schema is a dependency, not expected
 failure or a reason to fabricate skipped green results. Known privacy failures
@@ -129,7 +131,8 @@ that protection is enabled. The September 18 check reported Imad has repository
 write access, not administration. Do not activate or relax settings without
 explicit authorization. An authorized administrator should:
 
-1. Confirm this policy and workflow are on main, **test** and **Merge policy**
+1. Confirm this policy and workflow are on main, **test**, **Merge policy** and
+   **Consent privacy audit**
    have reported on a fresh PR, and each listed CODEOWNER has repository write
    access. All ownership areas include alternates so authors can obtain review.
 2. Apply the reviewed config and then read it back:

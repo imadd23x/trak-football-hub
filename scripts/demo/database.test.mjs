@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { applyDemo } from './apply.mjs';
 import { buildDemoPlan } from './plan.mjs';
+import { migrationReplayOrder } from '../test-native-db.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const plan = buildDemoPlan({ asOf: '2026-09-25' });
@@ -26,12 +27,12 @@ async function caller(db, role, id = null) {
   await db.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ role, ...(id ? { sub: id } : {}) })]);
 }
 
-async function fixture(t) {
+async function fixture(t, replayMode = 'all') {
   // No path/URL/config is accepted: this database exists in memory only.
   const db = new PGlite();
   t.after(() => db.close());
   await db.exec(await readFile(resolve(root, 'supabase/tests/bootstrap.sql'), 'utf8'));
-  const migrations = (await readdir(resolve(root, 'supabase/migrations'))).filter(name => name.endsWith('.sql')).sort();
+  const migrations = migrationReplayOrder((await readdir(resolve(root, 'supabase/migrations'))).filter(name => name.endsWith('.sql')), replayMode);
   for (const name of migrations) {
     try {
       await db.exec(await readFile(resolve(root, 'supabase/migrations', name), 'utf8'));
@@ -41,7 +42,7 @@ async function fixture(t) {
   }
   assert.ok(migrations.includes('20260917205027_secure_parent_invites.sql'), 'P1 is a seed-review dependency');
   assert.ok(migrations.includes('20260918062345_preserve_academy_access_and_fk_cleanup.sql'), 'academy access/adoption repair is a seed-review dependency');
-  t.diagnostic(`Replayed ${migrations.length} real migrations; Auth HTTP/email/password behavior is not simulated or verified.`);
+  t.diagnostic(`Replayed ${migrations.length} real migrations (${replayMode}); Auth HTTP/email/password behavior is not simulated or verified.`);
 
   // The SQL Auth boundary stores real FK identities. Only the admin API's
   // app_metadata is represented in JS because bootstrap intentionally omits
@@ -113,28 +114,30 @@ function failOnce(adapter, operation, when, at = 3) {
   };
 }
 
-test('real schema: fresh apply, exact replay and unrelated identity preservation', async t => {
-  const { db, adapter, writes } = await fixture(t);
-  const untouched = await sentinel(db);
-  const first = await applyDemo(plan, adapter, credentials);
-  assert.equal(first.createdAccounts, plan.accounts.length);
-  assert.equal(first.insertedRecords, plan.records.length);
-  assert.equal(first.existingAccounts, 0);
-  assert.equal(first.existingRecords, 0);
-  assert.deepEqual((await db.query('SELECT current_user AS role,auth.uid() AS uid')).rows,
-    [{ role: 'service_role', uid: null }], 'database fixture writes use service role without impersonating an end user');
-  assert.deepEqual(await sentinel(db), untouched);
-  const stored = await snapshot(db);
-  const before = { ...writes };
-  const second = await applyDemo(plan, adapter, credentials);
-  assert.equal(second.createdAccounts, 0);
-  assert.equal(second.insertedRecords, 0);
-  assert.equal(second.existingAccounts, plan.accounts.length);
-  assert.equal(second.existingRecords, plan.records.length);
-  assert.deepEqual(writes, before, 'second apply performs no writes at all');
-  assert.deepEqual(await snapshot(db), stored, 'all stored values, including defaults, remain unchanged');
-  assert.deepEqual(await sentinel(db), untouched);
-});
+for (const replayMode of ['all', '--academy-upgrade-review']) {
+  test(`real schema (${replayMode}): fresh apply, exact replay and unrelated identity preservation`, async t => {
+    const { db, adapter, writes } = await fixture(t, replayMode);
+    const untouched = await sentinel(db);
+    const first = await applyDemo(plan, adapter, credentials);
+    assert.equal(first.createdAccounts, plan.accounts.length);
+    assert.equal(first.insertedRecords, plan.records.length);
+    assert.equal(first.existingAccounts, 0);
+    assert.equal(first.existingRecords, 0);
+    assert.deepEqual((await db.query('SELECT current_user AS role,auth.uid() AS uid')).rows,
+      [{ role: 'service_role', uid: null }], 'database fixture writes use service role without impersonating an end user');
+    assert.deepEqual(await sentinel(db), untouched);
+    const stored = await snapshot(db);
+    const before = { ...writes };
+    const second = await applyDemo(plan, adapter, credentials);
+    assert.equal(second.createdAccounts, 0);
+    assert.equal(second.insertedRecords, 0);
+    assert.equal(second.existingAccounts, plan.accounts.length);
+    assert.equal(second.existingRecords, plan.records.length);
+    assert.deepEqual(writes, before, 'second apply performs no writes at all');
+    assert.deepEqual(await snapshot(db), stored, 'all stored values, including defaults, remain unchanged');
+    assert.deepEqual(await sentinel(db), untouched);
+  });
+}
 
 for (const [operation, when] of [['createRecord', 'before'], ['createRecord', 'after'], ['createAccount', 'after']]) {
   test(`real schema: resume ${operation} ${when === 'before' ? 'partial failure' : 'uncertain response'} without duplicates`, async t => {

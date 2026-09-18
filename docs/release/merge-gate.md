@@ -17,7 +17,7 @@ Require `test` on the latest main state, one independent approval after the late
 
 ## Before merge
 
-1. Announce migration table/RPC changes and shared-file reservations in #all-trak-football before editing. Never rewrite a historical migration.
+1. Announce migration table/RPC changes and shared-file reservations in #coding-agent-reviews before editing. Never rewrite a historical migration.
 2. Rebase or merge current main; identify dependent PRs and backward compatibility of SQL, callers and generated types.
 3. Run `npm test`, `npm run test:harness`, `npm run typecheck`, `npm run build`, `npm run lint` and `npm run uc:check`. Run the executable SQL tests for a migration. Pending use-case failures are debt, not proof of correctness: explicitly record them and require the changed journey to pass.
 4. Obtain a teammate's approval. Do not accept an agent's self-review as the independent human approval.

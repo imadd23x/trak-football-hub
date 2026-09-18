@@ -5,18 +5,23 @@ project_id = "xbykbqolvqyqmipikuae"
 # default (verify_jwt = true) and a deploy can flip a setting that was changed in
 # the dashboard. Declaring every function keeps this file the source of truth.
 
-# No platform JWT gate, and no auth check in the function body either — it
-# forwards straight to the Lovable AI gateway. See the open task to fix this.
+# Both AI functions now reject before spending anything: getUser() must return
+# a real user, that user's profile role must be 'coach', and claim_ai_call()
+# must allow the call against a per-user daily cap.
+#
+# The platform gate stays on as well, but it is NOT what protects these. The
+# publishable anon key is a validly-signed JWT and ships in the client bundle
+# of a public repo, so verify_jwt accepts it and proves nothing about who is
+# calling. Only getUser() establishes a session. Do not weaken the body checks
+# on the strength of this flag being true.
 [functions.parse-schedule]
-verify_jwt = false
+verify_jwt = true
 
-# Platform gate off, but the function calls getUser() itself and 401s without a
-# valid user, so authentication is enforced in the body rather than by the edge.
 [functions.coach-assistant]
-verify_jwt = false
+verify_jwt = true
 
-# Same self-enforced pattern as coach-assistant, with the platform gate left on.
-# The caller in PlayerFeedback.tsx refuses to fire without a session token.
+# getUser() plus an explicit 401 in the body, with the platform gate on too.
+# This one was already doing the right thing when the other two were not.
 [functions.player-feedback]
 verify_jwt = true
 

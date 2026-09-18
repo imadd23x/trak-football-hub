@@ -1,3 +1,4 @@
+-- @trak-suite mode=--consent-review in-all=false
 -- ============================================================
 -- P2 — What the parental-consent gate does and does not cover
 --

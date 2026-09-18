@@ -1,3 +1,4 @@
+-- @trak-suite mode=--parent-invite-review in-all=true
 -- Execute against a DISPOSABLE database after replaying migrations.
 -- The harness must SET trak.test_database = 'disposable' on this connection.
 -- These tests execute real RPCs and RLS under authenticated/anon roles; no mocks.

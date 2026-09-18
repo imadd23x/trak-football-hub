@@ -294,6 +294,9 @@ export type Database = {
           coach_user_id: string
           created_at: string
           ends_at: string | null
+          end_time: string | null
+          event_date: string | null
+          start_time: string | null
           event_type: string
           id: string
           notes: string | null
@@ -309,6 +312,9 @@ export type Database = {
           coach_user_id: string
           created_at?: string
           ends_at?: string | null
+          end_time?: string | null
+          event_date?: string | null
+          start_time?: string | null
           event_type?: string
           id?: string
           notes?: string | null
@@ -324,6 +330,9 @@ export type Database = {
           coach_user_id?: string
           created_at?: string
           ends_at?: string | null
+          end_time?: string | null
+          event_date?: string | null
+          start_time?: string | null
           event_type?: string
           id?: string
           notes?: string | null

@@ -10,8 +10,9 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 const args = process.argv.slice(2);
 const mode = args[0] ?? '--pilot-views-review';
-if (args.length > 1 || !['--pilot-views-review', '--pilot-views-baseline'].includes(mode)) {
-  throw new Error('Usage: node scripts/test-db.mjs [--pilot-views-review | --pilot-views-baseline]');
+const modes = ['--pilot-views-review', '--pilot-views-baseline', '--roster-adoption-review'];
+if (args.length > 1 || !modes.includes(mode)) {
+  throw new Error(`Usage: node scripts/test-db.mjs [${modes.join(' | ')}]`);
 }
 const pilotViewsBaseline = mode === '--pilot-views-baseline';
 const db = new PGlite();
@@ -32,7 +33,9 @@ try {
     }
   }
   console.log(`Replayed ${migrations.length} migrations${pilotViewsBaseline ? ' (vulnerable baseline; security assertions should fail)' : ' with legacy privilege fixtures'}.`);
-  const suites = ['pilot_view_security.sql'];
+  const suites = mode === '--roster-adoption-review'
+    ? ['roster_adoption.sql']
+    : ['pilot_view_security.sql'];
   for (const suite of suites) {
     const result = await db.exec(await read(suite));
     console.log(`Passed: ${suite}`);

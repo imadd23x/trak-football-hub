@@ -10,7 +10,19 @@ A preceding disposable replay confirmed both anonymous and unrelated authenticat
 
 Current frontend and Edge Function source has no consumers of these views or the two SQL conversion functions. Existing consumers are founder reports in [the pilot runbook](../pilot-runbook.md) and SQL rehearsal checks. An application's `club` role is not the database `service_role` and must not gain access to global operational reports.
 
-A read-only live metadata check confirmed owner-privilege mode and anonymous/authenticated SELECT grants on all 12 views; the ten `pilot_%` views also reported UPDATE/DELETE grants. No real report rows were read and no live mutations were attempted. The isolated review branch is based directly on canonical `ff9d713` and does not require the P1 or academy-access changes.
+Tarek's review identified two legacy script references. `check-pilot-state.mjs`
+formerly probed `pilot_scorecard` and `pilot_activation` anonymously and treated
+permission errors as proof of presence; isolated PR #35 skips restricted reports
+and directs operators to the authorized SQL workflow. `seed-pilot-rehearsal.mjs`
+only prints a scorecard query, without executing it; its output now identifies the
+required operator/service role. Both Markdown and HTML runbooks document that same
+boundary for weekly, drill-down and duplicate checks, including S3 evidence.
+Neither script receives service credentials. This compatibility adjustment does
+not depend on the separate S2 replacement, which retires the legacy scripts.
+The integration branch includes S2 and retains those fail-closed retirement
+wrappers; integrating the report guidance must not restore the old scripts.
+
+A read-only live metadata check on September 18 confirmed owner-privilege mode and anonymous/authenticated SELECT grants on all 12 views; the ten `pilot_%` views also reported UPDATE/DELETE grants. No real report rows were read and no live mutations were attempted. Disposable fixtures reproduce the resulting bypass; live data exposure was not probed.
 
 ## Forward repair
 
@@ -26,6 +38,12 @@ Migration `20260918070209_restrict_pilot_operational_views.sql` applies to exact
 | Roster and consent review | `squad_duplicate_candidates`, `stale_pending_consent` |
 
 Every view uses `security_invoker=true`. All privileges are revoked from `PUBLIC`, `anon`, `authenticated` and `service_role`; only SELECT is then granted to `service_role`. PostgreSQL table-level revocation also removes the corresponding column privileges; the tests seed explicit column grants and verify both table and column queries are denied. Report definitions and underlying table policies are unchanged.
+
+Missing views intentionally fail the migration. All 12 are required by earlier
+migrations and were present in the September 18 metadata check. Silently skipping
+one would hide schema drift and leave an incomplete reporting contract. Investigate
+and repair a missing prerequisite through the reviewed release process; do not add
+blanket existence guards or weaken the access checks to keep deployment green.
 
 `band_ordinal(text)` and `score_to_band(numeric)` remain pure invoker functions; their search paths are pinned to `pg_catalog`. Existing conversion behavior is preserved. This change does not repair consent policy, academy provenance, metric definitions or the accuracy of the pilot cohort.
 

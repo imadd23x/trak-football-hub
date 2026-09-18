@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "id": "roster-adoption",
+  "assertions": [
+    {
+      "id": "RA-C-fixture",
+      "kind": "control"
+    },
+    {
+      "id": "RA-C-exact-role",
+      "kind": "control"
+    },
+    {
+      "id": "RA-C-exact-read",
+      "kind": "control"
+    },
+    {
+      "id": "RA-exact-id",
+      "kind": "check"
+    },
+    {
+      "id": "RA-exact-owner",
+      "kind": "check"
+    },
+    {
+      "id": "RA-exact-read",
+      "kind": "check"
+    },
+    {
+      "id": "RA-exact-repeat",
+      "kind": "check"
+    },
+    {
+      "id": "RA-exact-one-link",
+      "kind": "check"
+    },
+    {
+      "id": "RA-C-typo-role",
+      "kind": "control"
+    },
+    {
+      "id": "RA-C-typo-read",
+      "kind": "control"
+    },
+    {
+      "id": "RA-typo-own-link",
+      "kind": "check"
+    },
+    {
+      "id": "RA-typo-no-wrong-read",
+      "kind": "check"
+    },
+    {
+      "id": "RA-C-ambiguous-role",
+      "kind": "control"
+    },
+    {
+      "id": "RA-C-ambiguous-read",
+      "kind": "control"
+    },
+    {
+      "id": "RA-ambiguous-own-link",
+      "kind": "check"
+    },
+    {
+      "id": "RA-ambiguous-no-wrong-read",
+      "kind": "check"
+    },
+    {
+      "id": "RA-typo-identity",
+      "kind": "check"
+    },
+    {
+      "id": "RA-ambiguous-identities",
+      "kind": "check"
+    },
+    {
+      "id": "RA-exact-history",
+      "kind": "check"
+    },
+    {
+      "id": "RA-typo-history",
+      "kind": "check"
+    },
+    {
+      "id": "RA-ambiguous-histories",
+      "kind": "check"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { it, expect } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useCase } from '../../support/use-case'
 import { renderApp } from '../../support/render-app'
 import { signInAs } from '../../support/session'
@@ -77,6 +78,51 @@ useCase('UC-X02', () => {
 })
 
 useCase('UC-X02', () => {
+  it('preserves loaded matches and appends each recovered page exactly once', async () => {
+    signedInAthlete()
+    const user = userEvent.setup()
+    const rows = (label: string, count: number, month: string) => Array.from({ length: count }, (_, i) => ({
+      id: `${label}-${i}`, user_id: ATHLETE.id, opponent: `${label} ${i}`, competition: 'League',
+      match_date: `2026-${month}-${String(20 - i).padStart(2, '0')}`,
+      created_at: '2026-09-01T18:00:00.000Z', team_score: 1, opponent_score: 0, computed_rating: 7,
+    }))
+    const first = rows('First', 20, '09')
+    const second = rows('Second', 20, '08')
+    const final = rows('Final', 1, '07')
+    const offsets: number[] = []
+    let secondPageFails = true
+    server.use(http.get(`${SUPABASE_URL}/rest/v1/matches`, ({ request }) => {
+      const offset = Number(new URL(request.url).searchParams.get('offset') ?? '0')
+      offsets.push(offset)
+      if (offset === 0) return HttpResponse.json(first)
+      if (offset === 20) return secondPageFails
+        ? HttpResponse.json({ message: 'Synthetic page failure' }, { status: 500 })
+        : HttpResponse.json(second)
+      if (offset === 40) return HttpResponse.json(final)
+      return HttpResponse.json({ message: 'Unexpected page' }, { status: 400 })
+    }))
+
+    renderApp('/player/matches')
+    expect(await screen.findByText('vs First 0')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /load more/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load the next matches")
+    expect(screen.getAllByRole('button', { name: /^vs First / })).toHaveLength(20)
+    expect(screen.queryByText(/no matches found/i)).not.toBeInTheDocument()
+
+    secondPageFails = false
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+    expect(await screen.findByText('vs Second 19')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^vs (First|Second) / })).toHaveLength(40)
+
+    await user.click(screen.getByRole('button', { name: /load more/i }))
+    expect(await screen.findByText('vs Final 0')).toBeInTheDocument()
+    const displayed = screen.getAllByText(/^vs (First|Second|Final) /).map(node => node.textContent)
+    expect(displayed).toEqual([...first, ...second, ...final].map(row => `vs ${row.opponent}`))
+    expect(offsets).toEqual([0, 20, 20, 40])
+    expect(screen.queryByRole('button', { name: /load more|retry/i })).not.toBeInTheDocument()
+  })
+
   it('a failed page never silently skips matches', async () => {
     signedInAthlete()
 

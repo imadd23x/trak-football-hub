@@ -99,6 +99,14 @@ jobs:
       - name: Use cases
         run: npm run uc:check
 
+      # These delivered fixes must regress red even while their wider use-case
+      # contracts remain pending. Missing test files must not silently narrow the run.
+      - name: Player linking and match recovery regressions
+        run: |
+          test -f tests/usecases/athlete/UC-A08.claim-squad-row.test.tsx
+          test -f tests/usecases/system/UC-X02.false-empty-state.test.tsx
+          npx vitest run tests/usecases/athlete/UC-A08.claim-squad-row.test.tsx tests/usecases/system/UC-X02.false-empty-state.test.tsx
+
       - name: Build
         run: npm run build
 

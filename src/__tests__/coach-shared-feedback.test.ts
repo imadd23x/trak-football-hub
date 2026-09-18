@@ -132,6 +132,24 @@ describe('K9 UI: the coach writes shared feedback separately', () => {
     ).toBe(false)
   })
 
+  it('a retracted publication disappears from the player screen', () => {
+    // Imad's re-review: the reader only assigned a truthy body, so once
+    // feedback had been displayed it could never be taken away. A coach
+    // retracting a publication left the old text on the child's screen. That
+    // makes retract — a control I built in this same PR — decorative.
+    const src = code(PLAYER_HOME)
+    expect(
+      /setCoachAssessmentNote\(body \|\| null\)/.test(src),
+      'PlayerHome assigns coach feedback only when it is truthy, so retracted or unreadable ' +
+        'feedback stays on screen. Assign unconditionally, including null.',
+    ).toBe(true)
+    expect(
+      /if \(cancelled\) return[\s\S]{0,400}coach_shared_feedback|coach_shared_feedback[\s\S]{0,600}if \(cancelled\) return/.test(src),
+      'the shared-feedback read is not guarded against a stale response, so a slower earlier ' +
+        'request can reinstate text the newer one cleared.',
+    ).toBe(true)
+  })
+
   it('no longer tells the coach their private note reaches the player', () => {
     // The label said "AI will expand these into personalised feedback for the
     // player". K9 makes that false — player-feedback runs as the player and can

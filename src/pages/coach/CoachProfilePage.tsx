@@ -13,6 +13,10 @@ export default function CoachProfilePage() {
   const location = useLocation()
   const [details, setDetails] = useState<any>(null)
   const [inviteCode, setInviteCode] = useState('')
+  // InviteCodeDisplay always renders a working Copy button, so an unverified
+  // code must not be handed to it at all. It is a shared component and this is
+  // a coach-page concern, so the gate lives here rather than in its props.
+  const [inviteStatus, setInviteStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
 
   useEffect(() => {
     if (!user) return
@@ -22,15 +26,38 @@ export default function CoachProfilePage() {
     // The real invite code lives on profiles.invite_code — it's what
     // get_coach_id_by_invite_code matches when players link up.
     supabase.from('profiles').select('invite_code').eq('user_id', user.id).maybeSingle()
-      .then(async ({ data }) => {
+      .then(async ({ data, error }) => {
+        // The read's error was discarded here too, so a failed read looked
+        // exactly like "no code yet" and the self-heal below overwrote the
+        // coach's real invite code — the code players type to join. This page
+        // and CoachHomePage each rotated it independently, so an offline
+        // moment on either one invalidated every code already handed out.
+        if (error) {
+          console.error('Invite code read failed:', error)
+          setInviteStatus('failed')
+          return
+        }
+
         if (data?.invite_code) {
           setInviteCode(formatCoachCode(data.invite_code))
-        } else {
-          // Self-heal: generate and persist one (same pattern as CoachHomePage)
-          const newCode = generateCode()
-          const { error } = await supabase.from('profiles').update({ invite_code: newCode }).eq('user_id', user.id)
-          if (!error) setInviteCode(formatCoachCode(newCode))
+          setInviteStatus('ready')
+          return
         }
+
+        // Self-heal, now only when the read actually succeeded and found none.
+        const newCode = generateCode()
+        // select() back: a zero-row update returns no error, and showing the
+        // generated code then promises a player something never stored.
+        const { data: stored, error: writeError } = await supabase
+          .from('profiles').update({ invite_code: newCode })
+          .eq('user_id', user.id).select('invite_code').maybeSingle()
+        if (writeError || stored?.invite_code !== newCode) {
+          console.error('Invite code write failed or stored nothing:', writeError)
+          setInviteStatus('failed')
+          return
+        }
+        setInviteCode(formatCoachCode(newCode))
+        setInviteStatus('ready')
       })
   }, [user])
 
@@ -66,7 +93,25 @@ export default function CoachProfilePage() {
 
         {/* Invite code */}
         <TrakCard>
-          <InviteCodeDisplay code={inviteCode} label="YOUR INVITE CODE" />
+          {inviteStatus === 'ready' ? (
+            <InviteCodeDisplay code={inviteCode} label="YOUR INVITE CODE" />
+          ) : (
+            <div className="flex flex-col items-center gap-2 py-6">
+              <span
+                className="text-[9px] font-medium tracking-[0.12em] uppercase text-[rgba(255,255,255,0.45)]"
+                style={{ fontFamily: "'DM Mono', monospace" }}
+              >
+                YOUR INVITE CODE
+              </span>
+              <p className="text-[32px] tracking-wider text-[rgba(255,255,255,0.3)]"
+                 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300 }}>
+                {inviteStatus === 'loading' ? '···' : 'Unavailable'}
+              </p>
+              {inviteStatus === 'failed' && (
+                <span className="text-[11px] text-white/35">Reload to try again.</span>
+              )}
+            </div>
+          )}
           <p className="text-[11px] text-white/45 text-center mt-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Share this code with your players so they can connect with you.
           </p>

@@ -160,7 +160,17 @@ CREATE TRIGGER coach_shared_feedback_touch
 CREATE INDEX IF NOT EXISTS coach_shared_feedback_published_idx
   ON public.coach_shared_feedback (assessment_id) WHERE published_at IS NOT NULL;
 
-REVOKE ALL ON TABLE public.coach_shared_feedback FROM PUBLIC, anon;
+-- `authenticated` must be in the REVOKE, not only PUBLIC and anon. This schema
+-- grants broadly by default, so a new table inherits privileges the migration
+-- never asked for — including TRUNCATE, which is NOT subject to RLS. Without
+-- this, any signed-in account (every coach, player and parent in the pilot)
+-- could empty every child's published feedback, and no policy could stop it:
+-- "No shared feedback deletion" governs DELETE and TRUNCATE is not DELETE.
+--
+-- Tarek demonstrated it on #44 by running TRUNCATE as a player against the real
+-- policies: 1 row before, 0 after, no error. The GRANT below then restores
+-- exactly what the application needs and nothing else.
+REVOKE ALL ON TABLE public.coach_shared_feedback FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.coach_shared_feedback TO authenticated;
 
 COMMENT ON COLUMN public.coach_shared_feedback.body IS

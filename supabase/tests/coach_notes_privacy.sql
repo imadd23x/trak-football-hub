@@ -146,5 +146,35 @@ SELECT pg_temp.assert_true(
   (SELECT count(*) FROM public.coach_shared_feedback) = 0,
   'K9: another academy''s coach reads none of coach A''s shared feedback');
 
+-- ── Table privileges, which RLS does not govern ─────────────────────────
+-- Tarek found this on #44: the migration revoked from PUBLIC and anon but not
+-- from `authenticated`, so the table kept the schema's default grants. RLS
+-- covers SELECT/INSERT/UPDATE/DELETE and does NOT cover TRUNCATE — so a
+-- signed-in player could empty every child's published feedback in the
+-- academy, with no error and no policy able to stop it.
+--
+-- Asserted as a privilege check rather than a policy one, because no policy
+-- could ever have caught it.
 RESET ROLE;
+
+SELECT pg_temp.assert_true(
+  NOT has_table_privilege('authenticated', 'public.coach_shared_feedback', 'TRUNCATE'),
+  'K9: authenticated must not hold TRUNCATE on coach_shared_feedback — TRUNCATE ignores RLS');
+
+SELECT pg_temp.assert_true(
+  NOT has_table_privilege('anon', 'public.coach_shared_feedback', 'TRUNCATE'),
+  'K9: anon must not hold TRUNCATE on coach_shared_feedback');
+
+SELECT pg_temp.assert_true(
+  NOT has_table_privilege('authenticated', 'public.coach_shared_feedback', 'DELETE'),
+  'K9: authenticated must not hold DELETE on coach_shared_feedback — the no-deletion policy '
+  'should not be the only thing standing between a child and a removed record');
+
+-- The grants the table actually needs must survive the revoke.
+SELECT pg_temp.assert_true(
+  has_table_privilege('authenticated', 'public.coach_shared_feedback', 'SELECT')
+  AND has_table_privilege('authenticated', 'public.coach_shared_feedback', 'INSERT')
+  AND has_table_privilege('authenticated', 'public.coach_shared_feedback', 'UPDATE'),
+  'CONTROL: authenticated keeps the SELECT/INSERT/UPDATE the application needs');
+
 ROLLBACK;

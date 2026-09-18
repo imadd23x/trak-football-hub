@@ -1,6 +1,29 @@
 # K9 publication runtime review
 
-## Current rereview: 89cd973
+## Current rereview: 42a82e2
+
+Kostas updated PR44 to `42a82e2a4a9ca6a56349441bcf4fcfbbe413ac13`.
+All **6/6** existing component/SDK reproductions pass (1.21 seconds), including
+the previously failing completed retraction reread. The three publication
+controls still verify explicit publication, retry without a duplicate assessment,
+and refusal of a zero-row save. Reader controls still verify the actual query
+filters and an unpublished row on a fresh mount. This is synthetic HTTP
+verification, not a hosted or device test.
+
+`npm run test:db` also passes on this exact candidate with **63 migrations**, the
+parent-invitation suite, **282** operational-view assertions and the updated
+coach-note privacy suite, including its grant assertions. These are disposable
+database results; no live grant or schema was changed.
+
+Source inspection confirms both invite-code initializers now require successful
+reads before generation and confirm the stored returned code before displaying
+or copying it. Their new failure paths were not exercised by the six runtime
+tests above. Do not infer a complete invitation journey test from that count.
+The detail-route/T2 feedback-storage contract still needs coordinated verification.
+This closes the reproduced publication/retraction findings at this head; it is
+not a formal human approval or a claim that the whole pilot is ready.
+
+## Historical rereview: 89cd973
 
 Kostas updated PR44 to `89cd973b773766840485efdcdfca1c037819f1ee`.
 The previous two save regressions now pass through the actual component and SDK:

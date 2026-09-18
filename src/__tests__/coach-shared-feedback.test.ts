@@ -18,10 +18,11 @@ import { join } from 'node:path'
  */
 
 const PAGE = join(process.cwd(), 'src', 'pages', 'coach', 'CoachAssessPage.tsx')
+const PLAYER_HOME = join(process.cwd(), 'src', 'pages', 'player', 'PlayerHome.tsx')
 
 /** Source with comments stripped — prose must not satisfy or trip these. */
-function code(): string {
-  return readFileSync(PAGE, 'utf8')
+function code(path: string = PAGE): string {
+  return readFileSync(path, 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '')
     .replace(/(^|[^:])\/\/.*$/gm, '$1')
@@ -77,6 +78,58 @@ describe('K9 UI: the coach writes shared feedback separately', () => {
       'the page never loads existing shared feedback, so a coach editing an assessment sees a ' +
         'blank box and cannot correct text the child is currently reading.',
     ).toBe(true)
+  })
+
+  it('a failed publication keeps the coach on the page with their text', () => {
+    // Imad reproduced this on #44: the shared-write error was toasted and the
+    // page navigated home anyway, losing the words the coach wrote for the
+    // child and offering no retry. Exactly what K5 fixed in the match flow an
+    // hour earlier, repeated in my own new code.
+    const src = code()
+    const sharedErr = src.indexOf('if (sharedError)')
+    const navigate = src.indexOf("navigate('/coach/home')", sharedErr)
+    expect(sharedErr, 'the shared-write error is no longer handled').toBeGreaterThan(-1)
+    const block = src.slice(sharedErr, navigate)
+    expect(
+      /return\b/.test(block),
+      'the shared-feedback failure path falls through to navigate(). The coach loses the text ' +
+        'they wrote for the child and cannot retry it.',
+    ).toBe(true)
+  })
+
+  it('requires an actually saved assessment row before writing anything to it', () => {
+    // .maybeSingle() on an UPDATE that matched nothing returns data null with
+    // error null. Everything downstream is keyed on saved.id, so without this
+    // the note and the shared feedback both skip silently and the coach is
+    // sent home believing it saved.
+    const src = code()
+    expect(
+      /if \(!saved\?\.id\)/.test(src),
+      'the save path continues when the assessment row is absent but no error was returned.',
+    ).toBe(true)
+  })
+
+  it('the player actually reads published shared feedback', () => {
+    // The gap Imad caught: I built the writer and no reader. coach_shared_feedback
+    // was queried only by the coach page, while PlayerHome still read the private
+    // note — which K9 makes invisible. So the child saw nothing and K9 stayed a
+    // net removal from the only side that matters.
+    const src = code(PLAYER_HOME)
+    expect(
+      src.includes('coach_shared_feedback'),
+      'PlayerHome does not read coach_shared_feedback, so published feedback never reaches the ' +
+        'child and K9 only removes what they could see.',
+    ).toBe(true)
+    expect(
+      /\.not\('published_at', 'is', null\)/.test(src),
+      'PlayerHome reads shared feedback without filtering on published_at. RLS enforces it, but ' +
+        'the call site should say so too, so a future policy change cannot quietly widen it.',
+    ).toBe(true)
+    expect(
+      /from\('coach_assessment_notes'\)/.test(src),
+      'PlayerHome still queries the private coach note. That is the record K9 made private; ' +
+        'the child reads coach_shared_feedback instead.',
+    ).toBe(false)
   })
 
   it('no longer tells the coach their private note reaches the player', () => {

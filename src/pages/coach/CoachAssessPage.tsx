@@ -217,6 +217,19 @@ export default function CoachAssessPage() {
       return
     }
 
+    // A row is required, not just the absence of an error. .maybeSingle() on an
+    // UPDATE that matched nothing returns data null with error null — an RLS
+    // denial, or an assessment deleted or transferred since this page loaded.
+    // Everything below is keyed on saved.id, so without this the note and the
+    // shared feedback both silently skip and the coach is sent home believing
+    // the assessment saved. Imad reproduced it on #44.
+    if (!saved?.id) {
+      console.error('Save matched no assessment row', { existingId })
+      toast.error('Nothing was saved — the assessment may have been removed. Reload and try again.')
+      setSaving(false)
+      return
+    }
+
     if (saved?.id && note.trim()) {
       // upsert, so re-saving replaces the note rather than stacking another
       const { error: noteError } = await supabase.from('coach_assessment_notes').upsert({
@@ -243,11 +256,22 @@ export default function CoachAssessPage() {
         published_at:  sharedPublished && shared.trim() ? new Date().toISOString() : null,
       }, { onConflict: 'assessment_id' })
       if (sharedError) {
+        // Stay put. Navigating away here loses the text the coach wrote for the
+        // child and gives them no way to retry it — the same mistake K5 fixed
+        // in the match flow, which I then repeated in my own new code an hour
+        // later. The assessment itself is saved, so keep its id: pressing save
+        // again updates that row rather than creating a second one.
         console.error('Shared feedback save failed:', sharedError)
-        toast.error(`Assessment saved, shared feedback failed: ${sharedError.message}`)
-      } else {
-        setSharedExists(true)
+        toast.error(
+          `Assessment saved, but the feedback for the player did not: ${sharedError.message}. ` +
+            `Your text is still here — press save to try again.`,
+          { duration: 12000 },
+        )
+        setExistingId(saved.id)
+        setSaving(false)
+        return
       }
+      setSharedExists(true)
     }
     trackEvent('assessment_submitted', {
       mode: 'full',

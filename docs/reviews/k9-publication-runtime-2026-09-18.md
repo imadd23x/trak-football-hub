@@ -1,5 +1,43 @@
 # K9 publication runtime review
 
+## Current rereview: 89cd973
+
+Kostas updated PR44 to `89cd973b773766840485efdcdfca1c037819f1ee`.
+The previous two save regressions now pass through the actual component and SDK:
+failed publication keeps the form/text, and a successful retry updates the saved
+assessment instead of inserting a duplicate; a zero-row assessment save reports
+failure and stays on the form. The successful-publication control also passes.
+
+PlayerHome now queries published `coach_shared_feedback`, and the new reader
+controls verify both rendering published text and hiding an unpublished row on
+a fresh mount. One remaining regression is reproducible: after showing published
+text, a same-account Auth refresh reruns the effect and receives no shared row,
+but the old text stays visible. `PlayerHome.tsx:153` only sets state for a truthy
+body. A retraction or failed read must clear the previous value, and stale request
+completion must not restore it. This is a state-replacement problem, not a claim
+that the backend returns unpublished text or that the app polls for retractions.
+
+Run both evidence suites:
+
+```sh
+npx vitest run tests/reviews/K9-publish-review.test.tsx tests/reviews/K9-reader-review.test.tsx
+```
+
+Current result: **5 pass, 1 failure**, 1.40 seconds. The sole failure is the
+retraction reread above. The old exact toast wording was relaxed to require the
+actual refusal message; the retry test now additionally counts one assessment
+insert and one update. Reader tests assert the actual request's assessment and
+publication filters and wait for the completed second load. These are synthetic
+HTTP fixtures with real components/SDK, not hosted or new SQL verification.
+
+The migrations are unchanged from the earlier reviewed head, so its SQL evidence
+below remains historical context rather than a newly rerun check. PlayerHome's
+feedback link still leads to PlayerFeedback, whose legacy consumer is unchanged;
+coordinate the final detail-route contract with T2's separate `player_feedback`
+reader. No formal approval or production action is implied by this rereview.
+
+## Original review: 2034f5f
+
 Reviewed canonical PR44 at `2034f5ff384c41a8d620623042b4615b41c180c8`.
 This fork branch adds review evidence and regression reproductions only; it does
 not change the teammate's application or migration. No hosted data was used.

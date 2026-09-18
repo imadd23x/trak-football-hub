@@ -57,14 +57,27 @@ describe('K9 routed assessment feedback runtime review', () => {
   })
 
   it('keeps the feedback form and a usable retry when publication fails', async () => {
+    let inserts = 0
+    let updates = 0
+    server.use(insertInto('coach_assessments', body => { inserts++; return { id: 'saved-assessment', ...body } }),
+      http.patch(`${SUPABASE_URL}/rest/v1/coach_assessments`, () => {
+        updates++
+        return HttpResponse.json([{ id: 'saved-assessment' }])
+      }))
     server.use(http.post(`${SUPABASE_URL}/rest/v1/coach_shared_feedback`, () =>
       HttpResponse.json({ code: '42501', message: 'Synthetic publication refusal' }, { status: 403 })))
     const { user, shared } = await editFeedback()
     await user.click(screen.getByRole('button', { name: /save assessment/i }))
-    await waitFor(() => expect(state.error).toHaveBeenCalledWith(expect.stringContaining('shared feedback failed')))
+    await waitFor(() => expect(state.error).toHaveBeenCalled())
+    expect(String(state.error.mock.calls[0][0])).toContain('Synthetic publication refusal')
     expect(state.navigate).not.toHaveBeenCalled()
     expect(shared).toHaveValue('Deliberately shared synthetic feedback')
     expect(screen.getByRole('button', { name: /save assessment/i })).toBeEnabled()
+    server.use(insertInto('coach_shared_feedback', body => ({ id: 'shared', ...body })))
+    await user.click(screen.getByRole('button', { name: /save assessment/i }))
+    await waitFor(() => expect(state.navigate).toHaveBeenCalledWith('/coach/home'))
+    expect(inserts).toBe(1)
+    expect(updates).toBe(1)
   })
 
   it('does not claim completion when an assessment update returns zero rows', async () => {

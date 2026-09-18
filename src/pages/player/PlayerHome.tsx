@@ -133,11 +133,24 @@ export default function PlayerHome() {
           setCoachAssessment(latest)
           const { data: cp } = await supabase.from('profiles').select('full_name').eq('user_id', latest.coach_user_id).maybeSingle()
           if (cp) setCoachName(cp.full_name)
-          // Check if the coach left improvement notes for this assessment
-          const { data: noteRow, error: noteError } = await supabase.from('coach_assessment_notes')
-            .select('note').eq('assessment_id', latest.id).maybeSingle()
-          console.log('[Trak] note fetch:', { note: noteRow?.note, error: noteError?.message })
-          if (noteRow?.note) setCoachAssessmentNote(noteRow.note)
+          // Published feedback the coach wrote FOR this player — not the
+          // coach's private note, which K9 (20260918135500) made unreadable
+          // here and which was never meant for the child in the first place.
+          // RLS already restricts this to published rows on their own
+          // assessments; the published_at filter makes that explicit at the
+          // call site so a future policy change cannot quietly widen it.
+          //
+          // The previous console.log printed the private note to the browser
+          // console — X9 by a third route. Gone with the query that fed it.
+          const { data: sharedRow, error: sharedError } = await supabase
+            .from('coach_shared_feedback' as any)
+            .select('body')
+            .eq('assessment_id', latest.id)
+            .not('published_at', 'is', null)
+            .maybeSingle()
+          if (sharedError) console.error('[Trak] shared feedback fetch failed', sharedError.message)
+          const body = (sharedRow as { body?: string } | null)?.body?.trim()
+          if (body) setCoachAssessmentNote(body)
         }
 
         // Published upcoming calendar events from coach

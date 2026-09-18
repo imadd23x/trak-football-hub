@@ -24,4 +24,4 @@ jobs:
       - name: Observe serialized execution
         run: |
           echo "Synthetic queue observation for $GITHUB_SHA"
-          sleep 90
+          sleep 10 # pending probe B

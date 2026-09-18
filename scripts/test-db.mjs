@@ -12,14 +12,17 @@ const academyMigration = '20260918062345_preserve_academy_access_and_fk_cleanup.
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 const args = process.argv.slice(2);
 const mode = args[0];
-if (args.length > 1 || (mode && !['--baseline', '--coach-departure-review', '--coach-departure-baseline', '--pilot-views-review', '--pilot-views-baseline'].includes(mode))) {
-  throw new Error('Usage: npm run test:db -- [--baseline | --coach-departure-review | --coach-departure-baseline | --pilot-views-review | --pilot-views-baseline]');
+if (args.length > 1 || (mode && !['--baseline', '--coach-departure-review', '--coach-departure-baseline', '--pilot-views-review', '--pilot-views-baseline', '--consent-privacy-review'].includes(mode))) {
+  throw new Error('Usage: npm run test:db -- [--baseline | --coach-departure-review | --coach-departure-baseline | --pilot-views-review | --pilot-views-baseline | --consent-privacy-review]');
 }
 const baseline = mode === '--baseline';
 const academyBaseline = mode === '--coach-departure-baseline';
 const coachReview = mode === '--coach-departure-review' || academyBaseline;
 const pilotViewsBaseline = mode === '--pilot-views-baseline';
 const pilotViewsReview = mode === '--pilot-views-review' || pilotViewsBaseline;
+// Opt-in unresolved audit. Never include its known privacy failures in a
+// "passing" baseline or silently add it to the default release suite.
+const consentPrivacyReview = mode === '--consent-privacy-review';
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
 try {
@@ -43,7 +46,7 @@ try {
     }
   }
   console.log(`Replayed ${migrations.length} migrations${baseline || academyBaseline || pilotViewsBaseline ? ' (vulnerable baseline; security assertions should fail)' : ' with backfill assertions'}.`);
-  const suites = coachReview ? [
+  const suites = consentPrivacyReview ? ['consent_privacy_review.sql'] : coachReview ? [
     'coach_departure_review.sql',
     'academy_access_security.sql',
     // Setup commits its fixtures before account-deletion assertions, exercising
@@ -57,6 +60,7 @@ try {
       console.log(`Passed: ${suite}`);
       for (const query of result) {
         if (query.rows?.[0]?.pilot_view_assertions) console.log(`Operational view assertions: ${query.rows[0].pilot_view_assertions}`);
+        if (query.rows?.[0]?.consent_privacy_assertions) console.log(`Consent/privacy assertions: ${query.rows[0].consent_privacy_assertions}`);
       }
     } catch (error) {
       throw new Error(`${suite}: ${error.message}`, { cause: error });

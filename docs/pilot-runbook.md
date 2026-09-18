@@ -1,12 +1,22 @@
 # Trak Academy Pilot — operational reference
 
-The full runbook lives in `docs/pilot-runbook.html` (published as an artifact) and the scope in
-`docs/pilot-scope.html`. This file carries only the parts you run, so the narrative lives in one
-place and cannot drift.
+Use the [current pilot charter and readiness](pilot-readiness-2026-09-25.md) for
+scope and admission gates. `pilot-scope.html` is a superseded single-academy
+proposal. The older `pilot-runbook.html` is background reference; its cohort,
+dates and deployment assumptions require reconciliation with the reviewed build.
+This file contains operational procedures, not authority to deploy, seed shared
+data or admit real children. Follow the reviewed release's instructions and the
+[merge/deployment gate](release/merge-gate.md) before executing commands.
 
 ---
 
 ## Deploy order
+
+Historical deployment illustration: the migration subset and eight-week SQL
+example below describe the earlier single-academy proposal. They are not a
+complete current release sequence or an agreed pilot duration. Use the reviewed
+release's full migration/deployment instructions and confirmed academy/window;
+do not copy these placeholders into the shared project.
 
 **Migrations first.** `CoachQuickMatchLog` and `CoachAddSession` pass `p_match_date` to
 `log_match_for_player`; against the old 15-argument function that call fails and coach match
@@ -89,6 +99,12 @@ Negative `avg_bias` means the engine bands **lower** than the coach. A consisten
 `gk`/`def` beside a positive for `att` is the systematic bias the scope predicts.
 
 ## Rehearsal data
+
+Historical fixture description, not current seed instructions. The invocation,
+purge switch and cohort below predate the reviewed S2 workflow. Use the accepted
+S2 revision and its explicit target/setup safeguards for synthetic rehearsal;
+do not execute this legacy invocation against the shared project. Thirty players
+and six weeks of generated fixtures are not confirmed real-pilot commitments.
 
 ```bash
 node seed-pilot-rehearsal.mjs

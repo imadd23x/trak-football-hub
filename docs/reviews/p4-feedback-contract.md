@@ -27,3 +27,14 @@ The source findings were coordinated in `#coding-agent-reviews`. Current green C
 [Tarek's September 18 proposal](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1789716645418969) separates coach-only `ai_feedback_drafts` from `player_feedback` containing the approved text, assessment/roster/academy IDs, coach author, draft provenance and published revision. [P4's response](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1789716895831159) accepts that shape and will query explicit published columns directly, with database RLS enforcing academy-specific active consent and `parent_visibility`. Parent screens show the current revision; superseded revisions remain for the academy audit trail.
 
 This is a coordinated contract, not delivered schema. Publication/supersession must be atomic; immutable server-checked academy/author/assessment relationships and direct-role denial tests are required. Table separation alone cannot distinguish a coach from a child because both use the `authenticated` database role. Draft protection still needs correct RLS or a narrowly scoped private/RPC boundary. P4 has no fallback to drafts or private notes. P2's effective-consent helper remains pending implementation and must be coordinated before calling the read gate complete.
+
+## PR40 executable review
+
+The proposed storage now exists in PR40 `e824ade`. Its [September 18 executable
+review](feedback-storage-2026-09-18.md) reproduces 14 failed security assertions,
+two simultaneous current revision-1 publications, and missing legitimate read
+access under restricted default grants. The 33 sequential controls pass. The
+review branch retains these as explicit failing tests, with no application or
+migration repair. P4 remains blocked on the repaired publication and effective
+consent contract; the existence of separate tables is not approval to consume
+their contents.

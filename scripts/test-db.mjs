@@ -12,8 +12,13 @@ const academyMigration = '20260918062345_preserve_academy_access_and_fk_cleanup.
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 const args = process.argv.slice(2);
 const mode = args[0];
-if (args.length > 1 || (mode && !['--baseline', '--coach-departure-review', '--coach-departure-baseline', '--pilot-views-review', '--pilot-views-baseline', '--consent-privacy-review'].includes(mode))) {
-  throw new Error('Usage: npm run test:db -- [--baseline | --coach-departure-review | --coach-departure-baseline | --pilot-views-review | --pilot-views-baseline | --consent-privacy-review]');
+const reviewSuites = {
+  '--consent-privacy-review': 'consent_privacy_review.sql',
+  '--feedback-storage-review': 'feedback_storage_review.sql',
+  '--coach-rating-contract': 'coach_rating_contract.sql',
+};
+if (args.length > 1 || (mode && !['--baseline', '--coach-departure-review', '--coach-departure-baseline', '--pilot-views-review', '--pilot-views-baseline', ...Object.keys(reviewSuites)].includes(mode))) {
+  throw new Error('Usage: npm run test:db -- [--baseline | --coach-departure-review | --coach-departure-baseline | --pilot-views-review | --pilot-views-baseline | --consent-privacy-review | --feedback-storage-review | --coach-rating-contract]');
 }
 const baseline = mode === '--baseline';
 const academyBaseline = mode === '--coach-departure-baseline';
@@ -22,7 +27,7 @@ const pilotViewsBaseline = mode === '--pilot-views-baseline';
 const pilotViewsReview = mode === '--pilot-views-review' || pilotViewsBaseline;
 // Opt-in unresolved audit. Never include its known privacy failures in a
 // "passing" baseline or silently add it to the default release suite.
-const consentPrivacyReview = mode === '--consent-privacy-review';
+const reviewSuite = reviewSuites[mode];
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
 try {
@@ -46,7 +51,7 @@ try {
     }
   }
   console.log(`Replayed ${migrations.length} migrations${baseline || academyBaseline || pilotViewsBaseline ? ' (vulnerable baseline; security assertions should fail)' : ' with backfill assertions'}.`);
-  const suites = consentPrivacyReview ? ['consent_privacy_review.sql'] : coachReview ? [
+  const suites = reviewSuite ? [reviewSuite] : coachReview ? [
     'coach_departure_review.sql',
     'academy_access_security.sql',
     // Setup commits its fixtures before account-deletion assertions, exercising

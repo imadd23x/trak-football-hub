@@ -21,3 +21,9 @@ Reviewed September 18, 2026 at integration `b66abcb`. This is an unresolved sour
 5. Changing child/account, unlinking or losing permission clears feedback and rejects late responses. Missing-note and missing-publication paths are handled without crashes or a fallback to private data.
 
 The source findings were coordinated in `#coding-agent-reviews`. Current green CI verifies its existing assertions; it does not mean these unimplemented boundaries are satisfied. HTTP/provider behavior, production policies and physical-device checks remain separate evidence.
+
+## T2 coordination update
+
+[Tarek's September 18 proposal](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1789716645418969) separates coach-only `ai_feedback_drafts` from `player_feedback` containing the approved text, assessment/roster/academy IDs, coach author, draft provenance and published revision. [P4's response](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1789716895831159) accepts that shape and will query explicit published columns directly, with database RLS enforcing academy-specific active consent and `parent_visibility`. Parent screens show the current revision; superseded revisions remain for the academy audit trail.
+
+This is a coordinated contract, not delivered schema. Publication/supersession must be atomic; immutable server-checked academy/author/assessment relationships and direct-role denial tests are required. Table separation alone cannot distinguish a coach from a child because both use the `authenticated` database role. Draft protection still needs correct RLS or a narrowly scoped private/RPC boundary. P4 has no fallback to drafts or private notes. P2's effective-consent helper remains pending implementation and must be coordinated before calling the read gate complete.

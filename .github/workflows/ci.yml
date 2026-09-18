@@ -13,8 +13,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # A new PR revision may replace its checks. A main deployment must finish
-  # both backend and frontend before the next revision can start deploying.
+  # A new PR revision may replace its checks. Pushes retain up to 100 pending
+  # runs as well as the running release; cancel-in-progress alone protects
+  # only the running one. The same predicate keeps max + true impossible.
+  queue: ${{ github.event_name == 'pull_request' && 'single' || 'max' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:

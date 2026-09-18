@@ -126,9 +126,24 @@ describe('release workflow regression gates', () => {
       rmSync(directory, { recursive: true, force: true })
     }
   })
-  it('runs checks on task branches and never cancels a main release', () => {
+  it('runs checks on task branches', () => {
     expect(workflow.on.push.branches).toEqual(expect.arrayContaining(['parent/**', 'shared/**']))
-    expect(workflow.concurrency['cancel-in-progress']).toBe("${{ github.event_name == 'pull_request' }}")
     expect(workflow.jobs.test.steps.find((step: { name: string }) => step.name === 'Install dependencies').run).toBe('npm ci --legacy-peer-deps')
+  })
+  it.each([
+    ['push', 'refs/heads/main', 'max', false],
+    ['push', 'refs/heads/shared/release-checks', 'max', false],
+    ['pull_request', 'refs/pull/25/merge', 'single', true],
+  ])('resolves the queue and cancellation policy for %s %s', (event, ref, queue, cancel) => {
+    // This is a contract check of the actual YAML expressions, not a mock of
+    // GitHub's scheduler. Hosted scheduling evidence is recorded separately.
+    const github = { event_name: event, ref, workflow: 'CI' }
+    const evaluate = (value: unknown): unknown => {
+      if (typeof value !== 'string' || !value.startsWith('${{')) return value
+      return new Function('github', `return (${value.slice(3, -2)})`)(github)
+    }
+    expect(evaluate(workflow.concurrency.queue ?? 'single')).toBe(queue)
+    expect(evaluate(workflow.concurrency['cancel-in-progress'])).toBe(cancel)
+    expect(workflow.concurrency.group).toBe('${{ github.workflow }}-${{ github.ref }}')
   })
 })

@@ -29,7 +29,23 @@ deployment requires a canonical main push and successful tests and backend job.
 
 ## After merge
 
-Wait for the full workflow to finish before the next schema merge. Production workflows are serialized and are not cancelled by newer pushes. The main frontend deployment requires an explicitly successful Supabase job. Missing production Vercel credentials fail the workflow rather than reporting a silent skipped deployment.
+Wait for the full workflow to finish before the next schema merge. Production
+workflows run one at a time, with up to 100 pending pushes retained by
+`concurrency.queue: max`. Disabling `cancel-in-progress` alone protects the
+running workflow; the default single-item queue still replaces an older pending
+run. PR revisions retain their single-item queue and may cancel obsolete checks.
+
+This is not a guarantee that every merged commit deploys: a full queue rejects
+additional runs, failures or manual cancellations can stop a release, and queue
+order follows when a run starts waiting rather than commit order. Do not batch
+schema merges or retry an old production run after a newer release without
+reviewing compatibility. A failed earlier run does not automatically stop the
+next queued run, so stop merges and inspect queued releases after a failure.
+See [GitHub's concurrency contract](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+
+The main frontend deployment requires an explicitly successful Supabase job.
+Missing production Vercel credentials fail the workflow rather than reporting a
+silent skipped deployment.
 
 Verify both deployment jobs and the routed journey on trakfootball.com using designated synthetic accounts. A PR preview uses the shared backend and does not test a new migration before it is applied. Record commit, workflow URL, migration version, role, expected/observed outcome, browser/phone, and outstanding limitations. Announce the result in Slack, distinguishing merged, deployed and verified.
 

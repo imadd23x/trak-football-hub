@@ -22,7 +22,7 @@ Node 22.23.1; PGlite 0.5.8 / PostgreSQL 18.3. Each merge was checked before cont
 
 | Command | Observed result |
 |---|---|
-| `npm test` | 454/454 tests across 34 source files pass |
+| `npm test` | 455/455 tests across 35 source files pass, including the combined account journey below |
 | `npm run test:harness` | 17/17 tests across four files pass |
 | `npm run typecheck` | Pass |
 | `npm run build` | Pass; existing bundle-size warning remains |
@@ -39,6 +39,12 @@ Registered browser journeys: public invitation privacy; shared-phone account swi
 
 Local logs are `/private/tmp/trak-parent-integration-{settings-focused,settings-types,consent-focused,consent-types,source,harness,typecheck,build,lint,usecases,db-fresh,db-parent-upgrade,db-upgrade-guards,db-history-upgrade,timezones,browser-list}.log`.
 
+## Combined consent and Settings journey
+
+`src/pages/parent/__tests__/parent-account-integration.test.tsx` uses the real App, router, AuthProvider, family provider and Supabase SDK with intercepted synthetic HTTP. Parent A opens Consent from Home and submits a held approval for Alex. The fixture verifies A's bearer and child ID, observes the SDK request being cancelled on browser Back, and retains the pending synthetic server operation. A visits Profile and Settings with both linked children; a failed logout preserves the account and a retry signs out. B then signs in through the real form, sees only Sam, and starts an unfinished name draft. Completing A's held server handler leaves B's account, route, family and draft unchanged and causes no extra grant, logout or pending-approval read.
+
+The focused test, typecheck and targeted ESLint pass. Removing only the Consent cleanup's request cancellation makes the test fail at the observed cancellation assertion; restoring the exact original application bytes makes it pass again. This control verifies cancellation, not server rollback or every possible late callback. The server may already have received the original write. Root review confirmed Settings/Auth and Consent remain byte-identical to their reviewed heads, then reran the full source suite: **455 passed**, recorded in `/private/tmp/trak-parent-integration-final-source.log`.
+
 ## Limits and next verification
 
-This work used synthetic intercepted HTTP and disposable in-memory SQL. No local browser execution, fresh native PostgreSQL/PostgREST run, hosted account, hosted write, email, Storage operation or production deployment is included. Prior native/browser evidence remains attached to the original reviewed candidates and must not be relabeled as an integrated run. Combined cross-feature journeys, hosted CI, independent review and separately approved deployment/live verification remain outstanding. A temporary dependency symlink is untracked and excluded from commits.
+This work used synthetic intercepted HTTP and disposable in-memory SQL. No local browser execution, fresh native PostgreSQL/PostgREST run, hosted account, hosted write, email, Storage operation or production deployment is included. Prior native/browser evidence remains attached to the original reviewed candidates and must not be relabeled as an integrated run. The combined source journey above establishes client isolation only; hosted CI, independent review and separately approved deployment/live verification remain outstanding. A temporary dependency symlink is untracked and excluded from commits.

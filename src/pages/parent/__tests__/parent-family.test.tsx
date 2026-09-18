@@ -52,6 +52,13 @@ function installFamily() {
       const child = new URL(request.url).searchParams.get('user_id')?.slice(3) ?? ''
       return HttpResponse.json([match(child)])
     }),
+    http.post(endpoint('rpc/get_parent_match_summary'), () => HttpResponse.json([{
+      total_count: 1, rated_count: 1, average_rating: 0, wins: 0, draws: 1, losses: 0,
+    }])),
+    http.post(endpoint('rpc/get_parent_match_page'), async ({ request }) => {
+      const { p_child_id } = await request.json() as { p_child_id: string }
+      return HttpResponse.json([match(p_child_id)])
+    }),
     http.get(endpoint('player_details'), ({ request }) => {
       const child = new URL(request.url).searchParams.get('user_id')?.slice(3)
       return HttpResponse.json([{ position: 'mid', current_club: `${child} academy`, age_group: 'U15' }])
@@ -140,8 +147,8 @@ describe('parent family navigation', () => {
     let release!: () => void
     let requested = false
     const pending = new Promise<void>(resolve => { release = resolve })
-    server.use(http.get(endpoint('matches'), async ({ request }) => {
-      const child = new URL(request.url).searchParams.get('user_id')?.slice(3) ?? ''
+    server.use(http.post(endpoint('rpc/get_parent_match_page'), async ({ request }) => {
+      const { p_child_id: child } = await request.json() as { p_child_id: string }
       if (child === 'Alex') { requested = true; await pending }
       return HttpResponse.json([match(child)])
     }))
@@ -213,9 +220,15 @@ describe('parent loading, empty and error states', () => {
   )
 
   it('clears the previous child when the selected child has no records', async () => {
-    server.use(http.get(endpoint('matches'), ({ request }) => HttpResponse.json(
-      new URL(request.url).searchParams.get('user_id') === 'eq.Alex' ? [match('Alex')] : [],
-    )))
+    server.use(http.post(endpoint('rpc/get_parent_match_summary'), async ({ request }) => {
+      const { p_child_id } = await request.json() as { p_child_id: string }
+      return HttpResponse.json([{ total_count: p_child_id === 'Alex' ? 1 : 0, rated_count: p_child_id === 'Alex' ? 1 : 0,
+        average_rating: p_child_id === 'Alex' ? 0 : null, wins: 0, draws: p_child_id === 'Alex' ? 1 : 0, losses: 0 }])
+    }))
+    server.use(http.post(endpoint('rpc/get_parent_match_page'), async ({ request }) => {
+      const { p_child_id } = await request.json() as { p_child_id: string }
+      return HttpResponse.json(p_child_id === 'Alex' ? [match('Alex')] : [])
+    }))
     renderFamily('/parent/matches')
     expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
     await userEvent.selectOptions(screen.getByRole('combobox'), 'Zara')
@@ -224,7 +237,7 @@ describe('parent loading, empty and error states', () => {
   })
 
   it('shows a matches failure and can recover without changing child', async () => {
-    server.use(http.get(endpoint('matches'), fail))
+    server.use(http.post(endpoint('rpc/get_parent_match_page'), fail))
     renderFamily('/parent/matches')
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load matches")
     expect(screen.queryByText('No matches yet.')).not.toBeInTheDocument()
@@ -243,34 +256,34 @@ describe('parent loading, empty and error states', () => {
 })
 
 describe('truthful parent ratings', () => {
-  it('includes a newly logged backfilled match among the latest 20 match alerts', async () => {
-    const historicalMatches = Array.from({ length: 20 }, (_, index) => ({
-      ...match(`Fixture ${index + 1}`),
-      match_date: `2026-09-${String(20 - index).padStart(2, '0')}`,
-      created_at: `2026-09-${String(20 - index).padStart(2, '0')}T10:00:00Z`,
+  it('requests recently recorded matches independently of match dates and caps the combined feed', async () => {
+    const queries: URLSearchParams[] = []
+    const latest = [
+      { ...match('Backfilled'), match_date: '2020-01-01', created_at: '2026-09-21T10:00:00Z' },
+      ...Array.from({ length: 19 }, (_, index) => ({
+        ...match(`Fixture ${index + 1}`), created_at: '2026-09-18T10:00:00Z',
+      })),
+    ]
+    server.use(http.get(endpoint('matches'), ({ request }) => {
+      const query = new URL(request.url).searchParams
+      queries.push(query)
+      return HttpResponse.json(query.get('limit') === '20' ? latest : [match('Recent match date')])
     }))
-    server.use(http.get(endpoint('matches'), () => HttpResponse.json([
-      ...historicalMatches,
-      { ...match('Backfilled'), match_date: '2026-08-01', created_at: '2026-09-21T10:00:00Z' },
-    ])))
-    const { client } = renderFamily('/parent/alerts')
+    renderFamily('/parent/alerts')
     expect(await screen.findByText('vs Backfilled opposition · 0–0')).toBeInTheDocument()
     const alerts = screen.getAllByText('Match logged')
     expect(alerts).toHaveLength(20)
     expect(alerts[0].parentElement).toHaveTextContent('vs Backfilled opposition')
-    expect(screen.queryByText('vs Fixture 20 opposition · 0–0')).not.toBeInTheDocument()
-    // Alerts must not reorder the shared match cache used by the Matches view.
-    // Assert before navigation: a mount refetch could hide an in-place mutation.
-    const cachedMatches = client.getQueryData<{ id: string }[]>(['parent', 'parent-a', 'Alex', 'matches'])
-    expect(cachedMatches?.map(row => row.id)).toEqual([
-      ...historicalMatches.map(row => row.id), 'match-Backfilled',
-    ])
+    expect(screen.queryByText('Coach assessment added')).not.toBeInTheDocument()
+    expect(queries[0].get('limit')).toBe('20')
+    expect(queries[0].get('order')).toBe('created_at.desc.nullslast,id.desc')
+    expect(queries[0].get('user_id')).toBe('eq.Alex')
     await userEvent.click(screen.getByRole('button', { name: 'Matches' }))
-    expect((await screen.findAllByText(/opposition/))[0]).toHaveTextContent('Fixture 1 opposition')
+    expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
   })
 
   it('shows zero as Difficult, null as Not rated, and uses the match date', async () => {
-    server.use(http.get(endpoint('matches'), () => HttpResponse.json([
+    server.use(http.post(endpoint('rpc/get_parent_match_page'), () => HttpResponse.json([
       match('Zero', 0), { ...match('Unknown', null), team_score: null, opponent_score: null },
     ])))
     renderFamily('/parent/matches')
@@ -283,11 +296,181 @@ describe('truthful parent ratings', () => {
 
   it('does not replace a missing rating in the average and preserves zero assessment categories', async () => {
     server.use(http.get(endpoint('matches'), () => HttpResponse.json([match('Zero', 0), match('Unknown', null)])))
+    server.use(http.post(endpoint('rpc/get_parent_match_summary'), () => HttpResponse.json([{
+      total_count: 2, rated_count: 1, average_rating: 0, wins: 0, draws: 2, losses: 0,
+    }])))
     renderFamily()
     const summary = await screen.findByRole('region', { name: 'Recorded matches summary' })
     expect(within(summary).getByText('Difficult')).toBeInTheDocument()
     const development = screen.getByRole('region', { name: 'Latest coach assessment' })
     expect(within(development).getAllByText('Difficult')).toHaveLength(7)
     expect(screen.queryByText('Steady')).not.toBeInTheDocument()
+  })
+})
+
+
+describe('bounded parent match history', () => {
+  const history = Array.from({ length: 101 }, (_, index) => ({
+    ...match(`History ${index + 1}`), id: `history-${index + 1}`,
+  }))
+  const summary = { total_count: 1001, rated_count: 1000, average_rating: 8, wins: 1000, draws: 0, losses: 1 }
+
+  it('uses complete server totals while requesting only five recent records', async () => {
+    let recentQuery: URLSearchParams | undefined
+    server.use(
+      http.post(endpoint('rpc/get_parent_match_summary'), () => HttpResponse.json([summary])),
+      http.get(endpoint('matches'), ({ request }) => {
+        recentQuery = new URL(request.url).searchParams
+        return HttpResponse.json(history.slice(0, 5))
+      }),
+    )
+    renderFamily()
+    const region = await screen.findByRole('region', { name: 'Recorded matches summary' })
+    expect(within(region).getByText('1001')).toBeInTheDocument()
+    expect(recentQuery?.get('limit')).toBe('5')
+    expect(recentQuery?.get('order')).toBe('match_date.desc.nullslast,created_at.desc.nullslast,id.desc')
+    expect(screen.getAllByText(/History \d+ opposition/)).toHaveLength(5)
+  })
+
+  it('does not claim empty history when the separate recent query is empty', async () => {
+    server.use(
+      http.post(endpoint('rpc/get_parent_match_summary'), () => HttpResponse.json([summary])),
+      http.get(endpoint('matches'), () => HttpResponse.json([])),
+    )
+    renderFamily()
+    expect(await screen.findByText('No recent matches available.')).toBeInTheDocument()
+    expect(screen.getByText('1001')).toBeInTheDocument()
+    expect(screen.queryByText(/No matches yet/)).not.toBeInTheDocument()
+  })
+
+  it('retains the current 50 rows on a failed next page and retries without skipping', async () => {
+    const requests: Record<string, unknown>[] = []
+    let failNext = true
+    server.use(http.post(endpoint('rpc/get_parent_match_page'), async ({ request }) => {
+      const body = await request.json() as Record<string, unknown>
+      requests.push(body)
+      if (!body.p_after_id) return HttpResponse.json(history.slice(0, 51))
+      if (failNext) return fail()
+      return HttpResponse.json(body.p_after_id === 'history-50' ? history.slice(50, 101) : history.slice(100))
+    }))
+    renderFamily('/parent/matches')
+    expect(await screen.findByText('History 1 opposition')).toBeInTheDocument()
+    expect(screen.getAllByText(/History \d+ opposition/)).toHaveLength(50)
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/load/i)
+    expect(screen.getByText('History 1 opposition')).toBeInTheDocument()
+    expect(screen.queryByText('No matches yet.')).not.toBeInTheDocument()
+    failNext = false
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('History 51 opposition')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Match history · page 2' })).toHaveFocus()
+    expect(screen.queryByText('History 1 opposition')).not.toBeInTheDocument()
+    expect(screen.getAllByText(/History \d+ opposition/)).toHaveLength(50)
+    expect(requests.slice(1, 3).map(request => request.p_after_id)).toEqual(['history-50', 'history-50'])
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('History 101 opposition')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Previous' }))
+    expect(await screen.findByText('History 51 opposition')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Match history · page 2' })).toHaveFocus()
+    expect(screen.queryByText('History 101 opposition')).not.toBeInTheDocument()
+    expect(requests.every(request => request.p_child_id === 'Alex' && request.p_limit === 51)).toBe(true)
+  })
+
+  it.each(['child', 'account'] as const)('ignores a late next page after switching %s', async switchKind => {
+    let release!: () => void
+    let requested = false
+    const pending = new Promise<void>(resolve => { release = resolve })
+    server.use(http.post(endpoint('rpc/get_parent_match_page'), async ({ request }) => {
+      const body = await request.json() as { p_child_id: string; p_after_id?: string }
+      if (body.p_child_id !== 'Alex') return HttpResponse.json([match(body.p_child_id)])
+      if (body.p_after_id) { requested = true; await pending; return HttpResponse.json(history.slice(50)) }
+      return HttpResponse.json(history.slice(0, 51))
+    }))
+    const view = renderFamily('/parent/matches')
+    expect(await screen.findByText('History 1 opposition')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(requested).toBe(true))
+    if (switchKind === 'child') await userEvent.selectOptions(screen.getByRole('combobox'), 'Zara')
+    else { auth.parentId = 'parent-b'; view.rerender(view.tree()) }
+    const nextName = switchKind === 'child' ? 'Zara' : 'Sam'
+    expect(await screen.findByText(`${nextName} opposition`)).toBeInTheDocument()
+    await act(async () => { release(); await pending })
+    expect(screen.queryByText(/History \d+ opposition/)).not.toBeInTheDocument()
+    expect(screen.getByText(`${nextName} opposition`)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+  })
+
+  it('does not advance after returning A -> B -> A while the original next-page response is pending', async () => {
+    let release!: () => void
+    let requested = false
+    let responseFinished = false
+    const pending = new Promise<void>(resolve => { release = resolve })
+    server.use(http.post(endpoint('rpc/get_parent_match_page'), async ({ request }) => {
+      const body = await request.json() as { p_child_id: string; p_after_id: string | null }
+      if (body.p_child_id !== 'Alex') return HttpResponse.json([match(body.p_child_id)])
+      if (body.p_after_id) {
+        requested = true
+        await pending
+        responseFinished = true
+        return HttpResponse.json(history.slice(50))
+      }
+      return HttpResponse.json(history.slice(0, 51))
+    }))
+    const { client } = renderFamily('/parent/matches')
+    try {
+      expect(await screen.findByText('History 1 opposition')).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await waitFor(() => expect(requested).toBe(true))
+      await userEvent.selectOptions(screen.getByRole('combobox'), 'Zara')
+      expect(await screen.findByText('Zara opposition')).toBeInTheDocument()
+      await userEvent.selectOptions(screen.getByRole('combobox'), 'Alex')
+      expect(await screen.findByText('History 1 opposition')).toBeInTheDocument()
+      expect(screen.getByRole('combobox')).toHaveFocus()
+      await act(async () => { release(); await pending })
+      await waitFor(() => expect(responseFinished).toBe(true))
+      expect(screen.getByText('Page 1')).toBeInTheDocument()
+      expect(screen.getByText('History 1 opposition')).toBeInTheDocument()
+      expect(screen.queryByText('History 51 opposition')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+      expect(client.getQueryData<{ pages: unknown[] }>(['parent', 'parent-a', 'Alex', 'match-history'])?.pages).toHaveLength(1)
+    } finally {
+      release()
+    }
+  })
+
+  it('allows Previous when the remaining records are deleted before loading the next page', async () => {
+    let remainingDeleted = false
+    server.use(
+      http.post(endpoint('rpc/get_parent_match_summary'), () => HttpResponse.json([{
+        total_count: 101, rated_count: 101, average_rating: 0, wins: 0, draws: 101, losses: 0,
+      }])),
+      http.post(endpoint('rpc/get_parent_match_page'), async ({ request }) => {
+        const body = await request.json() as { p_after_id: string | null }
+        return HttpResponse.json(body.p_after_id ? (remainingDeleted ? [] : history.slice(50)) : history.slice(0, 51))
+      }),
+    )
+    renderFamily('/parent/matches')
+    expect(await screen.findByText('History 1 opposition')).toBeInTheDocument()
+    remainingDeleted = true
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('No matches on this page.')).toBeInTheDocument()
+    expect(screen.queryByText('No matches yet.')).not.toBeInTheDocument()
+    expect(screen.queryByText('No child linked yet')).not.toBeInTheDocument()
+    expect(screen.queryByText('End of match history.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Previous' }))
+    expect(await screen.findByText('History 1 opposition')).toBeInTheDocument()
+    expect(screen.queryByText('No matches on this page.')).not.toBeInTheDocument()
+    expect(screen.getByText('Page 1')).toBeInTheDocument()
+  })
+
+  it('fails closed on a missing summary instead of claiming empty history', async () => {
+    server.use(http.post(endpoint('rpc/get_parent_match_summary'), () => HttpResponse.json([])))
+    renderFamily('/parent/matches')
+    expect(await screen.findByRole('alert')).toHaveTextContent(/load/i)
+    expect(screen.queryByText('Alex opposition')).not.toBeInTheDocument()
+    expect(screen.queryByText('No matches yet.')).not.toBeInTheDocument()
   })
 })

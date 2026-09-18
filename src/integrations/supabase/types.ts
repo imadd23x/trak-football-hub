@@ -801,6 +801,27 @@ export type Database = {
       }
       delete_my_account: { Args: never; Returns: undefined }
       get_coach_id_by_invite_code: { Args: { p_code: string }; Returns: string }
+      get_parent_match_page: {
+        Args: {
+          p_child_id: string
+          p_after_match_date?: string | null
+          p_after_created_at?: string | null
+          p_after_id?: string | null
+          p_limit?: number | null
+        }
+        Returns: Json
+      }
+      get_parent_match_summary: {
+        Args: { p_child_id: string }
+        Returns: {
+          total_count: number
+          rated_count: number
+          average_rating: number | null
+          wins: number
+          draws: number
+          losses: number
+        }[]
+      }
       get_parent_invite_by_token: {
         Args: { p_token: string }
         Returns: {

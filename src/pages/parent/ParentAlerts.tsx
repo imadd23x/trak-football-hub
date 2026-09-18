@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar } from '@/components/trak'
 import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading } from '@/components/parent/ParentFamily'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
-import { useParentDevelopment, useParentMatches } from '@/hooks/useParentData'
-import { formatParentAward, formatParentDate } from '@/lib/parent-data'
+import { useParentDevelopment, useParentMatchActivity } from '@/hooks/useParentData'
+import { compareParentActivity, formatParentAward, formatParentDate, PARENT_ACTIVITY_LIMIT } from '@/lib/parent-data'
 import { scoreToBand } from '@/lib/rating-engine'
 import { trackEvent } from '@/lib/telemetry'
 
@@ -19,16 +19,13 @@ export default function ParentAlerts() {
   const navigate = useNavigate()
   const location = useLocation()
   const { selectedChild } = useParentChildren()
-  const matches = useParentMatches()
+  const matches = useParentMatchActivity()
   const development = useParentDevelopment()
   const hasError = matches.isError || development.isError
   const loading = matches.isPending || development.isPending
   const alerts: ParentAlert[] = [
-    // Activity is ordered by when it was recorded, including backfilled games.
-    // Copy first: the shared query cache remains in match-date order.
-    ...[...(matches.data ?? [])]
-      .sort((a, b) => (Date.parse(b.created_at ?? '') || 0) - (Date.parse(a.created_at ?? '') || 0))
-      .slice(0, 20).map(match => ({
+    // This query is ordered by recorded time, independent of history browsing.
+    ...(matches.data ?? []).map(match => ({
       id: `match-${match.id}`, title: 'Match logged', date: match.created_at,
       description: `vs ${match.opponent || match.competition || 'Unknown'}${match.team_score != null && match.opponent_score != null ? ` · ${match.team_score}–${match.opponent_score}` : ''}`,
     })),
@@ -40,7 +37,7 @@ export default function ParentAlerts() {
       id: `award-${award.id}`, title: formatParentAward(award.award_type), date: award.created_at,
       description: [award.awarded_for, `by ${development.data?.coachNames[award.coach_user_id] || 'Coach'}`].filter(Boolean).join(' · '),
     })),
-  ].sort((a, b) => (Date.parse(b.date ?? '') || 0) - (Date.parse(a.date ?? '') || 0))
+  ].sort(compareParentActivity).slice(0, PARENT_ACTIVITY_LIMIT)
   const childId = selectedChild?.id
   const count = alerts.length
   useEffect(() => {
@@ -51,6 +48,7 @@ export default function ParentAlerts() {
     <MobileShell>
       <div className="pt-3 pb-4">
         <h1 className="text-xl text-foreground mb-5">Alerts</h1>
+        <p className="text-sm text-muted-foreground mb-4">Latest 20 updates · newest recorded first</p>
         <ParentChildSelector />
         <ParentFamilyContent>
           {hasError ? <ParentLoadError message="Couldn't load alerts." onRetry={() => { void matches.refetch(); void development.refetch() }} />
@@ -66,6 +64,9 @@ export default function ParentAlerts() {
                 </div>)}
               </div>}
         </ParentFamilyContent>
+        <button onClick={() => navigate('/parent/matches')} className="mt-3 min-h-11 px-4 rounded-lg border border-border text-sm text-foreground focus-visible:ring-2 focus-visible:ring-primary">
+          View match history
+        </button>
       </div>
       <NavBar role="parent" activeTab={location.pathname} onNavigate={navigate} />
     </MobileShell>

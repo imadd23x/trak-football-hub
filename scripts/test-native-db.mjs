@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const defaultBin = '/opt/homebrew/opt/postgresql@17/bin';
+export const temporaryRoot = process.platform === 'darwin' ? '/private/tmp' : '/tmp';
 const socketPort = '55439';
 const outputLimit = 16 * 1024;
 const securityMigration = '20260917205027_secure_parent_invites.sql';
@@ -124,7 +125,7 @@ export async function runNative({ args = [], bin = defaultBin, advisorBin } = {}
   if (advisorBin) await access(advisorBin, constants.X_OK);
   const plan = await buildReplayPlan(root, mode);
   // Never use Homebrew's default data directory or any existing cluster.
-  const directory = await mkdtemp('/private/tmp/trak-pg17-');
+  const directory = await mkdtemp(join(temporaryRoot, 'trak-pg17-'));
   const data = join(directory, 'data');
   const socket = join(directory, 'socket');
   const serverLog = join(directory, 'server.log');

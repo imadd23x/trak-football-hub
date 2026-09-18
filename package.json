@@ -22,7 +22,8 @@
     "uc:report": "node scripts/uc-report.mjs",
     "prepare": "husky",
     "test:usecases": "node scripts/uc-check.mjs --stage=ci",
-    "test:db:roster-adoption": "node scripts/test-db.mjs --roster-adoption-review"
+    "test:db:roster-adoption": "node scripts/test-db.mjs --roster-adoption-review",
+    "test:db:feedback": "node scripts/test-db.mjs --feedback-publication-review"
   },
   "dependencies": {
     "@axe-core/react": "^4.11.1",

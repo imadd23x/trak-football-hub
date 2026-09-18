@@ -81,11 +81,7 @@ export interface ParentDevelopment {
   coachNames: Record<string, string>
 }
 
-export interface AwaitingConsentChild {
-  player_user_id: string
-  full_name: string
-  age_years: number
-}
+export { fetchAwaitingConsent, type AwaitingConsentChild } from './parent-consent'
 
 // TanStack Query owns retries; avoid stacking PostgREST network backoff underneath it.
 export async function fetchParentChildren(parentId: string, signal: AbortSignal): Promise<ParentChild[]> {
@@ -195,14 +191,6 @@ export async function fetchParentDevelopment(childId: string, signal: AbortSigna
     coachNames = Object.fromEntries((data ?? []).map(profile => [profile.user_id, profile.full_name]))
   }
   return { details: detailsResult.data, assessments, awards, coachNames }
-}
-
-export async function fetchAwaitingConsent(signal: AbortSignal): Promise<AwaitingConsentChild[]> {
-  // This existing RPC is not yet in the generated Supabase function types.
-  const { data, error } = await supabase.rpc('get_children_awaiting_consent' as never)
-    .returns<AwaitingConsentChild[]>().abortSignal(signal).retry(false)
-  if (error) throw error
-  return data ?? []
 }
 
 export function averageRecordedRating(matches: ParentMatch[]): number | null {

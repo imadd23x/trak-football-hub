@@ -47,6 +47,12 @@ jobs:
       - name: Consent calendar timezones
         run: npm run test:consent-timezones
 
+      - name: Database security regressions
+        run: npm run test:db
+
+      - name: Parent migration after deployed reporting migration
+        run: npm run test:db -- --parent-upgrade-review
+
       # tests/msw and tests/support hold the MSW fidelity contract and the
       # useCase() unknown-id guard — package.json's "test" script only runs
       # src, so these run nowhere else in CI.
@@ -62,6 +68,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Parent invitation browser regressions
+        run: npx playwright test --config playwright.pilot.config.ts
 
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -167,7 +179,12 @@ jobs:
         run: supabase migration list --db-url "$DB_URL"
 
       - name: Push migrations
-        run: supabase db push --db-url "$DB_URL"
+        # Reviewed branches may contain an older timestamp than a migration
+        # already deployed from another PR. Include only unapplied migrations;
+        # never rename applied versions or repair history to skip their SQL.
+        run: |
+          supabase db push --db-url "$DB_URL" --include-all --dry-run
+          supabase db push --db-url "$DB_URL" --include-all
 
       # Deploys all four functions. Values come from supabase/config.toml, so
       # that file is the source of truth for verify_jwt \u2014 not the dashboard.

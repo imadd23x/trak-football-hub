@@ -13,6 +13,8 @@
     "preview": "vite preview",
     "test": "vitest run src",
     "test:consent-timezones": "node scripts/test-consent-timezones.mjs",
+    "test:db": "node scripts/test-db.mjs",
+    "test:db:pilot-views": "node scripts/test-db.mjs --pilot-views-review",
     "test:watch": "vitest",
     "test:harness": "vitest run tests/msw tests/support",
     "storybook": "storybook dev -p 6006",
@@ -21,7 +23,8 @@
     "uc:lock": "node scripts/uc-check.mjs --write-lock",
     "uc:report": "node scripts/uc-report.mjs",
     "prepare": "husky",
-    "test:usecases": "node scripts/uc-check.mjs --stage=ci"
+    "test:usecases": "node scripts/uc-check.mjs --stage=ci",
+    "test:browser": "npm run build && playwright test --config playwright.pilot.config.ts"
   },
   "dependencies": {
     "@axe-core/react": "^4.11.1",
@@ -82,6 +85,7 @@
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.1.1",
+    "@electric-sql/pglite": "0.5.8",
     "@eslint/js": "^9.32.0",
     "@playwright/test": "^1.57.0",
     "@storybook/addon-a11y": "^10.3.5",

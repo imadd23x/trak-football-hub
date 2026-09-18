@@ -78,7 +78,7 @@ export default function ParentProfilePage() {
             <div>
               <MetadataLabel text="SETTINGS" />
               <p className="text-[12px] text-white/55 mt-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Notifications, privacy, account
+                Account settings
               </p>
             </div>
           </div>

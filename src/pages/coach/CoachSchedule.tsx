@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Eye, EyeOff, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
+import { toInstant, localParts, normalizeInstant } from '@/lib/event-time'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { trackEvent } from '@/lib/telemetry'
@@ -142,8 +143,8 @@ export default function CoachSchedule() {
         id:        e.id,
         title:     e.title,
         type:      (e.event_type || 'other') as EventType,
-        date:      e.starts_at?.slice(0, 10) ?? '',
-        time:      e.starts_at?.slice(11, 16),
+        date:      e.starts_at ? localParts(e.starts_at).date : '',
+        time:      e.starts_at ? localParts(e.starts_at).time : undefined,
         source:    'calendar',
         published: e.published,
         opponent:  e.opponent,
@@ -200,9 +201,14 @@ export default function CoachSchedule() {
   const saveEvent = async () => {
     if (!user || !modal.title.trim()) return
     setSaving(true)
-    const starts_at = modal.time
-      ? `${modal.date}T${modal.time}:00`
-      : `${modal.date}T00:00:00`
+    // A naive string handed to timestamptz is read as UTC, so the coach's
+    // 18:00 was stored four hours late in Dubai. Send a real instant.
+    const starts_at = toInstant(modal.date, modal.time || null)
+    if (!starts_at) {
+      setSaving(false)
+      toast.error("That date and time isn't valid — please check it")
+      return
+    }
     const { error } = await supabase.from('coach_calendar_events').insert({
       coach_user_id: user.id,
       title:         modal.title.trim(),
@@ -245,7 +251,16 @@ export default function CoachSchedule() {
       const { data, error } = await supabase.functions.invoke('parse-schedule', {
         body: { text: importText, todayISO: new Date().toISOString().slice(0, 10) },
       })
-      if (error || data?.error) throw new Error(data?.error || 'Parse failed')
+      // On a non-2xx, supabase-js puts the body on the error's response rather
+      // than in `data` (the same idiom AuthContext uses for send-parent-invite).
+      // Without this a spent daily allowance surfaced as "Parse failed", which
+      // tells the coach nothing and invites them to retry immediately — the one
+      // thing that cannot work. Prefer the function's own sentence.
+      let failure = data?.error as string | undefined
+      if (error && !failure) {
+        try { failure = (await (error as { context?: Response }).context?.json())?.error } catch { /* no body */ }
+      }
+      if (error || failure) throw new Error(failure || 'Parse failed')
       const list = data?.events || []
       trackEvent('schedule_parsed', {
         input_chars: importText.trim().length,
@@ -263,13 +278,24 @@ export default function CoachSchedule() {
   const saveDraft = async (idx: number) => {
     if (!user) return
     const ev = drafts[idx]
-    await supabase.from('coach_calendar_events').insert({
+    const startsAt = normalizeInstant(ev.starts_at)
+    if (!startsAt) {
+      toast.error(`"${ev.title}" has no usable date — set one before saving it`)
+      return
+    }
+    const { error } = await supabase.from('coach_calendar_events').insert({
       coach_user_id: user.id,
-      title: ev.title, event_type: ev.event_type, starts_at: ev.starts_at,
-      ends_at: ev.ends_at || null, venue: ev.venue || null,
+      title: ev.title, event_type: ev.event_type, starts_at: startsAt,
+      ends_at: normalizeInstant(ev.ends_at), venue: ev.venue || null,
       opponent: ev.opponent || null, notes: ev.notes || null,
       published: false, source: 'ai_text',
     })
+    // A rejected insert used to remove the draft and report success, so the
+    // coach believed a session was in the calendar that was never written.
+    if (error) {
+      toast.error(`Couldn't save "${ev.title}" — it's still here, try again`)
+      return
+    }
     setDrafts(d => d.filter((_, i) => i !== idx))
     loadData()
     toast.success('Event saved')
@@ -277,19 +303,39 @@ export default function CoachSchedule() {
 
   const saveAllDrafts = async () => {
     if (!user || !drafts.length) return
-    await supabase.from('coach_calendar_events').insert(
-      drafts.map(ev => ({
+    // A draft the parser could not date is not silently dropped into the
+    // calendar at the wrong moment — it is left behind and named.
+    const rows = drafts
+      .map(ev => ({ ev, startsAt: normalizeInstant(ev.starts_at) }))
+      .filter((r): r is { ev: typeof drafts[number]; startsAt: string } => r.startsAt !== null)
+
+    const undated = drafts.length - rows.length
+    if (undated > 0) {
+      toast.error(`${undated} event${undated === 1 ? '' : 's'} had no usable date and ${undated === 1 ? 'was' : 'were'} not saved`)
+    }
+    if (!rows.length) return
+
+    const { error } = await supabase.from('coach_calendar_events').insert(
+      rows.map(({ ev, startsAt }) => ({
         coach_user_id: user.id,
-        title: ev.title, event_type: ev.event_type, starts_at: ev.starts_at,
-        ends_at: ev.ends_at || null, venue: ev.venue || null,
+        title: ev.title, event_type: ev.event_type, starts_at: startsAt,
+        ends_at: normalizeInstant(ev.ends_at), venue: ev.venue || null,
         opponent: ev.opponent || null, notes: ev.notes || null,
         published: false, source: 'ai_text',
       }))
     )
-    setDrafts([])
-    setImportText('')
+    // A rejected insert used to clear every draft and report them all saved.
+    // Nothing was written, so nothing is removed and nothing is claimed.
+    if (error) {
+      toast.error("Couldn't save those events — they're still here, try again")
+      return
+    }
+    // Keep the ones that were not saved, so they are not lost silently, and
+    // report the number actually written rather than the number attempted.
+    setDrafts(drafts.filter(ev => normalizeInstant(ev.starts_at) === null))
+    if (!undated) setImportText('')
     loadData()
-    toast.success(`Saved ${drafts.length} events`)
+    toast.success(`Saved ${rows.length} event${rows.length === 1 ? '' : 's'}`)
   }
 
   return (

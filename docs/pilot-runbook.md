@@ -33,14 +33,35 @@ becomes meaningless. Verified in rehearsal: 3.2% unscoped, 60% scoped.
 
 ## The weekly query
 
+Operational reports are restricted to the authorized operator SQL workflow or a
+separate trusted server-side `service_role` connection. This includes every
+`pilot_*` report, `squad_duplicate_candidates` and `stale_pending_consent`.
+An application's `club` account still uses the `authenticated` database role;
+it is not `service_role`. Denial with app credentials is expected, not evidence
+that measurement is broken. Never put service credentials in browser `VITE_*`
+configuration or substitute them into the legacy seed/check clients.
+
+In the reviewed project's operator SQL editor, verify report access explicitly:
+
 ```sql
-SELECT * FROM pilot_scorecard;
+BEGIN READ ONLY;
+SET LOCAL ROLE service_role;
+SELECT current_user;
+SELECT * FROM public.pilot_scorecard;
+ROLLBACK;
 ```
 
 One row per pilot week: activation, match coverage, assessment rate (H1), median seconds to
 assess, rating agreement (H4, derived and blind), player and parent return, safeguarding flags.
 
+For S3, record the target project, deployed migration, querying role, configured
+academy/window and observed values. Permission alone does not prove that numbers
+are correct. The legacy checker skips these reports; it cannot attest to their
+contents or migration state using an application key.
+
 ### Drill-downs
+
+Run these reports and the H4 query below through the same authorized workflow.
 
 | Metric | View |
 |---|---|
@@ -108,6 +129,8 @@ In development the console logs `[telemetry] "<event>" failed:` on any write err
 
 Player signup now adopts the coach's own roster entry instead of inserting a second one.
 Any duplicates created before that fix are surfaced, not merged:
+
+Use the same authorized operator/service-role workflow as the weekly query.
 
 ```sql
 SELECT * FROM squad_duplicate_candidates;

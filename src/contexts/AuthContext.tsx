@@ -173,6 +173,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const generation = useRef(0);
   const mounted = useRef(false);
   const hydration = useRef<{ generation: number; promise: Promise<void> } | null>(null);
+  const authTransition = useRef<Promise<unknown> | null>(null);
+  const explicitSignOut = useRef(false);
+
+  // The SDK removes its shared session after the logout HTTP response. A
+  // concurrent password sign-in can otherwise save B before A deletes it.
+  // Serialize provider-owned transitions, including signup-created sessions.
+  const runAuthTransition = <T,>(operation: () => Promise<T>): Promise<T> => {
+    const previous = authTransition.current;
+    const result = previous ? previous.then(operation, operation) : operation();
+    authTransition.current = result;
+    const finished = () => {
+      if (authTransition.current === result) authTransition.current = null;
+    };
+    void result.then(finished, finished);
+    return result;
+  };
 
   const fetchOrCreateProfile = (session: Session, version: number): Promise<void> => {
     if (hydration.current?.generation === version) return hydration.current.promise;
@@ -266,7 +282,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         acceptSession(null);
         queryClient.clear();
         discardLegacyPendingProfile();
-        window.location.replace('/');
+        // Explicit callers own navigation. A hard reload here would discard
+        // a queued sign-in and strip the current parent invitation URL.
+        if (!explicitSignOut.current) window.location.replace('/');
         return;
       }
 
@@ -312,7 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user && profile) trackSessionOpen(user.id, profile.role);
   }, [user?.id, profile?.role]);
 
-  const signUp = async (email: string, password: string, pendingProfile?: PendingProfileData) => {
+  const signUp = (email: string, password: string, pendingProfile?: PendingProfileData) => runAuthTransition(async () => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -327,14 +345,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return { user: data.user, error: error as Error | null };
-  };
+  });
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = (email: string, password: string) => runAuthTransition(async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error as Error | null };
-  };
+  });
 
-  const signOut = async () => {
+  const signOut = () => runAuthTransition(async () => {
+    explicitSignOut.current = true;
     const version = ++generation.current;
     hydration.current = null;
     discardLegacyPendingProfile();
@@ -358,8 +377,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.error('Could not sign out. You are still signed in on this device. Check your connection and try again.');
       }
       return { error };
+    } finally {
+      explicitSignOut.current = false;
     }
-  };
+  });
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, refreshProfile }}>

@@ -1,5 +1,5 @@
-// Read-only probe. Writes nothing. Uses PostgREST error messages to tell
-// whether each schema object exists, which needs no authentication.
+// Legacy application-schema and rehearsal-account probe. Operational reports
+// are intentionally excluded: verify them through the authorized SQL workflow.
 import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'node:fs'
 
@@ -45,8 +45,7 @@ await probe('telemetry_events        (migration 1)', () => sb.from('telemetry_ev
 await probe('matches.match_date      (migration 2)', () => sb.from('matches').select('match_date').limit(1))
 await probe('matches.logged_by_role  (migration 2)', () => sb.from('matches').select('logged_by_role').limit(1))
 await probe('pilot_config            (migration 3)', () => sb.from('pilot_config').select('starts_on').limit(1))
-await probe('pilot_scorecard         (migration 3)', () => sb.from('pilot_scorecard').select('week').limit(1))
-await probe('pilot_activation        (migration 3)', () => sb.from('pilot_activation').select('cohort').limit(1))
+console.log('  SKIPPED   operational reports are intentionally restricted; verify through the authorized SQL workflow in docs/pilot-runbook.md. Application credentials cannot verify their contents or migration state.')
 
 console.log('\nRehearsal seed\n')
 

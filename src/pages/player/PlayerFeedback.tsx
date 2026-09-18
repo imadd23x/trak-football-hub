@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell } from '@/components/trak'
 import { ChevronLeft, Sparkles, Send, Loader2, MessageSquare } from 'lucide-react'
 import { trackEvent } from '@/lib/telemetry'
+import { SSEBuffer } from '@/lib/sse-buffer'
 
 /* ---------- types (forward-declared so FEEDBACK_BANK can reference them) ---------- */
 
@@ -397,38 +398,56 @@ export default function PlayerFeedback() {
       // Stream the response
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
+      const sse = new SSEBuffer()
       let assistantText = ''
 
       // Add placeholder
       setChatMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n').filter(l => l.startsWith('data: '))
-
-        for (const line of lines) {
-          const data = line.slice(6).trim()
-          if (data === '[DONE]') continue
+      const consume = (payloads: string[]) => {
+        for (const data of payloads) {
           try {
             const json = JSON.parse(data)
             const delta = json.choices?.[0]?.delta?.content || ''
+            if (!delta) continue
             assistantText += delta
             setChatMessages(prev => {
               const updated = [...prev]
               updated[updated.length - 1] = { role: 'assistant', content: assistantText }
               return updated
             })
-          } catch { /* ignore parse errors */ }
+          } catch { /* a payload that is not JSON is not ours to render */ }
         }
       }
-    } catch (e: any) {
-      setChatMessages(prev => [...prev, {
-        role: 'assistant',
-        content: "Sorry, I couldn't get a response. Try again in a moment.",
-      }])
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          // Release any final line that arrived without a trailing newline.
+          consume(sse.flush())
+          break
+        }
+        consume(sse.push(decoder.decode(value, { stream: true })))
+      }
+
+      if (!assistantText.trim()) {
+        throw new Error('The response came back empty')
+      }
+    } catch {
+      const message = navigator.onLine === false
+        ? "You're offline, so I couldn't get a response. Reconnect and ask again."
+        : "Sorry, I couldn't get a response. Try again in a moment."
+      setChatMessages(prev => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        // Replace the streaming placeholder rather than leaving an empty bubble
+        // above the error.
+        if (last && last.role === 'assistant' && !last.content.trim()) {
+          updated[updated.length - 1] = { role: 'assistant', content: message }
+          return updated
+        }
+        return [...updated, { role: 'assistant', content: message }]
+      })
     } finally {
       setChatLoading(false)
     }

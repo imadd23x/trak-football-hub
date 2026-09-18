@@ -7,7 +7,7 @@ import { CardSkeleton, MatchCardSkeleton, Skeleton } from '@/components/trak'
 import { BANDS, type BandType } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
 import { dedupeMatches } from '@/lib/match-dedupe'
-import { isTimeTBC } from '@/lib/event-time'
+import { displayEventTime } from '@/lib/event-time'
 import { parseDisplayDate } from '@/lib/calendar'
 import { trackEvent } from '@/lib/telemetry'
 import CardRevealModal from '@/components/player/CardRevealModal'
@@ -153,7 +153,14 @@ export default function PlayerHome() {
             .select('*')
             .in('coach_user_id', coachIds)
             .eq('published', true)
-            .gte('starts_at', new Date().toISOString())
+            // An untimed session is stored at midnight, so `starts_at >= now()`
+            // dropped it from its own day the moment the clock passed 00:00 —
+            // the session a player most needs to see disappears on the morning
+            // it happens. Filtered on the calendar day instead, with the
+            // instant kept as the fallback for rows written before the
+            // backfill.
+            .or(`event_date.gte.${new Date().toLocaleDateString('en-CA')},and(event_date.is.null,starts_at.gte.${new Date().toISOString()})`)
+            .order('event_date', { ascending: true, nullsFirst: false })
             .order('starts_at', { ascending: true })
             .limit(5)
           // A failed calendar read is not an empty calendar. Without this the
@@ -509,11 +516,13 @@ export default function PlayerHome() {
                 }
                 const color = typeColors[ev.event_type] || typeColors.other
                 const label = typeLabels[ev.event_type] || 'EVENT'
-                const d = new Date(ev.starts_at)
+                const shown = displayEventTime(ev)
+                const d = parseDisplayDate(shown.date) ?? new Date(ev.starts_at)
                 const dayStr = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-                const timeStr = isTimeTBC(ev.starts_at)
-                  ? 'TBC'
-                  : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                // The wall clock the coach typed, rendered as-is. Formatting it
+                // through a Date would reintroduce the timezone conversion the
+                // calendar columns exist to avoid.
+                const timeStr = shown.time ?? 'TBC'
                 return (
                   <div key={ev.id}
                     className="flex items-center gap-3 rounded-[14px] p-3.5"

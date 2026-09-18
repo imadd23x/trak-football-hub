@@ -137,3 +137,52 @@ export function normalizeInstant(value: string | null | undefined): string | nul
  * migration on his table rather than bolted on here. Within a single academy,
  * where writer and reader share a timezone, the behaviour is correct.
  */
+
+/**
+ * The calendar-day fields introduced by 20260918000001.
+ *
+ * `event_date` is the day the coach chose and `start_time` is the wall clock
+ * they typed, with NULL meaning the time is not yet known. Storing those
+ * alongside `starts_at` is what makes an untimed session survive a timezone
+ * difference: an instant cannot express "the 1st of March, time to be
+ * confirmed", and encoding it as local midnight moves the date.
+ */
+export function calendarFields(date: string, time?: string | null): {
+  event_date: string
+  start_time: string | null
+} | null {
+  const trimmedDate = (date || '').trim()
+  const trimmedTime = (time ?? '').trim()
+
+  // Reuse toInstant purely as the validator, so the calendar columns and
+  // starts_at can never disagree about whether the input was usable.
+  if (!toInstant(trimmedDate, trimmedTime || null)) return null
+
+  return {
+    event_date: trimmedDate,
+    start_time: trimmedTime ? `${trimmedTime}:00`.slice(0, 8) : null,
+  }
+}
+
+/** Read back what a person should see, preferring the calendar columns. */
+export function displayEventTime(row: {
+  event_date?: string | null
+  start_time?: string | null
+  starts_at?: string | null
+}): { date: string; time: string | null } {
+  // New rows carry the wall clock the coach typed, so no timezone maths is
+  // involved and no reader can shift the date.
+  if (row.event_date) {
+    return {
+      date: row.event_date,
+      time: row.start_time ? row.start_time.slice(0, 5) : null,
+    }
+  }
+  // A row written before the backfill, or by an older client that has not
+  // reloaded. Falls back to the instant.
+  if (row.starts_at) {
+    const parts = localParts(row.starts_at)
+    return { date: parts.date, time: isTimeTBC(row.starts_at) ? null : parts.time }
+  }
+  return { date: '', time: null }
+}

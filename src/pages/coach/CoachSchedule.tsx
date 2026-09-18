@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Eye, EyeOff, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
-import { toInstant, localParts, normalizeInstant } from '@/lib/event-time'
+import { toInstant, localParts, normalizeInstant, calendarFields, displayEventTime } from '@/lib/event-time'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { trackEvent } from '@/lib/telemetry'
@@ -143,8 +143,9 @@ export default function CoachSchedule() {
         id:        e.id,
         title:     e.title,
         type:      (e.event_type || 'other') as EventType,
-        date:      e.starts_at ? localParts(e.starts_at).date : '',
-        time:      e.starts_at ? localParts(e.starts_at).time : undefined,
+        date:      displayEventTime(e).date,
+        // undefined rather than null keeps the existing "no time set" rendering.
+        time:      displayEventTime(e).time ?? undefined,
         source:    'calendar',
         published: e.published,
         opponent:  e.opponent,
@@ -209,11 +210,17 @@ export default function CoachSchedule() {
       toast.error("That date and time isn't valid — please check it")
       return
     }
+    // Written alongside starts_at, not instead of it: old clients still read
+    // the instant, new readers prefer the calendar day. start_time NULL is the
+    // explicit "time not known" that an instant cannot express.
+    const cal = calendarFields(modal.date, modal.time || null)
+
     const { error } = await supabase.from('coach_calendar_events').insert({
       coach_user_id: user.id,
       title:         modal.title.trim(),
       event_type:    modal.type,
       starts_at,
+      ...(cal ?? {}),
       opponent:      modal.opponent.trim() || null,
       venue:         modal.venue.trim() || null,
       published:     false,

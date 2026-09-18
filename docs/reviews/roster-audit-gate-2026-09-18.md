@@ -6,7 +6,8 @@ must land first; this branch and its pins still require independent review.
 
 ## Observed baseline and execution
 
-Runner/inventory and observed candidate: `415a796af366e436de3c36c1e2f8a716da14ce0c`.
+Runner and observed candidate: `781f4d423a4f85c7658dfbae53e8002e96773db3`.
+Inventory: `415a796af366e436de3c36c1e2f8a716da14ce0c`.
 Replayed **62 real candidate migrations** in an in-memory PGlite 0.5.8 database.
 All **21 assertions passed: 14 behavior checks and 7 positive controls**.
 The baseline expects every assertion to pass; there is **no accepted roster debt**
@@ -48,8 +49,12 @@ node scripts/audits/roster-adoption.mjs \
   --baseline-revision FULL_REVIEWED_BASELINE_SHA
 ```
 
-The initial **9 runner tests passed**. Disposable in-memory mutations prove:
+All **11 runner tests passed** after independent review strengthened target-coach
+verification and owner checks strengthened sequential idempotency. Disposable in-memory mutations prove:
 - denying assessment reads fails all three same-player read controls;
+- returning a membership under a different coach fails both fallback-link assertions;
+- returning the correct original ID while inserting hidden unlinked duplicates fails
+  the owner postcondition;
 - granting all assessment reads fails both wrong-child read assertions;
 - choosing one ambiguous namesake fails link, visibility and identity checks;
 - deleting one namesake fails identity and history preservation;
@@ -57,6 +62,15 @@ The initial **9 runner tests passed**. Disposable in-memory mutations prove:
   errors are fatal, with rollback checked;
 - a non-disposable marker is refused; changed/missing trusted inputs are refused;
   dirty candidate SQL is ignored in favor of exact Git objects.
+
+The source suite passed **319 tests**, the harness **17**, and governance **69**
+(including the new workflow contract). Default and deployed-parent-upgrade SQL
+modes both passed with 62 migrations and 282 operational-view assertions.
+Typecheck/build/lint passed; lint retains 136 warnings and build its chunk-size
+warning. `uc:check` exited zero with the existing three pending UC-A02 failures
+visible; that is not a claim that every use case passes. No browser rerun was
+needed for this test-only change. Exact merged-governance rerun evidence will be
+recorded with the final candidate.
 
 ## Limits and unresolved product work
 

@@ -3,8 +3,8 @@
   "suites": [
     {
       "id": "roster-adoption",
-      "sourceRevision": "415a796af366e436de3c36c1e2f8a716da14ce0c",
-      "runnerRevision": "415a796af366e436de3c36c1e2f8a716da14ce0c",
+      "sourceRevision": "781f4d423a4f85c7658dfbae53e8002e96773db3",
+      "runnerRevision": "781f4d423a4f85c7658dfbae53e8002e96773db3",
       "inventoryRevision": "415a796af366e436de3c36c1e2f8a716da14ce0c",
       "assertions": [
         {

@@ -59,6 +59,11 @@ ancestry alone. A closed/merged badge on a different base is insufficient. For a
 squashed/rebased dependency, its recorded merge result must actually reach main.
 Independent branches sharing only main history remain valid.
 
+This deliberately tightens the previous warning for a live stack. A PR targeting
+another task branch, or including an undelivered open PR head, remains blocked
+until its dependency lands and it is updated to current main. Opening a stack for
+coordination does not make it eligible to merge.
+
 The check reads all pages of GitHub PR/review inventories, validates exact
 base/head revisions, and fails when API/Git evidence is unavailable. Its result
 is a snapshot, not an atomic repository lock. Main changes require an updated
@@ -132,6 +137,14 @@ explicit authorization. An authorized administrator should:
 1. Confirm this policy and workflow are on main, **test** and **Merge policy**
    have reported on a fresh PR, and each listed CODEOWNER has repository write
    access. All ownership areas include alternates so authors can obtain review.
+   The old check **Base branch still reaches main** is renamed **Merge policy**;
+   an old green check does not satisfy the new name. Coordinate a queue pause
+   around the approved governance release, finish its deployment verification,
+   then update every still-open PR onto that main and rerun its checks. With
+   strict protection, any PR not refreshed will be blocked until it is updated.
+   Expect this queue-wide transition; do not keep the retired check or weaken
+   protection to make an old head mergeable. Fix and verify the superseded-release
+   behavior before activation, including both production eligibility conditions.
 2. Apply the reviewed config and then read it back:
 
 ```sh

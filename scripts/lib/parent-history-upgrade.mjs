@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-// Explicit historical deployment snapshot, not a moving origin/main alias.
+// Explicit canonical-main schema snapshot, not a moving origin/main alias or
+// independent proof of which versions are applied to the hosted database.
 export const historyUpgradeBase = '00910940f596d9fe9a7cd416dc741943d1df2cc9';
 export const historyMigration = '20260918112323_parent_match_history.sql';
 

@@ -53,7 +53,7 @@ jobs:
       - name: Parent migration after deployed reporting migration
         run: npm run test:db -- --parent-upgrade-review
 
-      - name: Parent history after exact deployed main with negative controls
+      - name: Parent history after exact canonical main with negative controls
         run: node --test tests/db/parent-history-upgrade.test.mjs
 
       # tests/msw and tests/support hold the MSW fidelity contract and the

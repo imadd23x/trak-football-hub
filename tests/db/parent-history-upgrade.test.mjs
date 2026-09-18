@@ -6,10 +6,20 @@ import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { parse } from 'yaml';
 import { historyUpgradeBase, historyMigration, parentHistoryUpgradeOrder } from '../../scripts/lib/parent-history-upgrade.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const run = promisify(execFile);
+
+test('CI executes the real upgrade controls with pinned Git history available', async () => {
+  const workflow = parse(await readFile(resolve(root, '.github/workflows/ci.yml'), 'utf8'));
+  const steps = workflow.jobs.test.steps;
+  assert.equal(steps.filter(step => step.run === 'node --test tests/db/parent-history-upgrade.test.mjs').length, 1);
+  assert.equal(steps.find(step => step.uses === 'actions/checkout@v4')?.with?.['fetch-depth'], 0);
+  assert.ok(steps.some(step => step.run === 'npm run test:db'));
+  assert.ok(steps.some(step => step.run === 'npm run test:db -- --parent-upgrade-review'));
+});
 
 // Each mutation is a private test-source copy. Original migrations, suites,
 // Git objects and working-tree files are never changed by these controls.

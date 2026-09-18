@@ -1,10 +1,9 @@
 # Parent match history: scope and verification
 
 Status: implemented and locally verified in the fork. The original history
-review head `484ad20` is preserved. Branch `parent/P3-history-integration` now
-integrates canonical main `b9adf1c45d468f4987b08c8def4c9ce23eaf4634` and repeats
-the affected parent verification. No production changes and no new PR while
-the existing review queue is cleared.
+review head `484ad20` and integration head `a1e5339` are preserved. The latest
+`parent/P3-history-current` refresh and its pinned-main upgrade evidence are
+recorded below. No production change is established by this document.
 
 ## Observed failure
 
@@ -86,3 +85,69 @@ Fresh checks on the integrated branch:
 This is a separate fork review candidate. S4 event/queue and view-inventory
 repairs remain their own branches. The calendar migration/caller and feedback
 blockers still prevent treating a green parent branch as a production release.
+
+## Pinned-main refresh — September 18, 2026
+
+`parent/P3-history-current` starts at `a1e5339`, merges canonical main
+`00910940f596d9fe9a7cd416dc741943d1df2cc9` (`960a83c`), then merges the retained
+coach-history fix `01304a4f26d6c79c7b9be9511463a17ef9382f0e` from #49 (`6febc81`).
+Both merges were automatic. Nullable author projections, null-ID filtering,
+neutral attribution and genuine name-query failure/retry behavior are retained.
+The history migration and all existing SQL suites are byte-identical to the
+reviewed history candidate. No new feature or migration SQL was written.
+
+The added opt-in `--parent-history-upgrade-review` mode validates all 62 migration
+files against immutable Git blobs at main `0091094`, applies those first, checks
+that history RPCs are still absent, then applies the pending
+`20260918112323_parent_match_history.sql` as migration 63. It rejects changed or
+missing main migrations and unexpected additional versions. This is a pinned
+canonical-main schema replay; it is not itself proof of the hosted migration
+inventory. Existing default and P1/report upgrade modes remain available.
+
+CI now runs five Node tests for this mode with full Git history available. The
+tests execute the real in-memory CLI and role suites; temporary copies prove
+that a missing history completion report and a deliberate failing history
+assertion both produce exit 1. Missing/incomplete reports cannot masquerade as
+success. Every temporary fixture is disposable and is removed afterward.
+
+Fresh local results on the refreshed code:
+
+- Source: **372/372**, including **69** focused parent data/family/retained-history
+  tests. The six retained-history tests initially failed because their previous
+  Home fixture lacked the new summary RPC; only that authenticated, child-checked
+  response fixture was added. Original behavior assertions remain intact.
+- New CLI/negative-control/CI-registration tests: **5/5**. Actual CI-condition tests: **8/8**.
+  MSW/use-case harness: **17/17**. Typecheck and production build pass.
+- Lint: **0 errors / 136 warnings**. Existing large build-chunk warning remains.
+- Default, P1/report upgrade and new pinned-main upgrade replays each pass with
+  **63 migrations**, **81 history assertions** and **282 operational-view
+  assertions**. The new mode also requires all **55 P1 assertion results**.
+- Use-case gate exits 0 with **2 enforced cases passing**; pending UC-A02 still
+  has **3 failures**, and **15 pending cases have no tests**.
+- The first browser attempt built successfully but could not bind preview port
+  4189 under the sandbox (`EPERM`). The authorized Chromium rerun passed
+  **6/6 mobile journeys in 17.5 seconds**, including the 1,001-row history,
+  pagination retry and child switching. All backend HTTP remained synthetic.
+
+Commands: `npm test`, `npm run test:harness`, `npm run typecheck`, `npm run lint`,
+`npm run uc:check`, `npm run test:db`,
+`npm run test:db -- --parent-upgrade-review`,
+`npm run test:db -- --parent-history-upgrade-review`, and
+`node --test tests/db/parent-history-upgrade.test.mjs`.
+Local logs use `/private/tmp/trak-history-current-*.log`; the successful browser
+log is `/private/tmp/trak-parent-history-current-browser.log`.
+
+The coordinator's read-only hosted migration-ledger check on September 18
+returned 62 applied versions through `20260918133800`, with the pending history
+version absent. This supports the selected upgrade starting point; it does not
+verify live schema bytes, table data or the historical order of application.
+
+The pending migration's version is below main's `20260918133800` high-water mark.
+Before production, refresh against then-current main, obtain exact-head CI
+upgrade evidence and the independent human migration-order exception required by
+PR46; an author's acknowledgement or this local pass is insufficient. #49 must
+be delivered or declared as the outstanding dependency. The migration must reach
+the backend before the frontend calls its RPCs. Earlier native PostgreSQL and
+PostgREST results remain historical evidence for the unchanged SQL, not fresh
+hosted or current-refresh runs. No hosted fixtures, real emails, consent-policy
+changes, parked P2 work, production deployment or live-role verification occurred.

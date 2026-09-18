@@ -5,7 +5,7 @@ import { useCase } from '../../support/use-case'
 import { renderApp } from '../../support/render-app'
 import { signInAs } from '../../support/session'
 import { server } from '../../msw/server'
-import { table, rpc } from '../../msw/supabase'
+import { table, tableError, rpc } from '../../msw/supabase'
 
 const ATHLETE = { id: 'athlete-1' }
 
@@ -94,5 +94,41 @@ useCase('UC-A08', () => {
     // A server fault must not be reported to a teenager as a typo.
     expect(await screen.findByText(/couldn't connect right now|check your signal/i)).toBeInTheDocument()
     expect(screen.queryByText(/wasn't recognised|not recognised/i)).toBeNull()
+  })
+
+  it('does not claim "not connected" when the lookup itself failed', async () => {
+    signInAs(ATHLETE)
+    server.use(
+      table('profiles', [{ id: 'p-athlete', user_id: ATHLETE.id, role: 'player', full_name: 'Nikos Papadopoulos' }]),
+      table('player_details', []),
+      table('matches', []),
+      table('coach_assessments', []),
+      tableError('squad_players', 500, { message: 'upstream unavailable' }),
+    )
+
+    renderApp('/player/profile')
+
+    // Imad's finding on #17: a failed lookup fell through to the prompt, so a
+    // player who IS linked was invited to enter a code they do not have.
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/TRK-/i)).toBeNull()
+  })
+
+  it('treats a departed coach as not connected, so a replacement code can be entered', async () => {
+    signInAs(ATHLETE)
+    server.use(
+      table('profiles', [{ id: 'p-athlete', user_id: ATHLETE.id, role: 'player', full_name: 'Nikos Papadopoulos' }]),
+      table('player_details', []),
+      table('matches', []),
+      table('coach_assessments', []),
+      // The query filters departed rows server-side, so the mock returns none.
+      // Since K2 a departed row is invisible to its old coach; showing the
+      // player "Connected" would strand them with no way to re-link.
+      table('squad_players', []),
+    )
+
+    renderApp('/player/profile')
+
+    expect(await codeField()).toBeInTheDocument()
   })
 })

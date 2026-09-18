@@ -23,6 +23,7 @@ export function CoachLinkCard() {
   const { user } = useAuth()
   const [linked, setLinked] = useState<{ coachName: string | null } | null>(null)
   const [checking, setChecking] = useState(true)
+  const [lookupFailed, setLookupFailed] = useState(false)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -31,18 +32,31 @@ export function CoachLinkCard() {
   async function checkLink() {
     if (!user) return
     setChecking(true)
+    setLookupFailed(false)
+
+    // Only an *active* relationship counts as connected. A row whose coach has
+    // left the academy (status 'coach_departed') or whose coach_user_id has
+    // been nulled by the ON DELETE SET NULL on squad_players is preserved
+    // history, not a live link — and since K2 those rows are genuinely
+    // invisible to the old coach, so showing "Connected" would strand the
+    // player with no way to enter a replacement code.
     const { data, error } = await supabase
       .from('squad_players')
-      .select('id, coach_user_id')
+      .select('id, coach_user_id, status')
       .eq('linked_player_id', user.id)
+      .neq('status', 'coach_departed')
+      .not('coach_user_id', 'is', null)
       .limit(1)
       .maybeSingle()
 
-    // A failed read must not render as "not connected" — that is the same
+    setChecking(false)
+
+    // A failed read must not render as "not connected". That is the same
     // false-negative that made the parent screens tell people to redo a step
-    // they had already completed.
-    if (error) { setChecking(false); return }
-    if (!data) { setLinked(null); setChecking(false); return }
+    // they had already completed — and here it would invite a player who is
+    // already linked to re-enter a code they do not have.
+    if (error) { setLookupFailed(true); return }
+    if (!data) { setLinked(null); return }
 
     let coachName: string | null = null
     if (data.coach_user_id) {
@@ -51,7 +65,6 @@ export function CoachLinkCard() {
       coachName = profile?.full_name ?? null
     }
     setLinked({ coachName })
-    setChecking(false)
   }
 
   async function handleConnect() {
@@ -82,6 +95,29 @@ export function CoachLinkCard() {
   }
 
   if (checking) return null
+
+  // Deliberately a local error rather than the shared LoadError component:
+  // that lands in #18 and neither branch has merged, so adding a second
+  // src/components/trak/LoadError.tsx here would guarantee a conflict on a
+  // file that does not exist on main yet. Consolidate once #18 is in.
+  if (lookupFailed) {
+    return (
+      <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]" role="alert">
+        <MetadataLabel text="YOUR COACH" />
+        <p className="mt-2 text-[12px] text-white/55 leading-relaxed">
+          We couldn't check whether you're connected to a coach. This isn't a change
+          to your account — nothing has been lost.
+        </p>
+        <button
+          onClick={checkLink}
+          className="mt-3 px-4 py-2 rounded-[10px] text-[12px] text-white/70 border border-white/[0.07] active:bg-white/[0.04]"
+          style={{ fontFamily: "'DM Mono', monospace" }}
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   if (linked) {
     return (

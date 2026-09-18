@@ -49,6 +49,41 @@ test('exposing all assessment rows fails both wrong-child read checks while the 
   assert.equal(evaluator(result).ok, false);
 });
 
+test('sequential repeat cannot pass by returning the original ID while creating hidden unlinked duplicates', async () => {
+  const result = await executeRosterSuite(db, mutate(`
+    ALTER FUNCTION public.link_player_to_coach(text) RENAME TO audit_original_link;
+    CREATE FUNCTION public.link_player_to_coach(p_code text) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $mutant$
+    DECLARE linked_id uuid;
+    BEGIN
+      linked_id := public.audit_original_link(p_code);
+      IF auth.uid() = pg_temp.rid(20) THEN
+        INSERT INTO public.squad_players (coach_user_id, player_name, status)
+        VALUES (pg_temp.rid(10), 'Synthetic Yusuf Exact', 'active');
+      END IF;
+      RETURN linked_id;
+    END;
+    $mutant$;`), inventory);
+  assert.deepEqual(failed(result), ['RA-exact-one-link']);
+  assert.equal(evaluator(result).ok, false);
+});
+
+test('returning a control-coach membership is not successful linkage to the requested coach', async () => {
+  const result = await executeRosterSuite(db, mutate(`
+    ALTER FUNCTION public.link_player_to_coach(text) RENAME TO audit_original_link;
+    CREATE FUNCTION public.link_player_to_coach(p_code text) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $mutant$
+    BEGIN
+      IF auth.uid() = pg_temp.rid(21) THEN RETURN pg_temp.rid(51); END IF;
+      IF auth.uid() = pg_temp.rid(22) THEN RETURN pg_temp.rid(52); END IF;
+      RETURN public.audit_original_link(p_code);
+    END;
+    $mutant$;`), inventory);
+  assert.deepEqual(failed(result).sort(), ['RA-typo-own-link','RA-ambiguous-own-link'].sort());
+  assert.ok(result.filter(item => item.kind === 'control').every(item => item.status === 'pass'));
+  assert.equal(evaluator(result).ok, false);
+});
+
 const wrapper = body => `
   ALTER FUNCTION public.link_player_to_coach(text) RENAME TO audit_original_link;
   CREATE FUNCTION public.link_player_to_coach(p_code text) RETURNS uuid

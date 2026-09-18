@@ -84,9 +84,6 @@ BEGIN
     'Authenticated caller reads both original assessment IDs');
   second_id := public.link_player_to_coach('RAUDIT');
   PERFORM pg_temp.rassert('RA-exact-repeat', 'check', second_id = first_id AND first_id = pg_temp.rid(30), 'Sequential repeat returns the same original ID');
-  PERFORM pg_temp.rassert('RA-exact-one-link', 'check',
-    (SELECT count(*) = 1 FROM public.squad_players WHERE coach_user_id = pg_temp.rid(10) AND linked_player_id = auth.uid()),
-    'Sequential repeat leaves one linked target-coach row');
 END;
 $test$;
 
@@ -100,7 +97,8 @@ DECLARE linked_id uuid;
 BEGIN
   linked_id := public.link_player_to_coach('RAUDIT');
   PERFORM pg_temp.rassert('RA-typo-own-link', 'check', linked_id IS NOT NULL AND linked_id <> pg_temp.rid(31) AND EXISTS (
-    SELECT 1 FROM public.squad_players WHERE id = linked_id AND linked_player_id = auth.uid()), 'Nonmatching spelling does not guess the old identity');
+    SELECT 1 FROM public.squad_players WHERE id = linked_id AND linked_player_id = auth.uid()
+      AND coach_user_id = pg_temp.rid(10) AND organization_id = pg_temp.rid(1)), 'Nonmatching spelling links to the requested coach and academy without guessing the old identity');
   PERFORM pg_temp.rassert('RA-typo-no-wrong-read', 'check',
     NOT EXISTS (SELECT 1 FROM public.coach_assessments WHERE id IN (pg_temp.rid(42),pg_temp.rid(43))),
     'Authenticated caller cannot read the unverified typo identity history');
@@ -117,7 +115,8 @@ DECLARE linked_id uuid;
 BEGIN
   linked_id := public.link_player_to_coach('RAUDIT');
   PERFORM pg_temp.rassert('RA-ambiguous-own-link', 'check', linked_id IS NOT NULL AND linked_id NOT IN (pg_temp.rid(32),pg_temp.rid(33)) AND EXISTS (
-    SELECT 1 FROM public.squad_players WHERE id = linked_id AND linked_player_id = auth.uid()), 'Ambiguity does not choose either preexisting namesake');
+    SELECT 1 FROM public.squad_players WHERE id = linked_id AND linked_player_id = auth.uid()
+      AND coach_user_id = pg_temp.rid(10) AND organization_id = pg_temp.rid(1)), 'Ambiguity links to the requested coach and academy without choosing either preexisting namesake');
   PERFORM pg_temp.rassert('RA-ambiguous-no-wrong-read', 'check',
     NOT EXISTS (SELECT 1 FROM public.coach_assessments WHERE id IN (pg_temp.rid(44),pg_temp.rid(45),pg_temp.rid(46),pg_temp.rid(47))),
     'Authenticated caller cannot read either unverified namesake history');
@@ -127,6 +126,10 @@ $test$;
 -- Owner checks establish preservation independently of player RLS hiding data.
 RESET ROLE;
 SELECT set_config('request.jwt.claims', '{}', true);
+SELECT pg_temp.rassert('RA-exact-one-link', 'check',
+  (SELECT count(*) = 1 AND bool_and(id = pg_temp.rid(30) AND linked_player_id = pg_temp.rid(20))
+   FROM public.squad_players WHERE coach_user_id = pg_temp.rid(10) AND player_name = 'Synthetic Yusuf Exact'),
+  'Owner verifies sequential repeat leaves only the original row, including rows hidden by player RLS');
 SELECT pg_temp.rassert('RA-typo-identity', 'check',
   (SELECT to_jsonb(sp) = original.body FROM original_roster original LEFT JOIN public.squad_players sp USING(id) WHERE original.id = pg_temp.rid(31)),
   'Typo row retains its full original identity and remains unlinked');

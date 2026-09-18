@@ -37,7 +37,7 @@ export function blob(root, revision, path) {
 export async function verifyPinnedFiles(root, revision, paths) {
   requireCommit(root, revision);
   for (const path of paths) {
-    requireValue(await readFile(resolve(root, path), 'utf8') === blob(root, revision, path),
+    requireValue((await readFile(resolve(root, path))).equals(Buffer.from(blob(root, revision, path))),
       `Executing runner input differs from pinned revision: ${path}`);
   }
 }
@@ -63,7 +63,7 @@ export async function readPinnedInputs(runnerRevision, inventoryRevision) {
   requireCommit(runnerRoot, inventoryRevision);
   await verifyPinnedFiles(runnerRoot, runnerRevision, pinnedRunnerPaths);
   const inventoryText = blob(runnerRoot, inventoryRevision, inventoryPath);
-  requireValue(await readFile(resolve(runnerRoot, inventoryPath), 'utf8') === inventoryText, 'Inventory bytes differ from pinned revision');
+  requireValue((await readFile(resolve(runnerRoot, inventoryPath))).equals(Buffer.from(inventoryText)), 'Inventory bytes differ from pinned revision');
   return {
     inventory: validateInventory(JSON.parse(inventoryText)),
     bootstrap: blob(runnerRoot, runnerRevision, bootstrapPath),

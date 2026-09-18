@@ -85,6 +85,12 @@ beforeEach(async () => {
     http.get(table('recognition_awards'), ({ request }) => HttpResponse.json(awards[childFrom(request, 'squad_player_id')])),
     http.get(table('matches'), ({ request }) => HttpResponse.json([{ id: id(300), created_at: '2026-09-18T11:00:00Z', match_date: '2026-09-18', opponent: `${label(childFrom(request, 'user_id'))} opposition`,
       competition: 'League', venue: null, computed_rating: 0, team_score: 0, opponent_score: 0 }])),
+    http.post(table('rpc/get_parent_match_summary'), async ({ request }) => {
+      expect(request.headers.get('Authorization')).toBe('Bearer synthetic-parent-token')
+      const body = await request.json() as { p_child_id: string }
+      expect([alex, zara]).toContain(body.p_child_id)
+      return HttpResponse.json([{ total_count: 1, rated_count: 1, average_rating: 0, wins: 0, draws: 1, losses: 0 }])
+    }),
     http.post(table('rpc/get_children_awaiting_consent'), () => HttpResponse.json([])),
   )
 })

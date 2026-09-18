@@ -119,7 +119,7 @@ describe('parent family navigation', () => {
     await user.click(screen.getByRole('button', { name: 'Profile' }))
     expect(await screen.findByText('Following Zara · 2 children linked')).toBeInTheDocument()
     expect(screen.getByRole('combobox')).toHaveValue('Zara')
-    await user.click(screen.getByRole('button', { name: /settings notifications/i }))
+    await user.click(screen.getByRole('button', { name: /settings account settings/i }))
     const connections = await screen.findByRole('list', { name: 'Linked children' })
     expect(within(connections).getByText('Alex')).toBeInTheDocument()
     expect(within(connections).getByText('Zara')).toBeInTheDocument()

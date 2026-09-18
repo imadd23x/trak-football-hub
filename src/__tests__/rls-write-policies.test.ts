@@ -243,6 +243,140 @@ describe('a departed coach keeps nothing', () => {
     }
   })
 
+  it('a roster row with no academy can still acquire one', () => {
+    // 20260917000002 pinned organization_id on every UPDATE, which also pinned
+    // NULL: a row orphaned by ON DELETE SET NULL on the coach FK could never
+    // gain an academy again, so a coach adopting it left the player invisible
+    // to the academy. 20260917000003 pins only a real academy.
+    const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
+    let latest = ''
+    for (const f of files) {
+      const sql = readFileSync(join(MIGRATIONS, f), 'utf8')
+      const i = sql.indexOf('FUNCTION public.set_squad_player_org_id')
+      if (i >= 0) latest = sql.slice(i, i + 1600)
+    }
+    expect(latest, 'set_squad_player_org_id() is missing').not.toBe('')
+    expect(
+      latest.includes('OLD.organization_id IS NOT NULL'),
+      'set_squad_player_org_id() pins organization_id on update without checking whether there ' +
+        'is one. That pins NULL too, so an orphaned roster row can never join an academy and the ' +
+        'player stays invisible to it.',
+    ).toBe(true)
+    expect(
+      latest.includes('coach_details'),
+      'set_squad_player_org_id() no longer derives the academy from the coach on the row',
+    ).toBe(true)
+  })
+
+  it('F2: coach authority follows the academy on the row, not its status', () => {
+    // remove_coach_from_org() converted only 'active', and the K2 gate was
+    // status <> 'coach_departed', so a row the coach archived before leaving
+    // survived removal and stayed writable. status is a value the departing
+    // coach can set; the academy on the row is not.
+    const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
+    let latest = ''
+    for (const f of files) {
+      const sql = readFileSync(join(MIGRATIONS, f), 'utf8')
+      const i = sql.indexOf('FUNCTION public.squad_player_is_mine')
+      if (i >= 0) latest = sql.slice(i, i + 900)
+    }
+    expect(latest, 'squad_player_is_mine() is missing').not.toBe('')
+    expect(
+      latest.includes('my_coach_organization_id()'),
+      'squad_player_is_mine() gates on status alone. A coach who archives a row before being ' +
+        'removed keeps read and write access to that child afterwards (audit finding F2).',
+    ).toBe(true)
+
+    const own = live.filter(
+      p =>
+        p.table === 'squad_players' &&
+        ['SELECT', 'UPDATE', 'DELETE'].includes(p.op) &&
+        p.body.includes('coach_user_id = auth.uid()'),
+    )
+    expect(own.length).toBeGreaterThan(0)
+    for (const p of own) {
+      expect(
+        p.body.includes('my_coach_organization_id()'),
+        `Policy "${p.name}" on squad_players (${p.file}) gates on status alone, so a removed ` +
+          `coach keeps access to any row that was not 'active' at the moment of removal.`,
+      ).toBe(true)
+    }
+  })
+
+  it('F3: a coach cannot link a player by asserting their user id', () => {
+    // K1 checked that the referenced roster row belonged to the writer, but a
+    // coach could create a new row carrying another academy's child's
+    // linked_player_id — so the ownership check passed on a relationship the
+    // coach invented. link_player_to_coach() always sets linked_player_id to
+    // auth.uid(), so "only the caller may be linked" admits every real linkage.
+    const inserts = live.filter(p => p.table === 'squad_players' && ['INSERT', 'UPDATE'].includes(p.op))
+    expect(inserts.length).toBeGreaterThan(0)
+    for (const p of inserts) {
+      expect(
+        p.body.includes('linked_player_id'),
+        `Policy "${p.name}" on squad_players (${p.file}) does not constrain linked_player_id, so a ` +
+          `coach can attach any child to their squad by user id and then write about them (F3).`,
+      ).toBe(true)
+    }
+
+    const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
+    const guarded = files.some(f =>
+      readFileSync(join(MIGRATIONS, f), 'utf8').includes('FUNCTION public.enforce_self_linked_player'),
+    )
+    expect(
+      guarded,
+      'No trigger enforces self-linking. RLS alone is not enough: link_player_to_coach() is ' +
+        'SECURITY DEFINER, so policies do not apply on that path.',
+    ).toBe(true)
+  })
+
+  it('F5: the match RPC checks departure, not just ownership', () => {
+    // log_match_for_player() is SECURITY DEFINER, so RLS does not apply inside
+    // it — K1's write policies and K2's departure gate are both invisible on
+    // this path. It authorised on ownership alone, so a removed coach could
+    // still log matches for that academy's children.
+    const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
+    let latest = ''
+    for (const f of files) {
+      const sql = readFileSync(join(MIGRATIONS, f), 'utf8')
+      const i = sql.indexOf('FUNCTION public.log_match_for_player')
+      if (i >= 0) latest = sql.slice(i, i + 3000)
+    }
+    expect(latest, 'log_match_for_player() is missing').not.toBe('')
+    expect(
+      latest.includes('squad_player_is_mine('),
+      'log_match_for_player() authorises on ownership alone. A coach removed from the academy, ' +
+        'or transferred away from it, can still log matches for its children (audit finding F5). ' +
+        'RLS cannot cover this: the function is SECURITY DEFINER.',
+    ).toBe(true)
+    expect(
+      latest.includes('is_coach()'),
+      'log_match_for_player() stamps logged_by_role = \'coach\' without checking the role.',
+    ).toBe(true)
+  })
+
+  it('F4: attendance reads and deletes follow the roster, not just the session', () => {
+    // K1 rewrote session_attendance INSERT and UPDATE to prove ownership of the
+    // roster row and left SELECT and DELETE checking the session alone, so a
+    // departed coach kept reading and deleting former players' attendance.
+    // Coach policies are the ones routed through the session; the player's
+    // own-attendance policy is keyed on linked_player_id and is not in scope.
+    const attendance = live.filter(
+      p =>
+        p.table === 'session_attendance' &&
+        ['SELECT', 'DELETE', 'ALL'].includes(p.op) &&
+        p.body.includes('coach_session'),
+    )
+    expect(attendance.length, 'no coach attendance read/delete policy found').toBeGreaterThan(0)
+    for (const p of attendance) {
+      expect(
+        p.body.includes('squad_player_is_mine('),
+        `Policy "${p.name}" on session_attendance (${p.file}) checks session ownership only, so a ` +
+          `coach who has left the academy keeps reading and deleting its children's attendance (F4).`,
+      ).toBe(true)
+    }
+  })
+
   it("a roster row's academy comes from the row, not from its coach's current club", () => {
     const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
     let latest = ''

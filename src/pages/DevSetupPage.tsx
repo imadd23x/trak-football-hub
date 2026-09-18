@@ -116,8 +116,32 @@ export default function DevSetupPage() {
       update('Sign in as coach (squad + assessments)', 'done')
 
       update('Squad player link', 'running')
-      await supabase.from('squad_players').upsert({ id: SQUAD_ID, coach_user_id: coachId, player_name: 'Jamie Wilson', position: 'CM', shirt_number: 8, linked_player_id: playerId }, { onConflict: 'id' })
-      update('Squad player link', 'done')
+      // The coach seeds the roster row UNLINKED. A coach cannot attach a player
+      // to their squad by asserting that player's user id — that was finding F3
+      // of the K1/K2 departure audit, and this page was doing it. Linking is the
+      // player's own act, below.
+      await supabase.from('squad_players').upsert({ id: SQUAD_ID, coach_user_id: coachId, player_name: 'Jamie Wilson', position: 'CM', shirt_number: 8 }, { onConflict: 'id' })
+
+      // Sign in as the player and link the real way, with the coach's code.
+      // link_player_to_coach() adopts the unlinked row above by name, so it
+      // keeps SQUAD_ID and every assessment seeded against it below still lands
+      // on the same row. This also means the dev seed exercises the linking path
+      // the pilot actually uses, instead of a shortcut only the seed can take.
+      await supabase.auth.signInWithPassword({ email: 'player@trak.dev', password: 'TrakDev123' })
+      // 'as any' on the name: the committed types.ts omits this RPC, same as
+      // provision_my_profile in AuthContext.
+      const { data: linkedId, error: linkError } = await supabase.rpc('link_player_to_coach' as any, { p_code: 'DEMO' })
+      await supabase.auth.signInWithPassword({ email: 'coach@trak.dev', password: 'TrakDev123' })
+
+      if (linkError) {
+        update('Squad player link', 'error', linkError.message)
+      } else if (linkedId && linkedId !== SQUAD_ID) {
+        // A second unlinked row with the same name would make the adoption
+        // ambiguous and the RPC would create a new row instead of adopting.
+        update('Squad player link', 'error', `linked ${linkedId}, expected the seeded row — assessments would attach to the wrong row`)
+      } else {
+        update('Squad player link', 'done')
+      }
 
       update('3 coach assessments', 'running')
       const seedAssessments = [

@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, BandPill } from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
-import { Plus } from 'lucide-react'
+import { Plus, WifiOff } from 'lucide-react'
 
 const POSITIONS = ['All', 'Goalkeeper', 'Defender', 'Midfielder', 'Attacker'] as const
 
@@ -16,6 +16,8 @@ export default function CoachSquadPage() {
   const [assessments, setAssessments] = useState<Record<string, number>>({})
   const [posFilter, setPosFilter] = useState<string>('All')
   const [ageFilter, setAgeFilter] = useState<string>('All')
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [retry, setRetry] = useState(0)
 
   // Age group label: prefer the age_group text column ('U12'), fall back to legacy integer age
   const ageLabel = (p: any): string | null => p.age_group ?? (p.age != null ? String(p.age) : null)
@@ -27,23 +29,37 @@ export default function CoachSquadPage() {
 
   useEffect(() => {
     if (!user) return
+    let cancelled = false
+    setLoadFailed(false)
 
-    // Fetch squad players
+    // Fetch squad players.
+    // The error must be checked: falling through to `data || []` renders a
+    // failed read as an empty squad, so a coach offline with a full roster is
+    // told to "Add your first player".
     supabase
       .from('squad_players')
       .select('*')
       .eq('coach_user_id', user.id)
       .order('player_name')
-      .then(({ data }) => setPlayers(data || []))
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          setLoadFailed(true)
+          return
+        }
+        setPlayers(data || [])
+      })
 
-    // Fetch latest assessment per player for band display
+    // Fetch latest assessment per player for band display.
+    // A failure here is not fatal — the squad still renders, just without
+    // bands — but it must not be mistaken for "nobody has been assessed".
     supabase
       .from('coach_assessments')
       .select('squad_player_id, coach_rating, created_at')
       .eq('coach_user_id', user.id)
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (!data) return
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return
         const latest: Record<string, number> = {}
         for (const a of data) {
           if (a.squad_player_id && latest[a.squad_player_id] === undefined && a.coach_rating != null) {
@@ -52,7 +68,9 @@ export default function CoachSquadPage() {
         }
         setAssessments(latest)
       })
-  }, [user])
+
+    return () => { cancelled = true }
+  }, [user, retry])
 
   const filtered = players.filter(p => {
     const posMatch = posFilter === 'All' || p.position?.toLowerCase() === posFilter.toLowerCase()
@@ -129,7 +147,29 @@ export default function CoachSquadPage() {
 
       {/* Squad list */}
       <div className="flex-1 overflow-y-auto px-5 pb-24">
-        {filtered.length === 0 ? (
+        {loadFailed ? (
+          <div className="flex flex-col items-center text-center pt-14 px-6">
+            <div
+              className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
+              style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)' }}
+            >
+              <WifiOff size={22} className="text-[rgb(251,191,36)]" strokeWidth={1.5} />
+            </div>
+            <p className="text-[15px] text-white/70 font-medium mb-1">Couldn't load your squad</p>
+            <p className="text-[12px] text-white/35 leading-relaxed mb-5">
+              {navigator.onLine
+                ? "We couldn't reach Trak just now. Nothing has been lost — your squad is safe."
+                : 'You appear to be offline. Nothing has been lost — your squad is safe.'}
+            </p>
+            <button
+              onClick={() => setRetry(r => r + 1)}
+              className="px-5 py-2.5 rounded-[10px] text-[13px] font-medium text-black"
+              style={{ background: '#C8F25A' }}
+            >
+              Try again
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
           players.length === 0 ? (
             <div className="flex flex-col items-center text-center pt-14 px-6">
               <div

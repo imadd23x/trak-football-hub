@@ -251,7 +251,16 @@ export default function CoachSchedule() {
       const { data, error } = await supabase.functions.invoke('parse-schedule', {
         body: { text: importText, todayISO: new Date().toISOString().slice(0, 10) },
       })
-      if (error || data?.error) throw new Error(data?.error || 'Parse failed')
+      // On a non-2xx, supabase-js puts the body on the error's response rather
+      // than in `data` (the same idiom AuthContext uses for send-parent-invite).
+      // Without this a spent daily allowance surfaced as "Parse failed", which
+      // tells the coach nothing and invites them to retry immediately — the one
+      // thing that cannot work. Prefer the function's own sentence.
+      let failure = data?.error as string | undefined
+      if (error && !failure) {
+        try { failure = (await (error as { context?: Response }).context?.json())?.error } catch { /* no body */ }
+      }
+      if (error || failure) throw new Error(failure || 'Parse failed')
       const list = data?.events || []
       trackEvent('schedule_parsed', {
         input_chars: importText.trim().length,

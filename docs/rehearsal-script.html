@@ -350,11 +350,10 @@ SELECT * FROM pilot_safeguarding_checks;</pre>
 <section>
   <div class="sec-head">
     <div class="eyebrow">After the run</div>
-    <h2>Reset</h2>
+    <h2>Preserve and review rehearsal data</h2>
   </div>
   <div class="card">
-    <p class="small">The rehearsal run leaves extra players, matches and assessments behind. Before real data arrives:</p>
-    <pre>node seed-pilot-rehearsal.mjs --purge</pre>
+    <p class="small">The legacy purge has been retired because it could delete unrelated records and leave a partial cohort. Current fixtures resume by exact manifest ID; there is no reset command. See <a href="demo-data.md">the synthetic demo guide</a>. Any cleanup needs an exact reviewed manifest and dependency check.</p>
     <p class="small">Then set the pilot window to the real values &mdash; <code>starts_on</code> to the pilot start date and <code>org_id</code> to the academy's own organisation, once the director has created it. Leaving <code>org_id</code> pointing at Rehearsal FC makes every cohort metric wrong.</p>
   </div>
 </section>

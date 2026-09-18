@@ -100,8 +100,10 @@ npm run build          # production build
 
 ## Dev Accounts (local seed)
 
-Use the DevSetupPage (`/dev-setup`, PIN: `013`) to quick-login as any test role.
-Real credentials live in your local Supabase project — never committed.
+Use the explicit-target [synthetic demo tooling](docs/demo-data.md). Planning is
+read-only; generated passwords stay in a private ignored local file. The legacy
+seed/purge scripts are retired. `/dev-setup` still uses outdated provisioning
+paths and is not evidence that the current linking or consent gates work.
 
 ## TDD Workflow
 

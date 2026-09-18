@@ -253,13 +253,18 @@ describe('truthful parent ratings', () => {
       ...historicalMatches,
       { ...match('Backfilled'), match_date: '2026-08-01', created_at: '2026-09-21T10:00:00Z' },
     ])))
-    renderFamily('/parent/alerts')
+    const { client } = renderFamily('/parent/alerts')
     expect(await screen.findByText('vs Backfilled opposition · 0–0')).toBeInTheDocument()
     const alerts = screen.getAllByText('Match logged')
     expect(alerts).toHaveLength(20)
     expect(alerts[0].parentElement).toHaveTextContent('vs Backfilled opposition')
     expect(screen.queryByText('vs Fixture 20 opposition · 0–0')).not.toBeInTheDocument()
     // Alerts must not reorder the shared match cache used by the Matches view.
+    // Assert before navigation: a mount refetch could hide an in-place mutation.
+    const cachedMatches = client.getQueryData<{ id: string }[]>(['parent', 'parent-a', 'Alex', 'matches'])
+    expect(cachedMatches?.map(row => row.id)).toEqual([
+      ...historicalMatches.map(row => row.id), 'match-Backfilled',
+    ])
     await userEvent.click(screen.getByRole('button', { name: 'Matches' }))
     expect((await screen.findAllByText(/opposition/))[0]).toHaveTextContent('Fixture 1 opposition')
   })

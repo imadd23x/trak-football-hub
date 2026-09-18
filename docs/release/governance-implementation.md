@@ -14,7 +14,9 @@ setting changes are part of this implementation.
   approval of this candidate and current base; author acknowledgement alone fails.
 - Verify delivery using GitHub's actual merge result and exact reviewed file objects.
   Original-head ancestry is not required for squash/rebase merges. Run source
-  checks on the delivered commit before the existing production jobs.
+  checks on the delivered commit before the existing production jobs. An older
+  run superseded by a normal forward merge reports ineligible and skips both
+  production jobs; divergent or unverifiable history still fails.
 - Replace the old inline-Bash extraction tests with executable Node tests of
   the new guard and workflow contract. Main remains valid; every non-main base
   is now rejected, including the formerly warning-only live stack.

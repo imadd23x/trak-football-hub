@@ -68,14 +68,20 @@ export async function verifyDelivery({ api, git, repository, commit, prNumber, f
   const main = await api.get(`/repos/${repo}/branches/main`);
   const mainSha = sha(main?.commit?.sha);
   git.ensureCommit(mainSha);
-  if (commit !== undefined && sha(commit) !== mainSha) {
-    throw new Error(`Refusing stale release ${commit}; current main is ${mainSha}. Re-run the current revision.`);
-  }
+  if (commit !== undefined) git.ensureCommit(sha(commit));
   if (previousSha !== undefined) {
     if (commit === undefined) throw new Error('Previous push SHA is only valid for release verification');
     git.ensureCommit(sha(previousSha));
     if (!git.isAncestor(previousSha, commit)) throw new Error('Main push does not advance from its previous revision');
   }
+  // A newer ordinary merge supersedes this release; that is not a broken
+  // candidate. It MUST remain ineligible for both production jobs, however.
+  const superseded = current => {
+    git.ensureCommit(current);
+    if (!git.isAncestor(commit, current)) throw new Error('Main no longer contains the release revision; supersession is not a forward advance');
+    return { repository: repo, mainSha: current, releaseSha: commit, results: [], skipped: true, releaseEligible: false };
+  };
+  if (commit !== undefined && commit !== mainSha) return superseded(mainSha);
   const associated = prNumber === undefined
     ? await api.paginate(`/repos/${repo}/commits/${sha(commit)}/pulls`)
     : [{ number: prNumber }];
@@ -117,8 +123,27 @@ export async function verifyDelivery({ api, git, repository, commit, prNumber, f
   }
   if (results.length === 0) throw new Error('The release commit is not the recorded result of a merged main-targeting PR');
   const finalMain = await api.get(`/repos/${repo}/branches/main`);
-  if (sha(finalMain?.commit?.sha) !== mainSha) throw new Error('Main changed during delivery verification; rerun on the current revision');
-  return { repository: repo, mainSha, results };
+  const finalMainSha = sha(finalMain?.commit?.sha);
+  if (finalMainSha !== mainSha) {
+    if (commit !== undefined) return superseded(finalMainSha);
+    throw new Error('Main changed during delivery verification; rerun on the current revision');
+  }
+  return { repository: repo, mainSha, results, skipped: false, releaseEligible: commit !== undefined };
+}
+
+export function reportDelivery(result, { outputPath = process.env.GITHUB_OUTPUT, summaryPath = process.env.GITHUB_STEP_SUMMARY } = {}) {
+  const summary = result.skipped ? [
+    '### Release superseded — production skipped', '',
+    `Release \`${result.releaseSha}\` is an ancestor of newer main \`${result.mainSha}\`.`,
+    'Delivery verification is not applicable to this older release. It is not verified and cannot deploy; the newer revision needs its own successful checks.', '',
+  ].join('\n') : [
+    '### Merge delivery verified', '', `Main revision: \`${result.mainSha}\``,
+    ...result.results.map(pr => `- PR #${pr.number}: result \`${pr.resultSha}\`; ${pr.files.length} changed paths and reviewed file objects verified.`),
+    '', 'This verifies merge-result ancestry and reviewed file contents. Application behavior, migration effects and live deployment require their separate checks.', '',
+  ].join('\n');
+  if (outputPath) appendFileSync(outputPath, `release_eligible=${result.releaseEligible === true && !result.skipped}\n`);
+  if (summaryPath) appendFileSync(summaryPath, summary);
+  return summary;
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -136,13 +161,8 @@ export async function main(argv = process.argv.slice(2)) {
     prNumber: options['--pr'] === undefined ? undefined : Number(options['--pr']),
     forced: options['--forced'] === 'true', previousSha: options['--previous-sha'],
   });
-  const summary = [
-    '### Merge delivery verified', '', `Main revision: \`${result.mainSha}\``,
-    ...result.results.map(pr => `- PR #${pr.number}: result \`${pr.resultSha}\`; ${pr.files.length} changed paths and reviewed file objects verified.`),
-    '', 'This verifies merge-result ancestry and reviewed file contents. Application behavior, migration effects and live deployment require their separate checks.', '',
-  ].join('\n');
-  console.log(summary);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+  if (result.skipped) console.log('::notice::A newer main revision supersedes this release; this run cannot deploy.');
+  console.log(reportDelivery(result));
   return result;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

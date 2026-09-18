@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { localGit, verifyDelivery } from '../../scripts/governance/verify-delivery.mjs';
+import { localGit, reportDelivery, verifyDelivery } from '../../scripts/governance/verify-delivery.mjs';
 
 function fixture(t, mode = 'merge') {
   const cwd = mkdtempSync(join(tmpdir(), 'trak-delivery-'));
@@ -37,12 +37,18 @@ function fixture(t, mode = 'merge') {
   api.paginate = api.get;
   return { cwd, git, local: localGit(cwd), base, originalHead, delivered, pr, files, data, api };
 }
+function advance(f) {
+  writeFileSync(join(f.cwd, 'later.txt'), 'later reviewed work'); f.git('add', '.'); f.git('commit', '-m', 'later');
+  return f.git('rev-parse', 'HEAD');
+}
 for (const mode of ['merge', 'squash', 'rebase']) {
   test(`actual ${mode} result passes without requiring original head ancestry`, async t => {
     const f = fixture(t, mode);
     if (mode !== 'merge') assert.equal(f.local.isAncestor(f.originalHead, f.delivered), false);
     const result = await verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered });
     assert.equal(result.results[0].resultSha, f.delivered);
+    assert.equal(result.releaseEligible, true);
+    assert.equal(result.skipped, false);
   });
 }
 test('a merge into a task branch fails even with merged badge', async t => {
@@ -53,9 +59,29 @@ test('a recorded merge absent from main fails', async t => {
   const f = fixture(t); f.data['/repos/example/trak/branches/main'].commit.sha = f.base;
   await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', prNumber: 12 }), /absent from main/);
 });
-test('a stale workflow cannot authorize an older production release', async t => {
+test('a normally superseded workflow skips without authorizing the older release', async t => {
   const f = fixture(t);
-  await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.base }), /stale release/);
+  f.data['/repos/example/trak/branches/main'].commit.sha = advance(f);
+  f.api.paginate = async () => { throw new Error('Superseded release must not read PR metadata'); };
+  const result = await verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered, previousSha: f.base });
+  assert.equal(result.skipped, true);
+  assert.equal(result.releaseEligible, false);
+  assert.deepEqual(result.results, []);
+  const outputPath = join(f.cwd, 'outputs'); const summaryPath = join(f.cwd, 'summary');
+  const summary = reportDelivery(result, { outputPath, summaryPath });
+  assert.equal(readFileSync(outputPath, 'utf8'), 'release_eligible=false\n');
+  assert.match(summary, /not verified and cannot deploy/);
+  assert.equal(readFileSync(summaryPath, 'utf8'), summary);
+});
+test('supersession cannot hide a forced or non-forward event', async t => {
+  const f = fixture(t); const later = advance(f);
+  f.data['/repos/example/trak/branches/main'].commit.sha = later;
+  await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered, forced: true }), /Forced main pushes/);
+  await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered, previousSha: later }), /does not advance/);
+});
+test('a main reset is not benign supersession', async t => {
+  const f = fixture(t); f.data['/repos/example/trak/branches/main'].commit.sha = f.base;
+  await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered }), /not a forward advance/);
 });
 test('a forced reset onto an old recorded PR result cannot authorize release', async t => {
   const f = fixture(t);
@@ -70,7 +96,32 @@ test('non-forward main pushes fail even without a forced flag', async t => {
 test('main moving during inventory reads cannot yield successful verification', async t => {
   const f = fixture(t); const original = f.api.get; let reads = 0;
   f.api.get = async path => path.endsWith('/branches/main') && ++reads === 2 ? { commit: { sha: f.base } } : original(path);
-  await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered }), /Main changed during/);
+  await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered }), /not a forward advance/);
+});
+test('main advancing normally during verification makes the older release ineligible', async t => {
+  const f = fixture(t); const later = advance(f); const original = f.api.get; let reads = 0;
+  f.api.get = async path => path.endsWith('/branches/main') && ++reads === 2 ? { commit: { sha: later } } : original(path);
+  const result = await verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered, previousSha: f.base });
+  assert.equal(result.skipped, true);
+  assert.equal(result.releaseEligible, false);
+  assert.equal(result.mainSha, later);
+});
+test('supersession with unavailable Git evidence fails instead of skipping', async t => {
+  const f = fixture(t); const later = advance(f);
+  f.data['/repos/example/trak/branches/main'].commit.sha = later;
+  f.local.isAncestor = () => { throw new Error('Git history unavailable'); };
+  await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered }), /history unavailable/);
+});
+test('only a verified release emits affirmative deployment eligibility', async t => {
+  const f = fixture(t); const outputPath = join(f.cwd, 'release-output');
+  const release = await verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', commit: f.delivered, previousSha: f.base });
+  reportDelivery(release, { outputPath, summaryPath: '' });
+  assert.equal(readFileSync(outputPath, 'utf8'), 'release_eligible=true\n');
+  const historical = await verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', prNumber: 12 });
+  assert.equal(historical.releaseEligible, false);
+  assert.equal(historical.skipped, false);
+  reportDelivery(historical, { outputPath, summaryPath: '' });
+  assert.equal(readFileSync(outputPath, 'utf8'), 'release_eligible=true\nrelease_eligible=false\n');
 });
 test('missing changed file fails despite delivered merge metadata', async t => {
   const f = fixture(t); f.files[0].filename = 'lost-change.txt';

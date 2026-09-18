@@ -20,13 +20,14 @@ was promoted to a current baseline, and no missing audit is a passing check.
 
 ## Local verification
 
-- `node --test tests/governance/*.test.mjs`: **69 passed**. Cases include actual
+- `node --test tests/governance/*.test.mjs`: **75 passed**. Cases include actual
   ordinary/squash/two-commit rebase histories, unmerged dependencies versus shared
   main history, current-head migration order approval, stale/revoked approvals,
-  incomplete API evidence, forced/non-forward/stale releases, shallow clone
+  incomplete API evidence, forced/non-forward releases, superseded release
+  output and actual production-condition execution, shallow clone
   rejection, event-head mismatch, a bad merge retaining a path but discarding its
   reviewed contents, and a same-count substitution of audit failures.
-- `npm test`: **315 passed**. Five obsolete inline-Bash tests were replaced by
+- `npm test`: **317 passed**. Five obsolete inline-Bash tests were replaced by
   the stronger policy/workflow tests above; the new policy rejects every non-main
   target instead of allowing a warning-only live stack.
 - `npm run test:harness`: **17 passed**.
@@ -53,6 +54,16 @@ Two independent agent reviews found issues that were fixed before publication:
 stale event/head binding, missing final-main refresh, forced historical reset,
 and shallow-checkout ancestry. Their regression cases are retained. Agent review
 does not replace Kostas/Tarek's required independent human approval.
+
+Tarek's review of `fe49465` identified that normal consecutive merges would make
+an older release fail as stale. The revised guard classifies forward supersession
+as non-failing but **ineligible for deployment**. Both Supabase and Deploy consume
+that explicit output. A bare successful return would have incorrectly allowed
+the older revision to deploy. Regression tests execute the actual job conditions
+for eligible, superseded, missing output, failed checks and preview scenarios.
+The existing human release lock remains necessary after the eligibility snapshot.
+The review was recorded as COMMENTED, not formal APPROVED; the updated head needs
+fresh independent approval.
 
 ## Migration fact-check and limits
 

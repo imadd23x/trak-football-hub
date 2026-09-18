@@ -14,6 +14,7 @@ interface Scenario {
   tests?: string
   backend?: string
   credentials?: string
+  releaseEligible?: string | null
 }
 function permits(job: string, scenario: Scenario = {}) {
   const github = {
@@ -23,7 +24,7 @@ function permits(job: string, scenario: Scenario = {}) {
     event: { pull_request: { head: { repo: { full_name: scenario.headRepository ?? upstream } } } },
   }
   const needs = {
-    test: { result: scenario.tests ?? 'success' },
+    test: { result: scenario.tests ?? 'success', outputs: { release_eligible: scenario.releaseEligible === undefined ? 'true' : scenario.releaseEligible } },
     supabase: { result: scenario.backend ?? 'success' },
     'vercel-credentials': { outputs: { configured: scenario.credentials ?? 'true' } },
   }
@@ -67,6 +68,9 @@ describe('release workflow regression gates', () => {
     }
     expect(permits('deploy', { credentials: 'false' })).toBe(false)
     expect(workflow.jobs.supabase.needs).toEqual(expect.arrayContaining(['test', 'vercel-credentials']))
+  })
+  it.each(['supabase', 'deploy'])('does not run %s for a superseded or unverified main release', job => {
+    for (const releaseEligible of ['false', '', null]) expect(permits(job, { releaseEligible })).toBe(false)
   })
   it('allows an upstream preview but blocks a fork PR preview and every PR database write', () => {
     const pr = { event: 'pull_request', ref: 'refs/pull/25/merge', backend: 'skipped' }

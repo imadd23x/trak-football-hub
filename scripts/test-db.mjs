@@ -11,7 +11,54 @@ const securityMigration = '20260917205027_secure_parent_invites.sql';
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 const args = process.argv.slice(2);
 const mode = args[0] ?? '--all';
-const modes = ['--all', '--baseline', '--pilot-views-review', '--pilot-views-baseline', '--parent-upgrade-review', '--roster-adoption-review'];
+// Suites register themselves. Each suite .sql declares its own mode in a
+// header pragma and this file discovers them:
+//
+//   -- @trak-suite mode=--consent-review in-all=false
+//
+// The reason is not tidiness. Four player-platform PRs were each MERGEABLE
+// against main and conflicted with each other the moment any one of them
+// landed, because every one of them hand-edited this same ternary chain. The
+// bad outcome is not the conflict, it is a resolution that drops a suite:
+// a suite that never runs is indistinguishable from a suite that passes.
+// Adding a suite must not touch a shared file, so now it does not.
+//
+// in-all=true means the suite passes today and CI should run it. A suite that
+// documents an unfixed defect sets in-all=false, or it turns main red for
+// everyone and people learn to ignore the colour.
+const FIXTURES = new Set([
+  'bootstrap.sql',
+  'parent_invite_backfill_setup.sql', 'parent_invite_backfill_assertions.sql',
+  'pilot_view_backfill_setup.sql',
+]);
+const PRAGMA = /^--\s*@trak-suite\s+(.*)$/m;
+const suiteFiles = (await readdir(resolve(root, 'supabase/tests')))
+  .filter(f => f.endsWith('.sql') && !FIXTURES.has(f)).sort();
+const registry = new Map();   // mode -> [suite files]
+const inAll = [];
+for (const file of suiteFiles) {
+  const head = (await readFile(resolve(root, 'supabase/tests', file), 'utf8')).slice(0, 4000);
+  const found = head.match(PRAGMA);
+  // Not silently skipped. A typo in the pragma would otherwise delete a suite
+  // from the run while leaving the file in the tree, which is the exact
+  // failure this registry exists to prevent.
+  if (!found) {
+    throw new Error(`supabase/tests/${file} declares no '-- @trak-suite' header. `
+      + `Add one, or list it in FIXTURES if it is a fixture, not a suite.`);
+  }
+  const attrs = Object.fromEntries(found[1].trim().split(/\s+/).map(kv => kv.split('=')));
+  if (!attrs.mode?.startsWith('--')) {
+    throw new Error(`supabase/tests/${file}: @trak-suite needs mode=--something`);
+  }
+  if (registry.has(attrs.mode)) {
+    throw new Error(`Two suites both claim ${attrs.mode}: `
+      + `${registry.get(attrs.mode).join(', ')} and ${file}`);
+  }
+  registry.set(attrs.mode, [file]);
+  if (attrs['in-all'] === 'true') inAll.push(file);
+}
+const modes = [...new Set(['--all', '--baseline', '--pilot-views-review',
+  '--pilot-views-baseline', '--parent-upgrade-review', ...registry.keys()])];
 if (args.length > 1 || !modes.includes(mode)) {
   throw new Error(`Usage: node scripts/test-db.mjs [${modes.join(' | ')}]`);
 }
@@ -50,12 +97,14 @@ try {
   console.log(`Replayed ${migrations.length} migrations${baseline || pilotViewsBaseline
     ? ' (vulnerable baseline; security assertions should fail)'
     : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
-  // Fails by design where T4 is unfixed, so it stays out of the default list
-  // that CI runs.
-  const suites = mode === '--roster-adoption-review' ? ['roster_adoption.sql']
+  const suites = registry.has(mode) ? registry.get(mode)
     : baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
-    : ['parent_invite_security.sql', 'pilot_view_security.sql'];
+    // --all runs every in-all suite, so a regression is caught by the command
+    // everyone already runs rather than only by a bespoke one.
+    : inAll;
+  // Printed so that a suite silently dropping out of the run is visible.
+  console.log(`Suites (${mode}): ${suites.join(', ') || 'none'}`);
   for (const suite of suites) {
     const result = await db.exec(await read(suite));
     console.log(`Passed: ${suite}`);

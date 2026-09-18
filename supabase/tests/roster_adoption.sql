@@ -1,3 +1,4 @@
+-- @trak-suite mode=--roster-adoption-review in-all=false
 -- T4 — does a player joining with a TRK code actually keep the assessments the
 -- coach already recorded against them?
 --

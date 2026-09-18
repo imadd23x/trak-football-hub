@@ -49,22 +49,25 @@ export function CoachLinkCard() {
       .limit(1)
       .maybeSingle()
 
-    setChecking(false)
-
     // A failed read must not render as "not connected". That is the same
     // false-negative that made the parent screens tell people to redo a step
     // they had already completed — and here it would invite a player who is
     // already linked to re-enter a code they do not have.
-    if (error) { setLookupFailed(true); return }
-    if (!data) { setLinked(null); return }
+    if (error) { setChecking(false); setLookupFailed(true); return }
+    if (!data) { setChecking(false); setLinked(null); return }
 
-    let coachName: string | null = null
+    // The link is already established at this point, so say so before going to
+    // fetch the coach's name. Clearing `checking` first left a window where
+    // `linked` was still null and the card rendered the code prompt to a player
+    // who is connected — brief on a fast network, indefinite on a slow one.
+    setLinked({ coachName: null })
+    setChecking(false)
+
     if (data.coach_user_id) {
       const { data: profile } = await supabase
         .from('profiles').select('full_name').eq('user_id', data.coach_user_id).maybeSingle()
-      coachName = profile?.full_name ?? null
+      setLinked({ coachName: profile?.full_name ?? null })
     }
-    setLinked({ coachName })
   }
 
   async function handleConnect() {

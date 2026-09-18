@@ -5,7 +5,8 @@ import { useCase } from '../../support/use-case'
 import { renderApp } from '../../support/render-app'
 import { signInAs } from '../../support/session'
 import { server } from '../../msw/server'
-import { table, tableError, rpc } from '../../msw/supabase'
+import { table, tableError, rpc, SUPABASE_URL } from '../../msw/supabase'
+import { http, HttpResponse } from 'msw'
 
 const ATHLETE = { id: 'athlete-1' }
 
@@ -32,6 +33,9 @@ function signedInAthleteWithNoCoach() {
     // No squad row: this athlete is not linked to a coach yet.
     table('squad_players', []),
     table('coach_assessments', []),
+    // ParentInviteCard shares this screen and calls this RPC. Modelled rather
+    // than left unhandled, so a genuinely unexpected request still stands out.
+    rpc('get_player_invites_for_current_user', () => []),
   )
 }
 
@@ -104,6 +108,7 @@ useCase('UC-A08', () => {
       table('matches', []),
       table('coach_assessments', []),
       tableError('squad_players', 500, { message: 'upstream unavailable' }),
+      rpc('get_player_invites_for_current_user', () => []),
     )
 
     renderApp('/player/profile')
@@ -125,10 +130,40 @@ useCase('UC-A08', () => {
       // Since K2 a departed row is invisible to its old coach; showing the
       // player "Connected" would strand them with no way to re-link.
       table('squad_players', []),
+      rpc('get_player_invites_for_current_user', () => []),
     )
 
     renderApp('/player/profile')
 
     expect(await codeField()).toBeInTheDocument()
+  })
+
+  it('does not offer the code prompt while the coach name is still loading', async () => {
+    signInAs(ATHLETE)
+    server.use(
+      table('profiles', [{ id: 'p-athlete', user_id: ATHLETE.id, role: 'player', full_name: 'Nikos Papadopoulos' }]),
+      table('player_details', []),
+      table('matches', []),
+      table('coach_assessments', []),
+      rpc('get_player_invites_for_current_user', () => []),
+      table('squad_players', [
+        { id: 'sq-1', coach_user_id: 'coach-1', status: 'active', linked_player_id: ATHLETE.id },
+      ]),
+      // The coach-name lookup never resolves. Imad's finding on #17: clearing
+      // `checking` before this returned left `linked` null, so a player who IS
+      // connected was shown the editable code prompt — briefly on a fast
+      // network, indefinitely on a slow one.
+      http.get(`${SUPABASE_URL}/rest/v1/profiles`, async () => {
+        await new Promise(() => {})
+        return HttpResponse.json([])
+      }),
+    )
+
+    renderApp('/player/profile')
+
+    // The connected placeholder stands in until the name arrives.
+    expect(await screen.findByText('Connected')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/TRK-/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /^connect$/i })).toBeNull()
   })
 })

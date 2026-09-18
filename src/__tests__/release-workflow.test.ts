@@ -14,6 +14,7 @@ interface Scenario {
   tests?: string
   backend?: string
   credentials?: string
+  rosterAudit?: string | null
 }
 function permits(job: string, scenario: Scenario = {}) {
   const github = {
@@ -25,10 +26,13 @@ function permits(job: string, scenario: Scenario = {}) {
   const needs = {
     test: { result: scenario.tests ?? 'success' },
     supabase: { result: scenario.backend ?? 'success' },
+    'roster-audit': { result: scenario.rosterAudit === undefined ? 'success' : scenario.rosterAudit },
     'vercel-credentials': { outputs: { configured: scenario.credentials ?? 'true' } },
   }
   // Evaluate the actual checked-in GitHub expression, not a duplicate gate.
-  const expression = workflow.jobs[job].if.replaceAll('needs.vercel-credentials', "needs['vercel-credentials']")
+  const expression = workflow.jobs[job].if
+    .replaceAll('needs.vercel-credentials', "needs['vercel-credentials']")
+    .replaceAll('needs.roster-audit', "needs['roster-audit']")
   return new Function('github', 'needs', 'always', `return (${expression})`)(github, needs, () => true)
 }
 describe('release workflow regression gates', () => {
@@ -73,6 +77,14 @@ describe('release workflow regression gates', () => {
     expect(permits('deploy', pr)).toBe(true)
     expect(permits('deploy', { ...pr, headRepository: fork })).toBe(false)
     expect(permits('supabase', pr)).toBe(false)
+  })
+  it.each(['failure', 'cancelled', 'skipped', null])('blocks both production jobs when the roster audit result is %s', rosterAudit => {
+    for (const job of ['supabase', 'deploy']) {
+      expect(permits(job, { rosterAudit })).toBe(false)
+      expect(workflow.jobs[job].needs).toContain('roster-audit')
+    }
+    const preview = { event: 'pull_request', ref: 'refs/pull/25/merge', backend: 'skipped', rosterAudit }
+    expect(permits('deploy', preview)).toBe(false)
   })
   it('runs checks on task branches and never cancels a main release', () => {
     expect(workflow.on.push.branches).toEqual(expect.arrayContaining(['parent/**', 'shared/**']))

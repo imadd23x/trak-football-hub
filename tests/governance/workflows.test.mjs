@@ -30,7 +30,7 @@ test('actual Actions metadata script refuses to certify a different head than it
 test('the protection proposal requires jobs that actually exist, independent review and current main', () => {
   const jobs = new Set([...Object.entries(ci.jobs), ...Object.entries(governance.jobs)].map(([id, job]) => job.name ?? id));
   for (const name of protection.required_status_checks.contexts) assert.ok(jobs.has(name), `Missing required job ${name}`);
-  assert.deepEqual(protection.required_status_checks.contexts, ['test', 'Merge policy']);
+  assert.deepEqual(protection.required_status_checks.contexts, ['test', 'Merge policy', 'Roster adoption audit']);
   assert.equal(protection.required_status_checks.strict, true);
   assert.equal(protection.enforce_admins, true);
   assert.equal(protection.required_pull_request_reviews.required_approving_review_count, 1);
@@ -63,6 +63,40 @@ test('existing source, database, upgrade, browser, harness and build checks rema
   const commands = ci.jobs.test.steps.map(step => step.run);
   for (const command of ['npm run lint', 'npm run typecheck', 'npm test', 'npm run test:db', 'npm run test:db -- --parent-upgrade-review', 'npm run test:harness', 'npm run uc:check', 'npm run build', 'npx playwright test --config playwright.pilot.config.ts', 'node --test tests/governance/*.test.mjs']) assert.ok(commands.includes(command), `Lost required command ${command}`);
   assert.ok(commands.indexOf('npm ci --legacy-peer-deps') < commands.indexOf('node --test tests/governance/*.test.mjs'));
+});
+test('roster audit uses pinned trusted inputs, a separate exact candidate and explicit production gates', () => {
+  const job = ci.jobs['roster-audit'];
+  assert.equal(job.name, 'Roster adoption audit');
+  assert.equal(job['timeout-minutes'], 10);
+  assert.deepEqual(job.permissions, { contents: 'read' });
+  const checkouts = job.steps.filter(step => step.uses?.startsWith('actions/checkout@'));
+  assert.equal(checkouts.length, 2);
+  const [candidate, trusted] = checkouts.map(step => step.with);
+  assert.equal(candidate.ref, '${{ github.sha }}');
+  assert.equal(job.env.CANDIDATE_REVISION, '${{ github.sha }}');
+  assert.notEqual(candidate.path, trusted.path);
+  assert.equal(trusted.repository, 'imadd23x/trak-football-hub');
+  assert.match(trusted.ref, /^[a-f0-9]{40}$/);
+  assert.equal(trusted.ref, job.env.ROSTER_BASELINE_REVISION);
+  for (const checkout of [candidate, trusted]) {
+    assert.equal(checkout['persist-credentials'], false);
+    assert.equal(checkout['fetch-depth'], 0);
+  }
+  const commands = job.steps.filter(step => step.run);
+  for (const step of commands) assert.equal(step['working-directory'], trusted.path);
+  assert.ok(commands.some(step => step.run === 'npm ci --legacy-peer-deps --ignore-scripts'));
+  assert.ok(commands.some(step => step.run === 'node --test tests/audits/roster-adoption.test.mjs'));
+  const audit = commands.find(step => step.run.includes('--candidate-root'));
+  assert.ok(audit.run.includes(`"$GITHUB_WORKSPACE/${candidate.path}"`));
+  assert.ok(audit.run.includes('--candidate-revision "$CANDIDATE_REVISION"'));
+  assert.ok(audit.run.includes('--baseline-revision "$ROSTER_BASELINE_REVISION"'));
+  assert.equal(JSON.stringify(job).includes('secrets.'), false);
+  assert.equal(job['continue-on-error'], undefined);
+  for (const step of job.steps) assert.equal(step['continue-on-error'], undefined);
+  for (const name of ['supabase', 'deploy']) {
+    assert.ok(ci.jobs[name].needs.includes('roster-audit'));
+    assert.ok(ci.jobs[name].if.includes("needs.roster-audit.result == 'success'"));
+  }
 });
 test('closed PR verification uses main policy and is separate from required PR checks', () => {
   const delivery = governance.jobs.delivery;

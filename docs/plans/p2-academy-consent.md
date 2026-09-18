@@ -120,4 +120,9 @@ If a historical match/session/meeting cannot be attributed uniquely from evidenc
 - Approved academy/controller identities, country-specific notices, purpose wording, revision policy, retention/deletion decisions and exact minimal-stub fields. No placeholders in real approvals.
 - Named UAE/Greece academy fixtures, stable IDs, age/cohort boundaries, DOB correction authority and birthday calendar rule. Synthetic fixtures must be clearly labelled.
 - Child-personal-data AI processing scope, provider/data flows and notice; whether a separate choice is required remains a decision, not an assumption.
-- Reviewed legacy-attribution evidence, repair owner, support contact and the disposable multi-connection PostgreSQL test environment.
+- Reviewed legacy-attribution evidence, repair owner and support contact.
+
+The disposable multi-connection PostgreSQL 17 environment is now available and
+has exercised concurrent linking and assessment reads. Consent grant/withdrawal
+race cases remain unimplemented; infrastructure availability is not evidence that
+the pending consent authorization contract works.

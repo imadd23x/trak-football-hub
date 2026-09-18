@@ -2,6 +2,12 @@
 
 Status reviewed at integration commit `4c3f35d`, September 18, 2026. This bounded source review explains the three previously recorded UC-A02 failures and one UC-A04 failure; it did not rerun the suite or change app code, tests, or registry contracts.
 
+Update: the [combined fork candidate](queue-integration-2026-09-18.md) `565e189`
+integrates #30 and passes UC-A04's three tests plus five UC-X02 tests, including
+successful recovery of a failed second page without lost or duplicated matches.
+Only the three UC-A02 failures remain in the use-case run. Canonical main has not
+received these fixes; the original findings below describe the earlier snapshot.
+
 ## UC-A02: missing registered functionality
 
 The [contract](../use-cases/registry.yaml) (lines 8–20) requires a signed-in athlete to save a match with a computed rating, reach its result screen, and see no decimal score. The [tests](../../tests/usecases/athlete/UC-A02.log-match.test.tsx) open `/player/log` at lines 39, 57 and 73.
@@ -22,7 +28,7 @@ Coordinate with Kostas K3–K5 for coach logging and Tarek T1 for match identity
 
 [PlayerMatches.tsx](../../src/pages/player/PlayerMatches.tsx) discards the query error at line 25, substitutes `[]` at line 30, and displays “No matches found” at lines 90–91. The [failed-load test](../../tests/usecases/athlete/UC-A04.match-history.test.tsx) (lines 94–129) correctly detects this violation of [UC-A04](../use-cases/registry.yaml) (lines 38–50).
 
-Tarek owns this through T7. Reviewed [PR #30](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/30), head `e5c5b41`, already includes loading/error/retry states and advances pagination only after success. That fix is not merged into the reviewed integration snapshot; review and integrate it rather than duplicate the application patch.
+Tarek owns this through T7. Reviewed [PR #30](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/30), head `e5c5b41`, includes loading/error/retry states and advances pagination only after success. That exact head is now in the fork candidate above and remains unmerged into canonical main.
 
 Required regressions before enforcement:
 

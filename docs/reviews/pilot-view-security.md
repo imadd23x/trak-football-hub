@@ -57,7 +57,7 @@ node scripts/test-db.mjs
 node scripts/test-db.mjs --pilot-views-baseline
 ```
 
-- Focused repair: **59 migrations, 282 assertions passed** on PostgreSQL 18.3 through PGlite 0.5.8. This branch starts from the P1 review base; combined branches may have a different migration count.
+- Historical focused repair at `fedb4c6`: **59 migrations, 282 assertions passed** on PostgreSQL 18.3 through PGlite 0.5.8, starting from the P1 review base. The later isolated PR #35 at `d357643` uses 58 migrations (baseline 57); the current combined candidate replays 61. Counts identify different source trees, not missing migrations.
 - Default runner: parent-invitation suite and the 282 operational-view assertions both passed.
 - Historical negative control: **58 migrations, exit 1, 246 failing assertions**. Failures include actual foreign telemetry INSERT/UPDATE/DELETE attempts and anonymous/application report queries. A baseline unexpectedly passing is also an error.
 - Coverage includes anonymous, coach, player, parent and club-administrator callers; direct SELECT denial on all 12 views; explicit column SELECT denial; absent table/column privileges; actual foreign telemetry UPDATE/DELETE denial through both writable views and INSERT denial through `pilot_time_to_assess`; exact preservation of base records; service-role SELECT-only access; and full JSON result equality between service and owner reads for all 12 nonempty reports.

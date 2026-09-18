@@ -20,11 +20,12 @@ was promoted to a current baseline, and no missing audit is a passing check.
 
 ## Local verification
 
-- `node --test tests/governance/*.test.mjs`: **68 passed**. Cases include actual
+- `node --test tests/governance/*.test.mjs`: **69 passed**. Cases include actual
   ordinary/squash/two-commit rebase histories, unmerged dependencies versus shared
   main history, current-head migration order approval, stale/revoked approvals,
   incomplete API evidence, forced/non-forward/stale releases, shallow clone
-  rejection, event-head mismatch, and a same-count substitution of audit failures.
+  rejection, event-head mismatch, a bad merge retaining a path but discarding its
+  reviewed contents, and a same-count substitution of audit failures.
 - `npm test`: **315 passed**. Five obsolete inline-Bash tests were replaced by
   the stronger policy/workflow tests above; the new policy rejects every non-main
   target instead of allowing a warning-only live stack.
@@ -42,6 +43,10 @@ was promoted to a current baseline, and no missing audit is a passing check.
   listener restriction and absent default browser executable were resolved by
   running the localhost server with the installed Chromium executable; no app
   fix or hosted account/data change was involved.
+- Read-only execution of the actual delivery CLI against already-merged #41:
+  passes for result `00910940f596d9fe9a7cd416dc741943d1df2cc9`, including
+  all **16 changed-file objects**. This verifies the guard against real GitHub
+  metadata without merging or deploying anything.
 - `git diff --check`: pass.
 
 Two independent agent reviews found issues that were fixed before publication:
@@ -60,8 +65,8 @@ order. This governance candidate changes neither migration.
 
 An evidence URL is checked for repository, exact candidate SHA and successful
 Actions conclusion. A reviewer must inspect the actual migration-order proof.
-Delivery verifies the actual merge result and changed paths, not every intended
-behavior. Candidate-owned policy code relies on protected independent review.
+Delivery verifies the actual merge result and exact reviewed file objects, not
+every intended behavior. Candidate-owned policy code relies on protected independent review.
 Settings in the prepared JSON are not active protection until an authorized
 administrator applies and verifies them. No production enforcement, merged
 delivery, deployment or live application outcome is claimed by these local tests.

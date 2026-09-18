@@ -7,7 +7,7 @@ import { createGitHubClient } from './github.mjs';
 const shaPattern = /^[0-9a-f]{40}$/;
 const repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 function sha(value) {
-  if (!shaPattern.test(value ?? '')) throw new Error('Expected a full Git commit SHA');
+  if (!shaPattern.test(value ?? '')) throw new Error('Expected a full Git object SHA');
   return value;
 }
 function repositoryName(value) {
@@ -44,12 +44,21 @@ export function localGit(cwd = process.cwd()) {
       const output = run(['ls-tree', '-r', '-z', sha(commit), '--', filePath(path)]);
       return output.split('\0').some(entry => entry.slice(entry.indexOf('\t') + 1) === path);
     },
+    objectAt(commit, path) {
+      const output = run(['ls-tree', '-r', '-z', sha(commit), '--', filePath(path)]);
+      const entry = output.split('\0').find(row => row.slice(row.indexOf('\t') + 1) === path);
+      if (!entry) return undefined;
+      const match = /^[0-7]+ (?:blob|commit) ([0-9a-f]{40})\t/.exec(entry);
+      if (!match) throw new Error(`Unsupported delivered Git entry: ${path}`);
+      return match[1];
+    },
   };
 }
 
 // GitHub supplies merge_commit_sha for merge, squash and rebase results.
-// File inventory is a completeness check, NOT proof of every intended behavior;
-// source/journey tests must separately run on the delivered revision.
+// The policy requires current main in the candidate, so changed-file objects
+// must match its reviewed head even after squash/rebase. Source/journey tests
+// must separately prove behavior on the delivered revision.
 export async function verifyDelivery({ api, git, repository, commit, prNumber, forced = false, previousSha }) {
   const repo = repositoryName(repository);
   if ((commit === undefined) === (prNumber === undefined)) throw new Error('Specify exactly one commit or PR');
@@ -94,6 +103,9 @@ export async function verifyDelivery({ api, git, repository, commit, prNumber, f
       if (!['added', 'modified', 'removed', 'renamed', 'copied', 'changed'].includes(file.status)) throw new Error(`Unknown changed-file status for ${path}`);
       const present = git.hasPath(resultSha, path);
       if (file.status === 'removed' ? present : !present) throw new Error(`Merge result has the wrong file inventory for ${path}`);
+      if (file.status !== 'removed' && git.objectAt(resultSha, path) !== sha(file.sha)) {
+        throw new Error(`Delivered contents differ from the reviewed PR for ${path}; update and re-review the actual merged candidate`);
+      }
       if (file.status === 'renamed' && file.previous_filename !== file.filename) {
         const oldPath = filePath(file.previous_filename);
         // A rename's old path can legitimately be recreated by another change.
@@ -126,8 +138,8 @@ export async function main(argv = process.argv.slice(2)) {
   });
   const summary = [
     '### Merge delivery verified', '', `Main revision: \`${result.mainSha}\``,
-    ...result.results.map(pr => `- PR #${pr.number}: result \`${pr.resultSha}\`; ${pr.files.length} changed paths accounted for.`),
-    '', 'This verifies merge-result ancestry and file inventory. Application behavior, migration effects and live deployment require their separate checks.', '',
+    ...result.results.map(pr => `- PR #${pr.number}: result \`${pr.resultSha}\`; ${pr.files.length} changed paths and reviewed file objects verified.`),
+    '', 'This verifies merge-result ancestry and reviewed file contents. Application behavior, migration effects and live deployment require their separate checks.', '',
   ].join('\n');
   console.log(summary);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);

@@ -161,15 +161,18 @@ policy service, and it must not be described as one.
 The main CI `test` job runs delivery verification before its application checks
 and before either production job. It rejects direct main pushes with no recorded
 PR result, forced/non-forward pushes, an obsolete release SHA, a PR merged into another base, absent merge
-results and incomplete/wrong changed-file inventory. It uses GitHub's actual
+results, incomplete/wrong changed-file inventory, and file objects that differ
+from the reviewed PR. It uses GitHub's actual
 `merge_commit_sha`, so ordinary, squash and rebase merges can all be verified.
 The separate closed-PR job also reports delivery failures after a merge.
 Main is reread at the end to reject a change during verification. This is still
 a snapshot; maintain the release lock through deployment and verify live results.
 
-File inventory is only a completeness check. Inspect the intended changes and
-run behavior tests on the delivered commit; neither file presence nor commit
-ancestry proves the application is correct. Source CI passing does not prove
+Because the policy requires current main in the candidate, each delivered changed
+file must match the reviewed PR's Git object hash, including squash/rebase results.
+A combined merge requiring different contents must be updated and reviewed first.
+Exact file delivery still does not prove application correctness: run behavior
+tests on the delivered commit. Source CI passing does not prove
 hosted migrations, functions or frontend deployment happened.
 
 Wait for the full workflow before the next schema merge. Current main workflows

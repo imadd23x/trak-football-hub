@@ -26,7 +26,7 @@ function fixture(t, mode = 'merge') {
   else { git('checkout', 'task'); git('rebase', 'main'); git('checkout', 'main'); git('merge', '--ff-only', 'task'); }
   const delivered = git('rev-parse', 'HEAD');
   const pr = { number: 12, merged: true, merge_commit_sha: delivered, changed_files: 1, base: { ref: 'main', repo: { full_name: 'example/trak' } } };
-  const files = [{ filename: 'change.txt', status: 'added' }];
+  const files = [{ filename: 'change.txt', status: 'added', sha: git('rev-parse', `${originalHead}:change.txt`) }];
   const data = {
     '/repos/example/trak/branches/main': { commit: { sha: delivered } },
     '/repos/example/trak/pulls/12': pr,
@@ -76,6 +76,16 @@ test('missing changed file fails despite delivered merge metadata', async t => {
   const f = fixture(t); f.files[0].filename = 'lost-change.txt';
   await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', prNumber: 12 }), /wrong file inventory/);
 });
+test('preserving a changed path while discarding its reviewed contents fails', async t => {
+  const f = fixture(t);
+  writeFileSync(join(f.cwd, 'change.txt'), 'old behavior restored by a bad merge\n');
+  f.git('add', '.'); f.git('commit', '--amend', '--no-edit');
+  const badMerge = f.git('rev-parse', 'HEAD');
+  assert.equal(f.local.isAncestor(f.originalHead, badMerge), true, 'the original PR head is still an ancestor');
+  f.data['/repos/example/trak/branches/main'].commit.sha = badMerge;
+  f.pr.merge_commit_sha = badMerge;
+  await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', prNumber: 12 }), /Delivered contents differ/);
+});
 test('an incomplete API file inventory fails', async t => {
   const f = fixture(t); f.pr.changed_files = 2;
   await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', prNumber: 12 }), /incomplete/);
@@ -101,6 +111,6 @@ test('API errors fail rather than reporting delivery', async t => {
 test('removed and renamed paths are checked in the delivered tree', async t => {
   const f = fixture(t); f.files[0].status = 'removed';
   await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', prNumber: 12 }), /wrong file inventory/);
-  f.files[0] = { filename: 'change.txt', status: 'renamed', previous_filename: 'base.txt' };
+  f.files[0] = { filename: 'change.txt', status: 'renamed', previous_filename: 'base.txt', sha: f.git('rev-parse', `${f.originalHead}:change.txt`) };
   await assert.rejects(verifyDelivery({ api: f.api, git: f.local, repository: 'example/trak', prNumber: 12 }), /Renamed path remains/);
 });

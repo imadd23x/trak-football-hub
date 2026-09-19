@@ -1,81 +1,112 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { resolve, join } from 'node:path'
+import { resolve, join, relative } from 'node:path'
 
 // The dev-account password was a literal in LandingPage.tsx, DevSetupPage.tsx
 // and DevSwitcher.tsx. The /dev-setup ROUTE is registered behind
-// `import.meta.env.DEV`, which is why this looked safe — but that guard decides
+// `import.meta.env.DEV`, which is why it looked safe — but that guard decides
 // which routes register, not which chunks Rollup emits. The built bundle shipped
 // dist/assets/DevSetupPage-*.js containing the password twelve times, referenced
 // from the entry bundle, on a public site.
 //
-// CORRECTION, from Kostas building the branch: LandingPage.tsx's copy did NOT
-// ship. Its only use sits behind an IS_DEV constant Vite folds to false, so
-// Rollup eliminated the branch and the literal with it. I claimed it shipped to
-// every visitor after reading line 18 and not the build output I already had.
-// Source exposure on a public repo is still real, which is why it is removed —
-// but only the DevSetupPage chunk was ever served.
+// (LandingPage's and DevSwitcher's copies did NOT ship — their uses are dead in
+// a production build and Rollup dropped them. Kostas caught that, by building
+// the branch while I read the source. Source exposure on a public repository is
+// still exposure, so they were removed anyway.)
 //
-// A grep is the right shape here, unlike the band-colour case where the palette
-// shares its hexes with the brand accent. A credential has no second meaning.
+// The FIRST version of this test searched only src/, scripts/ and
+// supabase/functions/, and only .ts/.tsx/.js/.mjs/.cjs. It reported clean while
+// three files still held the value — including supabase/seeds/dev_data.sql,
+// which inserts into auth.users with crypt('TrakDev123', …) and would have
+// silently restored the compromised password after a rotation. Kostas caught
+// that too. A guard that appears to protect and does not is worse than no guard,
+// so this version walks the whole repository and proves its own coverage first.
 
 const ROOT = resolve(__dirname, '../..')
-const SEARCH_DIRS = ['src', 'scripts', 'supabase/functions']
-const SEARCH_FILES = ['seed-pilot-rehearsal.mjs', 'seed-admin-data.mjs', 'check-pilot-state.mjs']
 
-// Known-leaked values. Keep rotated values OUT of this list — naming a live
-// credential here would recommit the thing this test exists to prevent. These
-// are burned and must never work again.
+const SKIP_DIRS = new Set([
+  'node_modules', 'dist', '.git', 'coverage', 'playwright-report', 'test-results', '.vercel',
+])
+const SKIP_EXT = /\.(png|jpe?g|gif|webp|svg|ico|woff2?|ttf|eot|pdf|pptx?|zip|mp4|lock)$/i
+
+// Values known to be public. A rotated value must NEVER be added here — naming
+// a live credential would recommit the thing this test exists to prevent.
 const BURNED = ['TrakDev123', 'RehearsalTrak123']
 
-function sourceFiles(): string[] {
+// The only files permitted to contain a burned value, because naming them is
+// their purpose: this test, and the incident record. Asserted as an exact set,
+// so a third file cannot quietly join them.
+const ALLOWED = [
+  'docs/reviews/credential-boundary-2026-09-19.md',
+  'src/__tests__/no-committed-credentials.test.ts',
+]
+
+function allFiles(): string[] {
   const out: string[] = []
   const walk = (dir: string) => {
     let entries: string[]
     try { entries = readdirSync(dir) } catch { return }
     for (const entry of entries) {
-      if (entry === 'node_modules' || entry === 'dist' || entry.startsWith('.')) continue
+      if (SKIP_DIRS.has(entry)) continue
       const full = join(dir, entry)
-      if (statSync(full).isDirectory()) walk(full)
-      else if (/\.(ts|tsx|js|mjs|cjs)$/.test(entry)) out.push(full)
+      let s
+      try { s = statSync(full) } catch { continue }
+      if (s.isDirectory()) walk(full)
+      else if (!SKIP_EXT.test(entry) && s.size < 2_000_000) out.push(full)
     }
   }
-  for (const dir of SEARCH_DIRS) walk(join(ROOT, dir))
-  for (const file of SEARCH_FILES) {
-    try { statSync(join(ROOT, file)); out.push(join(ROOT, file)) } catch { /* removed */ }
-  }
+  walk(ROOT)
   return out
 }
 
 describe('no committed credentials', () => {
-  const files = sourceFiles()
+  const files = allFiles()
+  const rel = files.map(f => relative(ROOT, f))
 
-  it('finds source to check, so a passing run means something', () => {
-    // Without this, a broken walk would report "no leaks" and look identical
-    // to a clean tree.
-    expect(files.length).toBeGreaterThan(100)
+  it('walks the whole repository, so a clean result means something', () => {
+    // The previous version passed while missing three files, because its search
+    // was scoped by directory and by extension. These pin the coverage itself,
+    // which is the part that silently regressed.
+    expect(rel.length).toBeGreaterThan(400)
+    for (const dir of ['src', 'scripts', 'supabase/migrations', 'supabase/seeds', 'supabase/functions', 'docs']) {
+      expect(rel.some(f => f.startsWith(dir + '/')), `nothing scanned under ${dir}/`).toBe(true)
+    }
+    for (const ext of ['.sql', '.md', '.html', '.mjs', '.tsx', '.json', '.yml']) {
+      expect(rel.some(f => f.endsWith(ext)), `no ${ext} files scanned`).toBe(true)
+    }
   })
 
   for (const secret of BURNED) {
-    it(`does not contain the burned credential ${secret}`, () => {
-      const offenders = files
-        .filter(file => file !== resolve(__dirname, 'no-committed-credentials.test.ts'))
-        .filter(file => readFileSync(file, 'utf8').includes(secret))
-        .map(file => file.slice(ROOT.length + 1))
-      expect(offenders, `${secret} is back in: ${offenders.join(', ')}`).toEqual([])
+    it(`${secret} appears only where it is meant to`, () => {
+      const found = files
+        .filter(f => readFileSync(f, 'utf8').includes(secret))
+        .map(f => relative(ROOT, f))
+        .sort()
+      const unexpected = found.filter(f => !ALLOWED.includes(f))
+      expect(unexpected, `${secret} is in: ${unexpected.join(', ')}`).toEqual([])
     })
   }
 
-  it('the dev password is read from the environment, never assigned a literal', () => {
+  it('the allowlist is exactly the two files that document the incident', () => {
+    // If one of these stops naming the value, shrink the list rather than
+    // leaving a permitted slot open for something else to fill.
+    expect([...ALLOWED].sort()).toEqual([
+      'docs/reviews/credential-boundary-2026-09-19.md',
+      'src/__tests__/no-committed-credentials.test.ts',
+    ])
+  })
+
+  it('no source file assigns a password literal', () => {
     const assignments: string[] = []
     for (const file of files) {
-      // Test fixtures legitimately carry synthetic passwords. The burned-value
+      const r = relative(ROOT, file)
+      if (!/\.(ts|tsx|js|mjs|cjs)$/.test(r)) continue
+      // Test fixtures legitimately carry synthetic passwords; the burned-value
       // checks above still apply to them.
-      if (/__tests__|\.test\.|\.spec\./.test(file)) continue
+      if (/__tests__|\.test\.|\.spec\./.test(r)) continue
       const text = readFileSync(file, 'utf8')
-      // password: 'literal'  /  const PW = 'literal'  — but not env reads.
-      for (const match of text.matchAll(/(?:password|PW|DEV_PASSWORD)\s*[:=]\s*(['"`])([^'"`]{6,})\1/gi)) {
-        assignments.push(`${file.slice(ROOT.length + 1)}: ${match[2].slice(0, 4)}…`)
+      for (const m of text.matchAll(/(?:password|PW|DEV_PASSWORD)\s*[:=]\s*(['"`])([^'"`]{6,})\1/gi)) {
+        assignments.push(`${r}: ${m[2].slice(0, 4)}…`)
       }
     }
     expect(assignments, `literal password assignments: ${assignments.join(' | ')}`).toEqual([])

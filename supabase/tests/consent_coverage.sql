@@ -255,33 +255,14 @@ SELECT pg_temp.cassert(
   'B4. Awards have the same reach, so the gap is not specific to assessments');
 
 
--- B5. The gate asks whether a record EXISTS, never what it granted.
--- player_has_parental_consent() is EXISTS(... withdrawn_at IS NULL AND
--- superseded_by IS NULL) and record_parental_consent() validates only that
--- purposes is a jsonb object. So a parent who declines every purpose, including
--- the one the UI marks required, is recorded as having consented and the gate
--- opens. ParentConsent.tsx prevents it by forcing the required purpose true and
--- disabling its checkbox — but record_parental_consent is granted to
--- authenticated, so a disabled checkbox is the only thing enforcing it.
-RESET ROLE;
-SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims',
-  jsonb_build_object('role','authenticated','sub',pg_temp.cid(4))::text, true);
-
--- Child 3's parent supersedes their earlier grant with one that allows nothing.
-SELECT public.record_parental_consent(
-  pg_temp.cid(3), 'parent',
-  '{"coaching_records": false, "recognition": false, "parent_visibility": false}'::jsonb,
-  'test-notice-v2', 'Synthetic refusal for the disposable harness.');
-
-RESET ROLE;
-SET LOCAL ROLE service_role;
-SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
-
-SELECT pg_temp.cassert(
-  public.squad_player_consent_required(pg_temp.cid(202)) IS FALSE,
-  'B5. A consent granting NOTHING still satisfies the gate — it counts records, not permissions');
-
+-- B5 and C5 lived here: a consent granting NOTHING still satisfied the gate,
+-- because player_has_parental_consent() asked only whether a record existed.
+-- Imad fixed it in #62 at both ends — the predicate now requires
+-- coaching_records, the RPC rejects a grant without it, and a CHECK mirrors it
+-- on the table. His privilege_and_consent_security.sql covers it better than
+-- these did, including the direct-INSERT path that bypasses the RPC (his B3).
+-- Removed rather than kept, because two suites asserting the same property is
+-- how they drift.
 
 -- ── Section C: what must be true before a real child ────────
 -- EXPECTED TO FAIL. Each is a property of the stored data, not of a policy,
@@ -333,14 +314,6 @@ SELECT pg_temp.cassert(
           AND pc.granted_at <= ca.created_at
           AND pc.withdrawn_at IS NULL)),
   'C2. EXPECTED FAIL — no under-age child holds an assessment that predates their consent');
-
-
-SELECT pg_temp.cassert(
-  NOT EXISTS (
-    SELECT 1 FROM public.parental_consents pc
-    WHERE pc.withdrawn_at IS NULL AND pc.superseded_by IS NULL
-      AND COALESCE((pc.purposes ->> 'coaching_records')::boolean, false) IS NOT TRUE),
-  'C5. EXPECTED FAIL — no active consent record grants nothing at all');
 
 
 -- ── Report ──────────────────────────────────────────────────

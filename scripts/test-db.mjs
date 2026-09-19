@@ -118,6 +118,32 @@ try {
     .filter(file => file.endsWith('.sql')
       && (!baseline || file < securityMigration)
       && (!pilotViewsBaseline || file < pilotViewsMigration)).sort();
+
+  // Supabase keys schema_migrations on the VERSION — the leading timestamp —
+  // with a primary key on it. This replay keys on nothing: it sorts filenames
+  // and applies them all, so two files sharing a version replay green here and
+  // collide on deploy. Found by Imad between #68's
+  // 20260919170000_deny_policies_grant_nothing.sql and #44's
+  // 20260919170000_no_delete_policy_means_no_delete_grant.sql — same version,
+  // different names, 73 files and 72 versions.
+  //
+  // Checked here rather than in either PR because the divergence is the
+  // runner's: a check that lives in one branch cannot see the collision, which
+  // by definition only exists when two branches meet.
+  const byVersion = new Map();
+  for (const file of migrations) {
+    const version = /^(\d+)_/.exec(file)?.[1];
+    if (!version) {
+      throw new Error(`supabase/migrations/${file} has no leading version. `
+        + `Supabase derives schema_migrations.version from it.`);
+    }
+    if (byVersion.has(version)) {
+      throw new Error(`Two migrations share version ${version}, which is a PRIMARY KEY `
+        + `in schema_migrations:\n  ${byVersion.get(version)}\n  ${file}\n`
+        + `They replay cleanly here and collide on deploy. Renumber one.`);
+    }
+    byVersion.set(version, file);
+  }
   if (parentUpgrade) {
     // PR35 was deployed before PR33. Replay that actual order as well as the
     // fresh-install order, retaining original filenames and immutable SQL.

@@ -1,3 +1,4 @@
+-- @trak-suite mode=--org-cleanup-review in-all=true
 -- Execute against a DISPOSABLE database after replaying migrations.
 -- The harness must SET trak.test_database = 'disposable' on this connection.
 -- All fixtures are rolled back.

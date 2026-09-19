@@ -1,3 +1,4 @@
+-- @trak-suite mode=--coach-notes-review in-all=true
 -- Execute against a DISPOSABLE database after replaying migrations.
 -- The harness must SET trak.test_database = 'disposable' on this connection.
 -- These tests execute real RLS under the authenticated role; no mocks.

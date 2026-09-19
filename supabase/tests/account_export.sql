@@ -1,3 +1,4 @@
+-- @trak-suite mode=--account-export-review in-all=true
 -- Execute against a DISPOSABLE database after replaying migrations.
 -- The harness must SET trak.test_database = 'disposable'. All fixtures roll back.
 --

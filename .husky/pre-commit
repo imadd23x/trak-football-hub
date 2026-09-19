@@ -1,1 +1,4 @@
 npm run uc:check
+# The repository is PUBLIC: a committed credential is exposed at `git push`,
+# not at merge. CI runs this too, but CI is too late to matter here.
+npx vitest run src/__tests__/no-committed-credentials.test.ts

@@ -26,37 +26,56 @@ const mode = args[0] ?? '--all';
 // in-all=true means the suite passes today and CI should run it. A suite that
 // documents an unfixed defect sets in-all=false, or it turns main red for
 // everyone and people learn to ignore the colour.
-const FIXTURES = new Set([
-  'bootstrap.sql',
-  'parent_invite_backfill_setup.sql', 'parent_invite_backfill_assertions.sql',
-  'pilot_view_backfill_setup.sql',
-]);
-const PRAGMA = /^--\s*@trak-suite\s+(.*)$/m;
+// Every .sql in supabase/tests declares what it is, in its own file:
+//
+//   -- @trak-suite mode=--consent-review in-all=false
+//   -- @trak-suite mode=--academy-review in-all=true order=2
+//   -- @trak-fixture
+//
+// A fixture is applied by name from the migration hooks below, not auto-run.
+// `order` sequences several suites under one mode, for the case where one must
+// run last because the others need a clean database.
+//
+// Declaring it per file rather than in a list here is the whole point: four
+// player PRs collided on this file because each added its own flag, and #34
+// adds seven more .sql files. A shared list would just move the collision.
+//
+// Naming convention was considered and rejected. #34's account_deletion_setup
+// and account_deletion_assertions are named like fixtures and are SUITES — his
+// runner executes them last, in order. A convention would have classified them
+// by name and silently dropped both, which is the failure this guard exists to
+// prevent, so the file has to say which it is rather than imply it.
+const SUITE_PRAGMA = /^--\s*@trak-suite\s+(.*)$/m;
+const FIXTURE_PRAGMA = /^--\s*@trak-fixture\b/m;
 const suiteFiles = (await readdir(resolve(root, 'supabase/tests')))
-  .filter(f => f.endsWith('.sql') && !FIXTURES.has(f)).sort();
-const registry = new Map();   // mode -> [suite files]
+  .filter(f => f.endsWith('.sql')).sort();
+const registry = new Map();   // mode -> [{ file, order }]
 const inAll = [];
 for (const file of suiteFiles) {
   const head = (await readFile(resolve(root, 'supabase/tests', file), 'utf8')).slice(0, 4000);
-  const found = head.match(PRAGMA);
+  if (FIXTURE_PRAGMA.test(head)) continue;
+  const found = head.match(SUITE_PRAGMA);
   // Not silently skipped. A typo in the pragma would otherwise delete a suite
-  // from the run while leaving the file in the tree, which is the exact
-  // failure this registry exists to prevent.
+  // from the run while leaving the file in the tree.
   if (!found) {
-    throw new Error(`supabase/tests/${file} declares no '-- @trak-suite' header. `
-      + `Add one, or list it in FIXTURES if it is a fixture, not a suite.`);
+    throw new Error(`supabase/tests/${file} declares neither '-- @trak-suite' nor `
+      + `'-- @trak-fixture'. Add whichever it is to the top of the file.`);
   }
   const attrs = Object.fromEntries(found[1].trim().split(/\s+/).map(kv => kv.split('=')));
   if (!attrs.mode?.startsWith('--')) {
     throw new Error(`supabase/tests/${file}: @trak-suite needs mode=--something`);
   }
-  if (registry.has(attrs.mode)) {
-    throw new Error(`Two suites both claim ${attrs.mode}: `
-      + `${registry.get(attrs.mode).join(', ')} and ${file}`);
+  const order = Number(attrs.order ?? 0);
+  if (!Number.isFinite(order)) {
+    throw new Error(`supabase/tests/${file}: order must be a number`);
   }
-  registry.set(attrs.mode, [file]);
-  if (attrs['in-all'] === 'true') inAll.push(file);
+  const entry = { file, order };
+  if (registry.has(attrs.mode)) registry.get(attrs.mode).push(entry);
+  else registry.set(attrs.mode, [entry]);
+  if (attrs['in-all'] === 'true') inAll.push(entry);
 }
+const ordered = entries => entries.slice()
+  .sort((a, b) => a.order - b.order || a.file.localeCompare(b.file)).map(e => e.file);
 const modes = [...new Set(['--all', '--baseline', '--pilot-views-review',
   '--pilot-views-baseline', '--parent-upgrade-review', ...registry.keys()])];
 if (args.length > 1 || !modes.includes(mode)) {
@@ -97,12 +116,12 @@ try {
   console.log(`Replayed ${migrations.length} migrations${baseline || pilotViewsBaseline
     ? ' (vulnerable baseline; security assertions should fail)'
     : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
-  const suites = registry.has(mode) ? registry.get(mode)
+  const suites = registry.has(mode) ? ordered(registry.get(mode))
     : baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
     // --all runs every in-all suite, so a regression is caught by the command
     // everyone already runs rather than only by a bespoke one.
-    : inAll;
+    : ordered(inAll);
   // Printed so that a suite silently dropping out of the run is visible.
   console.log(`Suites (${mode}): ${suites.join(', ') || 'none'}`);
   for (const suite of suites) {

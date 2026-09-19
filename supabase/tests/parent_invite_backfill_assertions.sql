@@ -1,3 +1,4 @@
+-- @trak-fixture
 -- Run immediately after secure_parent_invites against the setup fixtures.
 DO $test$
 BEGIN

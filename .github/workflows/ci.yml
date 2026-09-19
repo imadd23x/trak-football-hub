@@ -66,6 +66,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Layer 3. Every other credential check reads SOURCE; this reads what is
+      # actually served, which is a different question. A route guarded by
+      # `import.meta.env.DEV` still has its chunk emitted, because the guard
+      # decides which routes register and not which chunks Rollup builds — that
+      # is how the dev-account password shipped while the page looked guarded.
+      # Must run after Build; it refuses to conclude anything without a dist/.
+      - name: Bundle secrets
+        run: npm run check:bundle
+
       - name: Install test browser
         run: npx playwright install --with-deps chromium
 

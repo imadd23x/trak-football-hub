@@ -10,22 +10,59 @@ Everything below is verified against this repository, not recalled.
 
 ## 1. It did not arrive through forked work
 
+> ⚠️ **This section originally claimed the credential was in the repository's
+> root commit, and that therefore "no review gate could have caught it".
+> Both were wrong. @t-bones29 caught it. Corrected below; the conclusion
+> survives, the reasoning does not.**
+>
+> **My error was environmental and I reported it as a fact about the
+> repository.** This session's checkout is a shallow clone:
+>
+> ```
+> $ git rev-parse --is-shallow-repository
+> true                       ← 298 of 597 commits visible
+> $ git log -1 --format='parents:[%P]' 866949a
+> parents:[]                 ← grafted boundary, not a root commit
+> ```
+>
+> Git grafts boundary commits as parentless in a shallow clone. After
+> `git fetch --unshallow`:
+>
+> ```
+> parents:[7d6be8ab9f4e2e37fe35d0edd68bccdc29fd29b2]
+> 1 file changed, 48 insertions(+)    src/pages/player/PlayerPassport.tsx
+> ```
+>
+> It is an ordinary commit that did exactly what its message said. The
+> credential was already in the tree.
+
+The literal actually entered here — verified on the full history:
+
 ```
-$ git log -1 --format='%H parents:[%P] %an %ad %s' 866949a
-866949ac… parents:[] Kostas Anastasiou Fri Jul 31 2026
-          fix: passport no longer scrolls sideways on narrow phones
+778fd1d  2026-04-21  Kostas Anastasiou  Make app fully functional — all 7 phases complete
+                     adds DevSwitcher.tsx, DevSetupPage.tsx, LandingPage.tsx
+b99e6fe  2026-04-24  Kostas Anastasiou  fix: add club admin dev account …
+ecf1909  2026-09-01  Kostas Anastasiou  docs(pilot): measurement runbook … rehearsal tooling
 ```
 
-**No parents — this is the repository's root commit**, and the credential is in
-it. It has been present since the first line of history, in four files, under a
-commit message about horizontal scrolling on phones.
+**What survives:** none of these came through a fork or an agent. They are
+direct commits by the repository owner. So *"stop credentials entering via
+forked work"* still would not have prevented this leak, and building only that
+control still leaves the hole open. That was the point of the section and it
+holds.
 
-It did not come through a fork, a pull request, or an agent. No review gate
-existed to catch it because there was nothing to review: it arrived with the
-initial import.
+**What does not survive, and it is the part that changes the design:**
+`778fd1d` is an ordinary commit with a parent, adding three files in April. **A
+review gate could have caught it.** The correct diagnosis is not "it predates
+review" — it is **"nobody was looking at literals"**, which is a gap you close
+with a check rather than a process.
 
-**So "stop credentials entering via forked work" would not have prevented this
-leak, and building only that control would leave the actual hole open.**
+**And the guard that would have caught my mistake is one we already have.**
+#46's `verify-delivery.mjs` refuses to run in a shallow repository and says why:
+*"Delivery verification requires complete Git history."* I drew a conclusion
+about history from a checkout that could not support one. Worth adding to the
+layers below: **an analysis of history should assert it is not shallow before
+trusting what it sees.**
 
 ## 2. What forks actually change
 
@@ -69,8 +106,21 @@ with `false` in a production build and Rollup eliminates the branch, taking the
 constant with it. The source exposure is real — the repo is public — but nothing
 was served to visitors from this file.
 
-**b) The bundle contains it once, not twelve times.** Twelve is the count in
-`DevSetupPage.tsx` source; minification collapses a repeated literal to one.
+**b) ~~The bundle contains it once, not twelve times.~~ WRONG — it is twelve.**
+
+My correction was itself the error, and a beginner's one:
+
+```
+$ grep -c  TrakDev123 dist/assets/DevSetupPage-*.js      1   ← counts LINES
+$ grep -o  TrakDev123 dist/assets/DevSetupPage-*.js | wc -l
+                                                        12   ← counts matches
+```
+
+**Minified JavaScript is a single line**, so `grep -c` reports `1` for any
+number of occurrences. Minification did not collapse anything. @t-bones29's
+original figure was right and I corrected a correct number with a bad
+measurement. It changes nothing about the action — one occurrence is as exposed
+as twelve — but the number is twelve.
 
 **What holds, and is the actual served leak:** `DevSetupPage.tsx` has no
 `import.meta.env` guard of its own. The guard is in `App.tsx:96`, on the route —

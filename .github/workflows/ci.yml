@@ -23,6 +23,17 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      consent-db:
+        image: postgres:17
+        env:
+          POSTGRES_DB: trak_consent_test
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d trak_consent_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +63,16 @@ jobs:
 
       - name: Parent migration after deployed reporting migration
         run: npm run test:db -- --parent-upgrade-review
+
+      - name: Consent authority fault-injection controls
+        run: node --test tests/db/academy-consent-authority.test.mjs
+
+      - name: Native consent concurrency
+        run: python3 scripts/test-academy-consent-native.py --existing-local
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGPASSWORD: synthetic-ci-only
 
       # tests/msw and tests/support hold the MSW fidelity contract and the
       # useCase() unknown-id guard — package.json's "test" script only runs

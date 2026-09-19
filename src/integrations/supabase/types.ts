@@ -764,6 +764,10 @@ export type Database = {
         }[]
       }
       delete_my_account: { Args: never; Returns: undefined }
+      get_academy_consent_context: {
+        Args: { p_child: string; p_org: string }
+        Returns: Json
+      }
       get_coach_id_by_invite_code: { Args: { p_code: string }; Returns: string }
       get_parent_invite_by_token: {
         Args: { p_token: string }
@@ -802,6 +806,27 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       is_club_admin: { Args: never; Returns: boolean }
+      record_academy_consent: {
+        Args: {
+          p_child: string
+          p_org: string
+          p_request_id: string
+          p_expected_event_id: string | null
+          p_notice_id: string
+          p_relationship: string
+          p_purposes: Json
+        }
+        Returns: Json
+      }
+      withdraw_academy_consent: {
+        Args: {
+          p_child: string
+          p_org: string
+          p_request_id: string
+          p_expected_event_id: string | null
+        }
+        Returns: Json
+      }
       remove_coach_from_org: { Args: { p_coach_user_id: string }; Returns: undefined }
       link_parent_to_players_by_email: {
         Args: { p_email: string }

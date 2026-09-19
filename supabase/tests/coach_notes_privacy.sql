@@ -305,4 +305,144 @@ SELECT pg_temp.assert_true(
   AND has_table_privilege('authenticated', 'public.coach_shared_feedback', 'UPDATE'),
   'CONTROL: authenticated keeps the SELECT/INSERT/UPDATE the application needs');
 
+
+-- ── K9, final piece: a parent reads their child's published feedback ────
+--
+-- Imad decided yes; Kostas confirmed it as a human decision, because it defines
+-- what a parent can see about their child. Migration 20260919150000.
+--
+-- The claim worth testing is not "a parent can see something" — a policy of
+-- USING (true) passes that. It is that a parent sees their OWN child's
+-- PUBLISHED feedback and nothing else. So the fixture adds a SECOND child under
+-- the SAME coach with their own published row: without a second child, "only
+-- their own" is not falsifiable.
+
+RESET ROLE;
+-- RESET ROLE does not clear request.jwt.claims, and the K1 trigger on
+-- squad_players.linked_player_id refuses a link made by anyone other than that
+-- player. Left set, the claims from the K7 section above are still in effect
+-- and the roster insert below is rejected as coach B linking someone else's
+-- child — which is the trigger working correctly.
+SELECT set_config('request.jwt.claims', NULL, true);
+
+INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
+  ('b0000000-0000-0000-0000-000000000002', 'child2@k9.test',  now()),
+  ('b0000000-0000-0000-0000-000000000009', 'parent@k9.test',  now());
+
+INSERT INTO public.profiles (user_id, role, full_name) VALUES
+  ('b0000000-0000-0000-0000-000000000002', 'player', 'Child Two'),
+  ('b0000000-0000-0000-0000-000000000009', 'parent', 'Parent One');
+
+-- Child Two is on the SAME coach's roster as Child One.
+INSERT INTO public.squad_players (id, coach_user_id, linked_player_id, player_name, status, organization_id) VALUES
+  ('c0000000-0000-0000-0000-000000000003',
+   'a0000000-0000-0000-0000-000000000001',
+   'b0000000-0000-0000-0000-000000000002',
+   'Child Two', 'active', 'f0000000-0000-0000-0000-000000000001');
+
+INSERT INTO public.coach_assessments (id, squad_player_id, coach_user_id) VALUES
+  ('d0000000-0000-0000-0000-000000000003',
+   'c0000000-0000-0000-0000-000000000003',
+   'a0000000-0000-0000-0000-000000000001');
+
+-- Child Two's feedback is PUBLISHED. The canary belongs to the other family.
+INSERT INTO public.coach_shared_feedback (assessment_id, coach_user_id, body, published_at) VALUES
+  ('d0000000-0000-0000-0000-000000000003',
+   'a0000000-0000-0000-0000-000000000001',
+   'CHILD-TWO-FEEDBACK-CANARY',
+   now());
+
+-- The parent is linked to Child One only.
+INSERT INTO public.player_parent_links (player_user_id, parent_user_id) VALUES
+  ('b0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000009');
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"b0000000-0000-0000-0000-000000000009","role":"authenticated"}', true);
+
+-- POSITIVE CONTROL first. Child One's row was published earlier in this suite,
+-- so if this returns 0 every denial below would pass for the wrong reason.
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback
+    WHERE assessment_id = 'd0000000-0000-0000-0000-000000000001') = 1,
+  'K9: a parent reads their own child''s PUBLISHED feedback');
+
+-- THE assertion. Same coach, same academy, different family.
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback
+    WHERE body = 'CHILD-TWO-FEEDBACK-CANARY') = 0,
+  'K9: a parent does NOT read another child''s feedback, even under the same coach');
+
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback) = 1,
+  'K9: exactly one row is visible to the parent — their child''s, and no other');
+
+-- The parent sees what the CHILD sees. A private note is neither.
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_assessment_notes) = 0,
+  'K9: a parent reads no coach private note — parent access does not reopen K9');
+
+-- ── A dependency this suite could not otherwise see ─────────────────────
+--
+-- Found by mutation, and it survived: replacing the parent policy's join
+-- condition with ON true — so that ANY parent link belonging to the caller
+-- satisfies it — does NOT make another child's feedback visible, and every
+-- assertion above still passes.
+--
+-- The reason is that RLS applies to coach_assessments INSIDE the parent
+-- policy's EXISTS. 20260612000001 already scopes a parent's view of that table
+-- to their own linked children, so the subquery cannot reach another child's
+-- assessment however the join is written. The explicit join condition in
+-- 20260919150000 is therefore defence in depth rather than the thing doing the
+-- work — and it is kept for exactly that reason.
+--
+-- The consequence worth pinning: if a future migration widens a parent's read
+-- of coach_assessments, the feedback policy widens with it, silently. So the
+-- upstream invariant is asserted HERE, where it will fail next to the policy
+-- that depends on it, rather than being discovered by a parent reading another
+-- family's feedback.
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_assessments) = 1,
+  'K9 DEPENDENCY: a parent reads only their own child''s assessment. '
+  'The parent feedback policy leans on this scoping — widening it widens that.');
+
+-- Unpublished means unpublished for the parent too. Retract Child One's row and
+-- the parent loses it, exactly as the child does.
+RESET ROLE;
+UPDATE public.coach_shared_feedback
+   SET published_at = NULL
+ WHERE assessment_id = 'd0000000-0000-0000-0000-000000000001';
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"b0000000-0000-0000-0000-000000000009","role":"authenticated"}', true);
+
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback) = 0,
+  'K9: retraction removes the row from the parent as well as the child');
+
+-- Put it back, so the last state of the fixture matches the decided behaviour.
+RESET ROLE;
+UPDATE public.coach_shared_feedback
+   SET published_at = now()
+ WHERE assessment_id = 'd0000000-0000-0000-0000-000000000001';
+
+-- An unrelated parent is linked to nobody here and must read nothing. Without
+-- this, a policy keyed on "is a parent at all" would pass everything above.
+INSERT INTO auth.users (id, email, email_confirmed_at)
+VALUES ('b0000000-0000-0000-0000-00000000000a', 'otherparent@k9.test', now());
+INSERT INTO public.profiles (user_id, role, full_name)
+VALUES ('b0000000-0000-0000-0000-00000000000a', 'parent', 'Unrelated Parent');
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"b0000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback) = 0,
+  'K9: a parent with no link to any child reads nothing');
+
+RESET ROLE;
+SELECT set_config('request.jwt.claims', NULL, true);
+
 ROLLBACK;

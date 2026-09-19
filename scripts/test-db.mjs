@@ -24,7 +24,19 @@ try {
   await db.exec(await read('bootstrap.sql'));
   const { rows } = await db.query('SELECT version() AS version');
   console.log(`Disposable database: ${rows[0].version}`);
-  const migrations = (await readdir(resolve(root, 'supabase/migrations')))
+  // This replays whatever is in the directory, so it must refuse input it
+  // cannot vouch for. A cloud-sync conflict copy ("…privileges 2.sql") sorts
+  // next to the real file, replays a stale version of the same migration, and
+  // the failure surfaces somewhere else entirely. Untracked, so git never
+  // sees it. Name shape is the cheapest thing that tells them apart.
+  const files = await readdir(resolve(root, 'supabase/migrations'));
+  const unexpected = files.filter(file => !/^\d{14}_[a-z0-9_-]+\.sql$/.test(file));
+  if (unexpected.length) {
+    throw new Error(`Refusing to replay: supabase/migrations contains ${unexpected.length} file(s) that are not migrations.`
+      + ` A name with a space is usually an iCloud/Dropbox conflict copy — delete it, do not rename it.\n  `
+      + unexpected.join('\n  '));
+  }
+  const migrations = files
     .filter(file => file.endsWith('.sql')
       && (!baseline || file < securityMigration)
       && (!pilotViewsBaseline || file < pilotViewsMigration)).sort();

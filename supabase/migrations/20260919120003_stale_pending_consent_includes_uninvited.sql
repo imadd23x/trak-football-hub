@@ -13,9 +13,14 @@
 -- invites appears once per invite.
 --
 -- What this does:
---   * Measures the 30 days from the most recent invite, or from account
---     creation when there has never been one. "Stale" keeps its meaning —
---     a child invited yesterday, or created yesterday, is not stale.
+--   * Invited but unanswered: 30 days from the most recent invite. A parent
+--     was asked; day three is noise, a month is a nudge.
+--   * Never invited: reported immediately. Onboarding requires a parent
+--     email when consent is needed and create_parent_invite() runs inside
+--     provision_my_profile(), so a missing invite row means provisioning
+--     partially failed. That is a defect signal, not a staleness signal, and
+--     a month of a child who cannot be assessed and cannot find out why is
+--     the wrong response to it.
 --   * Joins the latest invite only, so the report has one row per child.
 --   * Same columns in the same order, so CREATE OR REPLACE VIEW applies and
 --     every existing grant is preserved. invited_at and waiting_for are NULL
@@ -43,10 +48,10 @@ LEFT JOIN LATERAL (
   LIMIT 1
 ) latest ON true
 WHERE public.player_consent_required(pd.user_id)
-  AND COALESCE(latest.created_at, p.created_at) < now() - interval '30 days';
+  AND (latest.created_at IS NULL OR latest.created_at < now() - interval '30 days');
 
 COMMENT ON VIEW public.stale_pending_consent IS
-  'Under-age players whose parent has not authorised within 30 days of the latest invite, or of account creation if no parent was ever invited. Review and erase via delete_my_account or an admin path; do not leave indefinitely.';
+  'Under-age players whose parent has not authorised within 30 days of the latest invite, plus any never invited at all (a provisioning defect, reported at once). Review and erase via delete_my_account or an admin path; do not leave indefinitely.';
 
 ALTER VIEW public.stale_pending_consent SET (security_invoker = true);
 REVOKE ALL ON TABLE public.stale_pending_consent FROM PUBLIC, anon, authenticated, service_role;
@@ -65,8 +70,8 @@ BEGIN
      OR NOT has_table_privilege('service_role', 'public.stale_pending_consent', 'SELECT') THEN
     RAISE EXCEPTION 'stale_pending_consent grants changed';
   END IF;
-  IF pg_get_viewdef('public.stale_pending_consent'::regclass) NOT LIKE '%p.created_at%' THEN
-    RAISE EXCEPTION 'stale_pending_consent does not fall back to account creation';
+  IF pg_get_viewdef('public.stale_pending_consent'::regclass) NOT ILIKE '%created_at IS NULL%' THEN
+    RAISE EXCEPTION 'stale_pending_consent does not report the never-invited';
   END IF;
 END;
 $migration$;

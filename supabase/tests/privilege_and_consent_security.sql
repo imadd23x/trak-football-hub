@@ -1,3 +1,4 @@
+-- @trak-suite mode=--privilege-consent-review in-all=true
 -- Synthetic fixtures only. Run after real migrations in a disposable database.
 -- Covers 20260919120001 (table privileges), 20260919120002 (consent purpose)
 -- and 20260919120003 (stale-consent report). Every denial assertion has a
@@ -86,7 +87,7 @@ $test$;
 -- ── Fixtures ────────────────────────────────────────────────
 -- 1 coach · 2 minor with consent · 3 minor never invited, 40 days old
 -- 4 minor invited 5 days ago · 5 parent (linked to 2, 3, 4)
--- 6 minor with two old invites · 7 minor never invited, 5 days old
+-- 6 minor with two old invites · 7 minor never invited, 5 days old (still reported)
 -- 8 adult player. All identities are synthetic.
 INSERT INTO auth.users (id, email, email_confirmed_at)
 SELECT pg_temp.pc_id(n), 'pc-' || n || '@test.invalid', now() FROM generate_series(1, 8) n;
@@ -260,8 +261,9 @@ SELECT pg_temp.pc_reset();
 -- ════════════════════════════════════════════════════════════
 -- C. Stale-consent report sees the never-invited (20260919120003)
 -- ════════════════════════════════════════════════════════════
--- Minor 3 was consented in B0. Withdraw it so the never-invited, 40-day-old
--- case is exercised; minor 7 covers never-invited but not yet stale.
+-- Minor 3 was consented in B0. Withdraw it so the never-invited case is
+-- exercised at 40 days; minor 7 is the same case at 5 days — both report,
+-- because a missing invite is a provisioning defect, not a slow parent.
 SELECT pg_temp.pc_as('authenticated', 5);
 SELECT pg_temp.pc_assert(public.withdraw_parental_consent(pg_temp.pc_id(3)) = 1, 'C0: parent withdraws minor 3 consent (one row closed)');
 SELECT pg_temp.pc_reset();
@@ -269,8 +271,9 @@ CREATE TEMP TABLE pc_stale AS SELECT * FROM public.stale_pending_consent;
 SELECT pg_temp.pc_assert(
   (SELECT count(*) = 1 AND bool_and(invited_at IS NULL AND waiting_for IS NULL) FROM pc_stale WHERE player_user_id = pg_temp.pc_id(3)),
   'C1: never-invited minor created 40 days ago is reported, with null invite fields');
-SELECT pg_temp.pc_assert(NOT EXISTS (SELECT 1 FROM pc_stale WHERE player_user_id = pg_temp.pc_id(7)),
-  'C1: never-invited minor created 5 days ago is not yet stale');
+SELECT pg_temp.pc_assert(
+  (SELECT count(*) = 1 AND bool_and(invited_at IS NULL) FROM pc_stale WHERE player_user_id = pg_temp.pc_id(7)),
+  'C1: never-invited minor created 5 days ago is reported at once (provisioning defect, not staleness)');
 SELECT pg_temp.pc_assert(NOT EXISTS (SELECT 1 FROM pc_stale WHERE player_user_id = pg_temp.pc_id(4)),
   'C2: minor invited 5 days ago is not stale');
 SELECT pg_temp.pc_assert(

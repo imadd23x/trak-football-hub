@@ -3,10 +3,23 @@
 -- Creates 3 test accounts with full realistic data
 --
 -- Login credentials after running:
---   coach@trak.dev  / TrakDev123
---   player@trak.dev / TrakDev123
---   parent@trak.dev / TrakDev123
+--   coach@trak.dev, player@trak.dev, parent@trak.dev
+--
+-- The password is NOT in this file. Set it for the session before running:
+--   SET trak.dev_password = '<a fresh value, never committed>';
+--   \i supabase/seeds/dev_data.sql
+--
+-- It used to be a literal here, which meant running this seed AFTER rotating
+-- the compromised accounts would silently restore the compromised password.
 -- =============================================================
+
+DO $guard$
+BEGIN
+  IF COALESCE(current_setting('trak.dev_password', true), '') = '' THEN
+    RAISE EXCEPTION 'Set trak.dev_password before running this seed. It is deliberately not in the file.';
+  END IF;
+END;
+$guard$;
 
 DO $$
 DECLARE
@@ -17,7 +30,7 @@ DECLARE
 BEGIN
 
   -- ==========================================
-  -- 1. Auth users (pre-confirmed, password = TrakDev123)
+  -- 1. Auth users (pre-confirmed; password comes from trak.dev_password)
   -- ==========================================
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'coach@trak.dev') THEN
     INSERT INTO auth.users (
@@ -25,7 +38,7 @@ BEGIN
       raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at
     ) VALUES (
       coach_id, '00000000-0000-0000-0000-000000000000',
-      'coach@trak.dev', crypt('TrakDev123', gen_salt('bf')), now(),
+      'coach@trak.dev', crypt(current_setting('trak.dev_password'), gen_salt('bf')), now(),
       '{"provider":"email","providers":["email"]}', '{}',
       'authenticated', 'authenticated', now(), now()
     );
@@ -41,7 +54,7 @@ BEGIN
       raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at
     ) VALUES (
       player_id, '00000000-0000-0000-0000-000000000000',
-      'player@trak.dev', crypt('TrakDev123', gen_salt('bf')), now(),
+      'player@trak.dev', crypt(current_setting('trak.dev_password'), gen_salt('bf')), now(),
       '{"provider":"email","providers":["email"]}', '{}',
       'authenticated', 'authenticated', now(), now()
     );
@@ -57,7 +70,7 @@ BEGIN
       raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at
     ) VALUES (
       parent_id, '00000000-0000-0000-0000-000000000000',
-      'parent@trak.dev', crypt('TrakDev123', gen_salt('bf')), now(),
+      'parent@trak.dev', crypt(current_setting('trak.dev_password'), gen_salt('bf')), now(),
       '{"provider":"email","providers":["email"]}', '{}',
       'authenticated', 'authenticated', now(), now()
     );

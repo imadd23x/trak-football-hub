@@ -8,7 +8,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ParentChildrenProvider } from "@/contexts/ParentChildrenContext";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { ErrorBoundary } from "@/components/trak/ErrorBoundary";
-import { DevSwitcher } from "@/components/trak/DevSwitcher";
 
 // Landing eagerly loaded so the first paint is instant
 import LandingPage from "./pages/LandingPage";
@@ -21,7 +20,17 @@ const ParentInfoPage = lazy(() => import("./pages/ParentInfoPage"));
 const ParentOnboarding = lazy(() => import("./pages/ParentOnboarding"));
 const AuthConfirm = lazy(() => import("./pages/AuthConfirm"));
 const Settings = lazy(() => import("./pages/Settings"));
-const DevSetupPage = lazy(() => import("./pages/DevSetupPage"));
+// The import itself is conditional, not just the route. A bare
+// lazy(() => import(...)) is a static reference Rollup always emits, so the
+// chunk shipped even though the route never registered.
+const DevSetupPage = import.meta.env.DEV
+  ? lazy(() => import("./pages/DevSetupPage"))
+  : null;
+// Was a static import, so it sat in the ENTRY bundle for every visitor with
+// only its render guarded. Same treatment.
+const DevSwitcher = import.meta.env.DEV
+  ? lazy(() => import("@/components/trak/DevSwitcher").then(m => ({ default: m.DevSwitcher })))
+  : null;
 
 const PlayerHome = lazy(() => import("./pages/player/PlayerHome"));
 const PlayerMatches = lazy(() => import("./pages/player/PlayerMatches"));
@@ -82,7 +91,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ParentChildrenProvider>
-          {import.meta.env.DEV && <DevSwitcher />}
+          {DevSwitcher && <DevSwitcher />}
           <Suspense fallback={<RouteFallback />}>
           <Routes>
             {/* Public routes */}
@@ -93,7 +102,7 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/parent-info" element={<ParentInfoPage />} />
             <Route path="/parent-invite" element={<ParentOnboarding />} />
-            {import.meta.env.DEV && <Route path="/dev-setup" element={<DevSetupPage />} />}
+            {DevSetupPage && <Route path="/dev-setup" element={<DevSetupPage />} />}
 
             {/* Player routes */}
             <Route path="/player/home" element={<RouteGuard allowedRole="player"><PlayerHome /></RouteGuard>} />

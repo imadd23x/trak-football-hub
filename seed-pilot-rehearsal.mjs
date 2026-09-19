@@ -44,7 +44,16 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 }
 
 const DOMAIN = 'rehearsal.trak.dev'
-const PW = 'RehearsalTrak123!'
+// Never commit this. The repository is public, and these accounts are created
+// in whatever project VITE_SUPABASE_URL points at — which the runbook points at
+// the pilot project. A literal here is a working credential for a live account
+// holding children's data, readable by anyone.
+const PW = process.env.TRAK_REHEARSAL_PASSWORD
+if (!PW || PW.length < 16) {
+  console.error('Set TRAK_REHEARSAL_PASSWORD (16+ characters) in the environment before seeding.')
+  console.error('Do not pass it as a command-line argument — it would land in shell history.')
+  process.exit(1)
+}
 const ORG_NAME = 'Rehearsal FC'
 const JOIN_CODE = 'REHRS'
 

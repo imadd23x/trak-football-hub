@@ -159,7 +159,7 @@ is idempotent — repeating it returns the existing row rather than creating a d
 - **Email confirmation is ON.** New accounts must click a link before they can sign in
   (*"Email not confirmed"*), so a fresh coach → player → parent chain cannot be completed in a
   test run without either mailbox access or temporarily disabling confirmation.
-- **`DevSetupPage` will fail on a fresh Supabase project** — it seeds with `TrakDev123`, which has
+- **`DevSetupPage` will fail on a fresh Supabase project** — it seeds with the password from `VITE_DEV_PASSWORD`, which has
   no symbol. Existing dev accounts predate the policy and still work. Not changed: altering it
   would break the logins currently in use.
 

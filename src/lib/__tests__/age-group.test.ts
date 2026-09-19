@@ -9,11 +9,23 @@ import { ageGroupCeiling, ageGroupMatches, lowestEligibleAgeGroup } from '@/lib/
 // The age itself comes from ageFromDateOfBirth in consent.ts — there is no
 // second implementation here, and its timezone behaviour is #38's to prove.
 
-/** A YYYY-MM-DD that is exactly `years` old today, offset by `days`. */
+/**
+ * A YYYY-MM-DD that is exactly `years` old today, offset by `days`.
+ *
+ * Built from the LOCAL calendar day, because that is the clock
+ * ageFromDateOfBirth reads on main today — `new Date(dob)` parsed as UTC
+ * midnight, then compared with local getters. This helper originally used UTC
+ * and the boundary assertion went red the moment local crossed midnight while
+ * UTC was still on the previous day, which is precisely the defect #38 fixes.
+ *
+ * When #38 lands the function becomes UTC on both sides; switch this helper to
+ * UTC with it. Until then, matching the function under test keeps the boundary
+ * assertion meaningful rather than papering over the mismatch by widening it.
+ */
 const dob = (years: number, days = 0) => {
   const n = new Date()
-  const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + days))
-  return `${d.getUTCFullYear() - years}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+  const d = new Date(n.getFullYear(), n.getMonth(), n.getDate() + days)
+  return `${d.getFullYear() - years}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 describe('ageGroupCeiling', () => {

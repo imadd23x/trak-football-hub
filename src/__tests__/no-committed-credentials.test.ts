@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { resolve, join, relative } from 'node:path'
+import * as burned from '../../scripts/burned-credentials.mjs'
 
 // The dev-account password was a literal in LandingPage.tsx, DevSetupPage.tsx
 // and DevSwitcher.tsx. The /dev-setup ROUTE is registered behind
@@ -29,17 +30,10 @@ const SKIP_DIRS = new Set([
 ])
 const SKIP_EXT = /\.(png|jpe?g|gif|webp|svg|ico|woff2?|ttf|eot|pdf|pptx?|zip|mp4|lock)$/i
 
-// Values known to be public. A rotated value must NEVER be added here — naming
-// a live credential would recommit the thing this test exists to prevent.
-const BURNED = ['TrakDev123', 'RehearsalTrak123']
-
-// The only files permitted to contain a burned value, because naming them is
-// their purpose: this test, and the incident record. Asserted as an exact set,
-// so a third file cannot quietly join them.
-const ALLOWED = [
-  'docs/reviews/credential-boundary-2026-09-19.md',
-  'src/__tests__/no-committed-credentials.test.ts',
-]
+// Both guards import the list from one module rather than one parsing the
+// other — Kostas's build-output check was reading this file with a regex,
+// which is not what either of us wants permanent.
+const { BURNED, ALLOWED_TO_NAME_THEM: ALLOWED } = burned
 
 function allFiles(): string[] {
   const out: string[] = []
@@ -87,11 +81,12 @@ describe('no committed credentials', () => {
     })
   }
 
-  it('the allowlist is exactly the two files that document the incident', () => {
+  it('the allowlist is exactly the files that document the incident', () => {
     // If one of these stops naming the value, shrink the list rather than
     // leaving a permitted slot open for something else to fill.
     expect([...ALLOWED].sort()).toEqual([
       'docs/reviews/credential-boundary-2026-09-19.md',
+      'scripts/burned-credentials.mjs',
       'src/__tests__/no-committed-credentials.test.ts',
     ])
   })

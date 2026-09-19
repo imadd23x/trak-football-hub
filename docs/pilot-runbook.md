@@ -91,7 +91,7 @@ Negative `avg_bias` means the engine bands **lower** than the coach. A consisten
 ## Rehearsal data
 
 ```bash
-node seed-pilot-rehearsal.mjs
+TRAK_REHEARSAL_PASSWORD='<set a fresh one, do not commit it>' node seed-pilot-rehearsal.mjs
 ```
 
 Two squads, ~30 players, six weeks of fixtures, matches, assessments and awards under

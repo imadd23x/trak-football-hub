@@ -17,10 +17,19 @@
 --      MAINTAIN is included — 20260917205027 listed six privileges by name
 --      and left MAINTAIN behind on both tables it hardened.
 --   2. Re-grants `authenticated` exactly the operations a row-level policy
---      backs. A grant with no policy can never succeed and is pure surface;
---      a policy with no grant can never run. The post-condition below fails
---      the migration if the two disagree, so a wrong line here aborts rather
---      than shipping a broken journey.
+--      backs, *derived from pg_policies at apply time* rather than from a
+--      list. A grant with no policy can never succeed and is pure surface;
+--      a policy with no grant can never run.
+--
+--      Deriving matters, not just tidiness. A list would be a snapshot of
+--      `main` on the day this was written, and migrations replay by filename:
+--      a table created at an earlier timestamp whose PR merges later exists
+--      by the time step 1 revokes, and a list that predates it would strip
+--      its grants and never restore them. Verified 2026-09-19 by replaying
+--      this migration with PR #44's `coach_shared_feedback` (20260918135500)
+--      and PR #40's `player_feedback` (20260918120000) present: the listed
+--      version aborted on all four operations; this version restores them.
+--      Found by Kostas in review.
 --   3. Revokes the *default* privileges, so the next `CREATE TABLE` is not
 --      born open. Without this, step 1 is a snapshot that the next migration
 --      silently undoes. New tables must now grant explicitly — which
@@ -60,44 +69,47 @@ $migration$;
 
 
 -- ── 2. Re-grant exactly what a policy backs ──────────────────
--- Derived from the live policy set on 2026-09-19 and re-verified by the
--- post-condition in section 4 against whatever policies exist at apply time.
+-- A FOR ALL policy expands to all four operations. A table with no policy
+-- for an operation gets no grant for it, and a table with no policies at all
+-- gets nothing — which is correct for parent_invites and pilot_config, whose
+-- access runs entirely through SECURITY DEFINER RPCs.
+--
+-- On main today this produces: SELECT on 18 tables, INSERT on 16, UPDATE on
+-- 15, DELETE on 11. Notable cases this derives correctly rather than by
+-- special-casing: coach_assessment_notes keeps DELETE although its policy is
+-- USING (false), so a delete stays "0 rows" instead of "permission denied";
+-- meeting_requests gets all four from one FOR ALL policy; telemetry_events
+-- gets INSERT only, so nothing can read it back.
+DO $migration$
+DECLARE
+  t    regclass;
+  cmds text;
+BEGIN
+  FOR t IN
+    SELECT c.oid::regclass
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+  LOOP
+    SELECT string_agg(DISTINCT operation, ', ')
+    INTO cmds
+    FROM (
+      SELECT unnest(CASE WHEN p.cmd IN ('ALL', '*')
+                         THEN ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']
+                         ELSE ARRAY[p.cmd] END) AS operation
+      FROM pg_policies p
+      WHERE p.schemaname = 'public'
+        AND p.tablename = (SELECT relname FROM pg_class WHERE oid = t)
+        AND p.roles && ARRAY['authenticated', 'public']::name[]
+    ) expanded
+    WHERE operation IN ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
 
--- SELECT, INSERT, UPDATE, DELETE policies all exist.
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
-  public.admin_notes,
-  public.coach_assessment_notes,   -- DELETE policy is USING (false); grant kept so the outcome stays "0 rows", not "permission denied"
-  public.coach_assessments,
-  public.coach_calendar_events,
-  public.coach_sessions,
-  public.matches,
-  public.meeting_requests,         -- FOR ALL policy
-  public.recognition_awards,
-  public.session_attendance,
-  public.squad_players,
-  public.staff_compliance
-TO authenticated;
-
--- No DELETE policy: account removal runs through delete_my_account().
-GRANT SELECT, INSERT, UPDATE ON TABLE
-  public.coach_details,
-  public.organizations,
-  public.player_details,
-  public.profiles
-TO authenticated;
-
--- Read-only to the app; writes go through SECURITY DEFINER RPCs.
-GRANT SELECT ON TABLE
-  public.ai_usage_daily,
-  public.parental_consents,
-  public.player_parent_links
-TO authenticated;
-
--- Append-only; nothing reads it back through the app.
-GRANT INSERT ON TABLE public.telemetry_events TO authenticated;
-
--- parent_invites and pilot_config: no grant. Both have RLS enabled with zero
--- policies, so every direct access was already denied; access is via RPC.
+    IF cmds IS NOT NULL THEN
+      EXECUTE format('GRANT %s ON TABLE %s TO authenticated', cmds, t);
+    END IF;
+  END LOOP;
+END;
+$migration$;
 
 
 -- ── 3. Close the source: default privileges for new tables ────

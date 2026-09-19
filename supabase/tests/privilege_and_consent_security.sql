@@ -173,6 +173,41 @@ BEGIN
 END;
 $test$;
 
+-- A1b. The invariant, asserted for every table that exists rather than for a
+-- list written today: authenticated's DML grants match what its policies back,
+-- in both directions. A table added by a migration with an earlier timestamp
+-- whose PR merges later is exactly the case a list misses.
+DO $test$
+DECLARE t record; expected text[]; actual text[];
+BEGIN
+  FOR t IN
+    SELECT c.oid::regclass AS rel, c.relname
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+    ORDER BY c.relname
+  LOOP
+    SELECT coalesce(array_agg(DISTINCT operation ORDER BY operation), '{}')
+    INTO expected
+    FROM (
+      SELECT unnest(CASE WHEN p.cmd IN ('ALL', '*')
+                         THEN ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']
+                         ELSE ARRAY[p.cmd] END) AS operation
+      FROM pg_policies p
+      WHERE p.schemaname = 'public' AND p.tablename = t.relname
+        AND p.roles && ARRAY['authenticated', 'public']::name[]
+    ) e
+    WHERE operation IN ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
+
+    SELECT coalesce(array_agg(op ORDER BY op), '{}') INTO actual
+    FROM unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']) op
+    WHERE has_table_privilege('authenticated', t.rel, op);
+
+    PERFORM pg_temp.pc_assert(expected = actual,
+      format('A1b: %s grants match its policies (policies %s, grants %s)', t.relname, expected, actual));
+  END LOOP;
+END;
+$test$;
+
 -- A2. Journeys that must survive: the grants that remain are the ones policies use.
 SELECT pg_temp.pc_as('authenticated', 1);
 SELECT pg_temp.pc_assert((SELECT full_name = 'Fixture Coach' FROM public.profiles WHERE user_id = pg_temp.pc_id(1)), 'A2 coach: reads own profile');

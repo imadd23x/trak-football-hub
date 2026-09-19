@@ -121,6 +121,8 @@ CI fails for enforced tests/build errors. Pending use-case failures currently do
 
 Create a new migration using the Supabase CLI; never edit existing migration files. Replay migrations in order on a disposable database and test with actual authenticated roles. Do not assume individual historical migrations are safe to rerun. The main CI workflow applies pending migrations and deploys edge functions before the frontend.
 
+Since `20260919120001`, new tables in `public` are born with no privileges for `anon` or `authenticated`. A migration that creates a table must `GRANT` exactly the operations its policies back (see `20260918000002_ai_call_quota.sql` for the pattern); `anon` needs nothing.
+
 Key migrations to be aware of:
 - `20260425000001_security_hardening.sql` — RLS policies + performance indexes
 - `20260526000002_rls_explicit_operations.sql` — replaces FOR ALL with explicit ops

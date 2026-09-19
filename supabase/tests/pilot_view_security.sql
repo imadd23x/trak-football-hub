@@ -37,6 +37,20 @@ BEGIN
   INSERT INTO pg_temp.pilot_view_results VALUES (description, denied, failure);
 END;
 $test$;
+-- Unreadable means either RLS returns nothing or the grant is absent.
+-- 20260919120001 removed SELECT on tables no policy reads, so the second
+-- form is now the expected one for base telemetry.
+CREATE FUNCTION pg_temp.pilot_unreadable(statement text) RETURNS boolean
+LANGUAGE plpgsql AS $test$
+DECLARE n bigint;
+BEGIN
+  BEGIN
+    EXECUTE statement INTO n;
+    RETURN n = 0;
+  EXCEPTION WHEN insufficient_privilege THEN RETURN true;
+  END;
+END;
+$test$;
 CREATE TEMP TABLE pilot_views (name text PRIMARY KEY, expected jsonb);
 INSERT INTO pilot_views (name) VALUES
   ('pilot_activation'), ('pilot_match_coverage'), ('pilot_assessment_rate'),
@@ -109,7 +123,7 @@ BEGIN
     EXECUTE format('SET LOCAL ROLE %I', actor.database_role);
     PERFORM set_config('request.jwt.claims', jsonb_build_object('role', actor.database_role, 'sub', pg_temp.pilot_id(actor.user_number))::text, true);
     PERFORM pg_temp.pilot_assert(current_user = actor.database_role AND auth.uid() IS NOT DISTINCT FROM pg_temp.pilot_id(actor.user_number), actor.label || ': actual caller identity');
-    PERFORM pg_temp.pilot_assert((SELECT count(*) = 0 FROM public.telemetry_events WHERE user_id = pg_temp.pilot_id(1)), actor.label || ': base telemetry remains unreadable');
+    PERFORM pg_temp.pilot_assert(pg_temp.pilot_unreadable(format('SELECT count(*) FROM public.telemetry_events WHERE user_id = %L', pg_temp.pilot_id(1))), actor.label || ': base telemetry remains unreadable');
     FOR report IN SELECT name FROM pg_temp.pilot_views LOOP
       PERFORM pg_temp.pilot_expect_denied(format('SELECT * FROM public.%I', report.name), actor.label || ': SELECT ' || report.name);
       PERFORM pg_temp.pilot_assert(NOT has_table_privilege('public.' || report.name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'), actor.label || ': no table privilege ' || report.name);

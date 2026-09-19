@@ -8,6 +8,11 @@
 // the time: "Real credentials live in your local Supabase project — never
 // committed." They were committed, and they were served.
 //
+// That chunk was the only one served. LandingPage.tsx and DevSwitcher.tsx held
+// the same literal in source but their uses are dead in a production build, so
+// Rollup dropped them. Removed anyway: the repository is public, so source
+// exposure is exposure.
+//
 // Reading it from the environment means the literal cannot exist in any build,
 // whether or not the chunk is emitted and whether or not the route is reachable.
 export const DEV_PASSWORD: string | undefined = import.meta.env.VITE_DEV_PASSWORD

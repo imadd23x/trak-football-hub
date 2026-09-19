@@ -7,8 +7,14 @@ import { resolve, join } from 'node:path'
 // `import.meta.env.DEV`, which is why this looked safe — but that guard decides
 // which routes register, not which chunks Rollup emits. The built bundle shipped
 // dist/assets/DevSetupPage-*.js containing the password twelve times, referenced
-// from the entry bundle, on a public site. LandingPage.tsx is in the entry
-// bundle itself, so its copy shipped to every visitor unconditionally.
+// from the entry bundle, on a public site.
+//
+// CORRECTION, from Kostas building the branch: LandingPage.tsx's copy did NOT
+// ship. Its only use sits behind an IS_DEV constant Vite folds to false, so
+// Rollup eliminated the branch and the literal with it. I claimed it shipped to
+// every visitor after reading line 18 and not the build output I already had.
+// Source exposure on a public repo is still real, which is why it is removed —
+// but only the DevSetupPage chunk was ever served.
 //
 // A grep is the right shape here, unlike the band-colour case where the palette
 // shares its hexes with the brand accent. A credential has no second meaning.

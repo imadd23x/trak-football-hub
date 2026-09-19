@@ -58,6 +58,33 @@ That is the causal chain, and it explains the leak better than any process failu
 
 `role: anon`. The anon key is designed to be public and shipped to browsers; row-level security is what protects the data behind it. It is not a leak and removing it would break the app for no gain. Saying so explicitly because the instinct after a credential incident is to strip every long string in sight.
 
+## 2a. Correction: only one chunk was ever served
+
+The incident report said `LandingPage.tsx` held the literal in the entry bundle
+and so shipped to every visitor. **That is wrong**, and Kostas caught it by
+building the branch. Verified on a fresh build of `upstream/main`:
+
+```
+$ grep -rl TrakDev123 dist/
+dist/assets/DevSetupPage-idPyqu34.js      ← the only file
+$ grep -c TrakDev123 dist/assets/index-*.js
+0
+```
+
+`LandingPage`'s only use of the constant sits behind an `IS_DEV` value Vite
+folds to `false`, so Rollup eliminated the branch and took the literal with it.
+`DevSwitcher` is the same. **Only the `DevSetupPage` chunk was served** — that
+one because its guard is on the *route* while the `lazy()` import is static, so
+the chunk is emitted and referenced regardless.
+
+I asserted the entry-bundle claim from reading line 18, while the build output
+that disproved it was already on screen. The count in that chunk is 12, which
+does stand — minification did not collapse the repeated literal.
+
+None of this changes what must be done. Source exposure on a public repository
+is exposure, so every literal is removed; and rotation was always the only thing
+that closes it.
+
 ## 3. Where the burned values still live
 
 Removing them from `HEAD` — which #59 does — changes none of this.
@@ -73,6 +100,20 @@ Removing them from `HEAD` — which #59 does — changes none of this.
 The Vercel row is the one usually forgotten. Shipping the fix creates a new deployment; it does not retract the old ones, and their URLs are linkable.
 
 History rewriting is not a remedy here. `git filter-repo` on the canonical repo does not touch two public forks or anyone's clone, and forks in a GitHub network share object storage, so previously-pushed commits often remain reachable. **Rotation is the only action that actually closes this**, which is why #59 says so in its own description rather than presenting itself as the fix.
+
+### Where they entered, since provenance was disputed
+
+```
+778fd1d  2026-04-21  "Make app fully functional — all 7 phases complete"
+                     adds DevSwitcher.tsx, DevSetupPage.tsx, LandingPage.tsx
+ecf1909  2026-09-01  "docs(pilot): measurement runbook … rehearsal tooling"
+```
+
+Both are ordinary commits with parents, not the initial import — the repository's
+actual roots are `a933ef6` and the Lovable template `1bc8809`, and neither
+carries a credential. **A review gate could have caught these**; nobody was
+looking at literals. That distinction decides whether the fix is process or
+tooling, and the answer is tooling: sections 4.4 and 4.7.
 
 ## 4. What to change, in order of value
 
@@ -97,7 +138,14 @@ Console work; nobody in a PR can do it. `coach@trak.dev`, `player@trak.dev`, `pa
 **5. Check GitHub secret scanning and push protection are enabled.**
 I could not read the setting without admin scope. Worth knowing that it would **not** have caught this: `TrakDev123` matches no provider token pattern. Custom patterns for `trak.dev` account passwords would.
 
-**6. Keep the `pull_request` / no-`pull_request_target` rule written down.**
+**6. Assert on `dist/` after the build — Kostas's Layer 3, and the best idea here.**
+Only a check on build output can see a chunk emitted despite its route being
+dev-gated, which is exactly this incident. The source guard in this PR would
+**not** have caught it: `DevSetupPage.tsx` looked guarded. `npm run build && !
+grep -rqE '<denylist>' dist/` maps to the actual harm — a string reachable over
+HTTP — rather than to a proxy for it.
+
+**7. Keep the `pull_request` / no-`pull_request_target` rule written down.**
 It is currently correct by everyone's good judgment rather than by any stated rule. It is the kind of thing a future workflow change breaks silently while looking like a convenience.
 
 ---

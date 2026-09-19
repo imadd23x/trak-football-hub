@@ -181,6 +181,39 @@ $test$;
 SELECT pg_temp.actor(pg_temp.fid(20));
 
 -- [1] A child cannot read drafts at all, by any route.
+--
+-- This assertion used to pass vacuously. By the time the child looked, every
+-- draft had been consumed by publish_player_feedback(), so it counted zero rows
+-- because there were none — not because the policy stopped it. Proven by
+-- mutation: replacing the drafts SELECT policy with USING (true), so that any
+-- authenticated user could read any coach's unapproved AI draft about any
+-- child, left this suite entirely green. The most important claim T2 makes was
+-- the one assertion that was not testing anything.
+--
+-- So: plant a draft as service_role, prove it is there, and only then look as
+-- the child. The positive control is what makes the negative one mean anything.
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+INSERT INTO public.ai_feedback_drafts (squad_player_id, generated_text, created_by)
+VALUES (pg_temp.fid(200), 'unapproved draft the child must never see', pg_temp.fid(10));
+DO $test$
+DECLARE v_drafts integer;
+BEGIN
+  SELECT count(*) INTO v_drafts FROM public.ai_feedback_drafts;
+  PERFORM pg_temp.fassert(v_drafts > 0,
+    '1-control a draft exists for the child to fail to read', v_drafts || ' present');
+END;
+$test$;
+
+-- SET LOCAL ROLE authenticated, not RESET ROLE. RESET returns to the OWNER,
+-- which bypasses RLS entirely — the first version of this control did that and
+-- made the child appear to read the draft, which I nearly reported as a
+-- product defect. pg_temp.actor() only sets the JWT claim; the database role
+-- is a separate thing and it is the one RLS actually consults.
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.actor(pg_temp.fid(20));
 DO $test$
 DECLARE v_drafts integer;
 BEGIN
@@ -261,15 +294,18 @@ RESET ROLE;
 -- ── Report ─────────────────────────────────────────────────────────────────
 
 DO $test$
-DECLARE failed integer; total integer; r record;
+DECLARE failed integer; total integer; failures text;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.feedback_results;
-  FOR r IN SELECT * FROM pg_temp.feedback_results WHERE NOT passed LOOP
-    RAISE WARNING 'FAILED: % — %', r.description, coalesce(r.detail, '');
-  END LOOP;
+  -- RAISE WARNING does not reach the runner, so a failing suite reported a
+  -- count and never said which assertion. Carry the names in the exception's
+  -- DETAIL, the way the other suites do.
+  SELECT string_agg(r.description || coalesce(' [' || r.detail || ']', ''), E'\n' ORDER BY r.description)
+    INTO failures FROM pg_temp.feedback_results r WHERE NOT r.passed;
   RAISE NOTICE 'Feedback publication assertions: % of % passed', total - failed, total;
   IF failed > 0 THEN
-    RAISE EXCEPTION 'Feedback publication: % of % desired assertions failed', failed, total;
+    RAISE EXCEPTION 'Feedback publication: % of % desired assertions failed', failed, total
+      USING DETAIL = failures;
   END IF;
 END;
 $test$;

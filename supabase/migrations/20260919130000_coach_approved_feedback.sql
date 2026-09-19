@@ -56,16 +56,37 @@ GRANT SELECT, INSERT, DELETE ON TABLE public.ai_feedback_drafts TO authenticated
 -- Coaches only, and only for a roster row that is theirs in their academy.
 -- squad_player_is_mine() already excludes departed coaches and enforces the
 -- academy, so this inherits future tightening rather than restating the rule.
+-- One policy per operation, matching the grant above exactly. This was FOR ALL,
+-- which claimed UPDATE while the grant deliberately withholds it — nothing
+-- updates a draft, because the coach's edited text travels to
+-- publish_player_feedback() as an argument rather than being written back.
+--
+-- #62's privilege post-condition treats "a policy governs an operation the
+-- grant does not allow" as a fault, and it is right to. The two should say the
+-- same thing; a policy for an operation nothing can perform is a claim about
+-- access that nothing honours.
 DROP POLICY IF EXISTS "Coaches manage drafts for their own roster" ON public.ai_feedback_drafts;
-CREATE POLICY "Coaches manage drafts for their own roster"
+DROP POLICY IF EXISTS "Coaches read drafts for their own roster" ON public.ai_feedback_drafts;
+CREATE POLICY "Coaches read drafts for their own roster"
   ON public.ai_feedback_drafts
-  FOR ALL TO authenticated
-  USING (public.squad_player_is_mine(squad_player_id))
+  FOR SELECT TO authenticated
+  USING (public.squad_player_is_mine(squad_player_id));
+
+DROP POLICY IF EXISTS "Coaches insert drafts for their own roster" ON public.ai_feedback_drafts;
+CREATE POLICY "Coaches insert drafts for their own roster"
+  ON public.ai_feedback_drafts
+  FOR INSERT TO authenticated
   WITH CHECK (
     public.squad_player_is_mine(squad_player_id)
     -- [F-2] A draft cannot be attributed to another coach.
     AND created_by = auth.uid()
   );
+
+DROP POLICY IF EXISTS "Coaches delete drafts for their own roster" ON public.ai_feedback_drafts;
+CREATE POLICY "Coaches delete drafts for their own roster"
+  ON public.ai_feedback_drafts
+  FOR DELETE TO authenticated
+  USING (public.squad_player_is_mine(squad_player_id));
 
 -- There is deliberately NO player or parent policy on this table, and none
 -- should be added. If a child needs to see something, it is published.

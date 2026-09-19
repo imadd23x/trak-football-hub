@@ -298,6 +298,56 @@ SELECT pg_temp.assert_true(
   'K9: authenticated must not hold DELETE on coach_shared_feedback — the no-deletion policy '
   'should not be the only thing standing between a child and a removed record');
 
+-- There must ALSO be no permissive DELETE policy, and this is not belt-and-braces
+-- pedantry — it is the whole point after 20260919120001.
+--
+-- #62 derives grants from pg_policies at apply time. Its input is "does a policy
+-- exist for this operation", not "does that policy permit anything", so the
+-- FOR DELETE ... USING (false) policy this table used to carry PRODUCED a DELETE
+-- grant — the exact privilege it was written to forbid. The assertion above
+-- started failing on merge for that reason, which is how it was found.
+-- 20260919170000 drops the policy; RLS then denies DELETE by default and no
+-- grant is derived, so there are two barriers instead of one.
+--
+-- Asserted as the absence of a policy rather than only as the absence of a
+-- grant, because re-introducing the deny policy would silently restore the
+-- grant on the next replay and the privilege assertion alone would read as a
+-- mystery rather than as a cause.
+SELECT pg_temp.assert_true(
+  NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'coach_shared_feedback'
+      AND cmd = 'DELETE'
+  ),
+  'K9: no DELETE policy exists on coach_shared_feedback — under derived grants a deny '
+  'policy manufactures the DELETE grant it was written to forbid');
+
+-- And the behaviour, not only the catalogue. A privilege check cannot tell you
+-- the child's row actually survives an attempt.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+
+DO $test$
+DECLARE before_count bigint; after_count bigint;
+BEGIN
+  SELECT count(*) INTO before_count FROM public.coach_shared_feedback;
+  BEGIN
+    DELETE FROM public.coach_shared_feedback;
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;  -- the expected refusal: no grant
+  END;
+  SELECT count(*) INTO after_count FROM public.coach_shared_feedback;
+  IF after_count IS DISTINCT FROM before_count OR before_count = 0 THEN
+    RAISE EXCEPTION 'Assertion failed: K9: the coach could delete published feedback (% -> %), '
+      'or the fixture was empty so the attempt proved nothing', before_count, after_count;
+  END IF;
+END;
+$test$;
+
+RESET ROLE;
+SELECT set_config('request.jwt.claims', NULL, true);
+
 -- The grants the table actually needs must survive the revoke.
 SELECT pg_temp.assert_true(
   has_table_privilege('authenticated', 'public.coach_shared_feedback', 'SELECT')

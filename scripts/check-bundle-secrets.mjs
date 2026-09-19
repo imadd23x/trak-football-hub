@@ -36,25 +36,27 @@
 //      that would have caught the incident. It needs no denylist, so it also
 //      catches the next dev page, whose password nobody has chosen yet.
 //
-//   C. No burned credential value ships. This is the VALUE check. It reads the
-//      burned list from #59 rather than restating it — see below.
+//   C. No burned credential value ships. This is the VALUE check. It imports
+//      the burned list rather than restating it — see below.
 //
 // ── Why this file names no credential
 //
-// #59 asserts that exactly two files may contain a burned value — its own test
-// and the incident record — as an exact set, so that a third cannot quietly
-// join them. That assertion is correct and this file must not break it. So the
-// values are read from #59's list at runtime and never written here.
+// #59 asserts that only a named set of files may contain a burned value, so
+// that a third cannot quietly join them. That assertion is correct and this
+// file must not break it, so the values are imported at runtime and never
+// written here. #59 merged with the list in scripts/burned-credentials.mjs,
+// which is the extraction asked for on that PR: one file names them, every
+// guard imports it.
 //
-// Until #59 merges that list does not exist, and check C reports itself as
-// unavailable rather than silently passing. Check B does not depend on it and
-// carries the load meanwhile — which is the right way round, since B is the
-// check that maps to this incident.
+// If that module is ever absent, check C reports that it did not run rather
+// than passing silently — so "no value check ran" can never be read as "no
+// values found". Check B does not depend on it and carries the load meanwhile,
+// which is the right way round: B is the check that maps to this incident.
 // ============================================================
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const DIST = resolve(ROOT, 'dist');
@@ -68,22 +70,31 @@ const fail = m => failures.push(m);
 // as dist/assets/<Name>-<hash>.js.
 const DEV_ONLY_MODULES = ['DevSetupPage', 'DevSwitcher', 'dev-credentials'];
 
-// Chunks known to ship today, each with the reason and what would remove it.
+// Chunks known to ship, each with the reason and what would remove it.
 //
 // An entry here is an admission, not an exemption: it is reported on every run.
 // And a STALE entry is itself a failure — if the chunk stops shipping and the
 // entry stays, the next real regression would be silently permitted by it. That
 // is the whole reason allowlists rot, so this one cannot.
-const KNOWN_SHIPPING = [
-  {
-    chunk: 'DevSetupPage',
-    why: 'App.tsx:24 lazy-imports it, so Rollup emits the chunk even though '
-       + 'App.tsx:96 gates the ROUTE on import.meta.env.DEV.',
-    removedBy: 'Not #59 — #59 removes the credential from the chunk and does '
-             + 'not touch App.tsx, so the chunk still ships after it merges. '
-             + 'Removing it needs the import itself made conditional.',
-  },
-];
+//
+// ── Empty, and it earned being empty.
+//
+// This list held one entry: DevSetupPage, which shipped because App.tsx
+// lazy-imported it unconditionally while gating only the ROUTE on
+// import.meta.env.DEV — so Rollup emitted the chunk regardless. That was the
+// mechanism behind the credential incident, and #59 alone did not close it:
+// it removed the literal from the chunk without touching App.tsx.
+//
+// App.tsx now makes the import itself conditional, so the chunk is eliminated
+// rather than emptied, and this guard FAILED on the stale entry the moment
+// main was merged in:
+//
+//   FAIL  KNOWN_SHIPPING names "DevSetupPage" but it is no longer in dist/.
+//
+// That is the stale-exemption rule working on a real event rather than a
+// simulated one, and it is why the entry is deleted here instead of quietly
+// surviving as a permanent hole that the next matching regression slips into.
+const KNOWN_SHIPPING = [];
 
 // ── A. Coverage ────────────────────────────────────────────────────
 if (!existsSync(DIST)) {
@@ -152,11 +163,15 @@ for (const e of entry) {
 
 // ── C. No burned credential value ships ────────────────────────────
 // Read from #59's list; never restated here. See the header.
-const BURNED_SOURCE = resolve(ROOT, 'src/__tests__/no-committed-credentials.test.ts');
+// #59 merged with the list lifted into a module of its own, which is what I
+// asked for on that PR: one file names the burned values, both guards import
+// it, and this one stays clean of them. That replaces the regex that used to
+// scrape them out of the test file — a parse that would have gone quietly
+// empty if the test were ever reformatted, and reported a clean bundle for it.
+const BURNED_SOURCE = resolve(ROOT, 'scripts/burned-credentials.mjs');
 let burned = null;
 if (existsSync(BURNED_SOURCE)) {
-  const m = readFileSync(BURNED_SOURCE, 'utf8').match(/const\s+BURNED\s*=\s*\[([^\]]*)\]/);
-  if (m) burned = [...m[1].matchAll(/['"]([^'"]+)['"]/g)].map(x => x[1]).filter(Boolean);
+  ({ BURNED: burned } = await import(pathToFileURL(BURNED_SOURCE).href));
 }
 
 if (burned === null) {

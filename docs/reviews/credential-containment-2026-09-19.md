@@ -1,6 +1,6 @@
 # Keeping credentials out of a public repository
 
-Investigation prompted by the `TrakDev123` leak. The brief was *"separate
+Investigation prompted by the dev-account credential leak. The brief was *"separate
 credentials from merging forked work"* — and the first finding is that the
 premise points at the wrong mechanism, in a way that matters for the fix.
 
@@ -97,7 +97,7 @@ visitor of trakfootball.com unconditionally."* It is in the **source** — line 
 declares it, line 420 uses it in live code — but:
 
 ```
-$ grep -rl TrakDev123 dist/
+$ grep -rl <burned-value> dist/
 dist/assets/DevSetupPage-Cbkrdgsv.js        ← the only file
 ```
 
@@ -111,8 +111,8 @@ was served to visitors from this file.
 My correction was itself the error, and a beginner's one:
 
 ```
-$ grep -c  TrakDev123 dist/assets/DevSetupPage-*.js      1   ← counts LINES
-$ grep -o  TrakDev123 dist/assets/DevSetupPage-*.js | wc -l
+$ grep -c  <burned-value> dist/assets/DevSetupPage-*.js   1   ← counts LINES
+$ grep -o  <burned-value> dist/assets/DevSetupPage-*.js | wc -l
                                                         12   ← counts matches
 ```
 
@@ -150,7 +150,7 @@ looked at **the build output**.
 
 ⚠️ **A generic password is not a scanner's natural prey.** GitHub's free secret
 scanning for public repos matches *partner patterns* — structured tokens with
-recognisable prefixes and checksums (`ghp_`, `AKIA`, `sk_live_`). `TrakDev123`
+recognisable prefixes and checksums (`ghp_`, `AKIA`, `sk_live_`). The leaked value
 has no structure; it is an ordinary string. **Enabling scanning would not have
 caught this**, and a plan that stops at "turn on secret scanning" recreates the
 gap. Generic values need an explicit denylist, which is what #59's

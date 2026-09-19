@@ -52,7 +52,7 @@ try {
     : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
   const suites = baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
-    : ['parent_invite_security.sql', 'pilot_view_security.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql'];
+    : ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql'];
   for (const suite of suites) {
     const result = await db.exec(await read(suite));
     console.log(`Passed: ${suite}`);

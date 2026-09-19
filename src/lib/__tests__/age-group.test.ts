@@ -10,22 +10,31 @@ import { ageGroupCeiling, ageGroupMatches, lowestEligibleAgeGroup } from '@/lib/
 // second implementation here, and its timezone behaviour is #38's to prove.
 
 /**
- * A YYYY-MM-DD that is exactly `years` old today, offset by `days`.
+ * A YYYY-MM-DD whose age is `years`, with their birthday `-days` ago.
  *
- * Built from the LOCAL calendar day, because that is the clock
- * ageFromDateOfBirth reads on main today — `new Date(dob)` parsed as UTC
- * midnight, then compared with local getters. This helper originally used UTC
- * and the boundary assertion went red the moment local crossed midnight while
- * UTC was still on the previous day, which is precisely the defect #38 fixes.
+ * The default puts the birthday a week behind us rather than on today, and
+ * that margin is the point. `ageFromDateOfBirth` reads one clock on main —
+ * `new Date(dob)` is UTC midnight, compared with LOCAL getters — and a
+ * different one under #38, which is consistently UTC to match the database's
+ * `current_date`. Those two disagree by at most a day, and only while local
+ * and UTC are on different calendar days.
  *
- * When #38 lands the function becomes UTC on both sides; switch this helper to
- * UTC with it. Until then, matching the function under test keeps the boundary
- * assertion meaningful rather than papering over the mismatch by widening it.
+ * A helper built on either clock is therefore correct against one
+ * implementation and wrong against the other for a few hours each night. This
+ * one is built on neither: seven days is wider than any disagreement the two
+ * can produce, so every assertion below holds in every timezone under both,
+ * and merging #38 cannot turn this file red. It went red twice before I
+ * understood that, both times because I picked a clock instead of removing the
+ * dependence on one.
+ *
+ * What is genuinely lost is the assertion on the exact birthday, and that is
+ * #38's to prove rather than this file's — its own tests freeze the clock and
+ * pin both sides of the boundary.
  */
-const dob = (years: number, days = 0) => {
+const dob = (years: number, days = -7) => {
   const n = new Date()
-  const d = new Date(n.getFullYear(), n.getMonth(), n.getDate() + days)
-  return `${d.getFullYear() - years}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + days))
+  return `${d.getUTCFullYear() - years}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
 describe('ageGroupCeiling', () => {
@@ -55,18 +64,18 @@ describe('ageGroupMatches', () => {
   })
 
   it('refuses an over-age player and accepts an under-age one near the boundary', () => {
-    // Two days either side, not the exact boundary, and that is deliberate.
+    // Three days either side, not the exact birthday, for the reason given on
+    // `dob`: the two implementations of ageFromDateOfBirth can disagree by a
+    // day, so an assertion sitting on the birthday itself is green under one
+    // and red under the other. Three days leaves two days of margin and still
+    // brackets the boundary closely enough to catch an off-by-one in
+    // ageGroupMatches, which is what this test is for.
     //
-    // ageFromDateOfBirth on main parses the date as UTC midnight and then
-    // compares it with LOCAL getters. In a negative-offset zone those disagree
-    // by a day, so NO construction of "exactly seventeen today" round-trips —
-    // an exact-boundary assertion is green in UTC and red in America/New_York.
-    // That is the defect #38 fixes, not something this suite can assert around.
-    //
-    // When #38 lands, both sides are UTC and the exact boundary becomes
-    // testable. Restore it then: dob(17) must be false and dob(17, 1) true.
-    expect(ageGroupMatches(dob(17, -2), 'U17')).toBe(false)
-    expect(ageGroupMatches(dob(17, 2), 'U17')).toBe(true)
+    // The exact birthday belongs in #38's own tests, which freeze the clock
+    // and pin both sides of it. It does not belong here, where the clock is
+    // live and the function under test is a caller.
+    expect(ageGroupMatches(dob(17, -3), 'U17')).toBe(false)
+    expect(ageGroupMatches(dob(17, 3), 'U17')).toBe(true)
   })
 
   it('permits what it cannot evaluate, so it never blocks a signup blindly', () => {

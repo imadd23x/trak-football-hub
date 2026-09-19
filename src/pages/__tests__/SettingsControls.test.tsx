@@ -50,6 +50,30 @@ function mount() {
 }
 
 describe('settings controls reflect supported behavior', () => {
+  it('gives an unconnected player the coach-code and parent-invitation instructions', async () => {
+    mount()
+    expect(await screen.findByText(/Ask your coach for their TRK- code/)).toHaveTextContent('enter it on your Profile')
+    expect(screen.getByText(/To add a parent/)).toHaveTextContent('send them an invite from your Profile')
+    expect(screen.queryByText(/Share your invite code/)).not.toBeInTheDocument()
+  })
+
+  it('keeps both connected coaches and only gives guidance for the missing parent', async () => {
+    server.use(
+      table('squad_players', [
+        { linked_player_id: 'settings-user', coach_user_id: 'coach-a', status: 'active' },
+        { linked_player_id: 'settings-user', coach_user_id: 'coach-b', status: 'active' },
+      ]),
+      table('profiles', [
+        { user_id: 'coach-a', full_name: 'Coach Alex' },
+        { user_id: 'coach-b', full_name: 'Coach Bea' },
+      ]),
+    )
+    mount()
+    expect(await screen.findByText('Coach Alex, Coach Bea')).toBeInTheDocument()
+    expect(screen.getByText(/To add a parent/)).toHaveTextContent('send them an invite from your Profile')
+    expect(screen.queryByText(/Ask your coach for their TRK- code/)).not.toBeInTheDocument()
+  })
+
   it.each<Role>(['player', 'coach', 'parent', 'club'])('does not revive ineffective controls from old storage for %s', async role => {
     state.role = role
     // An existing browser can still have these old values. They must never

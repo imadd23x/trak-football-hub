@@ -440,7 +440,8 @@ function AccountSettings({ userId }: { userId: string }) {
                 status={linkedParentNames.length ? 'connected' : 'none'} name={linkedParentNames.join(', ') || undefined} />
               {(!linkedCoachNames.length || !linkedParentNames.length) && (
                 <div className="py-3" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                  Share your invite code from your profile to connect with a coach or parent.
+                  {!linkedCoachNames.length && 'Ask your coach for their TRK- code and enter it on your Profile to connect. '}
+                  {!linkedParentNames.length && 'To add a parent, send them an invite from your Profile.'}
                 </div>
               )}
             </>}

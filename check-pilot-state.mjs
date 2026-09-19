@@ -49,7 +49,11 @@ console.log('  SKIPPED   operational reports are intentionally restricted; verif
 
 console.log('\nRehearsal seed\n')
 
-const PW = 'RehearsalTrak123!'
+const PW = process.env.TRAK_REHEARSAL_PASSWORD
+if (!PW) {
+  console.error('Set TRAK_REHEARSAL_PASSWORD in the environment before checking pilot state.')
+  process.exit(1)
+}
 const D  = 'rehearsal.trak.dev'
 
 const dirUser = await login(`director@${D}`, PW)

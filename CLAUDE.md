@@ -101,7 +101,15 @@ npm run build          # production build
 ## Dev Accounts (local seed)
 
 Use the DevSetupPage (`/dev-setup`, PIN: `013`) to quick-login as any test role.
-Real credentials live in your local Supabase project — never committed.
+Set `VITE_DEV_PASSWORD` in your local `.env` first — the dev accounts read it
+from the environment and refuse to sign in without it.
+
+This line previously read *"Real credentials live in your local Supabase
+project — never committed."* That was not true: the password was a literal in
+`LandingPage.tsx`, `DevSetupPage.tsx` and `DevSwitcher.tsx`, and the first of
+those is in the entry bundle, so it shipped to every visitor of the public
+site. Do not reintroduce a literal — `import.meta.env.DEV` guards which routes
+register, not which chunks Rollup emits.
 
 ## TDD Workflow
 
@@ -112,6 +120,8 @@ CI fails for enforced tests/build errors. Pending use-case failures currently do
 ## Database Migrations
 
 Create a new migration using the Supabase CLI; never edit existing migration files. Replay migrations in order on a disposable database and test with actual authenticated roles. Do not assume individual historical migrations are safe to rerun. The main CI workflow applies pending migrations and deploys edge functions before the frontend.
+
+Since `20260919120001`, new tables in `public` are born with no privileges for `anon` or `authenticated`. A migration that creates a table must `GRANT` exactly the operations its policies back (see `20260918000002_ai_call_quota.sql` for the pattern); `anon` needs nothing.
 
 Key migrations to be aware of:
 - `20260425000001_security_hardening.sql` — RLS policies + performance indexes

@@ -178,19 +178,54 @@ secrets, so it runs identically on fork PRs. Catches anything Layer 1 missed
 (hooks are local, optional, and skippable with `--no-verify`).
 
 **Layer 3 — assert on the built bundle.** ⭐ **The one that would have caught
-this.**
+this.** ✅ **Built: `scripts/check-bundle-secrets.mjs`, CI step after Build.**
 
 Layers 1 and 2 examine source. This examines **what actually ships**, which is a
 different question — the `DevSetupPage` chunk is emitted despite the route being
-dev-gated, and only an assertion on `dist/` can see that. It also catches the
-inverse case and is the honest test of *"is a secret being served"*:
+dev-gated, and only an assertion on `dist/` can see that. It is the layer that
+maps to the actual harm — a string reachable over HTTP — rather than to a proxy
+for it.
+
+⚠️ **Building it found that #59 does not close the mechanism, only the value.**
+#59 removes the credential from the chunk. It does not touch `App.tsx`, and that
+is where the mechanism lives:
 
 ```
-npm run build && ! grep -rqE "<denylist>" dist/
+App.tsx:24   const DevSetupPage = lazy(() => import("./pages/DevSetupPage"))
+App.tsx:96   {import.meta.env.DEV && <Route path="/dev-setup" ... />}
 ```
 
-Worth running in CI after the existing build step. It is the layer that maps to
-the actual harm — a string reachable over HTTP — rather than to a proxy for it.
+Verified on a build of this branch: the chunk is emitted **and** the entry bundle
+carries its URL. After #59 it still ships, minus the password. The residual risk
+is small — the route never registers, so the chunk is inert unless something
+loads it — but **the mechanism that caused the incident survives the fix**, and
+the next dev-only page inherits it with a credential nobody has written yet.
+Flagged on #59 as explicitly not a blocker; removing the chunk means making the
+import conditional, which is a separate change.
+
+**Two design decisions worth recording, because both are about this note's own
+failure mode.**
+
+*It names no credential.* #59 asserts that exactly two files may contain a burned
+value, as an exact set, *"so a third file cannot quietly join them."* A Layer 3
+guard that restated the denylist would break that assertion on merge, so the
+values are read from #59's list at runtime. Until #59 merges the list is absent
+and the value check **reports that it did not run, on every run** — so *"no value
+check ran"* can never be read as *"no values found"*. That is the defect class
+this whole document is about, appearing inside the control written to stop it.
+
+*A known exposure is an admission, not an exemption, and a stale one fails.*
+`DevSetupPage` is allowlisted with its reason and printed every run. If it ever
+stops shipping, the guard **fails** and says to delete the entry — because a
+stale exemption would silently permit the next regression that happened to match
+it, which is exactly how allowlists rot.
+
+Falsified four ways with exit codes checked: a new dev-only chunk appears; the
+known chunk disappears leaving the entry stale; a burned value is present in
+`dist/`; `dist/` absent. The third was proved with a **synthetic** value that is
+genuinely in the bundle, so the detection path is verified without writing a real
+credential to disk. The fourth is the lesson from the guard that searched only
+`src/` — it proves it read a real build before it is allowed to report one clean.
 
 **Layer 4 — GitHub push protection**, for the structured tokens the denylist
 will never anticipate. Complements Layers 1–3; does not replace them, per the
@@ -222,9 +257,19 @@ And one to add:
 
 ## 7. What this costs
 
-Layer 0 is done in #59. Layers 1–3 are three small additions: a `pre-commit`
-line, a CI step, and a build-output grep. Layer 4 is a settings toggle. Layer 5
-is blocked behind #46 and the CODEOWNERS fix.
+Layer 0 is done in #59, which also adds Layer 1 (`.husky/pre-commit` now runs the
+credential test — the only layer that stops a value reaching a public remote at
+all, since on a public repository the damage is done at `git push`, not at
+merge). **Layer 2 is covered by the same PR** and I nearly recorded it as
+outstanding: its guard lives at `src/__tests__/no-committed-credentials.test.ts`,
+`npm test` is `vitest run src`, and `ci.yml:45` runs it — so it already executes
+on every PR including forks, needing no secrets. **Layer 3 is built and in CI.**
+Layer 4 is a settings toggle. Layer 5 is blocked behind #46 and the CODEOWNERS
+fix.
+
+So after #59 and this branch, **four of the six layers exist**. The two that do
+not are a GitHub setting and a branch-protection change that is currently unsafe
+to activate.
 
 **None of it helps with the present incident.** The accounts are live, the value
 is public, and rotation in the Supabase console is the only thing that closes it.

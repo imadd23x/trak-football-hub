@@ -195,7 +195,7 @@ BEGIN
       FROM pg_policies p
       WHERE p.schemaname = 'public' AND p.tablename = t.relname
         AND p.roles && ARRAY['authenticated', 'public']::name[]
-        -- 20260919170000: a deny-only policy states a prohibition and must
+        -- 20260919193112: a deny-only policy states a prohibition and must
         -- not produce a grant, or it becomes the single barrier itself.
         AND coalesce(p.qual, 'true')       NOT IN ('false', '(false)')
         AND coalesce(p.with_check, 'true') NOT IN ('false', '(false)')

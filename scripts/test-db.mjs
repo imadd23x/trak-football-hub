@@ -3,6 +3,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { validateMigrationFiles } from './migration-input.mjs';
 
 // An in-memory database by construction. Never reads DB_URL or connects to a
 // Supabase project; SQL fixture guards also refuse an unmarked connection.
@@ -18,15 +19,15 @@ if (args.length > 1 || !modes.includes(mode)) {
 const baseline = mode === '--baseline';
 const pilotViewsBaseline = mode === '--pilot-views-baseline';
 const parentUpgrade = mode === '--parent-upgrade-review';
+const migrationFiles = validateMigrationFiles(await readdir(resolve(root, 'supabase/migrations')));
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
 try {
   await db.exec(await read('bootstrap.sql'));
   const { rows } = await db.query('SELECT version() AS version');
   console.log(`Disposable database: ${rows[0].version}`);
-  const migrations = (await readdir(resolve(root, 'supabase/migrations')))
-    .filter(file => file.endsWith('.sql')
-      && (!baseline || file < securityMigration)
+  const migrations = migrationFiles
+    .filter(file => (!baseline || file < securityMigration)
       && (!pilotViewsBaseline || file < pilotViewsMigration)).sort();
   if (parentUpgrade) {
     // PR35 was deployed before PR33. Replay that actual order as well as the

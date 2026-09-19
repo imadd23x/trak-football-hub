@@ -1,3 +1,4 @@
+-- @trak-suite mode=--parent-history-review in-all=true
 -- Synthetic adult fixtures only. All fixture rows, temporary RLS probes and
 -- the explicitly marked nullable-rating compatibility probe roll back.
 BEGIN;

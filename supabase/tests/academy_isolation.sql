@@ -52,8 +52,24 @@ BEGIN
     WHEN OTHERS THEN
       IF SQLERRM = 'trak-unexpectedly-allowed' THEN
         denied := false; failure := 'WRITE SUCCEEDED';
+      ELSIF SQLSTATE IN ('42501', 'P0001') THEN
+        -- 42501 is RLS or a privilege refusal; P0001 is a RAISE in our own
+        -- code. Anything else means the statement failed for an unrelated
+        -- reason and the assertion proved nothing. This branch used to accept
+        -- every SQLSTATE, so an undefined column or a constraint violation
+        -- read as isolation — the same trap the consent suite was corrected
+        -- for, left uncorrected here.
+        --
+        -- The SQLSTATE alone does not say WHICH refusal: 42501 covers both
+        -- "no grant on this table" and "RLS rejected this row". Those are very
+        -- different claims — the first would still refuse if every policy were
+        -- deleted — so the message is recorded alongside it and the
+        -- isolation assertions below assert on it. Kostas's suggestion.
+        denied := true;
+        failure := SQLSTATE || ': ' || left(SQLERRM, 80);
       ELSE
-        denied := true; failure := SQLSTATE;
+        denied := false;
+        failure := 'NOT A DENIAL — ' || SQLSTATE || ': ' || left(SQLERRM, 60);
       END IF;
   END;
   INSERT INTO pg_temp.iso_results VALUES (description, denied, failure);
@@ -75,6 +91,33 @@ CREATE FUNCTION pg_temp.iattempt(statement text) RETURNS void LANGUAGE plpgsql A
 BEGIN
   EXECUTE statement;
 EXCEPTION WHEN OTHERS THEN NULL;
+END;
+$test$;
+
+-- Isolation is a claim about ROW-LEVEL SECURITY, not about a missing grant.
+-- idenied accepts either, because 42501 covers both. Where the claim is
+-- specifically "the policy rejected this row", assert that: a suite that would
+-- still pass with every policy dropped is not testing isolation.
+CREATE FUNCTION pg_temp.idenied_by_rls(statement text, description text)
+RETURNS void LANGUAGE plpgsql AS $test$
+DECLARE passed boolean := false; failure text;
+BEGIN
+  BEGIN
+    EXECUTE statement;
+    RAISE EXCEPTION 'trak-unexpectedly-allowed';
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF SQLERRM = 'trak-unexpectedly-allowed' THEN
+        failure := 'WRITE SUCCEEDED';
+      ELSIF SQLSTATE = '42501' AND SQLERRM ILIKE '%row-level security%' THEN
+        passed := true; failure := 'RLS';
+      ELSIF SQLSTATE = '42501' THEN
+        failure := 'REFUSED, BUT NOT BY RLS — ' || left(SQLERRM, 70);
+      ELSE
+        failure := 'NOT A DENIAL — ' || SQLSTATE || ': ' || left(SQLERRM, 60);
+      END IF;
+  END;
+  INSERT INTO pg_temp.iso_results VALUES (description, passed, failure);
 END;
 $test$;
 
@@ -151,10 +194,37 @@ $test$;
 
 SELECT pg_temp.iactor(pg_temp.aid(11));
 
-SELECT pg_temp.idenied(format(
+-- WHICH clause refuses this, and which only look like they do.
+--
+-- I could not reconcile two observations: a standalone probe showed that
+-- neutralising squad_player_is_mine() let coach B write against academy A's
+-- child, while this suite stayed green through that mutation and through the
+-- organization_id one and through both together. Kostas took it and found the
+-- answer, and it is in his code rather than this suite:
+--
+--   20260917000001 installs a BEFORE INSERT trigger that derives
+--   organization_id FROM THE ROW'S COACH. The policy then compares it against
+--   that same coach's organisation, because coach_user_id = auth.uid() is
+--   enforced two clauses above. On INSERT the two sides are equal by
+--   construction, so that clause is tautologically true.
+--
+-- So for this attack the WITH CHECK is one load-bearing clause —
+-- squad_player_is_mine() — plus five that cannot fail. It reads as layered
+-- defence and is not. Keep the org clause: the trigger is BEFORE INSERT only,
+-- so on UPDATE it can genuinely fail.
+--
+-- This is not a live defect and isolation is not broken: squad_player_is_mine
+-- is intact, the refusal below is real, and U7's read direction was verified
+-- against two real academies in the live database. What changed is what this
+-- suite entitles anyone to claim.
+--
+-- Asserted through idenied_by_rls so the refusal must come from the POLICY.
+-- The old assertion accepted any 42501, which a missing grant also produces —
+-- and a missing grant would still refuse with every policy deleted.
+SELECT pg_temp.idenied_by_rls(format(
   'INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, work_rate, tactical, attitude, technical, physical, coachability) VALUES (%L, %L, 9,9,9,9,9,9)',
   pg_temp.aid(11), pg_temp.aid(200)),
-  'U7w a coach from academy B cannot assess academy A''s player');
+  'U7w a coach from academy B cannot assess academy A''s player (refused by RLS, not by a missing grant)');
 
 SELECT pg_temp.iattempt(format('UPDATE public.coach_assessments SET work_rate = 1 WHERE id = %L', pg_temp.aid(300)));
 SELECT pg_temp.iattempt(format('DELETE FROM public.coach_assessments WHERE id = %L', pg_temp.aid(300)));

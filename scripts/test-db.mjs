@@ -61,13 +61,37 @@ for (const file of suiteFiles) {
     throw new Error(`supabase/tests/${file} declares neither '-- @trak-suite' nor `
       + `'-- @trak-fixture'. Add whichever it is to the top of the file.`);
   }
-  const attrs = Object.fromEntries(found[1].trim().split(/\s+/).map(kv => kv.split('=')));
+  // Every attribute is validated, including the ones with a sensible-looking
+  // default. Kostas found that `in-all` was not: `in-all=ture` silently
+  // dropped the suite from --all and the run exited 0, which is the exact
+  // failure this registry exists to prevent, reachable through the registry.
+  // A typo must never be indistinguishable from a deliberate `false`.
+  const KNOWN = new Set(['mode', 'in-all', 'order']);
+  const attrs = {};
+  for (const pair of found[1].trim().split(/\s+/)) {
+    const eq = pair.indexOf('=');
+    if (eq < 1) {
+      throw new Error(`supabase/tests/${file}: '${pair}' is not key=value in @trak-suite`);
+    }
+    const key = pair.slice(0, eq);
+    if (!KNOWN.has(key)) {
+      throw new Error(`supabase/tests/${file}: unknown @trak-suite attribute '${key}'. `
+        + `Known: ${[...KNOWN].join(', ')}`);
+    }
+    if (key in attrs) throw new Error(`supabase/tests/${file}: '${key}' given twice`);
+    attrs[key] = pair.slice(eq + 1);
+  }
   if (!attrs.mode?.startsWith('--')) {
     throw new Error(`supabase/tests/${file}: @trak-suite needs mode=--something`);
   }
+  if (attrs['in-all'] !== 'true' && attrs['in-all'] !== 'false') {
+    throw new Error(`supabase/tests/${file}: in-all must be exactly true or false, `
+      + `got '${attrs['in-all'] ?? '(missing)'}'. A suite silently absent from --all is `
+      + `indistinguishable from one that passes.`);
+  }
   const order = Number(attrs.order ?? 0);
   if (!Number.isFinite(order)) {
-    throw new Error(`supabase/tests/${file}: order must be a number`);
+    throw new Error(`supabase/tests/${file}: order must be a number, got '${attrs.order}'`);
   }
   const entry = { file, order };
   if (registry.has(attrs.mode)) registry.get(attrs.mode).push(entry);

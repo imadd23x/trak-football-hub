@@ -52,8 +52,17 @@ BEGIN
     WHEN OTHERS THEN
       IF SQLERRM = 'trak-unexpectedly-allowed' THEN
         denied := false; failure := 'WRITE SUCCEEDED';
-      ELSE
+      ELSIF SQLSTATE IN ('42501', 'P0001') THEN
+        -- 42501 is RLS or a privilege refusal; P0001 is a RAISE in our own
+        -- code. Anything else means the statement failed for an unrelated
+        -- reason and the assertion proved nothing. This branch used to accept
+        -- every SQLSTATE, so an undefined column or a constraint violation
+        -- read as isolation — the same trap the consent suite was corrected
+        -- for, left uncorrected here.
         denied := true; failure := SQLSTATE;
+      ELSE
+        denied := false;
+        failure := 'NOT A DENIAL — ' || SQLSTATE || ': ' || left(SQLERRM, 60);
       END IF;
   END;
   INSERT INTO pg_temp.iso_results VALUES (description, denied, failure);

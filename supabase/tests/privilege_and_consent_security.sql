@@ -195,6 +195,10 @@ BEGIN
       FROM pg_policies p
       WHERE p.schemaname = 'public' AND p.tablename = t.relname
         AND p.roles && ARRAY['authenticated', 'public']::name[]
+        -- 20260919193112: a deny-only policy states a prohibition and must
+        -- not produce a grant, or it becomes the single barrier itself.
+        AND coalesce(p.qual, 'true')       NOT IN ('false', '(false)')
+        AND coalesce(p.with_check, 'true') NOT IN ('false', '(false)')
     ) e
     WHERE operation IN ('SELECT', 'INSERT', 'UPDATE', 'DELETE');
 
@@ -204,6 +208,30 @@ BEGIN
 
     PERFORM pg_temp.pc_assert(expected = actual,
       format('A1b: %s grants match its policies (policies %s, grants %s)', t.relname, expected, actual));
+  END LOOP;
+END;
+$test$;
+
+-- A1c. Append-only tables: the deny policy must not be the only barrier.
+-- A child's assessment history should need two mistakes to become deletable,
+-- not one. Named explicitly so a silent no-op cannot pass as a pass.
+DO $test$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['coach_assessment_notes', 'coach_assessments', 'recognition_awards'] LOOP
+    PERFORM pg_temp.pc_assert(
+      NOT has_table_privilege('authenticated', ('public.' || t)::regclass, 'DELETE'),
+      format('A1c: %s does not grant DELETE behind its no-deletion policy', t));
+    PERFORM pg_temp.pc_assert(
+      EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = t
+                AND cmd = 'DELETE' AND coalesce(qual, '') IN ('false', '(false)')),
+      format('A1c: %s still carries its no-deletion policy (both barriers, not one)', t));
+  END LOOP;
+  -- Positive control: the two tables a real journey deletes from keep DELETE.
+  FOREACH t IN ARRAY ARRAY['session_attendance', 'coach_calendar_events'] LOOP
+    PERFORM pg_temp.pc_assert(
+      has_table_privilege('authenticated', ('public.' || t)::regclass, 'DELETE'),
+      format('A1c positive control: %s keeps DELETE, a real journey uses it', t));
   END LOOP;
 END;
 $test$;

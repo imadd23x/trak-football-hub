@@ -116,7 +116,14 @@ try {
   await db.exec(await read('bootstrap.sql'));
   const { rows } = await db.query('SELECT version() AS version');
   console.log(`Disposable database: ${rows[0].version}`);
-  const migrations = migrationFiles
+  // `let`, not `const`: the upgrade-review modes REPLACE this list rather than
+  // filter it — Imad's --parent-history-upgrade-review reorders it so a pending
+  // migration applies after a pinned main. Declaring it const makes that
+  // reassignment a silent no-op when the two branches merge, which leaves the
+  // migrations in filename order and fails his boundary assertion for the
+  // wrong reason. Cost me twenty minutes chasing a count mismatch that was
+  // this word.
+  let migrations = migrationFiles
     .filter(file => (!baseline || file < securityMigration)
       && (!pilotViewsBaseline || file < pilotViewsMigration)).sort();
 

@@ -298,29 +298,31 @@ SELECT pg_temp.assert_true(
   'K9: authenticated must not hold DELETE on coach_shared_feedback — the no-deletion policy '
   'should not be the only thing standing between a child and a removed record');
 
--- There must ALSO be no permissive DELETE policy, and this is not belt-and-braces
--- pedantry — it is the whole point after 20260919120001.
+-- ── Both barriers, matching A1c on the other append-only tables ────────
 --
--- #62 derives grants from pg_policies at apply time. Its input is "does a policy
--- exist for this operation", not "does that policy permit anything", so the
--- FOR DELETE ... USING (false) policy this table used to carry PRODUCED a DELETE
--- grant — the exact privilege it was written to forbid. The assertion above
--- started failing on merge for that reason, which is how it was found.
--- 20260919170000 drops the policy; RLS then denies DELETE by default and no
--- grant is derived, so there are two barriers instead of one.
+-- This was briefly the other way round. #62 derived grants from pg_policies
+-- with no regard for whether a policy PERMITS anything, so this table's
+-- FOR DELETE ... USING (false) policy manufactured the DELETE grant it exists
+-- to forbid — the assertion above started failing the moment main was merged.
+-- I fixed it here by dropping the policy: RLS denies by default, so no policy
+-- plus no grant is two barriers rather than one.
 --
--- Asserted as the absence of a policy rather than only as the absence of a
--- grant, because re-introducing the deny policy would silently restore the
--- grant on the next replay and the privilege assertion alone would read as a
--- mystery rather than as a cause.
+-- @imadd23x then fixed it properly in #68, at the source: deny-only policies
+-- are excluded from derivation, so the policy is harmless AND stays. His A1c
+-- asserts exactly this pair on coach_assessment_notes, coach_assessments and
+-- recognition_awards — "a child's assessment history should need two mistakes
+-- to become deletable, not one".
+--
+-- So my migration was withdrawn and this table is asserted the same way as
+-- the other three. One table diverging on a rule the whole schema follows is
+-- a landmine for whoever adds coach_shared_feedback to that A1c list next.
 SELECT pg_temp.assert_true(
-  NOT EXISTS (
+  EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'coach_shared_feedback'
-      AND cmd = 'DELETE'
+      AND cmd = 'DELETE' AND coalesce(qual, '') IN ('false', '(false)')
   ),
-  'K9: no DELETE policy exists on coach_shared_feedback — under derived grants a deny '
-  'policy manufactures the DELETE grant it was written to forbid');
+  'K9: coach_shared_feedback still carries its no-deletion policy (both barriers, not one)');
 
 -- And the behaviour, not only the catalogue. A privilege check cannot tell you
 -- the child's row actually survives an attempt.

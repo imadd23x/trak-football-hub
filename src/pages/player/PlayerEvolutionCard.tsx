@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Flame, Target, Lock, Check, Shield, Zap, Activity, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MobileShell, NavBar } from '@/components/trak'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
+import { captureElementToPng, shareOrSaveImage } from '@/lib/card-export'
 
 /**
  * TRAK Player Evolution Card
@@ -300,6 +301,8 @@ export default function PlayerEvolutionCard() {
   const location = useLocation()
   const { user } = useAuth()
 
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [sharing, setSharing] = useState(false)
   const [name, setName] = useState('Player')
   const [positionDisplay, setPositionDisplay] = useState('—')
   const [posGroup, setPosGroup] = useState<PosGroup>('mid')
@@ -461,24 +464,31 @@ export default function PlayerEvolutionCard() {
 
   const series1Complete = evolutions.length === 3 && evolutions.every(e => e.state === 'done')
 
+  // F-4. This used to call navigator.share({ title, text }) with no `files`
+  // key, so the share sheet received a sentence and Messages pasted the card
+  // as plain writing. It now shares the card as an image, the way the passport
+  // already did, through the one implementation in card-export.ts.
   const handleShare = async () => {
-    const text = `${name} · ${tierName} tier · ${ovr} OVR · ${positionDisplay} — via TRAK football`
+    if (sharing) return
+    setSharing(true)
     try {
-      if (navigator.share) {
-        await navigator.share({ title: 'My TRAK Card', text })
-      } else {
-        await navigator.clipboard.writeText(text)
-        toast.success('Copied to clipboard')
+      const blob = await captureElementToPng(cardRef.current, {
+        background: '#0A0A0B',
+      })
+      if (!blob) {
+        toast.error('Could not render your card — please try again')
+        return
       }
-    } catch (e: any) {
-      if (e?.name !== 'AbortError') {
-        try {
-          await navigator.clipboard.writeText(text)
-          toast.success('Copied to clipboard')
-        } catch {
-          toast.error('Could not share card')
-        }
-      }
+      const outcome = await shareOrSaveImage(blob, {
+        filename: 'trak-evolution-card.png',
+        title: `${name} · TRAK Evolution Card`,
+      })
+      if (outcome === 'saved') toast.success('Card saved as an image')
+      if (outcome === 'failed') toast.error('Could not share your card')
+      // 'shared' needs no toast — the share sheet is the feedback.
+      // 'cancelled' is the player closing that sheet, which is not an error.
+    } finally {
+      setSharing(false)
     }
   }
 
@@ -499,6 +509,7 @@ export default function PlayerEvolutionCard() {
         {/* THE CARD */}
         <div className="flex justify-center mt-2">
           <div
+            ref={cardRef}
             className="relative"
             style={{
               width: '100%', maxWidth: 360, aspectRatio: '3 / 4',

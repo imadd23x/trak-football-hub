@@ -4,15 +4,16 @@ import { resolve } from 'node:path';
 
 // Explicit canonical-main schema snapshot, not a moving origin/main alias or
 // independent proof of which versions are applied to the hosted database.
-export const historyUpgradeBase = '00910940f596d9fe9a7cd416dc741943d1df2cc9';
+export const historyUpgradeBase = 'dc5c9d5682963fbff73f6117fe766c665db26776';
+export const historyUpgradeCount = 66;
 export const historyMigration = '20260918112323_parent_match_history.sql';
 
 export async function parentHistoryUpgradeOrder(root, candidateFiles) {
   const git = args => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const mainFiles = git(['ls-tree', '--name-only', `${historyUpgradeBase}:supabase/migrations`])
     .trim().split('\n').filter(file => file.endsWith('.sql')).sort();
-  if (mainFiles.length !== 62 || mainFiles.at(-1) !== '20260918133800_ai_quota_known_functions.sql') {
-    throw new Error('Unexpected migration inventory for pinned main 0091094');
+  if (mainFiles.length !== historyUpgradeCount || mainFiles.at(-1) !== '20260919193112_deny_policies_grant_nothing.sql') {
+    throw new Error('Unexpected migration inventory for pinned main dc5c9d5');
   }
   const additions = candidateFiles.filter(file => !mainFiles.includes(file));
   if (additions.length !== 1 || additions[0] !== historyMigration) {
@@ -43,6 +44,7 @@ export function requireHistoryUpgradeSuiteOutput(suite, result) {
   const expected = {
     'parent_match_history.sql': ['parent_match_history_assertions', 81],
     'pilot_view_security.sql': ['pilot_view_assertions', 282],
+    'privilege_and_consent_security.sql': ['privilege_consent_assertions', 151],
   }[suite];
   if (expected) {
     const [key, count] = expected;

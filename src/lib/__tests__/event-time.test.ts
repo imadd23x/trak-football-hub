@@ -129,3 +129,27 @@ describe('normalizeInstant — offset-bearing values are validated too (Imad, PR
     expect(normalizeInstant('2026-03-01T18:00:00+04:00')).toBe('2026-03-01T14:00:00.000Z')
   })
 })
+
+describe('normalizeInstant — input forms Kostas found rejected or misread (PR30 review)', () => {
+  it('treats a lowercase z as an offset, not as local wall clock', () => {
+    expect(normalizeInstant('2026-03-01T18:00:00z')).toBe('2026-03-01T18:00:00.000Z')
+  })
+
+  it('accepts an hour-only offset', () => {
+    // Valid ISO, and Date.parse rejects it unexpanded.
+    expect(normalizeInstant('2026-03-01T18:00:00+04')).toBe('2026-03-01T14:00:00.000Z')
+    expect(normalizeInstant('2026-03-01T18:00:00-05')).toBe('2026-03-01T23:00:00.000Z')
+  })
+
+  it('accepts a space between date and time, as Postgres writes it', () => {
+    const iso = normalizeInstant('2026-03-01 18:00:00')!
+    expect(iso).not.toBeNull()
+    expect(localParts(iso)).toEqual({ date: '2026-03-01', time: '18:00' })
+  })
+
+  it('still validates the calendar date in every one of those forms', () => {
+    expect(normalizeInstant('2026-02-31T10:00:00z')).toBeNull()
+    expect(normalizeInstant('2026-02-31T10:00:00+04')).toBeNull()
+    expect(normalizeInstant('2026-02-31 10:00:00')).toBeNull()
+  })
+})

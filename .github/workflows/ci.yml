@@ -27,10 +27,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # The exact-main upgrade test reads immutable migration blobs at 0091094.
+          # The exact-main upgrade test reads immutable migration blobs at the pinned canonical-main revision.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -233,7 +233,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'

@@ -3,7 +3,8 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { historyUpgradeBase, historyMigration, parentHistoryUpgradeOrder, requireHistoryUpgradeSuiteOutput } from './lib/parent-history-upgrade.mjs';
+import { historyUpgradeBase, historyUpgradeCount, historyMigration, parentHistoryUpgradeOrder, requireHistoryUpgradeSuiteOutput } from './lib/parent-history-upgrade.mjs';
+import { validateMigrationFiles } from './migration-input.mjs';
 
 // An in-memory database by construction. Never reads DB_URL or connects to a
 // Supabase project; SQL fixture guards also refuse an unmarked connection.
@@ -20,15 +21,15 @@ const baseline = mode === '--baseline';
 const pilotViewsBaseline = mode === '--pilot-views-baseline';
 const parentUpgrade = mode === '--parent-upgrade-review';
 const historyUpgrade = mode === '--parent-history-upgrade-review';
+const migrationFiles = validateMigrationFiles(await readdir(resolve(root, 'supabase/migrations')));
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
 try {
   await db.exec(await read('bootstrap.sql'));
   const { rows } = await db.query('SELECT version() AS version');
   console.log(`Disposable database: ${rows[0].version}`);
-  let migrations = (await readdir(resolve(root, 'supabase/migrations')))
-    .filter(file => file.endsWith('.sql')
-      && (!baseline || file < securityMigration)
+  let migrations = migrationFiles
+    .filter(file => (!baseline || file < securityMigration)
       && (!pilotViewsBaseline || file < pilotViewsMigration)).sort();
   if (parentUpgrade) {
     // PR35 was deployed before PR33. Replay that actual order as well as the
@@ -44,7 +45,7 @@ try {
   for (const file of migrations) {
     try {
       if (historyUpgrade && file === historyMigration) {
-        if (applied !== 62) throw new Error('History migration must follow all 62 pinned-main migrations');
+        if (applied !== historyUpgradeCount) throw new Error(`History migration must follow all ${historyUpgradeCount} pinned-main migrations`);
         const { rows } = await db.query("SELECT to_regprocedure('public.get_parent_match_summary(uuid)') IS NULL AND to_regprocedure('public.get_parent_match_page(uuid,date,timestamp with time zone,uuid,integer)') IS NULL AS absent");
         if (rows[0].absent !== true) throw new Error('History RPCs unexpectedly exist before pending migration');
         console.log(`Upgrade boundary: ${applied} migrations from main ${historyUpgradeBase} applied; history RPCs absent; applying ${file} next.`);
@@ -60,17 +61,18 @@ try {
   }
   console.log(`Replayed ${migrations.length} migrations${baseline || pilotViewsBaseline
     ? ' (vulnerable baseline; security assertions should fail)'
-    : historyUpgrade ? ' (exact main 0091094 first, then pending parent history)'
+    : historyUpgrade ? ` (exact main ${historyUpgradeBase.slice(0, 7)} first, then pending parent history)`
       : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
   const suites = baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
-    : ['parent_invite_security.sql', 'pilot_view_security.sql', 'parent_match_history.sql'];
+    : ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'parent_match_history.sql'];
   for (const suite of suites) {
     const result = await db.exec(await read(suite));
     if (historyUpgrade) requireHistoryUpgradeSuiteOutput(suite, result);
     console.log(`Passed: ${suite}`);
     if (historyUpgrade && suite === 'parent_invite_security.sql') console.log('Parent invitation assertions: 55');
     for (const query of result) {
+      if (query.rows?.[0]?.privilege_consent_assertions) console.log(`Privilege/consent assertions: ${query.rows[0].privilege_consent_assertions}`);
       if (query.rows?.[0]?.parent_match_history_assertions) console.log(`Parent history assertions: ${query.rows[0].parent_match_history_assertions}`);
       if (query.rows?.[0]?.pilot_view_assertions) console.log(`Operational view assertions: ${query.rows[0].pilot_view_assertions}`);
     }

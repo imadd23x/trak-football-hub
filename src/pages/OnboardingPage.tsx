@@ -13,6 +13,7 @@ import { Mail, RefreshCw, ChevronDown } from 'lucide-react';
 import { validatePassword, PASSWORD_HINT } from '@/lib/password'
 import { CONSENT_THRESHOLD_AGE, ageFromDateOfBirth } from '@/lib/consent'
 import { isRealCalendarDate, daysInMonth } from '@/lib/calendar'
+import { ageGroupMatches, lowestEligibleAgeGroup } from '@/lib/age-group'
 
 const StyledSelect = ({ value, onChange, placeholder, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { placeholder?: string }) => (
   <div className="relative">
@@ -200,6 +201,17 @@ const PlayerOnboarding = () => {
   const handleStep2 = () => {
     if (!position || !club || !ageGroup) {
       toast.error('Please fill in all required fields'); return;
+    }
+    // The age group and the date of birth were independent fields, so any
+    // combination was accepted. Playing up a group is normal and stays allowed;
+    // playing down is refused, because squad_player_consent_required() reads
+    // date_of_birth and a band that contradicts it is a signal nobody reads.
+    if (dateOfBirth && !ageGroupMatches(dateOfBirth, ageGroup)) {
+      const lowest = lowestEligibleAgeGroup(dateOfBirth);
+      toast.error(lowest
+        ? `That date of birth doesn't fit ${ageGroup}. The youngest group you can join is ${lowest} — you can pick an older one.`
+        : `That date of birth doesn't fit ${ageGroup}.`);
+      return;
     }
     setStep(3);
   };

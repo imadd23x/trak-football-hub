@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import App from '@/App'
 import { supabase } from '@/integrations/supabase/client'
 import { CONSENT_NOTICE_VERSION, CONSENT_STATEMENT } from '@/lib/consent'
+import type { ParentMatch } from '@/lib/parent-data'
 import { server } from '../../../../tests/msw/server'
 import { SUPABASE_URL } from '../../../../tests/msw/supabase'
 
@@ -42,6 +43,8 @@ let logins: unknown[]
 let unexpected: string[]
 let releaseGrant: () => void
 let grantWait: Promise<void>
+let releaseHistory: () => void
+let profileNames: Map<string, string>
 let sequence = 0
 
 function newSession(label: string): Session {
@@ -84,6 +87,8 @@ beforeEach(() => {
   sessions = new Map()
   parentA = newSession('a')
   parentB = newSession('b')
+  profileNames = new Map([[parentA.user.id, 'Synthetic Parent A'], [parentB.user.id, 'Synthetic Parent B']])
+  releaseHistory = () => {}
   grants = []; completedGrants = []; abortedGrants = []; pendingReads = []; logouts = []; logins = []; unexpected = []
   grantWait = new Promise<void>(resolve => { releaseGrant = resolve })
   server.use(
@@ -115,7 +120,7 @@ beforeEach(() => {
       expect(['*', 'role']).toContain(query.get('select'))
       return HttpResponse.json(query.get('select') === 'role' ? [{ role: 'parent' }]
         : [{ id: account.user.id, user_id: account.user.id, role: 'parent',
-          full_name: account.user.id === parentA.user.id ? 'Synthetic Parent A' : 'Synthetic Parent B',
+          full_name: profileNames.get(account.user.id),
           nationality: null, avatar_url: null }])
     }),
     http.get(endpoint('player_parent_links'), ({ request }) => {
@@ -164,8 +169,8 @@ beforeEach(() => {
       expect(await request.json()).toMatchObject({ user_id: account.user.id, event_type: 'app_opened' })
       return new HttpResponse(null, { status: 201 })
     }),
-    // Includes profile/password/provisioning writes: none are part of this
-    // journey. No unknown request is allowed to reach a real service.
+    // Includes profile/password/provisioning writes unless a test explicitly
+    // configures one below. Unknown requests never reach a real service.
     http.all('*', ({ request }) => {
       unexpected.push(`${request.method} ${request.url}`)
       return HttpResponse.json({ message: 'Unexpected request blocked by account integration fixture' }, { status: 500 })
@@ -176,10 +181,11 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   releaseGrant()
+  releaseHistory()
   expect(unexpected).toEqual([])
 })
 
-describe('parent consent and Settings on a shared phone', () => {
+describe('parent consent, history and Settings on a shared phone', () => {
   it('keeps B’s family, draft, route and session after A’s held approval completes across failed/retried logout', async () => {
     const user = userEvent.setup()
     const result = await supabase.auth.setSession({ access_token: parentA.access_token, refresh_token: parentA.refresh_token })
@@ -258,6 +264,163 @@ describe('parent consent and Settings on a shared phone', () => {
     expect(grants).toHaveLength(1)
     expect(logouts).toEqual([parentA.user.id, parentA.user.id])
     expect(logins).toHaveLength(1)
+    expect(unexpected).toEqual([])
+  })
+
+  it('preserves Zara through a Settings name save, then isolates B’s first history page from A’s late next-page response', async () => {
+    const user = userEvent.setup()
+    const historyWait = new Promise<void>(resolve => { releaseHistory = resolve })
+    const pageRequests: RecordedRequest[] = []
+    const summaryRequests: RecordedRequest[] = []
+    const nameWrites: RecordedRequest[] = []
+    const abortedHistory: string[] = []
+    const completedHistory: string[] = []
+    const savedName = 'Synthetic Parent A Updated'
+    const match = (name: string, index: number): ParentMatch => ({
+      id: `99700000-0000-4000-8000-${String(700 + index).padStart(12, '0')}`,
+      match_date: '2026-09-01', created_at: new Date(Date.UTC(2026, 8, 1, 12, -index)).toISOString(),
+      opponent: name, competition: 'Synthetic league', venue: 'Home', computed_rating: 7,
+      team_score: 2, opponent_score: 1,
+    })
+    const alexMatches = [match('Alex opponent', 100)]
+    const zaraMatches = Array.from({ length: 51 }, (_, index) => match(`Zara opponent ${index + 1}`, index))
+    const samMatches = [match('Sam first opponent', 200), match('Sam second opponent', 201)]
+    const histories = new Map([[childA.user_id, alexMatches], [siblingA.user_id, zaraMatches], [childB.user_id, samMatches]])
+
+    server.use(
+      http.patch(endpoint('profiles'), async ({ request }) => {
+        const account = authenticated(request)
+        const query = new URL(request.url).searchParams
+        const body: unknown = await request.json()
+        expect(account.user.id).toBe(parentA.user.id)
+        expect(query.get('user_id')).toBe(`eq.${parentA.user.id}`)
+        expect(query.get('select')).toBe('user_id,full_name')
+        expect(body).toEqual({ full_name: savedName })
+        nameWrites.push({ parentId: account.user.id, token: request.headers.get('authorization')!, body })
+        profileNames.set(account.user.id, savedName)
+        return HttpResponse.json([{ user_id: account.user.id, full_name: savedName }])
+      }),
+      http.post(endpoint('rpc/get_parent_match_summary'), async ({ request }) => {
+        const account = authenticated(request)
+        const body = await request.json() as { p_child_id: string }
+        expect(childrenFor(account).map(child => child.user_id)).toContain(body.p_child_id)
+        const rows = histories.get(body.p_child_id)
+        expect(rows).toBeDefined()
+        summaryRequests.push({ parentId: account.user.id, token: request.headers.get('authorization')!, body })
+        return HttpResponse.json([{ total_count: rows!.length, rated_count: rows!.length,
+          average_rating: 7, wins: rows!.length, draws: 0, losses: 0 }])
+      }),
+      http.post(endpoint('rpc/get_parent_match_page'), async ({ request }) => {
+        const account = authenticated(request)
+        const body = await request.json() as { p_child_id: string; p_after_id: string | null }
+        expect(childrenFor(account).map(child => child.user_id)).toContain(body.p_child_id)
+        const rows = histories.get(body.p_child_id)
+        expect(rows).toBeDefined()
+        pageRequests.push({ parentId: account.user.id, token: request.headers.get('authorization')!, body })
+        if (body.p_after_id !== null) {
+          const cursor = zaraMatches[49]
+          expect(account.user.id).toBe(parentA.user.id)
+          expect(body).toEqual({ p_child_id: siblingA.user_id, p_after_id: cursor.id,
+            p_after_match_date: cursor.match_date, p_after_created_at: cursor.created_at, p_limit: 51 })
+          request.signal.addEventListener('abort', () => { abortedHistory.push(account.user.id) }, { once: true })
+          await historyWait
+          completedHistory.push(account.user.id)
+          return HttpResponse.json([zaraMatches[50]])
+        }
+        expect(body).toEqual({ p_child_id: body.p_child_id, p_after_id: null,
+          p_after_match_date: null, p_after_created_at: null, p_limit: 51 })
+        return HttpResponse.json(rows)
+      }),
+    )
+
+    const signedIn = await supabase.auth.setSession({ access_token: parentA.access_token, refresh_token: parentA.refresh_token })
+    expect(signedIn.error).toBeNull()
+    window.history.replaceState({}, '', '/parent/matches')
+    render(<App />)
+    await screen.findByText('Alex opponent')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Following' }), siblingA.user_id)
+    await screen.findByText('51 recorded matches · all history')
+    await screen.findByText('Zara opponent 1')
+    expect(screen.getAllByText(/^Zara opponent /)).toHaveLength(50)
+    expect(screen.queryByText('Zara opponent 51')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByText('Loading next page…')
+    await waitFor(() => expect(pageRequests).toHaveLength(3))
+    expect(pageRequests[2]).toMatchObject({ parentId: parentA.user.id, token: `Bearer ${parentA.access_token}`,
+      body: { p_child_id: siblingA.user_id, p_after_id: zaraMatches[49].id } })
+    expect(completedHistory).toEqual([])
+
+    await user.click(screen.getByRole('button', { name: 'Profile' }))
+    await screen.findByText('Following Zara Synthetic · 2 children linked')
+    // Route departure cancels the client fetch even though the synthetic
+    // server is still processing A's page. Observe both sides separately.
+    await waitFor(() => expect(abortedHistory).toEqual([parentA.user.id]))
+    await user.click(screen.getByRole('button', { name: /^SETTINGS / }))
+    const family = await screen.findByRole('list', { name: 'Linked children' })
+    expect(within(family).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(family).getByText(siblingA.full_name)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Synthetic Parent A' }))
+    await user.clear(screen.getByRole('textbox'))
+    await user.type(screen.getByRole('textbox'), savedName)
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByText('Name updated')
+    expect(nameWrites).toEqual([{ parentId: parentA.user.id, token: `Bearer ${parentA.access_token}`,
+      body: { full_name: savedName } }])
+    expect(within(screen.getByRole('list', { name: 'Linked children' })).getAllByRole('listitem')).toHaveLength(2)
+
+    // The Profile screen reads AuthContext, so this checks refreshProfile,
+    // not just the name local to the Settings form. Selection is still Zara.
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await screen.findByText('Following Zara Synthetic · 2 children linked')
+    expect(screen.getByRole('combobox', { name: 'Following' })).toHaveValue(siblingA.user_id)
+    expect(screen.getAllByText(savedName)).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: /^SETTINGS / }))
+    await screen.findByRole('button', { name: savedName })
+    expect(completedHistory).toEqual([])
+
+    // Use the real SDK account event while mounted on real Settings. No
+    // useAuth mock forces an in-place lifecycle the provider would prevent.
+    await act(async () => {
+      const switched = await supabase.auth.setSession({ access_token: parentB.access_token, refresh_token: parentB.refresh_token })
+      expect(switched.error).toBeNull()
+    })
+    await screen.findByRole('button', { name: 'Synthetic Parent B' })
+    const bFamily = await screen.findByRole('list', { name: 'Linked children' })
+    expect(within(bFamily).getAllByRole('listitem')).toHaveLength(1)
+    expect(within(bFamily).getByText(childB.full_name)).toBeInTheDocument()
+    expect(within(bFamily).queryByText(childA.full_name)).not.toBeInTheDocument()
+    expect(within(bFamily).queryByText(siblingA.full_name)).not.toBeInTheDocument()
+    await act(async () => { releaseHistory(); await historyWait })
+    await waitFor(() => expect(completedHistory).toEqual([parentA.user.id]))
+    expect(abortedHistory).toEqual([parentA.user.id])
+    expect(window.location.pathname).toBe('/settings')
+    expect(screen.getByRole('button', { name: 'Synthetic Parent B' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await screen.findByText('Following Sam Synthetic · 1 child linked')
+    await user.click(screen.getByRole('button', { name: 'Matches' }))
+    await screen.findByText('2 recorded matches · all history')
+    await screen.findByText('Sam first opponent')
+    expect(screen.getByText('Sam second opponent')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Following' })).toHaveValue(childB.user_id)
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'Match history · page 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    expect(screen.queryByText(/^Zara opponent /)).not.toBeInTheDocument()
+    expect(screen.queryByText('Alex opponent')).not.toBeInTheDocument()
+    expect(screen.queryByText('51 recorded matches · all history')).not.toBeInTheDocument()
+    const expectedBRequest = { parentId: parentB.user.id, token: `Bearer ${parentB.access_token}`,
+      body: { p_child_id: childB.user_id, p_after_id: null, p_after_match_date: null, p_after_created_at: null, p_limit: 51 } }
+    expect(pageRequests).toHaveLength(4)
+    expect(pageRequests[3]).toEqual(expectedBRequest)
+    expect(summaryRequests.filter(request => request.parentId === parentB.user.id)).toEqual([{
+      parentId: parentB.user.id, token: `Bearer ${parentB.access_token}`, body: { p_child_id: childB.user_id },
+    }])
+    expect((await supabase.auth.getSession()).data.session?.user.id).toBe(parentB.user.id)
+    expect(nameWrites).toHaveLength(1)
+    expect(grants).toEqual([])
+    expect(logouts).toEqual([])
     expect(unexpected).toEqual([])
   })
 })

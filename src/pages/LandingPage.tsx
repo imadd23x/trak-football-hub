@@ -124,7 +124,7 @@ export default function LandingPage() {
 }
 
 function AccountChoice({ onSwitch }: { onSwitch: () => void }) {
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const { user, profile, profileError, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState<'signout' | 'refresh' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +147,7 @@ function AccountChoice({ onSwitch }: { onSwitch: () => void }) {
   async function checkAccess() {
     if (busy) return;
     setBusy('refresh'); setError(null);
-    // AuthContext owns lookup failures and displays its toast; this contract resolves.
+    // AuthContext reports lookup failures inline and by toast; this contract resolves.
     try { await refreshProfile(); }
     finally { if (mounted.current) setBusy(null); }
   }
@@ -158,11 +158,12 @@ function AccountChoice({ onSwitch }: { onSwitch: () => void }) {
       <h2 className="text-lg">{name}</h2>
       {user?.email && user.email !== name && <p className="text-sm text-muted-foreground">{user.email}</p>}
     </div>
-    {home ? <button type="button" disabled={!!busy} onClick={() => navigate(home, { replace: true })}
+    {home && <button type="button" disabled={!!busy} onClick={() => navigate(home, { replace: true })}
       className="w-full min-h-11 rounded-xl bg-primary text-primary-foreground p-3 font-medium break-words focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
       Continue as {name}
-    </button> : <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Your account access is not available yet. Open your academy invitation or check access again.</p>
+    </button>}
+    {(!home || profileError) && <div className="space-y-3">
+      <p role={profileError ? 'alert' : undefined} className="text-sm text-muted-foreground">{profileError ?? 'Your account access is not available yet. Open your academy invitation or check access again.'}</p>
       <button type="button" disabled={!!busy} onClick={() => { void checkAccess(); }}
         className="w-full min-h-11 rounded-xl border border-border p-3 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">{busy === 'refresh' ? 'Checking access…' : 'Check access again'}</button>
     </div>}

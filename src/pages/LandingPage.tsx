@@ -146,8 +146,8 @@ function AccountChoice({ onSwitch }: { onSwitch: () => void }) {
   async function checkAccess() {
     if (busy) return;
     setBusy('refresh'); setError(null);
+    // AuthContext owns lookup failures and displays its toast; this contract resolves.
     try { await refreshProfile(); }
-    catch { if (mounted.current) setError('Could not check your account access. Try again.'); }
     finally { if (mounted.current) setBusy(null); }
   }
 

@@ -1,3 +1,4 @@
+-- @trak-fixture
 -- DISPOSABLE ONLY, immediately before the F1/F6 repair migration.
 -- Simulate already-corrupt legacy organization references to verify the data
 -- repair UPDATEs. This is not a claim that authenticated users can disable FK

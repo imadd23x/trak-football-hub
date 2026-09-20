@@ -1,3 +1,4 @@
+-- @trak-suite mode=--coach-departure-review in-all=true order=1000
 -- Synthetic, committed fixtures for account_deletion_assertions.sql.
 -- ONLY the disposable in-memory harness may execute this file. COMMIT is
 -- intentional: inserting and deleting in one transaction masked the F6 bug.

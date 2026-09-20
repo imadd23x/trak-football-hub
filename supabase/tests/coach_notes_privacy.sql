@@ -313,9 +313,23 @@ SELECT pg_temp.assert_true(
 -- recognition_awards — "a child's assessment history should need two mistakes
 -- to become deletable, not one".
 --
--- So my migration was withdrawn and this table is asserted the same way as
--- the other three. One table diverging on a rule the whole schema follows is
--- a landmine for whoever adds coach_shared_feedback to that A1c list next.
+-- So this table is asserted the same way as the other three. One table
+-- diverging on a rule the whole schema follows is a landmine for whoever adds
+-- coach_shared_feedback to that A1c list next.
+--
+-- ⚠ This assertion is the reason 20260920104500 exists, and the order matters
+-- if you are reading the migrations. I first withdrew 20260919170000 to a
+-- no-op tombstone, which left the policy present on a fresh replay and ABSENT
+-- on any database that had already applied the original — including this PR's
+-- preview branch, measured read-only:
+--
+--   v170000_applied 1 · delete_policies 0 · authenticated DELETE false
+--
+-- The line below would therefore have passed here and failed there, which is
+-- the whole hazard: an assertion green only because the replay it runs against
+-- is the history that agrees with it. 20260919170000 is now restored to its
+-- original bytes and 20260920104500 recreates the policy on BOTH histories, so
+-- this assertion means the same thing wherever it runs.
 SELECT pg_temp.assert_true(
   EXISTS (
     SELECT 1 FROM pg_policies

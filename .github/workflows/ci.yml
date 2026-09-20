@@ -53,6 +53,13 @@ jobs:
       - name: Parent migration after deployed reporting migration
         run: npm run test:db -- --parent-upgrade-review
 
+      # Every step above replays migrations from empty, so none of them can see
+      # a database that already ran an earlier version of a migration file. That
+      # is the gap a withdrawn-and-replaced migration falls through: the replay
+      # goes green while the already-applied database keeps the old effects.
+      - name: Migration histories converge
+        run: npm run test:db:convergence
+
       # tests/msw and tests/support hold the MSW fidelity contract and the
       # useCase() unknown-id guard — package.json's "test" script only runs
       # src, so these run nowhere else in CI.

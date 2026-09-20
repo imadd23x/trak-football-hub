@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, MetadataLabel } from '@/components/trak'
 import { computeMatchScore } from '@/lib/rating-engine'
 import { trackEvent } from '@/lib/telemetry'
+import { validateMatchInput, MATCH_LIMITS } from '@/lib/match-input-rules'
 
 type SquadPlayer = {
   id: string
@@ -25,8 +26,12 @@ type PlayerDetail = {
   played:  boolean
   role:    'starter' | 'sub'
   minutes: number
-  goals:   0 | 1 | 2         // 2 means "2+"
-  assists: 0 | 1 | 2
+  /* Exact counts. These were once `0 | 1 | 2` with 2 meaning "2+", so a
+     hat-trick was stored as 2 and the only vocabulary the form had was the
+     rating bucket. The bucket still exists — goalsKey() below — but it is now
+     derived for the rating engine rather than being the thing recorded. */
+  goals:   number
+  assists: number
   card:    CardType
 }
 
@@ -43,8 +48,12 @@ function mapPosition(raw: string | null) {
   return 'mid'
 }
 
-function goalsKey(g: 0 | 1 | 2): string {
-  return g === 2 ? '2+' : String(g)
+/* The rating engine's vocabulary is '0', '1', '2+' — see rating-engine.ts,
+   which compares against those literals. Collapsing happens HERE, at the point
+   the rating is computed, so the exact count still reaches the database.
+   Three goals now rate identically to two and are stored as three. */
+function goalsKey(g: number): string {
+  return g >= 2 ? '2+' : String(g)
 }
 
 export default function CoachAddSession() {
@@ -156,7 +165,19 @@ export default function CoachAddSession() {
   const playedCount = Object.values(details).filter(d => d.played).length
 
   // ── validation ───────────────────────────────────────────────────────────────
-  const canSave = !saving && (
+  /* Only players marked as having played are checked. An untouched bench row
+     carries DEFAULT_DETAIL (90 minutes, no goals), which is valid anyway, but
+     checking it would mean a coach could be blocked by a row they never opened. */
+  const impossibleRecords = !isMatch ? [] : squad
+    .filter(p => details[p.id]?.played)
+    .filter(p => validateMatchInput({
+      minutes: details[p.id].minutes,
+      goals:   details[p.id].goals,
+      assists: details[p.id].assists,
+      teamScore: scoreUs === '' ? undefined : Number(scoreUs),
+    }).length > 0)
+
+  const canSave = !saving && impossibleRecords.length === 0 && (
     isMatch    ? opponent.trim().length > 0 && scoreUs !== '' && scoreThem !== ''
     : type === 'training' ? trainingFocus.size > 0
     : title.trim().length > 0
@@ -533,45 +554,48 @@ export default function CoachAddSession() {
                               </div>
                             </div>
 
-                            {/* Goals */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-[8px] tracking-[0.1em] uppercase text-white/30 w-[44px] flex-shrink-0"
-                                style={{ fontFamily: "'DM Mono', monospace" }}>GOALS</span>
-                              <div className="flex gap-1.5">
-                                {([0, 1, 2] as const).map(g => (
-                                  <button key={g} onClick={() => setDetail(p.id, { goals: g })}
-                                    className="px-2.5 py-1 rounded-full text-[10px] transition-colors"
-                                    style={{
-                                      background: d.goals === g ? 'rgba(200,242,90,0.12)' : 'rgba(255,255,255,0.04)',
-                                      color: d.goals === g ? '#C8F25A' : 'rgba(255,255,255,0.4)',
-                                      border: `1px solid ${d.goals === g ? 'rgba(200,242,90,0.3)' : 'rgba(255,255,255,0.07)'}`,
-                                      fontFamily: "'DM Mono', monospace",
-                                    }}>
-                                    {g === 2 ? '2+' : g}
-                                  </button>
-                                ))}
+                            {/* Goals and assists — steppers, not a 0/1/2+ picker.
+                                The old control could not express a hat-trick: it
+                                offered three buttons and stored "2+" as 2. */}
+                            {([
+                              { label: 'GOALS',   key: 'goals'   as const, value: d.goals,   max: MATCH_LIMITS.goalsMax },
+                              { label: 'ASSISTS', key: 'assists' as const, value: d.assists, max: MATCH_LIMITS.assistsMax },
+                            ]).map(({ label, key, value, max }) => (
+                              <div key={key} className="flex items-center gap-2">
+                                <span className="text-[8px] tracking-[0.1em] uppercase text-white/30 w-[44px] flex-shrink-0"
+                                  style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
+                                <button
+                                  aria-label={`One fewer ${key} for ${p.player_name}`}
+                                  onClick={() => setDetail(p.id, { [key]: Math.max(0, value - 1) })}
+                                  className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 text-sm">−</button>
+                                <span className="w-8 text-center text-[13px] text-white/88"
+                                  style={{ fontFamily: "'DM Mono', monospace" }}>
+                                  {value}
+                                </span>
+                                <button
+                                  aria-label={`One more ${key} for ${p.player_name}`}
+                                  onClick={() => setDetail(p.id, { [key]: Math.min(max, value + 1) })}
+                                  className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 text-sm">+</button>
                               </div>
-                            </div>
+                            ))}
 
-                            {/* Assists */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-[8px] tracking-[0.1em] uppercase text-white/30 w-[44px] flex-shrink-0"
-                                style={{ fontFamily: "'DM Mono', monospace" }}>ASSISTS</span>
-                              <div className="flex gap-1.5">
-                                {([0, 1, 2] as const).map(a => (
-                                  <button key={a} onClick={() => setDetail(p.id, { assists: a })}
-                                    className="px-2.5 py-1 rounded-full text-[10px] transition-colors"
-                                    style={{
-                                      background: d.assists === a ? 'rgba(200,242,90,0.12)' : 'rgba(255,255,255,0.04)',
-                                      color: d.assists === a ? '#C8F25A' : 'rgba(255,255,255,0.4)',
-                                      border: `1px solid ${d.assists === a ? 'rgba(200,242,90,0.3)' : 'rgba(255,255,255,0.07)'}`,
-                                      fontFamily: "'DM Mono', monospace",
-                                    }}>
-                                    {a === 2 ? '2+' : a}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                            {/* Why a save will be refused, before the coach taps it.
+                                The same rules run in the database, so this cannot
+                                be the only place they are applied — but a coach
+                                should not have to learn them from a rejection. */}
+                            {(() => {
+                              const problems = validateMatchInput({
+                                minutes: d.minutes, goals: d.goals, assists: d.assists,
+                                teamScore: scoreUs === '' ? undefined : Number(scoreUs),
+                              })
+                              if (problems.length === 0) return null
+                              return (
+                                <p role="alert" className="text-[10px] leading-snug text-[#F2705A] pl-[52px]"
+                                  style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                                  {problems[0].message}
+                                </p>
+                              )
+                            })()}
 
                             {/* Card */}
                             <div className="flex items-center gap-2">

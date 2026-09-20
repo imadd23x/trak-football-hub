@@ -283,10 +283,18 @@ export default function CoachSchedule() {
       toast.error(`"${ev.title}" has no usable date — set one before saving it`)
       return
     }
+    // An unreadable end time was being written as NULL without a word, while
+    // an unreadable start was reported. Same input, same parser, two different
+    // outcomes — so an event silently lost the time it was due to finish.
+    const endsAt = ev.ends_at ? normalizeInstant(ev.ends_at) : null
+    if (ev.ends_at && !endsAt) {
+      toast.error(`"${ev.title}" has an end time we couldn't read — check it before saving`)
+      return
+    }
     const { error } = await supabase.from('coach_calendar_events').insert({
       coach_user_id: user.id,
       title: ev.title, event_type: ev.event_type, starts_at: startsAt,
-      ends_at: normalizeInstant(ev.ends_at), venue: ev.venue || null,
+      ends_at: endsAt, venue: ev.venue || null,
       opponent: ev.opponent || null, notes: ev.notes || null,
       published: false, source: 'ai_text',
     })
@@ -306,20 +314,27 @@ export default function CoachSchedule() {
     // A draft the parser could not date is not silently dropped into the
     // calendar at the wrong moment — it is left behind and named.
     const rows = drafts
-      .map(ev => ({ ev, startsAt: normalizeInstant(ev.starts_at) }))
-      .filter((r): r is { ev: typeof drafts[number]; startsAt: string } => r.startsAt !== null)
+      .map(ev => ({
+        ev,
+        startsAt: normalizeInstant(ev.starts_at),
+        // Treated exactly like a bad start: reported, not silently nulled.
+        endsAt: ev.ends_at ? normalizeInstant(ev.ends_at) : null,
+        endBroken: !!ev.ends_at && normalizeInstant(ev.ends_at) === null,
+      }))
+      .filter((r): r is { ev: typeof drafts[number]; startsAt: string; endsAt: string | null; endBroken: boolean } =>
+        r.startsAt !== null && !r.endBroken)
 
     const undated = drafts.length - rows.length
     if (undated > 0) {
-      toast.error(`${undated} event${undated === 1 ? '' : 's'} had no usable date and ${undated === 1 ? 'was' : 'were'} not saved`)
+      toast.error(`${undated} event${undated === 1 ? '' : 's'} had a date or end time we couldn't read and ${undated === 1 ? 'was' : 'were'} not saved`)
     }
     if (!rows.length) return
 
     const { error } = await supabase.from('coach_calendar_events').insert(
-      rows.map(({ ev, startsAt }) => ({
+      rows.map(({ ev, startsAt, endsAt }) => ({
         coach_user_id: user.id,
         title: ev.title, event_type: ev.event_type, starts_at: startsAt,
-        ends_at: normalizeInstant(ev.ends_at), venue: ev.venue || null,
+        ends_at: endsAt, venue: ev.venue || null,
         opponent: ev.opponent || null, notes: ev.notes || null,
         published: false, source: 'ai_text',
       }))
@@ -332,7 +347,9 @@ export default function CoachSchedule() {
     }
     // Keep the ones that were not saved, so they are not lost silently, and
     // report the number actually written rather than the number attempted.
-    setDrafts(drafts.filter(ev => normalizeInstant(ev.starts_at) === null))
+    setDrafts(drafts.filter(ev =>
+      normalizeInstant(ev.starts_at) === null ||
+      (!!ev.ends_at && normalizeInstant(ev.ends_at) === null)))
     if (!undated) setImportText('')
     loadData()
     toast.success(`Saved ${rows.length} event${rows.length === 1 ? '' : 's'}`)

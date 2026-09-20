@@ -57,13 +57,24 @@ function OptPill({
 /* ========== main page ========== */
 
 export default function CoachAssessPage() {
+  const { user } = useAuth()
+  // A different signed-in coach must never render the previous account's
+  // roster or draft, even during the render before effects clean up.
+  return <CoachAssessmentForm key={user?.id ?? 'signed-out'} />
+}
+
+function CoachAssessmentForm() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const userId = user?.id
 
   /* --- data --- */
   const [players, setPlayers] = useState<any[]>([])
   const [sessions, setSessions] = useState<any[]>([])
+  const [choicesLoading, setChoicesLoading] = useState(true)
+  const [choicesError, setChoicesError] = useState(false)
+  const rosterAccount = useRef(userId)
   const [playerId, setPlayerId] = useState((location.state as any)?.preselectedPlayerId || '')
   const [sessionId, setSessionId] = useState('')
   const [appearance, setAppearance] = useState<'started' | 'sub' | 'training'>('started')
@@ -74,7 +85,26 @@ export default function CoachAssessPage() {
   const [physical, setPhysical]         = useState(5)
   const [coachability, setCoachability] = useState(5)
   const [note, setNote] = useState('')
+
+  // Shared feedback (K9). Deliberately separate state from `note`, mirroring
+  // the schema: the note is the coach's private working record and the child
+  // never sees it. This is written for the child to read, and only once the
+  // coach publishes it. Nothing copies one into the other — that is the whole
+  // point of the two tables, and it has to be true in the UI as well.
+  const [shared,          setShared]          = useState('')
+  const [sharedPublished, setSharedPublished] = useState(false)
+  const [sharedExists,    setSharedExists]    = useState(false)
   const [saving, setSaving] = useState(false)
+  const [noteExists, setNoteExists] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const scope = JSON.stringify([userId, playerId])
+  const currentScope = useRef(scope)
+  currentScope.current = scope
+  const [loadState, setLoadState] = useState<{ scope: string; status: 'loading' | 'ready' | 'error' }>({ scope: '', status: 'loading' })
+  const formReady = loadState.scope === scope && loadState.status === 'ready'
+    && !choicesLoading && !choicesError && players.some(player => player.id === playerId)
+  const saveRequest = useRef<AbortController | null>(null)
+  useEffect(() => () => { saveRequest.current?.abort() }, [scope])
 
   /* Scorecard metric 4: median time to assess one player, target <90s.
      The clock starts when a player is chosen, not on mount, so a page left
@@ -92,50 +122,100 @@ export default function CoachAssessPage() {
   const [existingId, setExistingId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!user || !playerId) { setExistingId(null); return }
-    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
-    supabase
-      .from('coach_assessments')
-      .select('id, work_rate, tactical, attitude, technical, physical, coachability, appearance, session_id')
-      .eq('coach_user_id', user.id)
-      .eq('squad_player_id', playerId)
-      .gte('created_at', startOfDay.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!data) { setExistingId(null); return }
-        setExistingId(data.id)
-        setWorkRate(data.work_rate); setTactical(data.tactical)
-        setAttitude(data.attitude); setTechnical(data.technical)
-        setPhysical(data.physical); setCoachability(data.coachability)
-        if (data.appearance) setAppearance(data.appearance as 'started' | 'sub' | 'training')
-        if (data.session_id) setSessionId(data.session_id)
-      })
-  }, [user, playerId])
+    let cancelled = false
+    const controller = new AbortController()
+    // The entire draft belongs to one account/player selection. Clear it
+    // before loading, and never make a failed read look like a new assessment.
+    setExistingId(null)
+    setWorkRate(5); setTactical(5); setAttitude(5)
+    setTechnical(5); setPhysical(5); setCoachability(5)
+    setAppearance('started'); setSessionId('')
+    setNote(''); setNoteExists(false)
+    setShared(''); setSharedPublished(false); setSharedExists(false)
+    setSaving(false)
+    setLoadState({ scope, status: 'loading' })
+    if (userId && playerId) {
+      void (async () => {
+        try {
+          const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+          const { data, error } = await supabase.from('coach_assessments')
+            .select('id, work_rate, tactical, attitude, technical, physical, coachability, appearance, session_id')
+            .eq('coach_user_id', userId).eq('squad_player_id', playerId)
+            .gte('created_at', startOfDay.toISOString())
+            .order('created_at', { ascending: false }).limit(1).abortSignal(controller.signal).maybeSingle()
+          if (cancelled) return
+          if (error) throw error
+          if (data) {
+            // Load both independent text fields before enabling editing. A
+            // stale or failed shared-text read must never restore another
+            // child's text, hide a publication, or overwrite a coach's edit.
+            const [privateResult, sharedResult] = await Promise.all([
+              supabase.from('coach_assessment_notes').select('note')
+                .eq('assessment_id', data.id).abortSignal(controller.signal).maybeSingle(),
+              supabase.from('coach_shared_feedback' as any).select('body, published_at')
+                .eq('assessment_id', data.id).abortSignal(controller.signal).maybeSingle(),
+            ])
+            if (cancelled) return
+            if (privateResult.error) throw privateResult.error
+            if (sharedResult.error) throw sharedResult.error
+            const sf = sharedResult.data as { body: string; published_at: string | null } | null
+            setExistingId(data.id)
+            setWorkRate(data.work_rate); setTactical(data.tactical)
+            setAttitude(data.attitude); setTechnical(data.technical)
+            setPhysical(data.physical); setCoachability(data.coachability)
+            setAppearance((data.appearance as 'started' | 'sub' | 'training') ?? 'started')
+            setSessionId(data.session_id ?? '')
+            setNote(privateResult.data?.note ?? '')
+            setNoteExists(privateResult.data != null)
+            setShared(sf?.body ?? '')
+            setSharedPublished(sf?.published_at != null)
+            setSharedExists(sf != null)
+          }
+          setLoadState({ scope, status: 'ready' })
+        } catch (error) {
+          if (cancelled) return
+          console.error('Assessment load failed:', error)
+          setLoadState({ scope, status: 'error' })
+        }
+      })()
+    }
+    return () => { cancelled = true; controller.abort() }
+  }, [userId, playerId, scope, loadAttempt])
 
-  /* fetch squad players */
+  /* Account-bound choices: a late response from another coach cannot repopulate them. */
   useEffect(() => {
-    if (!user) return
-    supabase
-      .from('squad_players')
-      .select('*')
-      .eq('coach_user_id', user.id)
-      .order('player_name')
-      .then(({ data }) => setPlayers(data || []))
-  }, [user])
-
-  /* fetch sessions/matches for the session dropdown */
-  useEffect(() => {
-    if (!user) return
-    supabase
-      .from('coach_sessions')
-      .select('*')
-      .eq('coach_user_id', user.id)
-      .order('session_date', { ascending: false })
-      .limit(20)
-      .then(({ data }) => setSessions(data || []))
-  }, [user])
+    let cancelled = false
+    const controller = new AbortController()
+    setPlayers([]); setSessions([])
+    setChoicesError(false); setChoicesLoading(true)
+    if (rosterAccount.current !== userId) {
+      rosterAccount.current = userId
+      setPlayerId('')
+    }
+    if (userId) {
+      void (async () => {
+        try {
+          const [roster, events] = await Promise.all([
+            supabase.from('squad_players').select('*').eq('coach_user_id', userId)
+              .order('player_name').abortSignal(controller.signal),
+            supabase.from('coach_sessions').select('*').eq('coach_user_id', userId)
+              .order('session_date', { ascending: false }).limit(20).abortSignal(controller.signal),
+          ])
+          if (cancelled) return
+          if (roster.error) throw roster.error
+          if (events.error) throw events.error
+          setPlayers(roster.data ?? []); setSessions(events.data ?? [])
+        } catch (error) {
+          if (cancelled) return
+          console.error('Assessment choices failed:', error)
+          setChoicesError(true)
+        } finally {
+          if (!cancelled) setChoicesLoading(false)
+        }
+      })()
+    } else setChoicesLoading(false)
+    return () => { cancelled = true; controller.abort() }
+  }, [userId, loadAttempt])
 
   /* --- computed --- */
   const avg = (workRate + tactical + attitude + technical + physical + coachability) / 6
@@ -149,61 +229,126 @@ export default function CoachAssessPage() {
 
   /* --- save --- */
   const handleSave = async () => {
-    if (!user || !playerId || saving) return
+    if (!user || !playerId || saving || !formReady || saveRequest.current) return
+    const controller = new AbortController()
+    saveRequest.current = controller
+    const isCurrent = () => !controller.signal.aborted && currentScope.current === scope
     setSaving(true)
-    const cardStats = deriveCardStats({ workRate, tactical, attitude, technical, physical, coachability })
-    const payload = {
-      coach_user_id: user.id,
-      coach_name_snapshot: profile?.full_name || null,
-      squad_player_id: playerId,
-      session_id: sessionId || null,
-      appearance,
-      // raw coach inputs
-      work_rate: workRate,
-      tactical,
-      attitude,
-      technical,
-      physical,
-      coachability,
-      // derived card stats
-      ...cardStats,
-    }
-
-    const { data: saved, error: saveError } = existingId
-      ? await supabase.from('coach_assessments')
-          .update(payload).eq('id', existingId).select('id').maybeSingle()
-      : await supabase.from('coach_assessments')
-          .insert(payload).select('id').maybeSingle()
-
-    if (saveError) {
-      console.error('Save failed:', saveError)
-      toast.error(`Could not save assessment: ${saveError.message}`)
-      setSaving(false)
-      return
-    }
-
-    if (saved?.id && note.trim()) {
-      // upsert, so re-saving replaces the note rather than stacking another
-      const { error: noteError } = await supabase.from('coach_assessment_notes').upsert({
-        assessment_id: saved.id,
+    try {
+      const cardStats = deriveCardStats({ workRate, tactical, attitude, technical, physical, coachability })
+      const payload = {
         coach_user_id: user.id,
-        note: note.trim(),
-      }, { onConflict: 'assessment_id' })
-      if (noteError) {
-        console.error('Note save failed:', noteError)
-        toast.error(`Assessment saved, note failed: ${noteError.message}`)
+        coach_name_snapshot: profile?.full_name || null,
+        squad_player_id: playerId,
+        session_id: sessionId || null,
+        appearance,
+        // raw coach inputs
+        work_rate: workRate,
+        tactical,
+        attitude,
+        technical,
+        physical,
+        coachability,
+        // derived card stats
+        ...cardStats,
       }
+
+      const { data: saved, error: saveError } = existingId
+        ? await supabase.from('coach_assessments')
+            .update(payload).eq('id', existingId)
+            .eq('coach_user_id', user.id).eq('squad_player_id', playerId)
+            .select('id').abortSignal(controller.signal).maybeSingle()
+        : await supabase.from('coach_assessments')
+            .insert(payload).select('id').abortSignal(controller.signal).maybeSingle()
+
+      if (!isCurrent()) return
+      if (saveError) {
+        console.error('Save failed:', saveError)
+        toast.error(`Could not save assessment: ${saveError.message}`)
+        setSaving(false)
+        return
+      }
+
+      // A row is required, not just the absence of an error. .maybeSingle() on an
+      // UPDATE that matched nothing returns data null with error null — an RLS
+      // denial, or an assessment deleted or transferred since this page loaded.
+      // Everything below is keyed on saved.id, so without this the note and the
+      // shared feedback both silently skip and the coach is sent home believing
+      // the assessment saved. Imad reproduced it on #44.
+      if (!saved?.id) {
+        console.error('Save matched no assessment row', { existingId })
+        toast.error('Nothing was saved — the assessment may have been removed. Reload and try again.')
+        setSaving(false)
+        return
+      }
+
+      setExistingId(saved.id)
+      if (saved?.id && (note.trim() || noteExists)) {
+        // upsert, so re-saving replaces the note rather than stacking another
+        const { error: noteError } = await supabase.from('coach_assessment_notes').upsert({
+          assessment_id: saved.id,
+          coach_user_id: user.id,
+          note: note.trim(),
+        }, { onConflict: 'assessment_id' }).abortSignal(controller.signal)
+        if (!isCurrent()) return
+        if (noteError) {
+          console.error('Note save failed:', noteError)
+          toast.error(`Assessment saved, note failed: ${noteError.message}. Your text is still here — press save to try again.`)
+          return
+        }
+        setNoteExists(true)
+      }
+
+      // Shared feedback, written separately and published deliberately (K9).
+      // Never derived from `note`. Saved whenever there is text OR a row already
+      // exists, so clearing the box and unpublishing both take effect.
+      if (saved?.id && (shared.trim() || sharedExists)) {
+        // Cast for the same reason as the read above.
+        const { error: sharedError } = await supabase.from('coach_shared_feedback' as any).upsert({
+          assessment_id: saved.id,
+          coach_user_id: user.id,
+          body:          shared.trim(),
+          // NULL retracts: the child stops seeing it immediately.
+          published_at:  sharedPublished && shared.trim() ? new Date().toISOString() : null,
+        }, { onConflict: 'assessment_id' }).abortSignal(controller.signal)
+        if (!isCurrent()) return
+        if (sharedError) {
+          // Stay put. Navigating away here loses the text the coach wrote for the
+          // child and gives them no way to retry it — the same mistake K5 fixed
+          // in the match flow, which I then repeated in my own new code an hour
+          // later. The assessment itself is saved, so keep its id: pressing save
+          // again updates that row rather than creating a second one.
+          console.error('Shared feedback save failed:', sharedError)
+          toast.error(
+            `Assessment saved, but the feedback for the player did not: ${sharedError.message}. ` +
+              `Your text is still here — press save to try again.`,
+            { duration: 12000 },
+          )
+          setExistingId(saved.id)
+          setSaving(false)
+          return
+        }
+        setSharedExists(true)
+      }
+      trackEvent('assessment_submitted', {
+        mode: 'full',
+        players: 1,
+        squad_player_id: playerId,
+        band,
+        updated: existingId !== null,
+        has_note: note.trim().length > 0,
+        duration_ms: timerRef.current?.() ?? null,
+      })
+      navigate('/coach/home')
+    } catch (error) {
+      if (isCurrent()) {
+        console.error('Assessment save interrupted:', error)
+        toast.error('Could not finish saving. Your text is still here — please try again.')
+      }
+    } finally {
+      if (saveRequest.current === controller) saveRequest.current = null
+      if (isCurrent()) setSaving(false)
     }
-    trackEvent('assessment_submitted', {
-      mode: 'full',
-      players: 1,
-      squad_player_id: playerId,
-      band,
-      updated: existingId !== null,
-      has_note: note.trim().length > 0,
-      duration_ms: timerRef.current?.() ?? null,
-    })
-    navigate('/coach/home')
   }
 
   /* ---- render ---- */
@@ -259,6 +404,8 @@ export default function CoachAssessPage() {
           </span>
           <div className="relative">
             <select
+              aria-label="Player"
+              disabled={saving || choicesLoading}
               value={playerId}
               onChange={e => setPlayerId(e.target.value)}
               className="w-full px-4 py-3 pr-10 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none appearance-none"
@@ -274,6 +421,15 @@ export default function CoachAssessPage() {
           </div>
         </div>
 
+        {((playerId && !formReady) || choicesError) && (
+          (choicesError || (loadState.scope === scope && loadState.status === 'error')) ? (
+            <div role="alert" className="text-sm text-amber-300">
+              Could not load this assessment. Retry before editing or saving.
+              <button type="button" onClick={() => setLoadAttempt(value => value + 1)} className="ml-2 underline">Retry</button>
+            </div>
+          ) : <p role="status" className="text-sm text-white/50">Loading assessment…</p>
+        )}
+        <fieldset disabled={!formReady || saving} className="contents">
         {/* ---- 3. session selector ---- */}
         <div className="space-y-1.5">
           <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
@@ -353,8 +509,13 @@ export default function CoachAssessPage() {
               <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
                 IMPROVEMENT AREAS
               </span>
+              {/* This used to read "AI will expand these into personalised
+                  feedback for the player". K9 made that false: the note is
+                  private and the player's feedback screen can no longer read
+                  it. A label promising a coach their words reach the child,
+                  when they do not, is worse than no label. */}
               <p className="text-[9px] text-white/25 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                AI will expand these into personalised feedback for the player
+                Private to you. The player never sees this.
               </p>
             </div>
             <span className="text-[10px] text-white/25">{note.length}/300</span>
@@ -371,14 +532,58 @@ export default function CoachAssessPage() {
           />
         </div>
 
+        {/* ---- 8b. shared feedback (K9) ---- */}
+        {/* Two boxes rather than one, because the schema has two tables and the
+            coach needs to see which words the child will read. Nothing copies
+            the note into here. */}
+        <div className="px-5 pb-5 space-y-2">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
+                FEEDBACK FOR THE PLAYER
+              </span>
+              <p className="text-[9px] text-white/25 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                {sharedPublished && shared.trim()
+                  ? 'The player can read this'
+                  : 'Only the player sees this, and only once you publish it'}
+              </p>
+            </div>
+            <span className="text-[10px] text-white/25">{shared.length}/300</span>
+          </div>
+          <textarea
+            value={shared}
+            onChange={e => {
+              if (e.target.value.length <= 300) setShared(e.target.value)
+            }}
+            maxLength={300}
+            rows={3}
+            placeholder="e.g. Great week. Keep working on your first touch — try the cone drill before training."
+            className="w-full px-4 py-3 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none resize-none placeholder:text-white/20"
+          />
+          <button
+            type="button"
+            onClick={() => setSharedPublished(v => !v)}
+            disabled={!shared.trim()}
+            className="w-full py-2.5 rounded-[10px] text-[11px] font-semibold transition-colors disabled:opacity-30"
+            style={{
+              background: sharedPublished ? 'rgba(200,242,90,0.12)' : 'rgba(255,255,255,0.04)',
+              color:      sharedPublished ? '#C8F25A' : 'rgba(255,255,255,0.4)',
+              border:     `1px solid ${sharedPublished ? 'rgba(200,242,90,0.3)' : 'rgba(255,255,255,0.07)'}`,
+            }}
+          >
+            {sharedPublished ? 'Published — tap to unpublish' : 'Publish to the player'}
+          </button>
+        </div>
+
         {/* ---- 9. save button ---- */}
         <button
           onClick={handleSave}
-          disabled={!playerId || saving}
+          disabled={!playerId || saving || !formReady}
           className="w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity"
         >
           {saving ? 'Saving...' : 'Save Assessment \u2192'}
         </button>
+        </fieldset>
       </div>
 
       {/* ---- 10. bottom nav ---- */}

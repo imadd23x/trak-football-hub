@@ -1,3 +1,4 @@
+-- @trak-suite mode=--academy-access-review in-all=true
 -- F1/F6 compatibility: actual authenticated access, immutable academy IDs,
 -- legitimate linked-player edits, and independent-coach roster adoption.
 BEGIN;
@@ -167,6 +168,8 @@ INSERT INTO public.squad_players (id, coach_user_id, player_name, linked_player_
 INSERT INTO public.coach_assessments (id, coach_user_id, squad_player_id) VALUES
   (pg_temp.academy_id(70), pg_temp.academy_id(52), pg_temp.academy_id(60)),
   (pg_temp.academy_id(71), pg_temp.academy_id(52), pg_temp.academy_id(61));
+INSERT INTO public.recognition_awards (id,coach_user_id,squad_player_id,award_type)
+VALUES (pg_temp.academy_id(72),pg_temp.academy_id(52),pg_temp.academy_id(61),'effort');
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(51), 'role', 'authenticated')::text, true);
 SELECT public.delete_my_account();
@@ -195,6 +198,27 @@ SELECT pg_temp.academy_assert(
    AND organization_deleted_at IS NOT NULL AND organization_id IS NULL AND status = 'coach_departed'),
   'closure marker, cleared org and departed status survive later updates'
 );
+-- Ordinary later bookkeeping must not reattribute assessment/award history
+-- via the coach's current academy, even when performed by maintenance code.
+SELECT pg_temp.academy_assert(
+  (SELECT count(*)=2 FROM public.coach_assessments WHERE id IN (pg_temp.academy_id(70),pg_temp.academy_id(71)))
+  AND EXISTS (SELECT 1 FROM public.recognition_awards WHERE id=pg_temp.academy_id(72)),
+  'closed assessment and award fixtures survive before reattribution checks');
+UPDATE public.coach_assessments SET organization_id=pg_temp.academy_id(11), appearance='training'
+WHERE id IN (pg_temp.academy_id(70),pg_temp.academy_id(71));
+UPDATE public.recognition_awards SET organization_id=pg_temp.academy_id(11)
+WHERE id=pg_temp.academy_id(72);
+SELECT pg_temp.academy_assert(
+  (SELECT count(*)=2 FROM public.coach_assessments WHERE id IN (pg_temp.academy_id(70),pg_temp.academy_id(71)) AND organization_id IS NULL)
+  AND (SELECT organization_id IS NULL FROM public.recognition_awards WHERE id=pg_temp.academy_id(72)),
+  'closed assessments and awards cannot acquire the coach current academy');
+SELECT pg_temp.academy_denied(
+  $$UPDATE public.coach_assessments SET squad_player_id=pg_temp.academy_id(22) WHERE id=pg_temp.academy_id(70)$$,
+  'even maintenance cannot retarget closed assessment history to another roster identity');
+SELECT pg_temp.academy_denied(
+  $$UPDATE public.recognition_awards SET squad_player_id=pg_temp.academy_id(22) WHERE id=pg_temp.academy_id(72)$$,
+  'even maintenance cannot retarget closed award history to another roster identity');
+
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(2), 'role', 'authenticated')::text, true);
 SELECT pg_temp.academy_assert((SELECT count(*) = 0 FROM public.profiles WHERE user_id = pg_temp.academy_id(54)), 'new academy admin cannot acquire old child profile through a later update');

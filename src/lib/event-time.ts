@@ -1,3 +1,5 @@
+import { daysInMonth } from './calendar'
+
 /**
  * Session times, stored as a real instant rather than a naive wall clock.
  *
@@ -17,10 +19,6 @@
  */
 
 /** Days in a month. `month` is 1-based. */
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate()
-}
-
 /**
  * Build an absolute instant from wall-clock parts entered locally, or null if
  * those parts are not a real date and time.
@@ -95,15 +93,32 @@ export function normalizeInstant(value: string | null | undefined): string | nul
   if (m < 1 || m > 12) return null
   if (d < 1 || d > daysInMonth(y, m)) return null
 
-  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/.test(raw)
+  // Case-insensitive Z, and hour-only offsets like +04. Both are valid ISO and
+  // both used to fall through to the naive branch, where a value that already
+  // carried an offset was re-read as the coach's local wall clock — off by
+  // exactly the offset, silently.
+  //
+  // The offset must follow a time. Matching a bare trailing [+-]NN would read
+  // the "-01" of "2026-03-01" as an hour-only offset and parse a plain date as
+  // UTC midnight — which in Dubai renders as 04:00. The existing suite caught
+  // that the moment the pattern was widened.
+  const hasOffset = /\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:[Zz]|[+-]\d{2}(?::?\d{2})?)$/.test(raw)
   if (hasOffset) {
     // The offset is authoritative for the instant; the calendar parts above
     // have already been checked against the frame they were written in.
-    const parsed = new Date(raw)
+    // An hour-only offset is expanded because Date.parse rejects "+04".
+    const normalised = raw
+      .replace(/\s+/, 'T')
+      .replace(/z$/, 'Z')
+      .replace(/([+-]\d{2})$/, '$1:00')
+    const parsed = new Date(normalised)
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
   }
 
-  const [datePart, timePart] = raw.split('T')
+  // Postgres and several exporters separate date and time with a space rather
+  // than a T. Rejecting those outright discarded rows that were perfectly
+  // well-formed.
+  const [datePart, timePart] = raw.split(/[T ]/)
   if (!datePart) return null
   return toInstant(datePart, timePart ? timePart.slice(0, 5) : null)
 }

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { IconRolePlayer, IconRoleCoach, IconRoleParent, IconRoleClub } from '@/components/icons/TrakIcons';
 import { Eye, EyeOff } from 'lucide-react';
+import { requireDevPassword } from '@/lib/dev-credentials';
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -15,7 +16,8 @@ const DEV_ACCOUNTS = [
   { role: 'club',   label: 'Admin',  email: 'club@trak.dev',   color: 'rgba(255,255,255,0.7)' },
 ] as const;
 
-const DEV_PASSWORD = 'TrakDev123';
+// Read from the environment, never a literal: this file is in the ENTRY bundle,
+// so a literal here ships to every visitor of the production site.
 
 type View = 'signin' | 'register';
 
@@ -417,7 +419,7 @@ function DevLoginPanel() {
   const loginAs = async (account: typeof DEV_ACCOUNTS[number]) => {
     setBusyRole(account.role);
     await supabase.auth.signOut();
-    const { error } = await signIn(account.email, DEV_PASSWORD);
+    const { error } = await signIn(account.email, requireDevPassword());
     if (error) {
       toast.error(`Dev login failed: ${error.message}`);
       setBusyRole(null);

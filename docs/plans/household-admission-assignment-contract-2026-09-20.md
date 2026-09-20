@@ -99,6 +99,8 @@ I-A and K-A must agree one lock order across child/academy scope, enrolment, hou
 
 Reassignment must preserve old history and remove departed coach access. Do not overwrite historical academy/coach provenance to move records into a new academy. Existing legacy squad IDs referenced by assessments require an explicit reviewed adoption/mapping, not delete-and-recreate.
 
+**Confirmed pilot rule, September 20:** academy data stays with the academy after coach departure. This includes session plans and calendar events as well as roster/development records, notes and attendance. Former authors have no continuing read/write/export entitlement through an old JWT, account export, reassignment or joining another academy. Preserve historical academy attribution and the authorised academy's operational access; retain private notes without automatically publishing them or widening administrator access. Personal account export remains separate, and consent/retention boundaries still apply. See the [verified gaps and single-writer handoff](../reviews/coach-departure-ownership-2026-09-20.md); existing departure policies alone do not satisfy this rule.
+
 ## 7. Cutover surfaces and single writers
 
 - **I-A:** `AuthContext`, `src/components/layout/RouteGuard.tsx`, onboarding/callback/recovery/household routes and libraries; `trak_admission`, `trak_consent`, generated types and shared App integration. Replace public parent/player provisioning in `provision_my_profile`, old parent invitation creation/accept/resend/autolink and `link_player_to_coach` authority. Inspect all callable overloads and triggers, not just the routed page.

@@ -276,10 +276,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (event === 'SIGNED_IN') return;
       }
 
-      // Same on the confirmation page. It verifies, then signs out on purpose,
-      // and navigates itself — the SIGNED_OUT redirect below would race it and
-      // strip the ?confirmed=1 flag the sign-in form looks for.
-      if (window.location.pathname === '/auth/confirm') return;
+      // Email confirmation now uses its own non-persistent Auth client.
+      // Keep hydrating the app session on that route so returning to account
+      // choice cannot leave loading=true after a suppressed INITIAL_SESSION.
 
       if (event === 'SIGNED_OUT') {
         acceptSession(null);
@@ -304,10 +303,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // If we're on the reset password page, don't auto-redirect — let
       // the ResetPassword component handle the PASSWORD_RECOVERY event.
       if (window.location.pathname === '/reset-password') {
-        setLoading(false);
-        return;
-      }
-      if (window.location.pathname === '/auth/confirm') {
         setLoading(false);
         return;
       }

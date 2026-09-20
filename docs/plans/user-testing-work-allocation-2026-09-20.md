@@ -1,6 +1,6 @@
 # User-testing implementation plan and three-owner handoff
 
-**Status: proposed allocation; review first, implementation starts only after the affected owners acknowledge the plan and conflicts are resolved.** Requested by Imad on September 20, 2026. Imad/Codex has paused application edits to prepare this handoff. Silence is not acceptance. This document is an implementation plan, not approval to merge or change production.
+**Status: partially accepted after review; only the bounded reservations in the ledger are released.** Requested by Imad on September 20, 2026. Tarek has reviewed and accepted T-D/T-V, including CAP-01. Kostas has supplied and corrected his #44 review findings but has not yet accepted the broader K-A/K-C allocation. Unreviewed or overlapping work remains held. Silence is not acceptance. This is not approval to merge or change production.
 
 ## 1. Source of truth and settled scope
 
@@ -33,7 +33,7 @@ First bounded task after reconciliation: [branch/base, reserved files/RPCs, test
 Dependencies/decisions: [specific missing contract or product choice]
 ```
 
-Imad will reconcile both reviews, update this plan and post `PLAN ACCEPTED` with the accepted task reservations. A PR title, green badge, old review or merge into a feature branch is not completion. Review the final delta and the actual routed page. Do not close/supersede someone else's PR without agreeing with its owner.
+Imad reconciles each package with its affected owners and posts `PLAN ACCEPTED — [bounded task]` with exact reservations. Independently reviewed, non-overlapping work can proceed while another package awaits its owner; this is not global acceptance of the plan. A PR title, green badge, old review or merge into a feature branch is not completion. Review the final delta and the actual routed page. Do not close/supersede someone else's PR without agreeing with its owner.
 
 ### Existing work to reuse before writing replacements
 
@@ -48,19 +48,22 @@ All numbers below refer to upstream unless explicitly marked **fork**. This is a
 | **fork #1** `a15219b`; #48 `43db21e`, #49 `01304a4`, #50 `6d3bb25` | Parent details, Settings account boundaries, retained history and consent recovery already implemented in branches. Review incremental parent changes and their integration base, not a blind squash of the stack. |
 | **fork #2** `f74a8a7`; #71 `7216ae0`; #72 `9ddcf31` | Private-avatar UI, password visibility, UTC database birthday correction already have tests and review requests. Reuse; deployment is pending. Avatar UI does not prove Storage-policy correctness. |
 | #73 `f88db54`, draft | Transitional truthful signup responses. Public signup is being replaced; carry applicable error/recovery behavior into admission, not the obsolete registration model. |
-| #44 `c5c94f2` | Kostas's coach/privacy/deletion/export/scorecard bundle remains OPEN. Its latest commit merges main **into #44**, not #44 into main. Clear the two review holds below before calling it merge-ready. |
-| #51 `5beba3b` | Tarek's exact goal-count/rating-key work overlaps `CoachAddSession` in #44. Reuse `match-input-keys` and its tests. Its 0–6 picker does not satisfy the newly requested 0–10 range. Kostas owns the final form; Tarek hands off and reviews the mapping. |
-| #42 `918d8c3`; #66 `de85bea` | Tarek owns calendar contracts and the SQL suite registry; #38 dependency is satisfied. #66 is stacked on #42 and supplies scorecard tests. Verify each final delta after main changes. |
+| #44 `8e72e80` | Still OPEN. Both previously raised holds independently verified corrected; see the scoped evidence below. This is not production approval or proof that the whole platform is ready. |
+| #51 `5beba3b` | Tarek's exact goal-count/rating-key work overlaps `CoachAddSession` in #44. Reuse `match-input-keys` and its tests. It already stores exact numbers independently of rating buckets. The remaining range change is its ceiling/options (0–6 to 0–10), plus boundary/consumer validation; do not redesign storage. Kostas owns the final form; Tarek hands off and reviews the mapping. |
+| #42 `918d8c3`; #66 `de85bea` | Tarek owns calendar contracts and the SQL suite registry; #38 dependency is satisfied. #66 carries an older snapshot of #42 work, not its current head (verified ancestry); it supplies scorecard tests. Integrate #42 first, then reconcile #66 against that exact base. Do not overwrite current runner/birthday coverage with an older file. Verify each final delta after main changes. |
 | #40 `1457b65`; #47 `2681685`; #53 `4061175` | Tarek owns AI approval, deletion tests and consent-coverage tests. #40's title/body understates its current files: it already includes an Edge Function and coach review page. Reconcile household/consent and private-note contracts; do not implement a duplicate review workflow. |
 | #17 `8b16f4a`; #45 `f54b56f` | Legacy coach-code linking/history work. Tarek identifies reusable identity/history safeguards; do not ship new code-based admission as the target architecture. Prior Settings integration is evidence to preserve behavior, not a reason to retain obsolete copy. |
 | #34 `805ccb2`, #36 `efb7b0a`, #37 `b8c3a19` | Imad owns coordinated migration/integration repair; all three carry the same older trigger definition. No branch may reintroduce a superseded definition after another is fixed. |
 | #46 `3c2a6e3`, #65 `8cb066c` | Imad owns release governance. #68 already supplied filename validation; retain #65's useful documentation/ignore rules without duplicating the validator. Reconcile old Friday/pilot wording with the current gate. |
 | #43/#60/#63/#64/#67 | Review documentation against actual delivery; do not let old claims or workshop suggestions override the agreed architecture. Slide 5 remains Chris's. |
 
-**Specific #44 review holds, still relevant at the checked head:**
+**#44 review holds corrected at `8e72e80`, independently checked:**
 
-- `CoachAssessPage.tsx` at `c5c94f2` has Git blob `8bd77e862131a92874bbc949e054b7444052b369`, identical to the previously reproduced defective `a9211cb` version. Kostas should review/incorporate the existing [fork correction `1b6b3e2`](https://github.com/imadd23x/trak-football-hub/commit/1b6b3e2) and its eight rendered regressions, not redevelop it. Retest the combined current head.
-- `20260919170000_no_delete_policy_means_no_delete_grant.sql` is still a no-op replacement of previously applied SQL. Restore historical bytes and add a forward repair; prove fresh and already-applied preview histories converge. The prior Slack hold has not been cleared by merging main into the branch. Do not reset a database to conceal the difference.
+- The three files from fork correction `1b6b3e2` are byte-identical in #44. All eight rendered/real-SDK assessment regressions pass on its current head; no competing implementation was introduced.
+- `20260919170000` matches its original blob `fe72f5349f6decf5ebb9c7ac9bddb6ca37f5c584`. Forward repair `20260920104500` restores the policy and correct comment. Six SQL suites pass on each of fresh 74 migrations, released-main 66 plus eight pending migrations in deployed order, and a preview already past the old DROP. All three converge on PostgreSQL 17 to policy present, DELETE absent, SELECT/INSERT/UPDATE intact and comment hash `fe45a829f8ff304046166e807f796062`. No live database was written or reset by this verification.
+- Imad accepts the narrow new `package.json` convergence script and CI test-step additions as the reviewed integration hunks; no revert/reimplementation is needed. This does not hand general ownership of those files away.
+- #66's unpublished match-fixture positive control still needs reconciliation with #44's published-only metric. Tarek owns that fixture correction and joint retest; do not weaken the published-only query.
+- Evidence: [current-head review](../reviews/pr44-current-head-2026-09-20.md). The two scoped holds are cleared; production approval and integration of remaining dependencies are separate.
 
 ## 3. Delivery packages and accountable owners
 
@@ -120,7 +123,7 @@ UT-09/10/13/34/36/37/38/40; player/calendar side of UT-14, handoff for UT-12.
 - Own existing `match-input-keys` mapping/tests; hand #51's form edits to Kostas. Maintain one engine vocabulary. Treat any rating-weight change as a separate product decision.
 - Finish/review #42 calendar helpers and player callers, then explicitly hand the schedule writer to Kostas. Parent consumers stay Imad-owned. Published/confirmed event audience, cancellation, location, Dubai/Athens dates and DST must be one agreed contract.
 
-Acceptance: exact totals across pagination, one shared position vocabulary including existing aliases, zero versus absent values, own-team home/away clean-sheet fixtures, no clipped exports, visible next series, no stale/wrong-account facts. Existing pending UC-A02 player match-log route tests need a stated product disposition and matching tests; do not invent a new self-reporting feature or silence failures to obtain a green badge.
+Acceptance: exact totals across pagination, one shared position vocabulary including existing aliases, zero versus absent values, own-team home/away clean-sheet fixtures, no clipped exports, visible next series, no stale/wrong-account facts. Imad explicitly confirmed coach-only logging for this pilot on September 20. Retire UC-A02 (player logs a match) and UC-A03 (result after that save) from active pilot scope, preserve the decision/history, and remove or archive obsolete active tests without relabeling them as passes. Retain positive player/parent viewing of coach-recorded matches and truthful band display coverage. Use a separate bounded registry/test/documentation branch; do not create the missing player logging routes. Backend coach-only write enforcement remains a coordinated K-C/I-A requirement with T-V denial tests, not permission for the registry-retirement task to edit shared auth/schema.
 
 ### T-V — Tarek: independent verification, AI publication and erasure
 
@@ -161,7 +164,7 @@ A file reservation is temporary execution coordination, not exclusive product ow
 
 ## 5. Sequence, decisions and completion bar
 
-**Wave 0 — now:** both teammates audit and review this plan; reconcile local/unmerged work; accept reservations. Imad's application edits remain paused until that review is reconciled. No work package is marked accepted yet.
+**Wave 0 — package-specific review:** Tarek has completed his review; his isolated export task and separate coach-only use-case retirement are released below. Kostas still owes his K-A/K-C acceptance/first-task reply. Existing #74 follow-up stays within Imad's already-announced reservation, with Tarek confirming no overlap. New household/assignment interfaces remain held until the affected owners reconcile them. No global acceptance or production authorization is implied.
 
 **Wave 1 — after acknowledgment:** Imad finishes the existing staff slice and publishes the household/consent interface. Kostas clears #44's two holds and scopes focused coach follow-ups. Tarek verifies #42/#51 handoffs and reproduces residual player/export issues against already-merged fixes. These can proceed independently within the reservations.
 
@@ -229,7 +232,7 @@ The linked source inventory supplies the detailed original observations. This in
 
 ## 7. Multi-user performance and recovery gate (CAP-01)
 
-The goal includes concurrent users and responsiveness, not only the 41 functional observations. This gate is additional to the UT index. **Proposed for the same team review; not yet accepted or measured.**
+The goal includes concurrent users and responsiveness, not only the 41 functional observations. This gate is additional to the UT index. **Tarek accepted harness/result ownership and the proposed workload shape; final cohort targets, budgets and execution evidence remain pending.**
 
 Read-only source evidence at main `4335e89`: `CoachHomePage` loads historical assessment rows for squad analytics; `CoachSquadPage` loads assessment history to choose latest values; `ClubHome` loads coaches, roster and assessments in a serial chain; `PlayerHome` loads match history without explicit pagination. These are profiling targets, not measured latency failures. Recheck against #44/#42 and the integrated candidate before optimizing. The old `docs/plans/ARCHITECTURE.md` assumes “30 users, no concurrent editing”; that is not an agreed capacity requirement or evidence of readiness for this pilot.
 
@@ -246,7 +249,7 @@ Run these workloads after the affected contracts are accepted:
 3. Recovery: expired session, temporary network/database failure, delayed response and return online; no false success, duplicated records, endless spinner or retry storm. Permission-denied cases are expected and counted separately from unexpected failures.
 4. Sustained traffic: a documented steady-state run and soak long enough to expose increasing memory, pool use or request queues; report actual duration, not just a single burst. Compare first and last windows and verify pending work drains after traffic stops.
 
-**Proposed review budgets:** p95 ordinary data reads at or below 1 second and writes at or below 2 seconds at the agreed peak, excluding separately measured external email/AI work. Record p50/p95/p99, throughput, payload sizes, timeouts, unexpected 4xx/5xx, database connections/locks and browser errors. These are initial engineering targets for team agreement, not measured results or a user-approved service promise. Measure actual phone interaction separately; fast SQL alone does not prove a responsive screen.
+**Proposed review budgets:** p95 ordinary data reads at or below 1 second and writes at or below 2 seconds at the agreed peak, excluding separately measured external email/AI work. Record p50/p95/p99, throughput, payload sizes, timeouts, unexpected 4xx/5xx, database connections/locks and browser errors. Also record request count and the longest dependent-request chain per screen: compare cold/warm loads and realistic mobile RTT/bandwidth, including one-user behavior. Agree screen-specific budgets against the integrated routes, preserving required authorization checks. Tarek's main-only PlayerHome chain includes a private-note read removed by #44; benchmark the final integrated reader, not a soon-to-be-removed path. RTT samples or CSS inspection are preliminary evidence, not measured phone/render results. These are initial engineering targets for team agreement, not measured results or a user-approved service promise. Measure actual phone interaction separately; fast SQL alone does not prove a responsive screen.
 
 Pass requires zero unexpected crashes/server errors and no duplicate, lost, unauthorized or cross-academy records in the exercised workloads; bounded queues/memory and recovery after injected failures; accurate complete totals beyond API row caps; stable pagination; the agreed latency budget at the agreed peak. Count fixture rows before and after so a workload that sent no meaningful writes cannot pass. Preserve failing evidence before fixing it. An index or cache is accepted only after measuring the affected query/route and rerunning correctness tests; caching must not weaken withdrawal or departure enforcement.
 
@@ -254,10 +257,22 @@ Attach reproducible commands, workload/data definitions and result artifacts to 
 
 ## Review and reservation ledger
 
-| Owner | Plan review | Accepted tasks / current reservation |
-|---|---|---|
-| Imad | Author; application coding paused for team review | I-A, I-P, I-R proposed; existing #74 local work preserved |
-| Kostas | Awaiting response | K-A, K-C proposed; review #44 and this overlap map first |
-| Tarek | Awaiting response | T-D, T-V proposed; review #42/#51/#40 and this overlap map first |
+Review discussion: [#coding-agent-reviews plan thread](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1789907439602529). Source snapshot remains main `4335e89`; no plan or #44 production merge has been performed here.
 
-Update this ledger with exact reply links and accepted changes before posting the implementation handoff. No nonresponse is treated as approval.
+| Owner | Review state | Bounded accepted reservation / remaining hold |
+|---|---|---|
+| Imad | Reconciled Tarek's review; independently verified #44's two fixes | I-R coordination/reviews active; existing #74 staff follow-up may resume in its original branch/reservation. New household/assignment contracts wait for affected-owner reconciliation. |
+| Kostas | Both #44 fixes verified; broad PLAN REVIEW reply still awaited | K-A/K-C proposed, not globally accepted. Existing #44 correction retained; next match-validation follow-up needs exact rules/reservation from Kostas. |
+| Tarek | Accepts T-D/T-V and CAP-01 ownership | T-D export audit/fix released: `src/lib/card-export.ts`, `PlayerPassport.tsx`, `PlayerEvolutionCard.tsx`, their focused tests. Separate UC-A02/UC-A03 retirement released below. Shared contract/AI/deletion changes still require their specific handoffs. |
+
+### Accepted handoffs and remaining corrections
+
+- **T-D export task:** use repository-locked Playwright and install its matching Chromium if absent (`npx playwright install chromium` after confirming the lockfile version). This normal task dependency is authorized; do not upgrade the repository toolchain or require an unnecessary permission round-trip. Use synthetic data, render/download the actual image, inspect edges/text/fonts at varied widths. Source `truncate`/ellipsis styling alone does not prove that long text is handled acceptably; rendering remains required. No shared App/Auth/Settings/schema edits are included.
+- **Coach-only use-case retirement:** Imad's explicit answer is “Yes—coach-only logging for the pilot.” Tarek may use a separate task branch for `docs/use-cases/registry.yaml`, its lock, the obsolete athlete self-log test and decision documentation, preserving current registry invariants. Supply any necessary shared script/package changes as hunks to Imad. Retirement is a scope decision, not a repaired route or passing behavior. Keep player/parent read journeys and report remaining debt honestly.
+- **#40 integration:** keep the existing PR; do not land it early to evade reservations or open a duplicate feature PR. Tarek supplies a current-base hunk/dependency manifest for App/types/package and coordinate CoachSchedule/PlayerHome deltas. Imad integrates the shared hunks preserving current additions; Tarek retains PlayerHome/event helpers until explicit schedule handoff. No whole-file checkout from an old branch as a conflict resolution.
+- **#42/#66 correction:** verified current #42 is not an ancestor of #66. Preserve #42's current runner and birthday test on integration. At `de85bea`, #66's age test calls `dob(17)` with default day offset zero, so the reported “widened boundary” characterization is not reproduced in that file; an older snapshot is confirmed, weakened birthday coverage there is not. Ask for a specific contrary location before recording it as fact.
+- **#51 correction:** exact-count storage and rating-key separation already exist. Reuse them; extend the numeric range and regression coverage without changing rating weights.
+- **Manual player creation:** settled by Imad's controlling architecture, now also reported by Kostas. No coach-created name/age-band development identity. C1 is closed only after positive eligible assignment and negative legacy/API bypass tests pass; architecture prose alone does not close it.
+- **Timing:** Kostas reports academy registration on Friday and child/coach/parent use the following Monday as intended dates. These are not evidence of readiness or new production authorization. Imad's real-child gates and confirmed academy configuration still apply.
+
+Post exact task head, file/RPC reservations, evidence and explicit handoff when a task changes owners. Unaccepted packages remain proposed; independent accepted work need not wait for unrelated package decisions.

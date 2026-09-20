@@ -16,7 +16,7 @@ async function replay({ mutate = sql => sql, baseline = false } = {}) {
   try {
     await db.exec(await readFile(root + 'supabase/tests/bootstrap.sql', 'utf8'));
     for (const file of validateMigrationFiles(await readdir(root + 'supabase/migrations'))) {
-      if (baseline && file === boundary) continue;
+      if (baseline && file >= boundary) continue;
       let sql = await readFile(root + 'supabase/migrations/' + file, 'utf8');
       if (file === boundary) sql = mutate(sql);
       await db.exec(sql);

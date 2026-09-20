@@ -19,7 +19,7 @@ The existing account-deletion body is moved behind a checked wrapper with a priv
 
 ## Still required before any release
 
-1. Purpose-aware reader policies, private/shared feedback and real-role read races; no claim that this draft closes existing read exposure.
+1. The six current direct-table reader policies are now covered by the subsequent read boundary and its role tests; see `p2-consent-read-boundary.md`. Private/shared feedback integration and service/owner readers remain.
 2. Legacy match/attendance/meeting provenance, safe roster adoption and retained history. Unresolved historical records currently cannot be edited through the new guard; do not treat that as a completed migration.
 3. Adult optional-purpose choices: this stage permits adult coaching without guardian approval but rejects adult recognition until the adult's own choice exists.
 4. Child-bearing AI and SECURITY DEFINER RPC path inventory, including the new feedback/draft tables in pending teammate branches. Direct table coverage alone does not establish complete service coverage.

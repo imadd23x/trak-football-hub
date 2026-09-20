@@ -12,7 +12,7 @@ const securityMigration = '20260917205027_secure_parent_invites.sql';
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 const args = process.argv.slice(2);
 const mode = args[0] ?? '--all';
-const modes = ['--all', '--baseline', '--pilot-views-review', '--pilot-views-baseline', '--parent-upgrade-review', '--academy-consent-review', '--academy-consent-writes-review'];
+const modes = ['--all', '--baseline', '--pilot-views-review', '--pilot-views-baseline', '--parent-upgrade-review', '--academy-consent-review', '--academy-consent-writes-review', '--academy-consent-reads-review'];
 if (args.length > 1 || !modes.includes(mode)) {
   throw new Error(`Usage: node scripts/test-db.mjs [${modes.join(' | ')}]`);
 }
@@ -53,13 +53,15 @@ try {
     : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
   const suites = baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
+    : mode === '--academy-consent-reads-review' ? ['academy_consent_reads.sql']
     : mode === '--academy-consent-writes-review' ? ['academy_consent_writes.sql']
     : mode === '--academy-consent-review' ? ['academy_consent_authority.sql']
-    : ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'academy_consent_authority.sql', 'academy_consent_writes.sql'];
+    : ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'academy_consent_authority.sql', 'academy_consent_writes.sql', 'academy_consent_reads.sql'];
   for (const suite of suites) {
     const result = await db.exec(await read(suite));
     console.log(`Passed: ${suite}`);
     for (const query of result) {
+      if (query.rows?.[0]?.academy_consent_read_assertions) console.log(`Academy consent read assertions: ${query.rows[0].academy_consent_read_assertions}`);
       if (query.rows?.[0]?.academy_consent_write_assertions) console.log(`Academy consent write assertions: ${query.rows[0].academy_consent_write_assertions}`);
       if (query.rows?.[0]?.academy_consent_authority_assertions) console.log(`Academy consent authority assertions: ${query.rows[0].academy_consent_authority_assertions}`);
       if (query.rows?.[0]?.pilot_view_assertions) console.log(`Operational view assertions: ${query.rows[0].pilot_view_assertions}`);

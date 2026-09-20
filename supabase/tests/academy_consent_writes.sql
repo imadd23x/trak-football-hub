@@ -86,6 +86,19 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN matched:=SQLSTATE='42501'; detail:=SQLSTATE||': '||SQLERRM; END;
   INSERT INTO pg_temp.ac_results VALUES(label,matched,detail);
 END $$;
+-- SELECT RLS may hide a withdrawn record before UPDATE reaches its trigger.
+-- A denial therefore means zero affected rows or insufficient_privilege, never
+-- an arbitrary SQL error or a successful write that happens to look unchanged.
+CREATE FUNCTION pg_temp.dc_no_update(statement text,label text) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE affected bigint; matched boolean:=false; detail text;
+BEGIN
+  BEGIN
+    EXECUTE statement; GET DIAGNOSTICS affected=ROW_COUNT;
+    IF affected<>0 THEN RAISE EXCEPTION 'unexpected write' USING ERRCODE='ZV001'; END IF;
+    matched:=true;
+  EXCEPTION WHEN OTHERS THEN matched:=SQLSTATE='42501'; detail:=SQLSTATE||': '||SQLERRM; END;
+  INSERT INTO pg_temp.ac_results VALUES(label,matched,detail);
+END $$;
 CREATE FUNCTION pg_temp.dc_assess(n int,roster int DEFAULT 311,coach int DEFAULT 5) RETURNS void LANGUAGE sql AS $$
   INSERT INTO public.coach_assessments(id,coach_user_id,squad_player_id) VALUES(pg_temp.ac_id(n),pg_temp.ac_id(coach),pg_temp.ac_id(roster));
 $$;
@@ -161,13 +174,13 @@ SELECT pg_temp.ac_as(2);
 SELECT public.withdraw_academy_consent(pg_temp.ac_id(11),pg_temp.ac_id(101),pg_temp.ac_id(704),current_setting('trak.dc_second')::uuid);
 SELECT pg_temp.ac_as(5);
 SELECT pg_temp.dc_error('SELECT pg_temp.dc_assess(720)','last withdrawal blocks new assessments');
-SELECT pg_temp.dc_error($s$UPDATE public.coach_assessments SET work_rate=8 WHERE id=pg_temp.ac_id(710)$s$,'last withdrawal blocks assessment updates');
-SELECT pg_temp.dc_error($s$UPDATE public.coach_assessment_notes SET note='Changed' WHERE id=pg_temp.ac_id(711)$s$,'last withdrawal blocks private-note updates');
-SELECT pg_temp.dc_error($s$UPDATE public.session_attendance SET minutes_played=10 WHERE id=pg_temp.ac_id(712)$s$,'last withdrawal blocks attendance updates');
-SELECT pg_temp.dc_error($s$UPDATE public.meeting_requests SET reason='Changed' WHERE id=pg_temp.ac_id(713)$s$,'last withdrawal blocks meeting updates');
-SELECT pg_temp.dc_error($s$UPDATE public.recognition_awards SET note='Changed' WHERE id=pg_temp.ac_id(716)$s$,'last withdrawal blocks recognition updates');
+SELECT pg_temp.dc_no_update($s$UPDATE public.coach_assessments SET work_rate=8 WHERE id=pg_temp.ac_id(710)$s$,'last withdrawal blocks assessment updates');
+SELECT pg_temp.dc_no_update($s$UPDATE public.coach_assessment_notes SET note='Changed' WHERE id=pg_temp.ac_id(711)$s$,'last withdrawal blocks private-note updates');
+SELECT pg_temp.dc_no_update($s$UPDATE public.session_attendance SET minutes_played=10 WHERE id=pg_temp.ac_id(712)$s$,'last withdrawal blocks attendance updates');
+SELECT pg_temp.dc_no_update($s$UPDATE public.meeting_requests SET reason='Changed' WHERE id=pg_temp.ac_id(713)$s$,'last withdrawal blocks meeting updates');
+SELECT pg_temp.dc_no_update($s$UPDATE public.recognition_awards SET note='Changed' WHERE id=pg_temp.ac_id(716)$s$,'last withdrawal blocks recognition updates');
 SELECT pg_temp.ac_as(11);
-SELECT pg_temp.dc_error($s$UPDATE public.matches SET goals=1 WHERE id=pg_temp.ac_id(715)$s$,'last withdrawal blocks player match updates');
+SELECT pg_temp.dc_no_update($s$UPDATE public.matches SET goals=1 WHERE id=pg_temp.ac_id(715)$s$,'last withdrawal blocks player match updates');
 SELECT pg_temp.ac_reset();
 SELECT pg_temp.ac_check((SELECT count(*)=9 FROM trak_consent.authorization_receipts),'failed updates leave no receipt');
 SELECT pg_temp.ac_as(5);

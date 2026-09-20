@@ -128,7 +128,7 @@ def main() -> None:
         files = json.loads(inventory.stdout)
         for filename in files:
             sql((ROOT / 'supabase/migrations' / filename).read_text())
-        for suite in ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'academy_consent_authority.sql', 'academy_consent_writes.sql']:
+        for suite in ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'academy_consent_authority.sql', 'academy_consent_writes.sql', 'academy_consent_reads.sql']:
             sql("SET trak.test_database='disposable';\n" + (ROOT / 'supabase/tests' / suite).read_text())
             print('Native suite passed:', suite, flush=True)
         fixture = (ROOT / 'supabase/tests/academy_consent_authority.sql').read_text().split('-- Legacy evidence')[0]
@@ -221,7 +221,29 @@ def main() -> None:
         first, second = race(transfer, 5, assessment(36, 836), 5, 'transfer-before-write')
         assert second.returncode != 0 and '42501' in second.stderr, second.stderr
         assert record_count(836) == 0
-        print('PASS: ten independent-connection races, exact event/revision/record/receipt assertions', flush=True)
+        # An actual API-shaped read-only transaction must succeed. It cannot use
+        # SELECT FOR SHARE/UPDATE or insert authorization state from an RLS filter.
+        reader = subprocess.Popen(connection, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  text=True, env=env, cwd=ROOT)
+        assert reader.stdin is not None and reader.stdout is not None
+        try:
+            read_count = f"SELECT count(*) FROM public.coach_assessments WHERE id='{identity(831)}';"
+            reader.stdin.write("BEGIN READ ONLY; SET statement_timeout='15s';" + as_parent(2) + read_count + '\n')
+            reader.stdin.flush()
+            assert reader.stdout.readline().strip() == '1', 'read-only parent must see approved retained history'
+            event = sql(f"SELECT event_id FROM trak_consent.decisions WHERE player_user_id='{identity(31)}' AND organization_id='{identity(101)}' AND parent_user_id='{identity(1)}';").stdout.strip()
+            result = sql('BEGIN;' + as_parent(1) + withdraw(31, 901, event) + 'COMMIT;')
+            assert response(result.stdout)['action'] == 'withdraw'
+            reader.stdin.write(read_count + '\n'); reader.stdin.flush()
+            assert reader.stdout.readline().strip() == '0', 'next read must observe committed withdrawal'
+            reader.stdin.write('COMMIT;\n\\q\n'); reader.stdin.flush()
+            reader.wait(timeout=10)
+            assert reader.returncode == 0, reader.stderr.read() if reader.stderr else ''
+            print('Read-only parent transaction: approved read succeeds; next statement after concurrent withdrawal returns zero.', flush=True)
+        finally:
+            if reader.poll() is None:
+                reader.terminate(); reader.wait(timeout=10)
+        print('PASS: ten independent-connection races plus read-only withdrawal visibility', flush=True)
     finally:
         if started:
             run([str(pg / 'pg_ctl'), '-D', str(scratch / 'data'), '-m', 'fast', '-w', 'stop'])

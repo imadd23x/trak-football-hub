@@ -1,0 +1,238 @@
+# User-testing implementation plan and three-owner handoff
+
+**Status: proposed allocation; review first, implementation starts only after the affected owners acknowledge the plan and conflicts are resolved.** Requested by Imad on September 20, 2026. Imad/Codex has paused application edits to prepare this handoff. Silence is not acceptance. This document is an implementation plan, not approval to merge or change production.
+
+## 1. Source of truth and settled scope
+
+Canonical source: `kostasanastasioubusiness-lang/trak-football-hub`. Snapshot checked through the GitHub API: main is `4335e8984777b7b704e8706d3fe277352658c9ed` (#38), on September 20. Recheck before starting each task; this snapshot cannot account for later pushes or unpublished local work.
+
+The source is Imad's `trak_use_cases_and_testing.md`, with all 41 grouped observations retained in the [existing inventory at f88db54](https://github.com/imadd23x/trak-football-hub/blob/f88db54/docs/testing/user-testing-2026-09-20.md). The [academy-led admission decision](https://github.com/imadd23x/trak-football-hub/blob/9408ea9/docs/plans/academy-led-admission.md) overrides conflicting signup observations:
+
+1. Owner-issued academy administrator activation; academy-issued coach invitations. Verified recipient, one-time expiring activation, fixed role and academy. No public staff self-registration or shared-code admission.
+2. Academy approval of **fully waived enrolment** activates one shared household login. No payments now or later in the pilot, no payment details, billing integration, or automatic paid conversion.
+3. Consent precedes ordinary household dashboard access, child username/password creation, child access and development processing. No child email required. Parent-managed credential recovery is part of this flow.
+4. Academy assigns eligible, consented children to coaches using stable identities. Manual name-only child creation and shared-code linking are legacy paths to replace, including backend bypasses.
+5. Approval is academy-specific. Historical independent-guardian records must be preserved; the previously agreed continued approval/parent-visibility rules must be reconciled with a shared household identity explicitly, not silently discarded. A shared login alone cannot identify the adult who signed; record the named guardian's attestation with household authority and immutable events.
+6. Private coach notes remain private unless explicitly published. Draft AI feedback remains private until coach approval. Preserve existing histories; no name/email-based automatic household or player merges.
+
+September 25 remains the documented **synthetic phone demonstration**, not authorization to admit real children through legacy paths. The real-child gate remains separate. No payments, slide 5 financial work (Chris owns it), character/medals, multi-sport, or broad redesign is added here.
+
+## 2. Review before implementation: immediate assignments
+
+**Kostas and Tarek: first review this plan, your current main/PR diffs and your agents' local work. Do not begin the new implementation packages below until this review is reconciled.** Continue no overlapping edits on assumptions about another person's branch. Report already-completed work so we reuse it.
+
+Reply in the plan's #coding-agent-reviews thread using:
+
+```text
+PLAN REVIEW — [name], main [full SHA]
+Already on main: [UT IDs, commit, relevant runtime/test evidence]
+Existing unmerged/local work to reuse: [UT IDs, repo/PR/branch, exact head, files]
+Conflicts or superseded requirements: [specific files/functions and proposed owner]
+Accept/change allocation: [package IDs]
+First bounded task after reconciliation: [branch/base, reserved files/RPCs, tests]
+Dependencies/decisions: [specific missing contract or product choice]
+```
+
+Imad will reconcile both reviews, update this plan and post `PLAN ACCEPTED` with the accepted task reservations. A PR title, green badge, old review or merge into a feature branch is not completion. Review the final delta and the actual routed page. Do not close/supersede someone else's PR without agreeing with its owner.
+
+### Existing work to reuse before writing replacements
+
+All numbers below refer to upstream unless explicitly marked **fork**. This is a review map, not a release queue.
+
+| Existing work, verified head | Current disposition and next action |
+|---|---|
+| Main #38 / `4335e89`; #59/#62/#68 already merged | Reuse calendar-date, credential-removal and grant fixes; do not recreate them. Deployment/runtime checks remain separate from source history. |
+| #55 and #57 already merged | Tarek retests remaining export/calendar observations against these changes. #55 already centralizes card export and band/age logic; #57 already delivers part of the old #42 description. Do not rebuild those fixes from the original report. |
+| #74 `9408ea9`, draft | Imad owns staff admission. Foundation committed and CI green. Additional email/activation/management work is **local and uncommitted**, not part of that reviewed head; reserve it and do not duplicate it. Current local checks have type errors in new tests and one incomplete browser fixture; not a green release candidate. |
+| #70 `8467ecd`, draft; **fork #3** `9ced1cd` | Imad's consent authority and development read/write cutover. Reconcile household identity, existing history, AI/export/deletion before release. Do not replace with a second consent system. |
+| **fork #1** `a15219b`; #48 `43db21e`, #49 `01304a4`, #50 `6d3bb25` | Parent details, Settings account boundaries, retained history and consent recovery already implemented in branches. Review incremental parent changes and their integration base, not a blind squash of the stack. |
+| **fork #2** `f74a8a7`; #71 `7216ae0`; #72 `9ddcf31` | Private-avatar UI, password visibility, UTC database birthday correction already have tests and review requests. Reuse; deployment is pending. Avatar UI does not prove Storage-policy correctness. |
+| #73 `f88db54`, draft | Transitional truthful signup responses. Public signup is being replaced; carry applicable error/recovery behavior into admission, not the obsolete registration model. |
+| #44 `c5c94f2` | Kostas's coach/privacy/deletion/export/scorecard bundle remains OPEN. Its latest commit merges main **into #44**, not #44 into main. Clear the two review holds below before calling it merge-ready. |
+| #51 `5beba3b` | Tarek's exact goal-count/rating-key work overlaps `CoachAddSession` in #44. Reuse `match-input-keys` and its tests. Its 0–6 picker does not satisfy the newly requested 0–10 range. Kostas owns the final form; Tarek hands off and reviews the mapping. |
+| #42 `918d8c3`; #66 `de85bea` | Tarek owns calendar contracts and the SQL suite registry; #38 dependency is satisfied. #66 is stacked on #42 and supplies scorecard tests. Verify each final delta after main changes. |
+| #40 `1457b65`; #47 `2681685`; #53 `4061175` | Tarek owns AI approval, deletion tests and consent-coverage tests. #40's title/body understates its current files: it already includes an Edge Function and coach review page. Reconcile household/consent and private-note contracts; do not implement a duplicate review workflow. |
+| #17 `8b16f4a`; #45 `f54b56f` | Legacy coach-code linking/history work. Tarek identifies reusable identity/history safeguards; do not ship new code-based admission as the target architecture. Prior Settings integration is evidence to preserve behavior, not a reason to retain obsolete copy. |
+| #34 `805ccb2`, #36 `efb7b0a`, #37 `b8c3a19` | Imad owns coordinated migration/integration repair; all three carry the same older trigger definition. No branch may reintroduce a superseded definition after another is fixed. |
+| #46 `3c2a6e3`, #65 `8cb066c` | Imad owns release governance. #68 already supplied filename validation; retain #65's useful documentation/ignore rules without duplicating the validator. Reconcile old Friday/pilot wording with the current gate. |
+| #43/#60/#63/#64/#67 | Review documentation against actual delivery; do not let old claims or workshop suggestions override the agreed architecture. Slide 5 remains Chris's. |
+
+**Specific #44 review holds, still relevant at the checked head:**
+
+- `CoachAssessPage.tsx` at `c5c94f2` has Git blob `8bd77e862131a92874bbc949e054b7444052b369`, identical to the previously reproduced defective `a9211cb` version. Kostas should review/incorporate the existing [fork correction `1b6b3e2`](https://github.com/imadd23x/trak-football-hub/commit/1b6b3e2) and its eight rendered regressions, not redevelop it. Retest the combined current head.
+- `20260919170000_no_delete_policy_means_no_delete_grant.sql` is still a no-op replacement of previously applied SQL. Restore historical bytes and add a forward repair; prove fresh and already-applied preview histories converge. The prior Slack hold has not been cleared by merging main into the branch. Do not reset a database to conceal the difference.
+
+## 3. Delivery packages and accountable owners
+
+These are assignments for the three people and their agents. Dependencies below permit parallel work after plan review; they do not authorize simultaneous edits to shared files.
+
+### I-A — Imad: admission, household identity and consent (first priority)
+
+UT-01/03/18/19/20/21/22/39/41; consent part of UT-02/05/08/14/35.
+
+- Complete existing #74 staff delivery/activation/management and regressions. Preserve existing-account passwords, truthful delivery states, recipient binding, expiry, revocation, idempotency and shared-phone identity boundaries.
+- Define and publish the household/enrolment/child/consent interface before K-A writes consumers. Implement academy-approved waived enrolment, household activation, hard consent gate, child username/password creation/reset and explicit account choice. No public role or metadata provisioning bypasses.
+- Reconcile #70/fork #3 with household authority and all read/write/AI/export/deletion consumers. Withdrawal and enrolment removal must affect already-issued sessions as well as login. Preserve legacy audit evidence and records; no silent identity migration.
+- Own `AuthContext`, `RouteGuard`, signup/callback/recovery routes, staff/household auth libraries, admission/consent schemas and authorization helpers. Tarek/Kostas send contract requests or patches for these, not independent replacements.
+
+Acceptance: owner → academy → coach and academy → household → consent → child login work with synthetic identities; wrong recipient/role/academy/household, expired/reused/revoked links, duplicate requests, delayed failures and existing sessions cannot bypass eligibility. No payment fields, scheduled charges or child email requirement. Database role tests and concurrent withdrawal/write tests complement routed browser tests. Real mail latency/expiry is verified later using approved synthetic inboxes; a provider accepting a request is not delivery.
+
+### I-P — Imad: parent experience and shared account surfaces
+
+UT-15/16/17/20/22/33/35; parent consumer of UT-10/14.
+
+- Reuse fork #1/#2 and #48–50/#71. Complete exact-record details, complete-history stats, next confirmed session/location, consistent connection state, account-bound Settings and private-avatar display/retry.
+- Consume T-D's canonical stats/calendar contracts. Do not independently define clean sheets or event dates inside parent pages.
+- Own parent pages/components, `ParentFamily`, `Settings.tsx`, shared password/avatar components and their mounting changes in the four own-profile pages. Tarek/Kostas coordinate their profile changes through this owner until the avatar diff is integrated.
+
+Acceptance: two children, pagination, correct selected record, missing versus zero, denied/failed fetch with retry, cancellation, account switch, refresh and accessible phone layouts. No private notes or AI drafts in parent responses. Avatar reload/replacement passes and T-V verifies backend read/delete boundaries.
+
+### K-A — Kostas: academy roster and coach assignment
+
+UT-02/04/05; academy part of UT-01/03/41. Wait for I-A's agreed interface, not its complete UI, before schema-dependent implementation.
+
+- Build approved/unassigned-child lists, single/bulk squad assignment and coach selectors from stable registration IDs. Only current academy authority may assign eligible children; validate eligibility again at write time.
+- Replace `CoachAddPlayer` name-only admission and shared-code assignment callers. Replace enforced UC-C02 with the positive academy-assignment journey **and** an old-manual/API-path denial regression; do not merely delete the test.
+- Own new assignment RPCs and assignment-specific migrations, `ClubSquads`, coach roster selectors and squad membership behavior. I-A retains enrolment/identity/consent functions. `ClubHome`/`ClubProfile`/`ClubCoaches` staff invitation edits are currently reserved by Imad; exchange focused handoff patches before editing those files.
+- UT-05 is a confirmed synthetic name mismatch (linked George profile, roster display Jamie), not proof of a missing identity. Reconcile using reviewed stable IDs and deterministic fixtures; no fuzzy merges or live seed replay.
+
+Acceptance: two academies, two coaches, several children; no unapproved/wrong-academy selection or direct write; duplicates/retries are safe with per-row bulk outcomes; same identities/history appear across all roles; reassignment/departure revokes old access and preserves history. Do not preserve NULL/unknown-age loopholes just to make an old fixture pass.
+
+### K-C — Kostas: coach logging, history, notes and schedule authoring
+
+UT-06/07/08/11/12/23/24/25/26/27/28/29/30/31/32; coach writer for UT-10/13/14.
+
+- First reconcile #44 and existing fork `1b6b3e2`; absorb #51's mapping with Tarek's review. Avoid expanding the large #44 with unrelated new work: use focused follow-up branches after its reviewed base.
+- Fix the **routed** `CoachAddSession` flow (not the currently unrouted `CoachQuickMatchLog`): integer minutes 0–120, integer goals/assists 0–10, no invented facts, truthful partial-save recovery, match/training/other semantics and consistent selection. Store exact numbers separately from rating buckets.
+- Open/edit actual saved session and assessment history including permitted notes; dashboard session count opens history; remove duplicate quick/full entry paths; preserve draft values and prevent cross-player async writes. Loading/error must not flash false zeros or empty squads.
+- Add goalkeeper coach specialty, align manual with released behavior, and propose the optional recent-assessment simplification. Do not infer a new permission role from a specialty.
+- After Tarek explicitly hands off #42's `CoachSchedule` writer, fix smart-calendar authentication and missing-field clarification before event creation. Require confirmation; do not invent days/times. Keep private/shared notes separate and explicitly published.
+
+Acceptance: full save/read/edit round-trip for match, training and other; boundary and server validation; deferred/failed/partial responses, retries without duplicates; saved zeros survive; private notes stay private; impossible match contributions are rejected against an agreed academy team-format/duration model. Do not assume all matches are 11-a-side or that roster size alone implies impossible participation.
+
+### T-D — Tarek: player experience and shared data contracts
+
+UT-09/10/13/34/36/37/38/40; player/calendar side of UT-14, handoff for UT-12.
+
+- Audit #55/#57 and current exports first. Fix residual passport/evolution clipping by inspecting actual output images, fonts, long text, varied phone widths and complete content. Demonstrate Series 2 with deterministic synthetic progression and retained card history.
+- Remove the requested season-bands overview; move parent connection status from Home to Profile. Review optional recent-match simplification while keeping history discoverable. Household admission replaces player-issued parent invites.
+- Own the canonical four-position normalization and full-history stats contract used by coach/player/parent callers. Publish interfaces and fixtures before consumers change. Clean sheets use the player's **own team's conceded score**, with known participation/position eligibility; unknown facts must stay unknown. Do not fabricate backfilled totals from scorelines without the needed facts.
+- Own existing `match-input-keys` mapping/tests; hand #51's form edits to Kostas. Maintain one engine vocabulary. Treat any rating-weight change as a separate product decision.
+- Finish/review #42 calendar helpers and player callers, then explicitly hand the schedule writer to Kostas. Parent consumers stay Imad-owned. Published/confirmed event audience, cancellation, location, Dubai/Athens dates and DST must be one agreed contract.
+
+Acceptance: exact totals across pagination, one shared position vocabulary including existing aliases, zero versus absent values, own-team home/away clean-sheet fixtures, no clipped exports, visible next series, no stale/wrong-account facts. Existing pending UC-A02 player match-log route tests need a stated product disposition and matching tests; do not invent a new self-reporting feature or silence failures to obtain a green badge.
+
+### T-V — Tarek: independent verification, AI publication and erasure
+
+Reuse #40/#42/#47/#53/#66, not new parallel systems.
+
+- Own the SQL suite registry in `scripts/test-db.mjs`, independent cross-academy/consent/adoption/deletion tests, and #66 scorecard scope/date regressions. Owners add suite pragmas; request runner changes from Tarek.
+- Integrate AI draft/review/publication with I-A's academy/purpose checks and K-C's note privacy. Include service-role/Edge Function bypass paths, not only browser policies. No child data sent to AI before the required authority exists; no drafts/private notes returned to child/parent.
+- Verify all-role and new household/child deletion, retention/export behavior and Storage root-key read/delete rules. Coordinate any `delete_my_account`/export function edits with the single writers below before changing them. Retained consent evidence is a reviewed policy choice, not an accidental orphan.
+- Independently review I-A's staff/household authority and K-A's roster assignment; use positive controls plus regressions that demonstrably fail before a fix. Legacy unknown-age/manual-roster gaps are closed only when backend and callers both enforce the replacement.
+
+Acceptance: real-role disposable SQL + native concurrent operations, both migration replay orders, no unrelated child's deletion, no foreign record access, no unapproved feedback, scorecard counts only the intended cohort/date window. A synthetic second academy is an isolation fixture, not staging or a backup.
+
+### I-R / operational owners — Imad coordinates integration and release
+
+- Imad owns the accepted plan, dependency/UT ledger, fork integrations, release queue, agreement/privacy/charter drafting and support-owner decisions. Kostas/Tarek review Imad's code; Imad reviews their code. This allocation does not substitute agent verdicts for required human approval.
+- Kostas owns preparation of pilot cohort/org/date/duration configuration, second-academy setup and backup/restore rehearsal evidence. Coordinate with Imad for real academy details and production authorization; do not choose a real pilot start from the synthetic demo date. Tarek reviews scorecard evidence.
+- Kostas coordinates status/evidence of previously requested credential rotation and checks of older deployment access; current status must be verified. Do not post secrets or claim older URLs are exposed merely because they are unverified.
+- Imad owns #34/#36/#37 trigger-collision repair, #46/#65 integration, immutable migrations and release records. Keep all copied branches consistent. Do not merge a stale definition back later.
+
+## 4. Single-writer reservations and required handoffs
+
+| Shared surface | Writer / handoff rule |
+|---|---|
+| `src/contexts/AuthContext.tsx`, auth routes, `src/components/layout/RouteGuard.tsx` | Imad. Preserve account/role guards while integrating admission; do not follow stale documentation paths. |
+| `src/App.tsx`, `src/integrations/supabase/types.ts`, `.github/workflows/ci.yml`, `playwright.pilot.config.ts`, `supabase/config.toml`, `package.json` | Imad integrates narrow owner-supplied hunks; no competing whole-file replacements. Existing PR diffs are preserved and reconciled. |
+| `scripts/test-db.mjs`, suite-discovery logic | Tarek. Keep #42 registry, `migrationReplayOrder` and assertion output. Add missing pragmas to #34/#37 suites; #70/#72/#74/#44 already have their new suite pragmas. |
+| `trak_admission`, household/enrolment/child identity, `trak_consent`, consent/provenance guards | Imad. Kostas owns assignment consumers and assignment RPCs after the agreed contract. No second admission/consent gate. |
+| `CoachAddSession.tsx`, coach assessment/squad/history | Kostas. Tarek hands over #51 form delta; Imad's existing `1b6b3e2` is a repair to reuse, not a competing feature branch. |
+| `CoachSchedule.tsx`, event-time helpers | Tarek until #42 caller contract/diff is accepted; explicit writer handoff to Kostas for schedule UI; helpers remain Tarek-owned. |
+| `PlayerHome.tsx` | Tarek integrates #44's published-feedback reader and #42 calendar delta while preserving removal of the private-note query. Kostas supplies the exact hunk, not a second rewrite. |
+| `Settings.tsx`, shared password/avatar components, own-profile avatar mounting points | Imad until fork #2/#71 integration; coordinate all profile changes before editing. Storage policy work is Tarek's separate task. |
+| `pin_org_id_on_update`, `set_squad_player_org_id` | Kostas's reviewed #44 intent plus Imad's coordinated #34/#36/#37 resolution; preserve both attribution and deleted-academy history protections. Neither merge order alone solves replacement collisions. |
+| `delete_my_account`, `export_my_account` | Kostas owns current #44 repair/export bodies; Imad owns household/consent maintenance boundaries. Agree the final function contract and one writer before either replaces it; Tarek verifies. |
+| stats/position helpers and rating-input keys | Tarek owns shared model; Kostas coach writer and Imad parent reader consume it. Announce changes to `types.ts`, `rating-engine.ts` or SQL match contracts before editing. |
+| migration files and tests | Unique forward versions created with the CLI; owner reserves table/RPC scope. Never edit another task's historical migration or use a duplicate version. Tests added with the change stay with its owner. |
+
+A file reservation is temporary execution coordination, not exclusive product ownership. A handoff records the accepted commit, remaining patch, next writer and tests. Conflicting existing PRs are resolved by combining required behavior, never by choosing an entire side for convenience. Each new task gets one bounded branch, an exact base and explicit dependencies; do not grow one omnibus PR per person.
+
+## 5. Sequence, decisions and completion bar
+
+**Wave 0 — now:** both teammates audit and review this plan; reconcile local/unmerged work; accept reservations. Imad's application edits remain paused until that review is reconciled. No work package is marked accepted yet.
+
+**Wave 1 — after acknowledgment:** Imad finishes the existing staff slice and publishes the household/consent interface. Kostas clears #44's two holds and scopes focused coach follow-ups. Tarek verifies #42/#51 handoffs and reproduces residual player/export issues against already-merged fixes. These can proceed independently within the reservations.
+
+**Wave 2 — after interface agreement:** household/consent work, academy assignment and player/coach/parent consumers proceed in parallel against pinned contracts. Independently review schema boundaries before integration. Tarek's model fixtures unblock shared stats; #42's handoff unblocks schedule UI and parent next-session work. Existing implemented slices are reviewed/reused rather than rewritten.
+
+**Wave 3 — integrated candidate:** two academies, all four roles, several children and shared phones; owner/academy/coach/household/child admission; record save/read/edit; scheduling; private/shared/AI feedback; withdrawal with active sessions; departure/reassignment; exports and deletion. Replace obsolete acceptance journeys with new positive and denial tests. Run the current-main dependency composition, not just each branch in isolation.
+
+**Wave 4 — release and live synthetic rehearsal:** peer review at final head, required checks, explicit Imad production authorization, serialized backend then frontend delivery, observed live synthetic journeys and phone/email checks. This plan does not grant production permission. Stop the queue on failed deployment and inspect what actually applied. Use reviewed forward repairs; a compatible frontend revert must not reopen old admission or privacy bypasses.
+
+Decisions to resolve before the affected implementation (owners submit concrete options, not assumptions): match formats/duration/substitution constraints (Kostas); participation/position eligibility for clean sheets (Tarek); multi-academy child access when one academy's consent is withdrawn (Imad); deliberate mapping of existing separate guardian accounts into households and named-consenter evidence (Imad with policy review). Never impose a global multi-academy suspension or retain an access loophole by accident. Optional dashboard simplifications/manual content can be proposed without blocking admission work.
+
+For every changed journey, record reproduction or positive baseline, regression evidence, exact commit and test results. Run the repository's required source/harness/typecheck/build/lint/use-case checks; SQL changes also require real-role disposable replay and deployed-order/upgrade coverage. Use native PostgreSQL for races. Render actual exported assets and built-app phone-sized journeys where relevant. Do not call a pending test pass, or treat mock HTTP as live email/backend verification.
+
+Status vocabulary: `reported` → `reproduced` → `implemented` → `tested` → `independently reviewed` → `merged` → `deployed` → `live synthetic verified`. Keep every stage distinct. A partial fix may close part of a UT item only, with the remaining scope named.
+
+Real-child admission additionally requires reviewed agreement/notice/retention responsibilities, complete consent enforcement, appropriate access reviews, verified deletion, restore evidence, correct pilot configuration and a named support owner/inbox. No passing code subset or waiver proves overall compliance or a bug-free platform.
+
+## 6. Complete UT allocation index
+
+The linked source inventory supplies the detailed original observations. This index gives every item one accountable lead; dependencies do not create multiple writers.
+
+| UT | Outcome | Accountable lead / package |
+|---|---|---|
+| 01 | Owner/academy-issued staff admission | Imad I-A; Kostas academy consumer |
+| 02 | Registered, consented roster and selectors | Kostas K-A; Imad eligibility contract |
+| 03 | No unconsented development processing/access | Imad I-A; Tarek independent coverage |
+| 04 | Bulk assignment of approved children | Kostas K-A |
+| 05 | Stable identity/name/history reconciliation | Kostas K-A; Tarek fixtures, Imad parent validation |
+| 06 | Goalkeeper coach specialty | Kostas K-C |
+| 07 | Coaching manual matches released workflows | Kostas K-C |
+| 08 | Separate private notes and published feedback | Kostas K-C; Imad parent consumer, Tarek AI |
+| 09 | Remove player season-bands overview | Tarek T-D |
+| 10 | Complete truthful goals/assists/clean-sheet totals | Tarek T-D contract; Kostas writer, Imad parent reader |
+| 11 | Session entry/navigation and count opens history | Kostas K-C |
+| 12 | Exact validated minutes/goals/assists | Kostas K-C; reuse Tarek #51 |
+| 13 | Four positions, existing-alias normalization | Tarek T-D; coordinated consumer handoff |
+| 14 | Confirmed calendar reaches child/parent; next session | Tarek T-D contract; Kostas writer, Imad parent UI |
+| 15 | Parent Home record details | Imad I-P; reuse fork #1 |
+| 16 | Parent match detail access | Imad I-P; reuse fork #1 |
+| 17 | Parent alerts open exact record | Imad I-P; reuse fork #1 |
+| 18 | Clear DOB back navigation in surviving admission flow | Imad I-A; obsolete public-signup flow not expanded |
+| 19 | Truthful duplicate/failed signup and delivery responses | Imad I-A; adapt #73 |
+| 20 | Password visibility | Imad I-P/I-A; reuse #71 |
+| 21 | Confirmation/resend/expiry and real-email evidence | Imad I-A |
+| 22 | Explicit account choice and callback/session safety | Imad I-A/I-P |
+| 23 | No false empty/zero coach loading states | Kostas K-C |
+| 24 | Smart-calendar authorization failure | Kostas K-C after #42 handoff |
+| 25 | Clarify missing schedule fields before creation | Kostas K-C |
+| 26 | Review redundant coach Home assessments | Kostas K-C |
+| 27 | Match/training assessment and participation clarity | Kostas K-C |
+| 28 | Descriptive assessment history | Kostas K-C |
+| 29 | Match/Training/Other order and consistent selection | Kostas K-C |
+| 30 | Feasible team/player match contributions | Kostas K-C; format decision first |
+| 31 | Session notes/details/history and authorized edit | Kostas K-C |
+| 32 | Preserve Other/gym/video session semantics | Kostas K-C |
+| 33 | Private-avatar upload/display and cleanup | Imad I-P UI; Tarek T-V Storage boundaries |
+| 34 | Parent connection status on player Profile | Tarek T-D; household contract from Imad |
+| 35 | Consistent Settings connection state | Imad I-P |
+| 36 | Passport export layout | Tarek T-D; retest #55 first |
+| 37 | Evolution export layout | Tarek T-D; retest #55 first |
+| 38 | Demonstrate Series 2 progression/history | Tarek T-D |
+| 39 | Safe personalized activation email greeting | Imad I-A; configuration approval before production |
+| 40 | Review redundant player recent matches | Tarek T-D |
+| 41 | Fully waived household/child admission architecture | Imad I-A; Kostas K-A assignment, Tarek verification |
+
+## Review and reservation ledger
+
+| Owner | Plan review | Accepted tasks / current reservation |
+|---|---|---|
+| Imad | Author; application coding paused for team review | I-A, I-P, I-R proposed; existing #74 local work preserved |
+| Kostas | Awaiting response | K-A, K-C proposed; review #44 and this overlap map first |
+| Tarek | Awaiting response | T-D, T-V proposed; review #42/#51/#40 and this overlap map first |
+
+Update this ledger with exact reply links and accepted changes before posting the implementation handoff. No nonresponse is treated as approval.

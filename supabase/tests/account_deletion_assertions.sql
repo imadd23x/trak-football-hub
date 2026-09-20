@@ -1,3 +1,4 @@
+-- @trak-suite mode=--coach-departure-review in-all=true order=1001
 -- Run after account_deletion_setup.sql has committed, on the SAME disposable
 -- connection. Application mutations run as authenticated, not as superuser.
 -- Assertion reads after RESET ROLE inspect persistence/FKs without RLS hiding

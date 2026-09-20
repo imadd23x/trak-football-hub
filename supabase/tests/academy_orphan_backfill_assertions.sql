@@ -1,3 +1,4 @@
+-- @trak-fixture
 -- Run directly after the repair migration, then remove every synthetic row.
 BEGIN;
 DO $test$

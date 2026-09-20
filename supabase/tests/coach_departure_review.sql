@@ -1,3 +1,4 @@
+-- @trak-suite mode=--coach-departure-review in-all=true
 -- Departure security regression: these assertions fail on K1/K2 at 6875968.
 -- Run ONLY through the disposable in-memory harness, never a shared database.
 -- This is separate from the passing parent-invitation suite. It deliberately

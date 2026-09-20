@@ -3,13 +3,13 @@ import { useParams } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { SignupOutcome } from '@/components/auth/SignupOutcome';
 import { toast } from 'sonner';
 import {
   NATIONALITIES, POSITIONS, AGE_GROUPS, COACH_ROLES,
   DAYS, MONTHS, YEARS,
 } from '@/lib/constants';
-import { Mail, RefreshCw, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { validatePassword, PASSWORD_HINT } from '@/lib/password'
 import { CONSENT_THRESHOLD_AGE, ageFromDateOfBirth } from '@/lib/consent'
 import { isRealCalendarDate, daysInMonth } from '@/lib/calendar'
@@ -31,82 +31,6 @@ const StyledSelect = ({ value, onChange, placeholder, children, ...props }: Reac
 
 type Role = 'player' | 'coach' | 'club';
 
-const EmailConfirmationScreen = ({ email }: { email: string }) => {
-  const [resending, setResending] = useState(false);
-  const [resent, setResent] = useState(false);
-
-  const handleResend = async () => {
-    setResending(true);
-    try {
-      const { error } = await supabase.auth.resend({ type: 'signup', email });
-      if (error) throw error;
-      setResent(true);
-      toast.success('Confirmation email resent!');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to resend email');
-    } finally {
-      setResending(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col items-center text-center py-6">
-      <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center mb-6">
-        <Mail className="w-10 h-10 text-primary" />
-      </div>
-      <h2 className="text-2xl text-foreground mb-2">Check your email</h2>
-      <p className="text-sm text-muted-foreground mb-2">
-        We sent a confirmation link to
-      </p>
-      <p className="text-sm font-medium text-foreground mb-6">{email}</p>
-      <p className="text-xs text-muted-foreground mb-8">
-        Click the link to activate your account and get started.
-      </p>
-      <Button
-        variant="outline"
-        onClick={handleResend}
-        disabled={resending || resent}
-        className="w-full gap-2"
-      >
-        <RefreshCw className={`w-4 h-4 ${resending ? 'animate-spin' : ''}`} />
-        {resent ? 'Email resent' : resending ? 'Resending...' : 'Resend confirmation email'}
-      </Button>
-      <a href="/" className="mt-6 text-sm text-muted-foreground hover:text-primary transition-colors">
-        ← Back to home
-      </a>
-    </div>
-  );
-};
-
-/**
- * Shown instead of the plain confirmation screen to players below the
- * digital-consent age. Their account exists and is theirs — they are waiting
- * on a parent to finish, not to start. Saying that plainly matters: the whole
- * point of letting them sign up themselves is that it stays their account.
- */
-const AwaitingParentScreen = ({ email, parentEmail }: { email: string; parentEmail: string }) => (
-  <div className="flex flex-col items-center text-center py-6">
-    <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center mb-6">
-      <Mail className="w-10 h-10 text-primary" />
-    </div>
-    <h2 className="text-2xl text-foreground mb-2">Almost there</h2>
-    <p className="text-sm text-muted-foreground mb-2">
-      Your account is created. We've asked your parent or guardian at
-    </p>
-    <p className="text-sm font-medium text-foreground mb-6">{parentEmail}</p>
-    <p className="text-xs text-muted-foreground mb-2">
-      to approve it. As soon as they do, your coach can start recording your
-      progress and you'll see it here.
-    </p>
-    <p className="text-xs text-muted-foreground mb-8">
-      Confirm your own email at {email} in the meantime.
-    </p>
-    <a href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-      ← Back to home
-    </a>
-  </div>
-);
-
 const OnboardingPage = () => {
   const { role } = useParams<{ role: string }>();
   const validRole = (role === 'player' || role === 'coach' || role === 'club') ? role as Role : null;
@@ -121,7 +45,8 @@ const OnboardingPage = () => {
         ← Back
       </a>
       <h1 className="text-2xl text-foreground mb-1">{titles[validRole]} Registration</h1>
-      <p className="text-muted-foreground text-sm mb-6">Create your Trak account</p>
+      <p className="text-muted-foreground text-sm mb-2">Create your Trak account</p>
+      <a href="/" className="inline-block text-sm text-primary underline mb-6">Sign in to an existing account</a>
       {validRole === 'player' && <PlayerOnboarding />}
       {validRole === 'coach' && <CoachOnboarding />}
       {validRole === 'club' && <ClubOnboarding />}
@@ -365,8 +290,8 @@ const PlayerOnboarding = () => {
 
       {step === 4 && (
         needsConsent
-          ? <AwaitingParentScreen email={email} parentEmail={parentEmail} />
-          : <EmailConfirmationScreen email={email} />
+          ? <SignupOutcome email={email} parentEmail={parentEmail} />
+          : <SignupOutcome email={email} />
       )}
     </div>
   );
@@ -487,7 +412,7 @@ const CoachOnboarding = () => {
       )}
 
       {step === 3 && (
-        <EmailConfirmationScreen email={email} />
+        <SignupOutcome email={email} />
       )}
     </div>
   );
@@ -531,7 +456,7 @@ const ClubOnboarding = () => {
     }
   };
 
-  if (done) return <EmailConfirmationScreen email={email} />;
+  if (done) return <SignupOutcome email={email} />;
 
   return (
     <div className="flex flex-col gap-4">

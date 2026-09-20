@@ -128,6 +128,16 @@ VALUES (pg_temp.pc_id(2), pg_temp.pc_id(5), 'parent', 'email_confirmed',
   'v1', 'fixture wording', 15, 10);
 
 
+-- P2 cutover: the positive assessment fixture needs its own real academy
+-- approval. Legacy rows below remain fixtures for the legacy evidence tests.
+INSERT INTO trak_consent.notices(id,organization_id,academy_name,controller_name,country_code,version,body,approved_at,approval_reference)
+VALUES(pg_temp.pc_id(901),pg_temp.pc_id(101),'Synthetic PC Academy','Synthetic PC controller','AE','pc-test','SYNTHETIC ONLY',now(),'synthetic-only');
+INSERT INTO trak_consent.programs(organization_id,notice_id,enabled) VALUES(pg_temp.pc_id(101),pg_temp.pc_id(901),true);
+SELECT pg_temp.pc_as('authenticated',5);
+SELECT public.record_academy_consent(pg_temp.pc_id(2),pg_temp.pc_id(101),pg_temp.pc_id(902),NULL,pg_temp.pc_id(901),'parent',
+  '{"coaching_records":true,"recognition":true,"parent_visibility":true}');
+SELECT pg_temp.pc_reset();
+
 -- ════════════════════════════════════════════════════════════
 -- A. Table privileges (20260919120001)
 -- ════════════════════════════════════════════════════════════

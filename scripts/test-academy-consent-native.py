@@ -128,13 +128,13 @@ def main() -> None:
         files = json.loads(inventory.stdout)
         for filename in files:
             sql((ROOT / 'supabase/migrations' / filename).read_text())
-        for suite in ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'academy_consent_authority.sql']:
+        for suite in ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'academy_consent_authority.sql', 'academy_consent_writes.sql']:
             sql("SET trak.test_database='disposable';\n" + (ROOT / 'supabase/tests' / suite).read_text())
             print('Native suite passed:', suite, flush=True)
         fixture = (ROOT / 'supabase/tests/academy_consent_authority.sql').read_text().split('-- Legacy evidence')[0]
         sql("SET trak.test_database='disposable';\n" + fixture + '\nCOMMIT;')
         # Distinct children keep cases independent without deleting any audit event.
-        for child in [21, 22, 23, 24]:
+        for child in [21, 22, 23, 24, 31, 32, 33, 34, 35, 36]:
             uid = identity(child)
             sql(f"INSERT INTO auth.users(id,email,email_confirmed_at) VALUES('{uid}','race-{child}@test.invalid',now());"
                 f"INSERT INTO public.profiles(user_id,role,full_name) VALUES('{uid}','player','Synthetic race child');"
@@ -163,7 +163,65 @@ def main() -> None:
         first, second = race(grant(24, 1, 707), 1, grant(24, 1, 707, org=102), 1, 'request-scope-conflict')
         assert second.returncode != 0 and '22023' in second.stderr, second.stderr
         assert sql(f"SELECT count(*) FROM trak_consent.events WHERE player_user_id='{identity(24)}';").stdout.strip() == '1'
-        print('PASS: four independent-connection races, exact event/revision/state assertions', flush=True)
+        def assessment(child: int, record: int) -> str:
+            return ("WITH saved AS (INSERT INTO public.coach_assessments(id,coach_user_id,squad_player_id) "
+                    f"SELECT '{identity(record)}','{identity(5)}',id FROM public.squad_players "
+                    f"WHERE linked_player_id='{identity(child)}' AND coach_user_id='{identity(5)}' "
+                    "RETURNING id) SELECT json_build_object('record_id',id) FROM saved;")
+
+        def withdraw(child: int, request: int, event: str) -> str:
+            return f"SELECT public.withdraw_academy_consent('{identity(child)}','{identity(101)}','{identity(request)}','{event}');"
+
+        def unlink(child: int) -> str:
+            # Model a privileged relationship removal without giving app roles a
+            # table DELETE grant. The contender remains an actual coach role.
+            return ("RESET ROLE; WITH removed AS (DELETE FROM public.player_parent_links "
+                    f"WHERE player_user_id='{identity(child)}' AND parent_user_id='{identity(1)}' "
+                    "RETURNING player_user_id) SELECT json_build_object('unlinked',player_user_id) FROM removed;")
+
+        def record_count(record: int) -> int:
+            return int(sql(f"SELECT count(*) FROM public.coach_assessments WHERE id='{identity(record)}';").stdout.strip())
+
+        first, second = race(grant(31, 1, 801), 1, assessment(31, 831), 5, 'grant-before-write')
+        assert second.returncode == 0, second.stderr
+        assert record_count(831) == 1
+        assert sql(f"SELECT guardian_event_ids=ARRAY['{first['event_id']}'::uuid] FROM trak_consent.authorization_receipts WHERE record_id='{identity(831)}';").stdout.strip() == 't'
+
+        event = response(sql('BEGIN;' + as_parent(1) + grant(32, 1, 802) + 'COMMIT;').stdout)['event_id']
+        first, second = race(assessment(32, 832), 5, withdraw(32, 803, event), 1, 'write-before-withdraw')
+        assert second.returncode == 0 and response(second.stdout)['action'] == 'withdraw', second.stderr
+        assert record_count(832) == 1
+        later = sql('BEGIN;' + as_parent(5) + assessment(32, 842) + 'COMMIT;', check=False)
+        assert later.returncode != 0 and '42501' in later.stderr, later.stderr
+        assert record_count(842) == 0
+
+        event = response(sql('BEGIN;' + as_parent(1) + grant(33, 1, 804) + 'COMMIT;').stdout)['event_id']
+        first, second = race(withdraw(33, 805, event), 1, assessment(33, 833), 5, 'withdraw-before-write')
+        assert first['action'] == 'withdraw'
+        assert second.returncode != 0 and '42501' in second.stderr, second.stderr
+        assert record_count(833) == 0
+        assert sql(f"SELECT count(*) FROM trak_consent.authorization_receipts WHERE record_id='{identity(833)}';").stdout.strip() == '0'
+
+        sql('BEGIN;' + as_parent(1) + grant(34, 1, 806) + 'COMMIT;')
+        first, second = race(unlink(34), 1, assessment(34, 834), 5, 'unlink-before-write')
+        assert second.returncode != 0 and '42501' in second.stderr, second.stderr
+        assert record_count(834) == 0
+
+        sql('BEGIN;' + as_parent(1) + grant(35, 1, 807) + 'COMMIT;')
+        first, second = race(assessment(35, 835), 5, unlink(35), 1, 'write-before-unlink')
+        assert second.returncode == 0 and response(second.stdout)['unlinked'] == identity(35), second.stderr
+        assert record_count(835) == 1
+        later = sql('BEGIN;' + as_parent(5) + assessment(35, 845) + 'COMMIT;', check=False)
+        assert later.returncode != 0 and '42501' in later.stderr, later.stderr
+        assert record_count(845) == 0
+
+        sql('BEGIN;' + as_parent(1) + grant(36, 1, 808) + 'COMMIT;')
+        transfer = (f"RESET ROLE; UPDATE public.coach_details SET organization_id='{identity(102)}' WHERE user_id='{identity(5)}';"
+                    "SELECT json_build_object('transferred',true);")
+        first, second = race(transfer, 5, assessment(36, 836), 5, 'transfer-before-write')
+        assert second.returncode != 0 and '42501' in second.stderr, second.stderr
+        assert record_count(836) == 0
+        print('PASS: ten independent-connection races, exact event/revision/record/receipt assertions', flush=True)
     finally:
         if started:
             run([str(pg / 'pg_ctl'), '-D', str(scratch / 'data'), '-m', 'fast', '-w', 'stop'])

@@ -12,24 +12,25 @@ import { ageGroupCeiling, ageGroupMatches, lowestEligibleAgeGroup } from '@/lib/
 /**
  * A YYYY-MM-DD whose age is `years`, with their birthday `-days` ago.
  *
- * The default puts the birthday a week behind us rather than on today, and
- * that margin is the point. `ageFromDateOfBirth` reads one clock on main —
- * `new Date(dob)` is UTC midnight, compared with LOCAL getters — and a
- * different one under #38, which is consistently UTC to match the database's
- * `current_date`. Those two disagree by at most a day, and only while local
- * and UTC are on different calendar days.
+ * Built from the UTC calendar day, which is the clock #38 makes
+ * `ageFromDateOfBirth` read on both sides, to match the database's
+ * `current_date`.
  *
- * A helper built on either clock is therefore correct against one
- * implementation and wrong against the other for a few hours each night. This
- * one is built on neither: seven days is wider than any disagreement the two
- * can produce, so every assertion below holds in every timezone under both,
- * and merging #38 cannot turn this file red. It went red twice before I
- * understood that, both times because I picked a clock instead of removing the
- * dependence on one.
+ * The default puts the birthday a week back so that the assertions which are
+ * NOT about the boundary — playing up, playing down, the lowest eligible band —
+ * cannot be disturbed by a one-day clock disagreement. That is a free
+ * robustness win and nothing depends on it.
  *
- * What is genuinely lost is the assertion on the exact birthday, and that is
- * #38's to prove rather than this file's — its own tests freeze the clock and
- * pin both sides of the boundary.
+ * The boundary assertion below is a different matter and is deliberately exact.
+ * It is RED on main today and green under #38, and that is the correct
+ * behaviour for it: main's `ageFromDateOfBirth` parses UTC midnight and then
+ * compares with LOCAL getters, so west of Greenwich it is a day out at every
+ * hour. Widening this assertion to hide that was my first instinct and it was
+ * wrong — it would have removed the only assertion in the repository that
+ * catches the defect, on the argument that the defect makes it fail.
+ *
+ * #42 therefore depends on #38. See the boundary test for why that is the
+ * cheap direction.
  */
 const dob = (years: number, days = -7) => {
   const n = new Date()
@@ -63,19 +64,23 @@ describe('ageGroupMatches', () => {
     expect(ageGroupMatches(dob(16), 'U16')).toBe(false)
   })
 
-  it('refuses an over-age player and accepts an under-age one near the boundary', () => {
-    // Three days either side, not the exact birthday, for the reason given on
-    // `dob`: the two implementations of ageFromDateOfBirth can disagree by a
-    // day, so an assertion sitting on the birthday itself is green under one
-    // and red under the other. Three days leaves two days of margin and still
-    // brackets the boundary closely enough to catch an off-by-one in
-    // ageGroupMatches, which is what this test is for.
+  it('is exact at the boundary', () => {
+    // Under 17 means under 17: someone who turned 17 today is not eligible,
+    // and someone whose 17th birthday is tomorrow still is.
     //
-    // The exact birthday belongs in #38's own tests, which freeze the clock
-    // and pin both sides of it. It does not belong here, where the clock is
-    // live and the function under test is a caller.
-    expect(ageGroupMatches(dob(17, -3), 'U17')).toBe(false)
-    expect(ageGroupMatches(dob(17, 3), 'U17')).toBe(true)
+    // This assertion fails on main west of Greenwich and passes under #38, so
+    // #38 must merge first. I briefly replaced it with a three-day window to
+    // make this branch green on its own, and Imad was right to push back:
+    // widening it removes the only assertion anywhere that catches the
+    // mixed-clock defect, and the justification for widening was that the
+    // defect makes it fail. A test that fails because the code is broken is
+    // doing its job.
+    //
+    // Verified under #38 at 241357d in UTC, Asia/Dubai, America/New_York,
+    // America/Los_Angeles, America/Sao_Paulo, Pacific/Auckland and
+    // Pacific/Kiritimati — green in all seven.
+    expect(ageGroupMatches(dob(17, 0), 'U17')).toBe(false)
+    expect(ageGroupMatches(dob(17, 1), 'U17')).toBe(true)
   })
 
   it('permits what it cannot evaluate, so it never blocks a signup blindly', () => {

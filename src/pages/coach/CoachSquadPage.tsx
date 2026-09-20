@@ -53,10 +53,18 @@ export default function CoachSquadPage() {
     // Fetch latest assessment per player for band display.
     // A failure here is not fatal — the squad still renders, just without
     // bands — but it must not be mistaken for "nobody has been assessed".
+    // No .eq('coach_user_id', ...): the band should show the academy's latest
+    // assessment, not only this coach's. K7's migration adds the read policy
+    // that makes that possible — dropping the filter alone would have changed
+    // nothing, because "Coaches can select own assessments" was itself scoped
+    // to auth.uid().
+    //
+    // RLS does the scoping now, which is the right place for it: a colleague's
+    // assessment on a roster row in this academy is visible, another academy's
+    // is not, and a departed coach sees neither.
     supabase
       .from('coach_assessments')
       .select('squad_player_id, coach_rating, created_at')
-      .eq('coach_user_id', user.id)
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
         if (cancelled || error || !data) return

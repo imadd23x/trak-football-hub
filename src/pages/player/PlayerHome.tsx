@@ -8,6 +8,7 @@ import { BANDS, type BandType } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
 import { dedupeMatches } from '@/lib/match-dedupe'
 import { isTimeTBC } from '@/lib/event-time'
+import { parseDisplayDate } from '@/lib/calendar'
 import { trackEvent } from '@/lib/telemetry'
 import CardRevealModal from '@/components/player/CardRevealModal'
 import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
@@ -80,11 +81,19 @@ export default function PlayerHome() {
   const [showReveal, setShowReveal] = useState(false)
   const [newMatchCount, setNewMatchCount] = useState(0)
   const [coachAssessmentNote, setCoachAssessmentNote] = useState<string | null>(null)
+  // A failed feedback read must not look like "no feedback yet".
+  const [feedbackLoadFailed, setFeedbackLoadFailed] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!user) return
+    // This effect re-runs on an Auth refresh for the same account. Without a
+    // guard, a response from the previous run can land after the current one
+    // and reinstate what it read — which is how retracted feedback stayed on
+    // screen. Only the newest run may write to state.
+    let cancelled = false
+
     supabase.from('matches').select('*').eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
@@ -112,37 +121,79 @@ export default function PlayerHome() {
         }
       })
     supabase.from('player_details').select('position, current_club, age_group').eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => setDetails(data))
+      .then(({ data, error }) => {
+        // These sibling reads used to destructure only `data`, so a failure
+        // rendered as "nothing recorded yet" — the same false empty state this
+        // screen's main query was fixed for, arriving one query along.
+        if (error) { setLoadFailed(true); return }
+        setDetails(data)
+      })
     // Fetch squad link → coach assessments + published calendar events
     supabase.from('squad_players').select('id, coach_user_id').eq('linked_player_id', user.id)
-      .then(async ({ data: squadRows }) => {
+      .then(async ({ data: squadRows, error: squadError }) => {
+        if (squadError) { setLoadFailed(true); return }
         if (!squadRows?.length) return
         const ids = squadRows.map((r: any) => r.id)
         const coachIds = squadRows.map((r: any) => r.coach_user_id).filter(Boolean)
 
         // Latest coach assessment
-        const { data: assessments } = await supabase.from('coach_assessments')
+        const { data: assessments, error: assessError } = await supabase.from('coach_assessments')
           .select('*')
           .in('squad_player_id', ids)
           .order('created_at', { ascending: false })
           .limit(1)
-        console.log('[Trak] squad ids:', ids)
-        console.log('[Trak] assessments found:', assessments?.length, assessments?.[0]?.id)
+        if (assessError) { setLoadFailed(true); return }
         if (assessments?.length) {
           const latest = assessments[0]
           setCoachAssessment(latest)
           const { data: cp } = await supabase.from('profiles').select('full_name').eq('user_id', latest.coach_user_id).maybeSingle()
           if (cp) setCoachName(cp.full_name)
-          // Check if the coach left improvement notes for this assessment
-          const { data: noteRow, error: noteError } = await supabase.from('coach_assessment_notes')
-            .select('note').eq('assessment_id', latest.id).maybeSingle()
-          console.log('[Trak] note fetch:', { note: noteRow?.note, error: noteError?.message })
-          if (noteRow?.note) setCoachAssessmentNote(noteRow.note)
+          // Published feedback the coach wrote FOR this player — not the
+          // coach's private note, which K9 (20260918135500) made unreadable
+          // here and which was never meant for the child in the first place.
+          // RLS already restricts this to published rows on their own
+          // assessments; the published_at filter makes that explicit at the
+          // call site so a future policy change cannot quietly widen it.
+          //
+          // The previous console.log printed the private note to the browser
+          // console — X9 by a third route. Gone with the query that fed it.
+          const { data: sharedRow, error: sharedError } = await supabase
+            .from('coach_shared_feedback' as any)
+            .select('body')
+            .eq('assessment_id', latest.id)
+            .not('published_at', 'is', null)
+            .maybeSingle()
+          if (cancelled) return
+          // Assign unconditionally, including null. The previous version only
+          // assigned a truthy body, so once feedback had been displayed it
+          // could never be taken away: a coach retracting a publication left
+          // the old text on the child's screen on every later render. Imad
+          // reproduced it with an Auth refresh returning zero rows.
+          //
+          // An error clears it too. If we cannot confirm the text is still
+          // published, continuing to show it is the wrong side to fail on —
+          // the whole point of K9 is that the child sees only what a coach
+          // currently means them to see.
+          // A console line is not a user-visible state. An empty card reads as
+          // "my coach hasn't written anything yet", which is the false-empty
+          // state #30 fixed on this screen — arriving back in the same file.
+          // Tarek raised it on #44; #42 makes the sibling queries in this
+          // effect set loadFailed, so this one would have stood out as the
+          // exception once both landed.
+          if (sharedError) {
+            console.error('[Trak] shared feedback fetch failed', sharedError.message)
+            setFeedbackLoadFailed(true)
+            setCoachAssessmentNote(null)
+            return
+          }
+          setFeedbackLoadFailed(false)
+          const body = (sharedRow as { body?: string } | null)?.body?.trim()
+          setCoachAssessmentNote(body || null)
         }
 
         // Published upcoming calendar events from coach
         if (coachIds.length) {
-          const { data: evs } = await supabase
+          const { data: evs, error: evsError } = await supabase
             .from('coach_calendar_events')
             .select('*')
             .in('coach_user_id', coachIds)
@@ -150,9 +201,15 @@ export default function PlayerHome() {
             .gte('starts_at', new Date().toISOString())
             .order('starts_at', { ascending: true })
             .limit(5)
+          // A failed calendar read is not an empty calendar. Without this the
+          // player is told they have no sessions coming up, which is a
+          // statement about their week, not about the network.
+          if (evsError) { setLoadFailed(true); return }
           setUpcomingEvents(evs || [])
         }
       })
+
+    return () => { cancelled = true }
   }, [user, reloadKey])
 
   const getBandDistribution = () => {
@@ -602,12 +659,16 @@ export default function PlayerHome() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-white/88">
-                  {coachAssessmentNote ? 'Your coach left feedback' : 'What to work on'}
+                  {feedbackLoadFailed
+                    ? "Couldn't load your feedback"
+                    : coachAssessmentNote ? 'Your coach left feedback' : 'What to work on'}
                 </p>
                 <p className="text-[11px] text-white/40 mt-0.5 truncate">
-                  {coachAssessmentNote
-                    ? `"${coachAssessmentNote}"`
-                    : 'Based on your latest assessment'}
+                  {feedbackLoadFailed
+                    ? 'Pull down to refresh and try again'
+                    : coachAssessmentNote
+                      ? `"${coachAssessmentNote}"`
+                      : 'Based on your latest assessment'}
                 </p>
               </div>
               <span className="text-[#C8F25A] text-[13px] flex-shrink-0">→</span>
@@ -622,7 +683,11 @@ export default function PlayerHome() {
             <div className="mt-2.5 space-y-2">
               {recentMatches.map(m => {
                 const band = scoreToBand(m.computed_rating || 6.5)
-                const formattedDate = new Date(m.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                // Same source of truth as PlayerMatches: when the match was played,
+                // falling back to when the row was logged. The two screens used
+                // to disagree about the same match's date.
+                const formattedDate = parseDisplayDate(m.match_date || m.created_at)
+                  ?.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) ?? ''
                 const result = m.team_score != null && m.opponent_score != null
                   ? (m.team_score > m.opponent_score ? 'W' : m.team_score < m.opponent_score ? 'L' : 'D')
                   : null

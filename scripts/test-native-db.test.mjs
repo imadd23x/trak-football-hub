@@ -66,7 +66,7 @@ test('full replay includes all backfills and leaves committed deletion fixtures 
   assert.ok(index('academy_access_security.sql') < index('account_deletion_setup.sql'));
 });
 
-test('academy upgrade replays every main migration before the unchanged older repair', async () => {
+test('academy upgrade preserves dependencies before the older repair and its forward correction last', async () => {
   const academy = '20260918062345_preserve_academy_access_and_fk_cleanup.sql';
   const parent = '20260917205027_secure_parent_invites.sql';
   const pilot = '20260918070209_restrict_pilot_operational_views.sql';
@@ -76,7 +76,8 @@ test('academy upgrade replays every main migration before the unchanged older re
   const replayed = stages.filter(file => /^\d{14}_/.test(file));
   assert.equal(migrationCount, files.length);
   assert.deepEqual([...replayed].sort(), files, 'no migration omitted, duplicated, or replaced');
-  assert.equal(replayed.at(-1), academy);
+  assert.equal(replayed.at(-1), '20260920152925_preserve_closed_academy_history.sql');
+  assert.equal(replayed.at(-2), academy);
   assert.ok(replayed.indexOf('20260918133800_ai_quota_known_functions.sql') < replayed.indexOf(academy));
   assert.equal(replayed.indexOf(parent), replayed.indexOf(pilot) + 1, 'preserve the deployed report-before-parent upgrade order');
   for (const [setup, migration, assertions] of [
@@ -89,6 +90,7 @@ test('academy upgrade replays every main migration before the unchanged older re
   }
   assert.equal(stages[stages.indexOf(pilot) - 1], 'pilot_view_backfill_setup.sql');
   assert.deepEqual(suites, ['parent_invite_security.sql', 'pilot_view_security.sql',
+    'privilege_and_consent_security.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql',
     'coach_departure_review.sql', 'academy_access_security.sql',
     'account_deletion_setup.sql', 'account_deletion_assertions.sql']);
   assert.match(sql, /deployed main first, then academy repair/);

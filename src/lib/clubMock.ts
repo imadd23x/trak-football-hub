@@ -1,3 +1,5 @@
+import { BANDS } from '@/lib/types'
+
 export const CLUB = {
   name: 'Panetolikos FC',
   totalPlayers: 47,
@@ -8,15 +10,10 @@ export const CLUB = {
 export type AgeGroup = 'U19' | 'U17' | 'U15'
 export type Band = 'Exceptional' | 'Standout' | 'Good' | 'Steady' | 'Mixed' | 'Developing' | 'Difficult'
 
-export const BAND_COLORS: Record<Band, string> = {
-  Exceptional: '#C8F25A',
-  Standout: '#86efac',
-  Good: '#4ade80',
-  Steady: '#60a5fa',
-  Mixed: '#fb923c',
-  Developing: '#a78bfa',
-  Difficult: 'rgba(255,255,255,0.4)',
-}
+// Derived from BANDS rather than restated. This file held a third copy of the
+// band colours; a fourth, on PlayerProfilePage, had different thresholds too.
+export const BAND_COLORS: Record<Band, string> =
+  Object.fromEntries(BANDS.map(b => [b.word, b.color])) as Record<Band, string>
 
 export interface SquadSummary {
   ageGroup: AgeGroup

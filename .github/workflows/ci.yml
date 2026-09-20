@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -47,6 +47,9 @@ jobs:
       - name: Deterministic synthetic demo regressions
         run: npm run test:demo
 
+      - name: Consent calendar timezones
+        run: npm run test:consent-timezones
+
       - name: Database security regressions
         run: npm run test:db
 
@@ -58,6 +61,9 @@ jobs:
 
       - name: Academy repair after current main migrations
         run: npm run test:db -- --academy-upgrade-review
+
+      - name: Academy history convergence and mutation controls
+        run: npm run test:db:academy-history
 
       - name: Disposable database runner safeguards
         run: npm run test:db:runner
@@ -79,6 +85,12 @@ jobs:
         run: npm run test:db:native -- --academy-upgrade-review
         env:
           TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+      # Every step above replays migrations from empty, so none of them can see
+      # a database that already ran an earlier version of a migration file. That
+      # is the gap a withdrawn-and-replaced migration falls through: the replay
+      # goes green while the already-applied database keeps the old effects.
+      - name: Migration histories converge
+        run: npm run test:db:convergence
 
       # tests/msw and tests/support hold the MSW fidelity contract and the
       # useCase() unknown-id guard — package.json's "test" script only runs
@@ -95,6 +107,15 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Layer 3. Every other credential check reads SOURCE; this reads what is
+      # actually served, which is a different question. A route guarded by
+      # `import.meta.env.DEV` still has its chunk emitted, because the guard
+      # decides which routes register and not which chunks Rollup builds — that
+      # is how the dev-account password shipped while the page looked guarded.
+      # Must run after Build; it refuses to conclude anything without a dist/.
+      - name: Bundle secrets
+        run: npm run check:bundle
 
       - name: Install test browser
         run: npx playwright install --with-deps chromium
@@ -254,7 +275,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'

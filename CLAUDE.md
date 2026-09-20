@@ -103,7 +103,15 @@ npm run build          # production build
 Use the explicit-target [synthetic demo tooling](docs/demo-data.md). Planning is
 read-only; generated passwords stay in a private ignored local file. The legacy
 seed/purge scripts are retired. `/dev-setup` still uses outdated provisioning
-paths and is not evidence that the current linking or consent gates work.
+paths and is not evidence that the current admission or consent gates work.
+Its quick-login credentials come from local `VITE_DEV_PASSWORD` and sign-in is
+refused when it is unset. A frontend environment variable is not a server secret;
+never put a service key or production password there.
+
+This file previously claimed credentials had never been committed. That was not
+true: password literals in `LandingPage.tsx`, `DevSetupPage.tsx` and
+`DevSwitcher.tsx` shipped to public visitors. Do not reintroduce a literal —
+`import.meta.env.DEV` guards which routes register, not which chunks Rollup emits.
 
 ## TDD Workflow
 
@@ -114,6 +122,8 @@ CI fails for enforced tests/build errors. Pending use-case failures currently do
 ## Database Migrations
 
 Create a new migration using the Supabase CLI; never edit existing migration files. Replay migrations in order on a disposable database and test with actual authenticated roles. Do not assume individual historical migrations are safe to rerun. The main CI workflow applies pending migrations and deploys edge functions before the frontend.
+
+Since `20260919120001`, new tables in `public` are born with no privileges for `anon` or `authenticated`. A migration that creates a table must `GRANT` exactly the operations its policies back (see `20260918000002_ai_call_quota.sql` for the pattern); `anon` needs nothing.
 
 Key migrations to be aware of:
 - `20260425000001_security_hardening.sql` — RLS policies + performance indexes

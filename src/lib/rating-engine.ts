@@ -1,4 +1,5 @@
-import type { MatchInput, BandType } from './types'
+import { bandConfig } from './types'
+import type { MatchInput, BandType, BandConfig } from './types'
 
 function getPositionModifiers(position: string, inputs: Record<string, string | number>): number {
   const get = (key: string): string => String(inputs[key] || '').toLowerCase()
@@ -185,4 +186,11 @@ export function scoreToBand(score: number): BandType {
   if (score >= 4) return 'mixed'
   if (score >= 2) return 'developing'
   return 'difficult'
+}
+
+// Score straight to colours, routed through scoreToBand so there is exactly one
+// ladder. Deriving a band from BANDS.minScore instead would be a second ladder
+// that agrees today and drifts the first time someone edits only one of them.
+export function bandForScore(score: number): BandConfig {
+  return bandConfig(scoreToBand(score))
 }

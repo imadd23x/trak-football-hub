@@ -1,0 +1,461 @@
+<title>Touchline Assessment</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,700&display=swap">
+<style>
+  :root{
+    --bg:#0A0A0B; --s1:#101012; --s2:#17171A; --s3:#202024;
+    --border:rgba(255,255,255,0.07); --border-md:rgba(255,255,255,0.11);
+    --accent:#C8F25A;
+    --t1:rgba(255,255,255,0.88); --t2:rgba(255,255,255,0.45); --t3:rgba(255,255,255,0.22);
+    --exceptional:#C8F25A; --standout:#86efac; --good:#4ade80; --steady:#60a5fa;
+    --mixed:#fb923c; --developing:#a78bfa; --difficult:rgba(255,255,255,0.4);
+    --sans:'DM Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+    --mono:'DM Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--t1);
+    font-family:var(--sans); font-weight:400; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .stage{
+    display:flex; gap:40px; justify-content:center;
+    align-items:flex-start; padding:32px 20px 64px;
+  }
+  .rail{display:none; width:280px; flex:0 0 280px; padding-top:8px}
+  @media(min-width:960px){.rail{display:block}}
+
+  .lbl{
+    font-family:var(--mono); font-weight:500; font-size:9px;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--t2);
+  }
+  .rail h1{
+    font-weight:300; font-size:34px; line-height:1.05; letter-spacing:-.03em;
+    margin:10px 0 6px; text-wrap:balance;
+  }
+  .rail .sub{color:var(--t2); font-size:13px; margin:0 0 26px; max-width:34ch}
+  .rule{
+    display:flex; gap:11px; align-items:flex-start;
+    padding:11px 0; border-top:1px solid var(--border);
+  }
+  .rule:last-of-type{border-bottom:1px solid var(--border)}
+  .tick{
+    flex:0 0 16px; height:16px; margin-top:2px; border-radius:5px;
+    background:rgba(200,242,90,.1); border:1px solid rgba(200,242,90,.28);
+    color:var(--accent); font-size:9px; line-height:14px; text-align:center;
+  }
+  .rule p{margin:0; font-size:12.5px; color:var(--t2); line-height:1.45}
+  .rule b{display:block; color:var(--t1); font-weight:400; font-size:13px; margin-bottom:1px}
+  .railfoot{margin-top:22px; font-size:11.5px; color:var(--t3); line-height:1.5; max-width:32ch}
+
+  .phone{
+    width:100%; max-width:430px; background:var(--s1);
+    border:1px solid var(--border-md); border-radius:24px; overflow:hidden;
+    box-shadow:0 30px 70px -30px rgba(0,0,0,.9);
+  }
+  .bar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px; border-bottom:1px solid var(--border);
+    background:rgba(10,10,11,.92); backdrop-filter:blur(24px);
+  }
+  .brand{display:flex; align-items:baseline; gap:7px}
+  .brand strong{font-weight:500; font-size:14px; letter-spacing:-.01em}
+  .brand em{color:var(--accent); font-style:normal}
+  .clock{display:flex; align-items:center; gap:7px}
+  .clock .t{
+    font-family:var(--mono); font-weight:500; font-size:13px;
+    font-variant-numeric:tabular-nums; color:var(--t2);
+  }
+  .clock.live .t{color:var(--accent)}
+  .dot{width:5px; height:5px; border-radius:50%; background:var(--t3)}
+  .clock.live .dot{background:var(--accent); animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.25}}
+  @media(prefers-reduced-motion:reduce){.clock.live .dot{animation:none}}
+
+  .screen{padding:20px; display:flex; flex-direction:column; gap:14px}
+
+  .who{display:flex; align-items:center; gap:13px; padding:14px 16px;
+    background:var(--s2); border:1px solid var(--border); border-radius:14px}
+  .shirt{
+    flex:0 0 42px; height:42px; border-radius:12px; background:var(--s3);
+    border:1px solid var(--border-md); display:grid; place-items:center;
+    font-family:var(--mono); font-weight:500; font-size:15px; color:var(--t1);
+  }
+  .who .nm{font-size:15px; letter-spacing:-.01em}
+  .who .mt{font-family:var(--mono); font-weight:500; font-size:9px;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--t2); margin-top:3px}
+
+  .field label{display:block; margin-bottom:8px}
+  textarea{
+    width:100%; min-height:156px; resize:vertical; padding:14px;
+    background:var(--s3); border:1px solid var(--border-md); border-radius:14px;
+    color:var(--t1); font-family:var(--sans); font-size:14.5px; line-height:1.55;
+  }
+  textarea::placeholder{color:var(--t3)}
+  textarea:focus-visible,button:focus-visible{
+    outline:2px solid var(--accent); outline-offset:2px;
+  }
+  .hint{font-size:11.5px; color:var(--t3); margin:8px 2px 0}
+
+  button{font-family:var(--sans); cursor:pointer; border:none}
+  .primary{
+    width:100%; padding:15px; border-radius:14px; background:var(--accent);
+    color:#0A0A0B; font-weight:700; font-size:14.5px; letter-spacing:-.01em;
+  }
+  .ghost{
+    width:100%; padding:13px; border-radius:14px; background:transparent;
+    border:1px solid var(--border-md); color:var(--t2); font-size:13.5px;
+  }
+
+  .rows{display:flex; flex-direction:column; border:1px solid var(--border);
+    border-radius:14px; overflow:hidden; background:var(--s2)}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:12px 14px; border-bottom:1px solid var(--border)}
+  .row:last-child{border-bottom:none}
+  .row .cat{font-size:13.5px; color:var(--t1)}
+  .row .ev{font-size:11.5px; color:var(--t3); margin-top:2px; max-width:26ch}
+  .chip{
+    flex:0 0 auto; padding:6px 11px; border-radius:10px; font-size:12px;
+    font-weight:500; letter-spacing:-.01em; background:transparent;
+    transition:transform .12s ease;
+  }
+  .chip:active{transform:scale(.96)}
+  .skel{height:13px; border-radius:6px; background:var(--s3); width:66px}
+  .shimmer{animation:sh 1.1s ease-in-out infinite}
+  @keyframes sh{50%{opacity:.4}}
+  @media(prefers-reduced-motion:reduce){.shimmer{animation:none}}
+
+  .panel{background:var(--s2); border:1px solid var(--border); border-radius:14px; padding:14px 16px}
+  .panel .lbl{display:block; margin-bottom:9px}
+  .note{
+    width:100%; background:transparent; border:none; color:var(--t1); padding:0;
+    font-family:var(--sans); font-size:14px; line-height:1.55; resize:vertical; min-height:86px;
+  }
+  .note:focus-visible{outline:2px solid var(--accent); outline-offset:6px; border-radius:6px}
+
+  .charwrap{border-color:rgba(167,139,250,.2); background:rgba(167,139,250,.045)}
+  .charwrap .lbl{color:#a78bfa}
+  .value{display:inline-block; padding:5px 10px; border-radius:10px; font-size:12px; font-weight:500;
+    background:rgba(167,139,250,.13); color:#a78bfa; border:1px solid rgba(167,139,250,.26)}
+  .charwrap p{margin:9px 0 0; font-size:13.5px; line-height:1.5}
+  .charwrap .foot{margin-top:10px; font-size:11px; color:var(--t3); line-height:1.45}
+
+  .flag{display:flex; gap:10px; padding:11px 0; border-top:1px solid var(--border)}
+  .flag:first-of-type{border-top:none; padding-top:2px}
+  .flag .q{flex:0 0 auto; font-family:var(--mono); font-weight:500; font-size:9px;
+    letter-spacing:.1em; color:#fb923c; padding-top:3px}
+  .flag p{margin:0; font-size:12.5px; color:var(--t2); line-height:1.45}
+  .flag em{color:var(--t1); font-style:normal}
+
+  .sign{border:1px solid var(--border-md); border-radius:14px; padding:14px 16px; background:var(--s2)}
+  .sign p{margin:0 0 12px; font-size:12.5px; color:var(--t2); line-height:1.5}
+  .sign strong{color:var(--t1); font-weight:400}
+
+  .done{display:flex; flex-direction:column; gap:14px; align-items:center; text-align:center; padding:8px 0 4px}
+  .done .big{font-weight:300; font-size:44px; letter-spacing:-.03em; line-height:1;
+    font-variant-numeric:tabular-nums; color:var(--accent)}
+  .done .cap{font-size:13px; color:var(--t2); max-width:32ch; margin:0}
+  .seen{width:100%; text-align:left}
+  .err{font-size:12.5px; color:#fb923c; margin:0}
+</style>
+
+<div class="stage">
+  <aside class="rail">
+    <div class="lbl">Trak &middot; prototype 01</div>
+    <h1>Touchline</h1>
+    <p class="sub">Twenty seconds of plain English becomes an assessment the coach signs.</p>
+
+    <div class="lbl" style="margin-bottom:4px">What the draft is held to</div>
+    <div class="rule"><div class="tick">&check;</div><p><b>Band words, never numbers</b>Seven fixed words. The score stays in the database.</p></div>
+    <div class="rule"><div class="tick">&check;</div><p><b>The coach signs it</b>Claude drafts. The record is authored by a person or it is worth nothing.</p></div>
+    <div class="rule"><div class="tick">&check;</div><p><b>Character on its own axis</b>Noticed, never graded, never folded into the band.</p></div>
+    <div class="rule"><div class="tick">&check;</div><p><b>Impressions get challenged</b>Anything the coach cannot point at comes back as a question.</p></div>
+
+    <p class="railfoot">The bet: coach effort is the single point of failure. If a full assessment takes thirty seconds instead of three minutes, week-four drop-off stops being the thing that kills the pilot.</p>
+  </aside>
+
+  <main class="phone">
+    <div class="bar">
+      <div class="brand"><strong>Touch<em>line</em></strong><span class="lbl">U15 &middot; Friday</span></div>
+      <div class="clock" id="clock"><span class="dot"></span><span class="t" id="t">0:00</span></div>
+    </div>
+    <div class="screen" id="screen"></div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var BANDS = [
+    {w:'Difficult',   v:'--difficult',   rgb:'255,255,255', a:.06, b:.10},
+    {w:'Developing',  v:'--developing',  rgb:'167,139,250', a:.13, b:.26},
+    {w:'Mixed',       v:'--mixed',       rgb:'251,146,60',  a:.13, b:.24},
+    {w:'Steady',      v:'--steady',      rgb:'96,165,250',  a:.13, b:.24},
+    {w:'Good',        v:'--good',        rgb:'74,222,128',  a:.13, b:.24},
+    {w:'Standout',    v:'--standout',    rgb:'134,239,172', a:.13, b:.26},
+    {w:'Exceptional', v:'--exceptional', rgb:'200,242,90',  a:.15, b:.30}
+  ];
+  var WORDS = BANDS.map(function(b){ return b.w; });
+  var CATS = ['Work rate','Tactical','Attitude','Technical','Physical','Coachability'];
+  var VALUES = ['Composure','Respect','Effort','Responsibility','Care','Transfer'];
+
+  var EXAMPLE = 'First half he was everywhere, pressed their centre-back properly, two good balls in behind. After we conceded he hid a bit, stopped showing for it. Took the sub without a word, clapped the lad coming on. Left foot is still a problem.';
+
+  var state = newState();
+  var screen = document.getElementById('screen');
+  var clock = document.getElementById('clock');
+  var tEl = document.getElementById('t');
+  var timer = null;
+
+  function newState(){
+    return {stage:'input', input:EXAMPLE, draft:null, err:null,
+            started:0, elapsed:0, ticking:false, offline:false};
+  }
+
+  function startClock(){
+    if(state.ticking) return;
+    state.ticking = true;
+    state.started = Date.now();
+    clock.classList.add('live');
+    timer = setInterval(function(){
+      state.elapsed = (Date.now() - state.started)/1000;
+      tEl.textContent = fmt(state.elapsed);
+    }, 100);
+  }
+  function stopClock(){
+    if(!state.ticking) return;
+    clearInterval(timer);
+    state.ticking = false;
+    clock.classList.remove('live');
+  }
+  function fmt(s){
+    var m = Math.floor(s/60), r = Math.floor(s%60);
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  function bandOf(w){
+    var t = String(w == null ? '' : w).toLowerCase();
+    for(var i=0; i<BANDS.length; i++){ if(BANDS[i].w.toLowerCase() === t) return BANDS[i]; }
+    return BANDS[3];
+  }
+  function chipStyle(b){
+    return 'background:rgba(' + b.rgb + ',' + b.a + ');color:var(' + b.v + ');border:1px solid rgba(' + b.rgb + ',' + b.b + ')';
+  }
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+    });
+  }
+  function clean(s){
+    return String(s == null ? '' : s).replace(/\b\d+(\.\d+)?\b/g,'').replace(/\s{2,}/g,' ').trim();
+  }
+
+  function who(){
+    return '<div class="who"><div class="shirt">7</div><div>' +
+      '<div class="nm">Nikos Papadakis</div>' +
+      '<div class="mt">Attacker &middot; U15 &middot; vs Aris &middot; Lost 1&ndash;2</div></div></div>';
+  }
+
+  function render(){
+    if(state.stage === 'input') return renderInput();
+    if(state.stage === 'drafting') return renderDraft(true);
+    if(state.stage === 'draft') return renderDraft(false);
+    renderDone();
+  }
+
+  function renderInput(){
+    screen.innerHTML =
+      who() +
+      '<div class="field"><label class="lbl" for="ta">What you saw &middot; say it how you would say it</label>' +
+      '<textarea id="ta" placeholder="Talk about one player. Plain words.">' + esc(state.input) + '</textarea>' +
+      '<p class="hint">Example text, already filled in &mdash; edit it or write your own.</p></div>' +
+      '<button class="primary" id="go">Draft assessment</button>' +
+      (state.err ? '<p class="err">' + esc(state.err) + '</p>' : '');
+
+    var ta = document.getElementById('ta');
+    ta.addEventListener('input', function(){ state.input = ta.value; startClock(); });
+    ta.addEventListener('focus', startClock);
+    document.getElementById('go').addEventListener('click', function(){
+      state.input = ta.value;
+      startClock();
+      go();
+    });
+  }
+
+  function renderDraft(loading){
+    var d = state.draft || {};
+    var cats = d.categories || [];
+    var rows = CATS.map(function(c, i){
+      if(loading){
+        return '<div class="row"><div><div class="cat">' + c + '</div></div>' +
+               '<div class="skel shimmer"></div></div>';
+      }
+      var item = cats[i] || {};
+      var b = bandOf(item.band);
+      return '<div class="row"><div><div class="cat">' + c + '</div>' +
+        (item.evidence ? '<div class="ev">' + esc(clean(item.evidence)) + '</div>' : '') +
+        '</div><button class="chip" data-i="' + i + '" style="' + chipStyle(b) + '">' + b.w + '</button></div>';
+    }).join('');
+
+    var body =
+      who() +
+      '<span class="lbl">' + (loading ? 'Claude is reading your words' : 'Six categories &middot; tap a band to adjust') + '</span>' +
+      '<div class="rows">' + rows + '</div>';
+
+    if(!loading){
+      body +=
+        '<div class="panel"><span class="lbl">What Nikos will read</span>' +
+        '<textarea class="note" id="note">' + esc(clean(d.note)) + '</textarea></div>' +
+
+        '<div class="panel charwrap"><span class="lbl">Character &middot; separate axis</span>' +
+        '<span class="value">' + esc(d.value || 'Responsibility') + '</span>' +
+        '<p>' + esc(clean(d.character)) + '</p>' +
+        '<p class="foot">Noticed, never graded. It does not touch his band, and it is never compared with another child.</p></div>' +
+
+        ((d.flags && d.flags.length) ?
+          '<div class="panel"><span class="lbl" style="color:#fb923c">Before you sign</span>' +
+          d.flags.map(function(f){
+            return '<div class="flag"><span class="q">ASK</span><p><em>&ldquo;' + esc(f.phrase) + '&rdquo;</em> &mdash; ' + esc(f.why) + '</p></div>';
+          }).join('') + '</div>' : '') +
+
+        '<div class="sign"><p>Claude drafted this from your words. <strong>You are the author</strong> &mdash; Trak files it under your name, and Nikos sees it as yours.</p>' +
+        '<button class="primary" id="sign">Sign &amp; save to his record</button></div>' +
+        '<button class="ghost" id="back">Start again</button>' +
+        (state.offline ? '<p class="hint">Drafted on-device &mdash; Claude is not reachable in this view.</p>' : '');
+    }
+
+    screen.innerHTML = body;
+    if(loading) return;
+
+    Array.prototype.forEach.call(screen.querySelectorAll('.chip'), function(el){
+      el.addEventListener('click', function(){
+        var i = +el.getAttribute('data-i');
+        var cur = WORDS.indexOf(bandOf(state.draft.categories[i].band).w);
+        var next = BANDS[(cur + 1) % BANDS.length];
+        state.draft.categories[i].band = next.w;
+        el.textContent = next.w;
+        el.setAttribute('style', chipStyle(next));
+      });
+    });
+    document.getElementById('note').addEventListener('input', function(e){
+      state.draft.note = e.target.value;
+    });
+    document.getElementById('sign').addEventListener('click', function(){
+      stopClock();
+      state.stage = 'done';
+      render();
+    });
+    document.getElementById('back').addEventListener('click', function(){
+      state.stage = 'input';
+      state.draft = null;
+      state.err = null;
+      render();
+    });
+  }
+
+  function renderDone(){
+    var d = state.draft;
+    var rows = CATS.map(function(c, i){
+      var b = bandOf((d.categories[i] || {}).band);
+      return '<div class="row"><div class="cat">' + c + '</div>' +
+        '<span class="chip" style="' + chipStyle(b) + '">' + b.w + '</span></div>';
+    }).join('');
+
+    screen.innerHTML =
+      '<div class="done">' +
+        '<span class="lbl">Signed by you &middot; saved to his record</span>' +
+        '<div class="big">' + fmt(state.elapsed) + '</div>' +
+        '<p class="cap">Blank screen to a signed, written assessment. The sliders take three minutes.</p>' +
+        '<div class="seen"><div class="rows">' + rows + '</div></div>' +
+        '<div class="panel seen"><span class="lbl">Nikos and his parents will see</span>' +
+        '<p style="margin:0;font-size:14px;line-height:1.55">' + esc(clean(d.note)) + '</p></div>' +
+        '<button class="ghost" id="again">Assess the next player</button>' +
+      '</div>';
+
+    document.getElementById('again').addEventListener('click', function(){
+      stopClock();
+      state = newState();
+      tEl.textContent = '0:00';
+      render();
+    });
+  }
+
+  function buildPrompt(text){
+    return [
+      'You are drafting a youth football assessment inside the Trak app. A U15 coach has just described one player, out loud, after a match his team lost 1-2.',
+      '',
+      'The coach said: "' + text + '"',
+      '',
+      'Return ONLY JSON shaped exactly like this:',
+      '{"categories":[{"name":"Work rate","band":"<word>","evidence":"<max 7 words quoting what the coach actually said>"}, ...all six, in this order: Work rate, Tactical, Attitude, Technical, Physical, Coachability],',
+      ' "note":"<40-55 words written TO the player as \\"you\\", warm and plain, one thing he did well and one thing to work on>",',
+      ' "value":"<exactly one of: ' + VALUES.join(', ') + '>",',
+      ' "character":"<one sentence, max 25 words, describing the conduct the coach observed. Describe it, never rate it.>",',
+      ' "flags":[{"phrase":"<the coach\'s exact words that are an impression rather than something observable>","why":"<max 15 words, asking what he actually saw>"}]}',
+      '',
+      'Rules you must not break:',
+      '- "band" must be exactly one of: ' + WORDS.join(', ') + '. Nothing else.',
+      '- No numbers, scores or ratings anywhere in the output.',
+      '- Where the coach said nothing about a category, use "Steady" and set evidence to "nothing seen - check before signing".',
+      '- The language is developmental, never harsh. "Developing", never "poor".',
+      '- flags: at most two, only for vague impressions ("hid", "lazy", "no confidence"). If everything he said was observable, return [].'
+    ].join('\n');
+  }
+
+  function localDraft(){
+    return {
+      categories:[
+        {name:'Work rate',    band:'Good',       evidence:'"he was everywhere" first half'},
+        {name:'Tactical',     band:'Good',       evidence:'"pressed their centre-back properly"'},
+        {name:'Attitude',     band:'Standout',   evidence:'"took the sub without a word"'},
+        {name:'Technical',    band:'Developing', evidence:'"left foot is still a problem"'},
+        {name:'Physical',     band:'Steady',     evidence:'nothing seen - check before signing'},
+        {name:'Coachability', band:'Standout',   evidence:'"clapped the lad coming on"'}
+      ],
+      note:'You started that one on the front foot - the press on their centre-back and those two balls in behind were exactly what we have been working on. When it went against us we lost you for a while. Keep showing for it.',
+      value:'Responsibility',
+      character:'Came off without complaint and applauded the player replacing him, in a game his team was losing.',
+      flags:[{phrase:'he hid a bit', why:'What did you actually see him stop doing?'}]
+    };
+  }
+
+  function fallback(){
+    setTimeout(function(){
+      state.draft = localDraft();
+      state.offline = true;
+      state.stage = 'draft';
+      render();
+    }, 900);
+  }
+
+  function go(){
+    if(!state.input.trim()){
+      state.err = 'Say something about the player first.';
+      return render();
+    }
+    state.err = null;
+    state.stage = 'drafting';
+    render();
+
+    var w = window.claude;
+    if(!w || typeof w.use !== 'function') return fallback();
+
+    w.use('sample').then(function(sample){
+      if(!sample) return fallback();
+      return sample.json(buildPrompt(state.input), {modelTier:'default'}).then(function(data){
+        if(!data || !data.categories || !data.categories.length) throw new Error('empty');
+        state.draft = data;
+        state.offline = false;
+        state.stage = 'draft';
+        render();
+      });
+    }).catch(function(e){
+      if(e && (e.code === 'not_granted' || e.code === 'not_supported')) return fallback();
+      state.err = 'That draft did not come back. Try again.';
+      state.stage = 'input';
+      render();
+    });
+  }
+
+  render();
+})();
+</script>

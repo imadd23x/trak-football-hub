@@ -7,6 +7,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { applyDemo } from './apply.mjs';
 import { buildDemoPlan } from './plan.mjs';
 import { migrationReplayOrder } from '../test-native-db.mjs';
+import { validateMigrationFiles } from '../migration-input.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const plan = buildDemoPlan({ asOf: '2026-09-25' });
@@ -32,7 +33,7 @@ async function fixture(t, replayMode = 'all') {
   const db = new PGlite();
   t.after(() => db.close());
   await db.exec(await readFile(resolve(root, 'supabase/tests/bootstrap.sql'), 'utf8'));
-  const migrations = migrationReplayOrder((await readdir(resolve(root, 'supabase/migrations'))).filter(name => name.endsWith('.sql')), replayMode);
+  const migrations = migrationReplayOrder(validateMigrationFiles(await readdir(resolve(root, 'supabase/migrations'))), replayMode);
   for (const name of migrations) {
     try {
       await db.exec(await readFile(resolve(root, 'supabase/migrations', name), 'utf8'));

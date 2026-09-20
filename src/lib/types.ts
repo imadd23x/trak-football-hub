@@ -32,6 +32,16 @@ export const BANDS: BandConfig[] = [
   { word: 'Difficult',   color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.1)', minScore: 0 },
 ]
 
+// The one way to turn a band into its colours. Before this existed, seven call
+// sites each wrote `BANDS.find(b => b.word.toLowerCase() === band)` with their
+// own fallback, and four files gave up and kept a private copy of the map. One
+// of those copies had different THRESHOLDS, so a score of 5 read "Mixed" on the
+// player's home screen and "Steady" on their profile — same child, same number,
+// two answers. Use this; do not re-derive it.
+export function bandConfig(band: BandType): BandConfig {
+  return BANDS.find(b => b.word.toLowerCase() === band) ?? BANDS[BANDS.length - 1]
+}
+
 export interface MatchInput {
   position: Position
   competition: Competition

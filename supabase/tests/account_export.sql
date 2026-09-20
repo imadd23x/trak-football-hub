@@ -1,0 +1,188 @@
+-- @trak-suite mode=--account-export-review in-all=true
+-- Execute against a DISPOSABLE database after replaying migrations.
+-- The harness must SET trak.test_database = 'disposable'. All fixtures roll back.
+--
+-- GDPR Article 20 — export_my_account().
+--
+-- The assertion that matters here is NOT "the export contained the subject's
+-- data". A function that returned every row in the database would pass that,
+-- and pass it impressively. The load-bearing assertion is the negative:
+-- **it contained ONLY theirs** — and every negative below is paired with a
+-- positive control, so a suite of zero-row results cannot pass by the identity
+-- being wrong and nothing matching anything.
+BEGIN;
+
+DO $test$
+BEGIN
+  IF current_setting('trak.test_database', true) IS DISTINCT FROM 'disposable' THEN
+    RAISE EXCEPTION 'Refusing to run export fixtures outside the disposable test harness';
+  END IF;
+END;
+$test$;
+
+CREATE FUNCTION pg_temp.assert_true(ok boolean, description text)
+RETURNS void LANGUAGE plpgsql AS $test$
+BEGIN
+  IF ok IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'Assertion failed: %', description;
+  END IF;
+END;
+$test$;
+
+-- ── Fixtures: two children under one coach, so "only theirs" is testable ──
+
+INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
+  ('11111111-0000-0000-0000-000000000001', 'coach@export.test',  now()),
+  ('11111111-0000-0000-0000-000000000002', 'childA@export.test', now()),
+  ('11111111-0000-0000-0000-000000000003', 'childB@export.test', now()),
+  ('11111111-0000-0000-0000-000000000004', 'parent@export.test', now());
+
+INSERT INTO public.profiles (user_id, role, full_name) VALUES
+  ('11111111-0000-0000-0000-000000000001', 'coach',  'Export Coach'),
+  ('11111111-0000-0000-0000-000000000002', 'player', 'Child A'),
+  ('11111111-0000-0000-0000-000000000003', 'player', 'Child B'),
+  ('11111111-0000-0000-0000-000000000004', 'parent', 'Export Parent');
+
+INSERT INTO public.player_details (user_id, position) VALUES
+  ('11111111-0000-0000-0000-000000000002', 'Midfielder'),
+  ('11111111-0000-0000-0000-000000000003', 'Defender');
+
+-- Both children on the same coach's roster.
+INSERT INTO public.squad_players (id, coach_user_id, linked_player_id, player_name, status) VALUES
+  ('22222222-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+   '11111111-0000-0000-0000-000000000002', 'Child A', 'active'),
+  ('22222222-0000-0000-0000-00000000000b', '11111111-0000-0000-0000-000000000001',
+   '11111111-0000-0000-0000-000000000003', 'Child B', 'active');
+
+INSERT INTO public.coach_assessments (id, squad_player_id, coach_user_id, work_rate) VALUES
+  ('33333333-0000-0000-0000-00000000000a', '22222222-0000-0000-0000-00000000000a',
+   '11111111-0000-0000-0000-000000000001', 9),
+  ('33333333-0000-0000-0000-00000000000b', '22222222-0000-0000-0000-00000000000b',
+   '11111111-0000-0000-0000-000000000001', 2);
+
+-- The coach's private note on Child A. Must never reach a player's export.
+INSERT INTO public.coach_assessment_notes (assessment_id, coach_user_id, note) VALUES
+  ('33333333-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
+   'PRIVATE-COACH-NOTE-CANARY');
+
+-- One match each, so "only mine" is distinguishable from "none".
+INSERT INTO public.matches
+  (user_id, opponent, match_date, position, competition, venue, age_group, goals, assists) VALUES
+  ('11111111-0000-0000-0000-000000000002', 'CHILD-A-OPPONENT', current_date,
+   'mid', 'League', 'Home', 'U15', 1, 0),
+  ('11111111-0000-0000-0000-000000000003', 'CHILD-B-OPPONENT', current_date,
+   'def', 'League', 'Away', 'U15', 0, 1);
+
+
+-- ── 1. Child A exports ──────────────────────────────────────────────────
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"11111111-0000-0000-0000-000000000002","role":"authenticated"}', true);
+
+CREATE TEMP TABLE export_a AS SELECT public.export_my_account() AS doc;
+
+-- POSITIVE CONTROL. Without this, every "does not contain" below would pass
+-- for an export that is simply empty.
+SELECT pg_temp.assert_true(
+  (SELECT doc->'profile'->>'full_name' FROM export_a) = 'Child A',
+  'positive control: the export identifies Child A');
+
+SELECT pg_temp.assert_true(
+  (SELECT doc::text FROM export_a) LIKE '%CHILD-A-OPPONENT%',
+  'positive control: Child A''s own match is present');
+
+-- THE assertion. Child B is on the same coach's roster.
+SELECT pg_temp.assert_true(
+  (SELECT doc::text FROM export_a) NOT LIKE '%CHILD-B-OPPONENT%',
+  'Child A''s export does not contain Child B''s match');
+
+SELECT pg_temp.assert_true(
+  (SELECT doc::text FROM export_a) NOT LIKE '%Child B%',
+  'Child A''s export does not name Child B');
+
+-- K9: coach-private notes never reach a player, whatever the scope switch says.
+SELECT pg_temp.assert_true(
+  (SELECT doc::text FROM export_a) NOT LIKE '%PRIVATE-COACH-NOTE-CANARY%',
+  'a player''s export never contains a coach''s private note');
+
+-- Observations about the subject, gated on the declared scope.
+SELECT pg_temp.assert_true(
+  CASE WHEN public.export_scope_includes_observations()
+       THEN jsonb_array_length((SELECT doc->'coach_assessments' FROM export_a)) = 1
+       ELSE (SELECT doc FROM export_a) ? 'coach_assessments' = false
+  END,
+  'assessments about the player follow export_scope_includes_observations()');
+
+-- And only the assessment on THEIR roster row, not the other child's.
+SELECT pg_temp.assert_true(
+  NOT public.export_scope_includes_observations()
+  OR (SELECT (doc->'coach_assessments'->0->>'work_rate')::int FROM export_a) = 9,
+  'the assessment exported is the one about Child A, not Child B');
+
+-- The document says what it covers.
+SELECT pg_temp.assert_true(
+  (SELECT doc->'scope'->>'never_included' FROM export_a) IS NOT NULL
+  AND (SELECT doc->'scope' FROM export_a) ? 'includes_observations_about_you',
+  'the export states its own scope to the subject');
+
+RESET ROLE;
+SELECT set_config('request.jwt.claims', NULL, true);
+
+
+-- ── 2. The coach exports ────────────────────────────────────────────────
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"11111111-0000-0000-0000-000000000001","role":"authenticated"}', true);
+
+CREATE TEMP TABLE export_c AS SELECT public.export_my_account() AS doc;
+
+SELECT pg_temp.assert_true(
+  (SELECT doc->'profile'->>'full_name' FROM export_c) = 'Export Coach',
+  'positive control: the export identifies the coach');
+
+-- The coach's own work product, including their private notes: they wrote them.
+SELECT pg_temp.assert_true(
+  (SELECT doc::text FROM export_c) LIKE '%PRIVATE-COACH-NOTE-CANARY%',
+  'a coach''s export DOES contain their own private notes');
+
+SELECT pg_temp.assert_true(
+  jsonb_array_length((SELECT doc->'squad_players' FROM export_c)) = 2,
+  'the coach''s export contains both roster rows — that is the coach''s record');
+
+-- But not the children's own logs. Those are the children's.
+SELECT pg_temp.assert_true(
+  (SELECT doc::text FROM export_c) NOT LIKE '%CHILD-A-OPPONENT%'
+  AND (SELECT doc::text FROM export_c) NOT LIKE '%CHILD-B-OPPONENT%',
+  'a coach''s export does not contain the children''s own match logs');
+
+RESET ROLE;
+SELECT set_config('request.jwt.claims', NULL, true);
+
+
+-- ── 3. An unauthenticated caller gets nothing ───────────────────────────
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', NULL, true);
+
+DO $test$
+BEGIN
+  PERFORM public.export_my_account();
+  RAISE EXCEPTION 'Assertion failed: export_my_account() succeeded with no auth.uid()';
+EXCEPTION
+  WHEN sqlstate 'P0001' THEN
+    IF SQLERRM LIKE '%Assertion failed%' THEN RAISE; END IF;
+    -- 'Not authenticated' is the expected refusal.
+END;
+$test$;
+
+RESET ROLE;
+
+-- ── 4. anon cannot execute it at all ────────────────────────────────────
+SELECT pg_temp.assert_true(
+  NOT has_function_privilege('anon', 'public.export_my_account()', 'EXECUTE'),
+  'anon holds no EXECUTE on export_my_account()');
+
+SELECT pg_temp.assert_true(
+  has_function_privilege('authenticated', 'public.export_my_account()', 'EXECUTE'),
+  'positive control: authenticated CAN execute it');
+
+ROLLBACK;

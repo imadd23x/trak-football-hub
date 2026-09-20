@@ -13,8 +13,11 @@ export function createAuthFetch(
   const refreshAttempts = new Map<string, { identity: string | null }>();
   const identity = (): string | null => {
     try {
-      const saved = JSON.parse(storage.getItem(storageKey) ?? 'null') as { user?: { id?: unknown } } | null;
-      return typeof saved?.user?.id === 'string' ? saved.user.id : null;
+      const saved = JSON.parse(storage.getItem(storageKey) ?? 'null') as { user?: { id?: unknown }; refresh_token?: unknown } | null;
+      // The same user can have a newer session. A late SDK response must not
+      // restore or remove the replaced credential, even when the user ID matches.
+      return typeof saved?.user?.id === 'string'
+        ? JSON.stringify([saved.user.id, typeof saved.refresh_token === 'string' ? saved.refresh_token : null]) : null;
     } catch { return null; }
   };
 

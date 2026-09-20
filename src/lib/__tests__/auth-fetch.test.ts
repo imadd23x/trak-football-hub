@@ -91,6 +91,14 @@ describe('persistent SDK Auth transport', () => {
   await expect(fetcher(`${url}/auth/v1/user`,{signal:outer.signal})).rejects.toMatchObject({name:'AbortError'});
   expect(raw).not.toHaveBeenCalled();
  });
+ it.each(['password','logout','refresh'])('preserves a newer session for the same user after a stale %s response',async action=>{
+  localStorage.setItem(key,JSON.stringify(session()));const held=deferred<Response>();
+  const client=sdk(asFetch(async()=>held.promise));await client.auth.initialize();await client.auth.stopAutoRefresh();
+  const pending=action==='password'?client.auth.signInWithPassword({email:'a@family.test',password:'SyntheticPass1!'}):action==='logout'?client.auth.signOut():client.auth.refreshSession();
+  await vi.advanceTimersByTimeAsync(0);const newer={...session(),access_token:'new-token-a',refresh_token:'new-refresh-a'};localStorage.setItem(key,JSON.stringify(newer));
+  held.resolve(action==='logout'?new Response(null,{status:204}):Response.json(session()));await vi.advanceTimersByTimeAsync(40_000);
+  expect((await pending).error).toBeTruthy();expect(JSON.parse(localStorage.getItem(key)!).refresh_token).toBe('new-refresh-a');
+ });
  it('preserves an explicit successful account adoption and refresh-token reuse', async () => {
   localStorage.setItem(key,JSON.stringify(session()));
   const client=sdk(asFetch(async () => Response.json(session('b')))); await client.auth.initialize();await client.auth.stopAutoRefresh();
@@ -98,6 +106,12 @@ describe('persistent SDK Auth transport', () => {
   expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('b');
   expect((await client.auth.refreshSession()).error).toBeNull();
   expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('b');
+ });
+ it('preserves successful refresh-token rotation for the same account',async()=>{
+  localStorage.setItem(key,JSON.stringify(session()));let count=0;
+  const client=sdk(asFetch(async()=>Response.json({...session(),refresh_token:`rotated-a-${++count}`})));await client.auth.initialize();await client.auth.stopAutoRefresh();
+  expect((await client.auth.refreshSession()).error).toBeNull();expect((await client.auth.refreshSession()).error).toBeNull();
+  const saved=JSON.parse(localStorage.getItem(key)!);expect(saved.user.id).toBe('a');expect(saved.refresh_token).toBe('rotated-a-2');
  });
  it('preserves HTTP rejection details and a successful authenticated response', async () => {
   let reject = true; const client = sdk(asFetch(async () => reject

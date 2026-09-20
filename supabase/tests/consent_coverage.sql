@@ -130,6 +130,19 @@ INSERT INTO public.squad_players (id, coach_user_id, player_name, linked_player_
   (pg_temp.cid(203), pg_temp.cid(1), 'Typed In Child',    NULL,           'U12');
 
 
+-- 7 is sixteen: above the statutory threshold this gate uses, below the
+-- under-18 guardian approval Imad has chosen as pilot product policy. Section D
+-- is about the band between those two numbers.
+INSERT INTO auth.users (id, email, email_confirmed_at)
+VALUES (pg_temp.cid(7), 'consent-7@test.invalid', now());
+INSERT INTO public.profiles (user_id, role, full_name, invite_code)
+VALUES (pg_temp.cid(7), 'player', 'Sixteen Year Old', NULL);
+INSERT INTO public.player_details (user_id, date_of_birth)
+VALUES (pg_temp.cid(7), (current_date - interval '16 years')::date - 7);
+INSERT INTO public.squad_players (id, coach_user_id, player_name, linked_player_id, age_group)
+VALUES (pg_temp.cid(204), pg_temp.cid(1), 'Sixteen Year Old', pg_temp.cid(7), 'U17');
+
+
 -- ── Section A: the reach of the gate ────────────────────────
 -- These pass today and describe exactly how far the gate extends.
 
@@ -314,6 +327,73 @@ SELECT pg_temp.cassert(
           AND pc.granted_at <= ca.created_at
           AND pc.withdrawn_at IS NULL)),
   'C2. EXPECTED FAIL — no under-age child holds an assessment that predates their consent');
+
+
+-- ── Section D: the band between the two thresholds ─────────
+-- Two numbers now govern consent and they are not the same number.
+--
+--   public.consent_threshold_age()   15   statutory, Greece, and the ONLY one
+--                                         any write policy consults
+--   trak_consent (#70)               18   Imad's pilot product policy, both
+--                                         markets, deliberately stricter
+--
+-- They agree below 15 and at 18+. Between them — 15, 16, 17 — the product
+-- policy says a guardian decides and the live gate says nobody needs to. I
+-- measured the disagreement across every age from 12 to 19 on main + #70; it is
+-- exactly these three.
+--
+-- These assertions PASS today and describe the live behaviour, in the manner of
+-- section A. They are not a complaint about the policy, which is a reasonable
+-- choice. They exist because #53 is the inventory for the write-path cutover,
+-- and this is the band the cutover has to act on. When the gates are wired to
+-- the authority, or when consent_threshold_age() moves to 18, D2 and D3 flip —
+-- and whoever changes them reads this comment.
+--
+-- What makes it worth pinning rather than noting: nothing outside #70's own
+-- migration references trak_consent. So in this band a verified parent can
+-- record a decision, including a WITHDRAWAL, and what a coach may write does
+-- not change. An unenforced withdrawal is worse than none — it is a promise to
+-- a parent that nothing keeps.
+
+SELECT pg_temp.cassert(
+  public.player_age_years(pg_temp.cid(7)) = 16,
+  'D1-control The band fixture is 16 years old',
+  'age is ' || coalesce(public.player_age_years(pg_temp.cid(7))::text, 'NULL'));
+
+SELECT pg_temp.cassert(
+  public.squad_player_consent_required(pg_temp.cid(204)) IS FALSE,
+  'D2. Consent is NOT required for a 16-year-old — above 15, below the 18 policy',
+  'threshold is ' || public.consent_threshold_age());
+
+-- The consequence, stated as the write rather than as the predicate, because
+-- "the function returns false" is not what harms anyone.
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  jsonb_build_object('role','authenticated','sub',pg_temp.cid(1))::text, true);
+
+SELECT pg_temp.cattempt($$
+  INSERT INTO public.coach_assessments (id, coach_user_id, squad_player_id)
+  VALUES ('c0000000-0000-0000-0000-000000000403',
+          'c0000000-0000-0000-0000-000000000001',
+          'c0000000-0000-0000-0000-000000000204')
+$$);
+
+-- Read back as service_role, not by RESET ROLE alone: returning to the owner
+-- bypasses RLS entirely and would make this assertion pass whatever happened.
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
+SELECT pg_temp.cassert(
+  EXISTS (SELECT 1 FROM public.coach_assessments WHERE id = pg_temp.cid(403)),
+  'D3. A coach may assess that child with no consent record of any kind');
+
+SELECT pg_temp.cassert(
+  NOT EXISTS (SELECT 1 FROM public.parental_consents WHERE player_user_id = pg_temp.cid(7)),
+  'D4-control and no consent record exists for them, so D3 is not consent working');
+
+RESET ROLE;
 
 
 -- ── Report ──────────────────────────────────────────────────

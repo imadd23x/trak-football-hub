@@ -1,5 +1,6 @@
 import { BandPill } from './BandPill'
 import type { BandType } from '@/lib/types'
+import { parseDisplayDate } from '@/lib/calendar'
 
 interface MatchCardProps {
   opponent: string
@@ -12,7 +13,11 @@ interface MatchCardProps {
 }
 
 export function MatchCard({ opponent, date, scoreUs, scoreThem, band, competition, onClick }: MatchCardProps) {
-  const formattedDate = new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  // A date-only value is a calendar day, not UTC midnight — see parseDisplayDate.
+  const parsed = parseDisplayDate(date)
+  const formattedDate = parsed
+    ? parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    : ''
   const result = scoreUs != null && scoreThem != null
     ? (scoreUs > scoreThem ? 'W' : scoreUs < scoreThem ? 'L' : 'D')
     : null

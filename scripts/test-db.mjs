@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { migrationReplayOrder } from './test-native-db.mjs';
+import { validateMigrationFiles } from './migration-input.mjs';
 
 // An in-memory database by construction. Never reads DB_URL or connects to a
 // Supabase project; SQL fixture guards also refuse an unmarked connection.
@@ -24,15 +25,15 @@ const academyBaseline = mode === '--coach-departure-baseline';
 const coachReview = mode === '--coach-departure-review' || academyBaseline;
 const academyUpgrade = mode === '--academy-upgrade-review';
 const assessmentUpgrade = mode === '--assessment-upgrade-review';
+const migrationFiles = validateMigrationFiles(await readdir(resolve(root, 'supabase/migrations')));
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
 try {
   await db.exec(await read('bootstrap.sql'));
   const { rows } = await db.query('SELECT version() AS version');
   console.log(`Disposable database: ${rows[0].version}`);
-  const migrations = migrationReplayOrder((await readdir(resolve(root, 'supabase/migrations')))
-    .filter(file => file.endsWith('.sql')
-      && (!baseline || file < securityMigration)
+  const migrations = migrationReplayOrder(migrationFiles
+    .filter(file => (!baseline || file < securityMigration)
       && (!pilotViewsBaseline || file < pilotViewsMigration)
       && (!academyBaseline || file < academyMigration)), mode);
   for (const file of migrations) {
@@ -59,7 +60,7 @@ try {
   const suites = baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
       : coachReview ? academySuites
-        : ['parent_invite_security.sql', 'pilot_view_security.sql', ...(academyUpgrade || assessmentUpgrade ? academySuites : [])];
+      : ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql', ...academySuites];
   for (const suite of suites) {
     try {
       const result = await db.exec(await read(suite));

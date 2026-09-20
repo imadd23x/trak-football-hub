@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { requireDevPassword } from '@/lib/dev-credentials'
 import { supabase } from '@/integrations/supabase/client'
 
 const COACH_ID  = '11111111-1111-1111-1111-111111111111'
@@ -10,11 +11,11 @@ const SQUAD_ID  = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 const CLUB_ID = '44444444-4444-4444-4444-444444444444'
 
 const ACCOUNTS = [
-  { email: 'coach@trak.dev',  password: 'TrakDev123', role: 'coach',  name: 'Alex Martinez'   },
-  { email: 'player@trak.dev', password: 'TrakDev123', role: 'player', name: 'Jamie Wilson'     },
-  { email: 'parent@trak.dev', password: 'TrakDev123', role: 'parent', name: 'Sarah Wilson'     },
-  { email: 'club@trak.dev',   password: 'TrakDev123', role: 'club',   name: 'City FC Academy'  },
-]
+  { email: 'coach@trak.dev',  role: 'coach',  name: 'Alex Martinez'   },
+  { email: 'player@trak.dev', role: 'player', name: 'Jamie Wilson'     },
+  { email: 'parent@trak.dev', role: 'parent', name: 'Sarah Wilson'     },
+  { email: 'club@trak.dev',   role: 'club',   name: 'City FC Academy'  },
+].map(account => ({ ...account, get password() { return requireDevPassword() } }))
 
 type Step = { label: string; status: 'pending' | 'running' | 'done' | 'error'; detail?: string }
 
@@ -68,7 +69,7 @@ export default function DevSetupPage() {
 
       // ── 2. Sign in as coach to seed coach data ───────────────────────
       update('Sign in as coach', 'running')
-      await supabase.auth.signInWithPassword({ email: 'coach@trak.dev', password: 'TrakDev123' })
+      await supabase.auth.signInWithPassword({ email: 'coach@trak.dev', password: requireDevPassword() })
       update('Sign in as coach', 'done')
 
       update('Coach profile + details', 'running')
@@ -78,7 +79,7 @@ export default function DevSetupPage() {
 
       // ── 3. Sign in as player to seed player data ─────────────────────
       update('Sign in as player', 'running')
-      await supabase.auth.signInWithPassword({ email: 'player@trak.dev', password: 'TrakDev123' })
+      await supabase.auth.signInWithPassword({ email: 'player@trak.dev', password: requireDevPassword() })
       update('Sign in as player', 'done')
 
       update('Player profile + details', 'running')
@@ -112,7 +113,7 @@ export default function DevSetupPage() {
 
       // ── 4. Sign back in as coach to create squad + assessments ───────
       update('Sign in as coach (squad + assessments)', 'running')
-      await supabase.auth.signInWithPassword({ email: 'coach@trak.dev', password: 'TrakDev123' })
+      await supabase.auth.signInWithPassword({ email: 'coach@trak.dev', password: requireDevPassword() })
       update('Sign in as coach (squad + assessments)', 'done')
 
       update('Squad player link', 'running')
@@ -127,11 +128,11 @@ export default function DevSetupPage() {
       // keeps SQUAD_ID and every assessment seeded against it below still lands
       // on the same row. This also means the dev seed exercises the linking path
       // the pilot actually uses, instead of a shortcut only the seed can take.
-      await supabase.auth.signInWithPassword({ email: 'player@trak.dev', password: 'TrakDev123' })
+      await supabase.auth.signInWithPassword({ email: 'player@trak.dev', password: requireDevPassword() })
       // 'as any' on the name: the committed types.ts omits this RPC, same as
       // provision_my_profile in AuthContext.
       const { data: linkedId, error: linkError } = await supabase.rpc('link_player_to_coach' as any, { p_code: 'DEMO' })
-      await supabase.auth.signInWithPassword({ email: 'coach@trak.dev', password: 'TrakDev123' })
+      await supabase.auth.signInWithPassword({ email: 'coach@trak.dev', password: requireDevPassword() })
 
       if (linkError) {
         update('Squad player link', 'error', linkError.message)
@@ -233,7 +234,7 @@ export default function DevSetupPage() {
 
       // ── 5. Sign in as parent to seed parent data ─────────────────────
       update('Sign in as parent', 'running')
-      await supabase.auth.signInWithPassword({ email: 'parent@trak.dev', password: 'TrakDev123' })
+      await supabase.auth.signInWithPassword({ email: 'parent@trak.dev', password: requireDevPassword() })
       update('Sign in as parent', 'done')
 
       update('Parent profile + links', 'running')
@@ -245,7 +246,7 @@ export default function DevSetupPage() {
       // ── 6. Sign out ─────────────────────────────────────────────────
       // ── Club admin account ────────────────────────────────────────────
       update('Club admin profile', 'running')
-      await supabase.auth.signInWithPassword({ email: 'club@trak.dev', password: 'TrakDev123' })
+      await supabase.auth.signInWithPassword({ email: 'club@trak.dev', password: requireDevPassword() })
       await supabase.from('profiles').upsert({
         user_id: clubId, role: 'club', full_name: 'City FC Academy',
       }, { onConflict: 'user_id' })
@@ -286,7 +287,7 @@ export default function DevSetupPage() {
         ].map(a => (
           <div key={a.role} className="flex justify-between text-[12px]">
             <span className="text-white/50">{a.role}</span>
-            <span className="text-[#C8F25A]/70" style={{ fontFamily: "'DM Mono', monospace" }}>{a.email} · TrakDev123</span>
+            <span className="text-[#C8F25A]/70" style={{ fontFamily: "'DM Mono', monospace" }}>{a.email}</span>
           </div>
         ))}
       </div>

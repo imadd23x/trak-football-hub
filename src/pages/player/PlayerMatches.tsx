@@ -27,7 +27,15 @@ export default function PlayerMatches() {
     const to = from + PAGE_SIZE - 1
     const { data, error } = await supabase.from('matches').select('*')
       .eq('user_id', user.id)
+      // match_date is a `date`, and the pilot migration backfills it from
+      // created_at::date with a CURRENT_DATE default, so twenty rows sharing
+      // one date is ordinary. Ties have no defined order across separate
+      // executions, so paging over match_date alone lets Load more re-append
+      // rows already on screen and drop the ones they displaced — the same
+      // silent gap this PR fixes, arriving from the ordering side.
       .order('match_date', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .range(from, to)
     if (pageIndex > 0) setLoadingMore(false)
     setLoading(false)

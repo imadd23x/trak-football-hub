@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { X, ArrowLeftRight } from 'lucide-react'
+import { requireDevPassword } from '@/lib/dev-credentials'
 
 const DEV_ACCOUNTS = [
   { role: 'coach',  label: 'Coach',  email: 'coach@trak.dev',  color: 'hsl(40,78%,60%)' },
@@ -20,7 +21,7 @@ export function DevSwitcher() {
     setOpen(false)
     const { error } = await supabase.auth.signInWithPassword({
       email: account.email,
-      password: 'TrakDev123',
+      password: requireDevPassword(),
     })
     if (error) {
       alert(`Switch failed: ${error.message}`)

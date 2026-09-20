@@ -6,6 +6,7 @@ import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { IconMatch, IconPassport, IconHowItWorks } from '@/components/icons/TrakIcons'
 import { ChevronRight, Settings as SettingsIcon } from 'lucide-react'
 import { trackEvent } from '@/lib/telemetry'
+import { bandForScore } from '@/lib/rating-engine'
 import RatingTrendChart from '@/components/player/RatingTrendChart'
 import { ParentInviteCard } from '@/components/player/ParentInviteCard'
 
@@ -67,14 +68,6 @@ export default function PlayerProfilePage() {
     { name: 'Physical', score: assessment.physical },
     { name: 'Coachability', score: assessment.coachability },
   ] : []
-
-  const scoreToBandLabel = (score: number) => {
-    if (score >= 9) return { word: 'Standout', color: '#86efac' }
-    if (score >= 7) return { word: 'Good', color: '#4ade80' }
-    if (score >= 5) return { word: 'Steady', color: '#60a5fa' }
-    if (score >= 3) return { word: 'Mixed', color: '#fb923c' }
-    return { word: 'Developing', color: '#a78bfa' }
-  }
 
   const FILTER_OPTIONS: { key: TrendFilter; label: string }[] = [
     { key: 'last5', label: 'Last 5' },
@@ -217,7 +210,7 @@ export default function PlayerProfilePage() {
             <MetadataLabel text="COACH ASSESSMENTS" />
             <div className="mt-3 space-y-2">
               {assessmentCategories.map(cat => {
-                const bandInfo = scoreToBandLabel(cat.score)
+                const bandInfo = bandForScore(cat.score)
                 const pct = (cat.score / 10) * 100
                 return (
                   <div key={cat.name} className="flex items-center gap-2.5">

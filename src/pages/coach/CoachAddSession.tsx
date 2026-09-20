@@ -95,6 +95,21 @@ export default function CoachAddSession() {
 
   const [saving, setSaving] = useState(false)
 
+  // Retry state (K5). A partial save used to be reported as a complete one, so
+  // these exist to make a second press finish the job rather than duplicate it:
+  // the session row is inserted once, attendance once, and each player's match
+  // is logged once. Without them, "try again" would create a second session and
+  // re-log every player who already succeeded.
+  //
+  // Known limit, stated rather than hidden: if the coach edits the score or
+  // opponent between a partial save and the retry, the already-written session
+  // row keeps the original values. The retry is meant for a transient failure
+  // pressed again immediately. Re-writing the session on retry would be the
+  // fuller fix; duplicating it would be worse than either.
+  const [savedSessionId,   setSavedSessionId]   = useState<string | null>(null)
+  const [attendanceSaved,  setAttendanceSaved]  = useState(false)
+  const [loggedPlayerIds,  setLoggedPlayerIds]  = useState<Set<string>>(new Set())
+
   useEffect(() => {
     if (!user) return
     supabase
@@ -176,7 +191,11 @@ export default function CoachAddSession() {
           })()
         : title.trim()
 
-    const { data: session, error } = await supabase
+    // On a retry the session already exists; inserting again would give the
+    // coach two identical sessions for one match.
+    let sessionId = savedSessionId
+    if (!sessionId) {
+      const { data: session, error } = await supabase
       .from('coach_sessions')
       .insert({
         coach_user_id: user.id,
@@ -206,26 +225,39 @@ export default function CoachAddSession() {
       .select()
       .single()
 
-    if (error || !session) {
-      console.error('Session save failed:', error)
-      toast.error(error?.message ? `Could not save: ${error.message}` : 'Could not save session')
-      setSaving(false)
-      return
+      if (error || !session) {
+        console.error('Session save failed:', error)
+        toast.error(error?.message ? `Could not save: ${error.message}` : 'Could not save session')
+        setSaving(false)
+        return
+      }
+      sessionId = session.id
+      setSavedSessionId(sessionId)
     }
+
+    // Collected rather than thrown, so one player's rejection does not abandon
+    // the rest. Reported by name at the end — silently dropping them is the bug.
+    const failures: string[] = []
 
     if (isMatch) {
       // Collect players who played
       const playedPlayers = squad.filter(p => details[p.id]?.played)
 
       // session_attendance
-      if (playedPlayers.length > 0) {
-        await supabase.from('session_attendance').insert(
+      if (playedPlayers.length > 0 && !attendanceSaved) {
+        const { error: attErr } = await supabase.from('session_attendance').insert(
           playedPlayers.map(p => ({
-            session_id:      session.id,
+            session_id:      sessionId,
             squad_player_id: p.id,
             status:          'present',
           }))
         )
+        if (attErr) {
+          console.error('Attendance save failed:', attErr)
+          failures.push('attendance')
+        } else {
+          setAttendanceSaved(true)
+        }
       }
 
       // matches rows — only for linked players, deduplicated by linked_player_id
@@ -237,7 +269,11 @@ export default function CoachAddSession() {
         seenIds.add(p.linked_player_id)
         return true
       })
+      const nowLogged = new Set(loggedPlayerIds)
       for (const p of linkedPlayers) {
+        // Already written on an earlier attempt — logging again would give the
+        // child two match rows for one match.
+        if (nowLogged.has(p.linked_player_id!)) continue
         const d = details[p.id]
         const pos = mapPosition(p.position)
         const computed_rating = computeMatchScore({
@@ -258,7 +294,12 @@ export default function CoachAddSession() {
           is_friendly: competition === 'Friendly',
         })
 
-        await supabase.rpc('log_match_for_player', {
+        // The error was discarded here. A rejection — a departed coach, a
+        // roster row in another academy, a lost connection — left the child
+        // with no match row while the coach was told the match had saved.
+        // K1/K2/F5 added legitimate reasons for this RPC to refuse, so the
+        // silence got more dangerous, not less.
+        const { error: rpcErr } = await supabase.rpc('log_match_for_player', {
           p_user_id:         p.linked_player_id!,
           p_opponent:        opponent.trim(),
           p_team_score:      Number(scoreUs)   || 0,
@@ -271,12 +312,37 @@ export default function CoachAddSession() {
           p_goals:           d.goals === 2 ? 2 : d.goals,
           p_assists:         d.assists === 2 ? 2 : d.assists,
           p_card_received:   d.card,
-          p_body_condition:  'Average',
-          p_self_rating:     'Average',
+          // Null, not 'Average'. These are the player's own account of the
+          // match and this is a coach logging it — nobody asked the child how
+          // they felt or how they rated themselves, so the record must not say
+          // they answered. Both columns are nullable; the previous values were
+          // invented for no reason.
+          //
+          // Score-neutral, deliberately: computeMatchScore only moves on
+          // self_rating 'excellent'/'good'/'poor' and body_condition
+          // 'fresh'/'tired'/'knock'. 'Average' and 'good' matched nothing and
+          // contributed 0, so no existing or future rating changes. The engine
+          // call above still passes its neutral values and is untouched.
+          //
+          // Cast because the generated types declare both as `string`: a
+          // Postgres function parameter carries no nullability, so the
+          // generator cannot know. The database accepts null and both columns
+          // are nullable. Cast narrowly rather than `as any` on the call, so
+          // the other fourteen arguments stay type-checked.
+          p_body_condition:  null as unknown as string,
+          p_self_rating:     null as unknown as string,
           p_computed_rating: computed_rating,
           p_match_date:      date,
         })
+
+        if (rpcErr) {
+          console.error(`Match log failed for ${p.player_name}:`, rpcErr)
+          failures.push(p.player_name)
+        } else {
+          nowLogged.add(p.linked_player_id!)
+        }
       }
+      setLoggedPlayerIds(nowLogged)
 
       trackEvent('match_logged', {
         actor: 'coach',
@@ -288,15 +354,36 @@ export default function CoachAddSession() {
       })
     } else {
       // Training / Other — simple attendance
-      if (attended.size > 0) {
-        await supabase.from('session_attendance').insert(
+      if (attended.size > 0 && !attendanceSaved) {
+        const { error: attErr } = await supabase.from('session_attendance').insert(
           [...attended].map(squad_player_id => ({
-            session_id: session.id,
+            session_id: sessionId,
             squad_player_id,
             status: 'present',
           }))
         )
+        if (attErr) {
+          console.error('Attendance save failed:', attErr)
+          failures.push('attendance')
+        } else {
+          setAttendanceSaved(true)
+        }
       }
+    }
+
+    // Only claim success for what actually saved. The session row is in either
+    // way, so the coach stays on this screen with their input intact and can
+    // press save again; the guards above make that finish the job rather than
+    // duplicate it.
+    if (failures.length > 0) {
+      const names = failures.join(', ')
+      toast.error(
+        `Saved, but ${failures.length} of these did not record: ${names}. ` +
+          `Press save again to retry just those — nothing will be duplicated.`,
+        { duration: 12000 },
+      )
+      setSaving(false)
+      return
     }
 
     toast.success(isMatch ? 'Match saved' : 'Session saved')

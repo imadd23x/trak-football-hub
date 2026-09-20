@@ -75,9 +75,17 @@ INSERT INTO public.squad_players (id, coach_user_id, player_name, linked_player_
 -- Both academies play a fixture, so pilot_match_coverage has rows from each to
 -- tell apart. Without this the D-section assertions would be vacuously true on
 -- an empty view, which is the failure mode this whole suite is about.
-INSERT INTO public.coach_calendar_events (coach_user_id, title, event_type, starts_at, opponent) VALUES
-  (pg_temp.sid(1), 'Pilot fixture', 'match', now() - interval '2 days', 'Rivals A'),
-  (pg_temp.sid(2), 'Other fixture', 'match', now() - interval '2 days', 'Rivals B');
+-- `published` defaults to FALSE, and #44 adds `AND e.published` to
+-- pilot_match_coverage so an unannounced draft stops counting as a fixture
+-- nobody logged. That is a real correction — 66.3% -> 77.4% on the pilot data —
+-- and it made D0 report zero rows here, because these fixtures were drafts.
+-- Publishing them is the fix; it is inert against a view without the filter.
+INSERT INTO public.coach_calendar_events (id, coach_user_id, title, event_type, starts_at, opponent, published) VALUES
+  (pg_temp.sid(301), pg_temp.sid(1), 'Pilot fixture', 'match', now() - interval '2 days', 'Rivals A', true),
+  (pg_temp.sid(302), pg_temp.sid(2), 'Other fixture', 'match', now() - interval '2 days', 'Rivals B', true),
+  -- The decoy. Publishing the two above would satisfy D0 whether or not the
+  -- filter does anything, so this unpublished fixture keeps it falsifiable.
+  (pg_temp.sid(303), pg_temp.sid(1), 'Unpublished decoy', 'match', now() - interval '2 days', 'Rivals C', false);
 
 
 -- ── A. Unscoped: the behaviour the migration describes ──────
@@ -164,6 +172,22 @@ SELECT pg_temp.sassert(
   (SELECT count(*) FROM public.pilot_match_coverage) > 0,
   'D0-control pilot_match_coverage returns rows at all',
   (SELECT count(*)::text FROM public.pilot_match_coverage));
+
+-- D0b keeps the decoy honest. Stated as an implication, and deliberately so:
+-- the filter only exists once #44 lands, so asserting the decoy's absence
+-- unconditionally would fail on main for the right reason and the wrong one.
+-- The antecedent is CHECKED rather than assumed, which is the difference
+-- between an implication and an assertion that quietly cannot fire. Before #44
+-- this reports true because the view does not filter; after it, the decoy must
+-- be gone or this fails.
+SELECT pg_temp.sassert(
+  pg_get_viewdef('public.pilot_match_coverage'::regclass) NOT ILIKE '%published%'
+  OR NOT EXISTS (SELECT 1 FROM public.pilot_match_coverage WHERE fixture_id = pg_temp.sid(303)),
+  'D0b where the view filters on published, an unpublished fixture is excluded',
+  CASE WHEN pg_get_viewdef('public.pilot_match_coverage'::regclass) ILIKE '%published%'
+       THEN 'filter present; decoy rows: '
+            || (SELECT count(*)::text FROM public.pilot_match_coverage WHERE fixture_id = pg_temp.sid(303))
+       ELSE 'filter absent on this base — assertion not applicable yet' END);
 
 SELECT pg_temp.sassert(
   NOT EXISTS (

@@ -227,6 +227,31 @@ The linked source inventory supplies the detailed original observations. This in
 | 40 | Review redundant player recent matches | Tarek T-D |
 | 41 | Fully waived household/child admission architecture | Imad I-A; Kostas K-A assignment, Tarek verification |
 
+## 7. Multi-user performance and recovery gate (CAP-01)
+
+The goal includes concurrent users and responsiveness, not only the 41 functional observations. This gate is additional to the UT index. **Proposed for the same team review; not yet accepted or measured.**
+
+Read-only source evidence at main `4335e89`: `CoachHomePage` loads historical assessment rows for squad analytics; `CoachSquadPage` loads assessment history to choose latest values; `ClubHome` loads coaches, roster and assessments in a serial chain; `PlayerHome` loads match history without explicit pagination. These are profiling targets, not measured latency failures. Recheck against #44/#42 and the integrated candidate before optimizing. The old `docs/plans/ARCHITECTURE.md` assumes “30 users, no concurrent editing”; that is not an agreed capacity requirement or evidence of readiness for this pilot.
+
+**Ownership:** Tarek/T-V owns the repeatable synthetic load harness and results; Kostas supplies expected academy/cohort sizes and peak simultaneous coaches/families, and repairs measured coach/academy bottlenecks. Imad supplies household/admission scenarios, repairs parent/auth bottlenecks and verifies the integrated release. Each owner keeps their file reservations; query/index changes use existing #37 work where applicable. No new performance library or shared-file change without announcing it in the same thread.
+
+Before execution, record the tested commit, database history, machine/service sizing, client/network profile, expected peak concurrent users, data volumes and external-service limits. Confirm the real cohort and proposed response budgets in the review. A provisional ramp of **5 → 20 → 50 simultaneous users** can establish a baseline; extend it beyond the agreed peak plus headroom if that is larger. Fifty is a test point, not an asserted pilot limit. Generate expected-cohort and 10-times-history datasets with at least two academies, all roles, multiple children and explicit synthetic consent.
+
+Use a disposable, isolated test deployment/database with synthetic identities. A Vercel preview attached to live Supabase is **not** an isolated load-test environment. Do not load-test the shared production project, send bulk real emails, or consume real AI calls for this exercise. Stub email/AI delivery at the boundary and clearly exclude those external latencies from the results; real email/AI functionality still has its own controlled verification.
+
+Run these workloads after the affected contracts are accepted:
+
+1. Normal traffic: dashboards, roster filtering, history pagination, parent child switching and schedule reads, mixed with independent session/assessment saves.
+2. Conflicts: two edits of one record; same request retried after a lost response; parallel bulk assignments; consent withdrawal/departure while another actor saves or reads. Define and test conflict behavior; do not silently lose an accepted update. Native lock tests are useful here but do not substitute for HTTP capacity testing.
+3. Recovery: expired session, temporary network/database failure, delayed response and return online; no false success, duplicated records, endless spinner or retry storm. Permission-denied cases are expected and counted separately from unexpected failures.
+4. Sustained traffic: a documented steady-state run and soak long enough to expose increasing memory, pool use or request queues; report actual duration, not just a single burst. Compare first and last windows and verify pending work drains after traffic stops.
+
+**Proposed review budgets:** p95 ordinary data reads at or below 1 second and writes at or below 2 seconds at the agreed peak, excluding separately measured external email/AI work. Record p50/p95/p99, throughput, payload sizes, timeouts, unexpected 4xx/5xx, database connections/locks and browser errors. These are initial engineering targets for team agreement, not measured results or a user-approved service promise. Measure actual phone interaction separately; fast SQL alone does not prove a responsive screen.
+
+Pass requires zero unexpected crashes/server errors and no duplicate, lost, unauthorized or cross-academy records in the exercised workloads; bounded queues/memory and recovery after injected failures; accurate complete totals beyond API row caps; stable pagination; the agreed latency budget at the agreed peak. Count fixture rows before and after so a workload that sent no meaningful writes cannot pass. Preserve failing evidence before fixing it. An index or cache is accepted only after measuring the affected query/route and rerunning correctness tests; caching must not weaken withdrawal or departure enforcement.
+
+Attach reproducible commands, workload/data definitions and result artifacts to the integration PR. Rerun after changes that affect the measured paths. Production readiness cannot be inferred from mocked HTTP, local-only timing, old 30-user assumptions or a green unit-test run.
+
 ## Review and reservation ledger
 
 | Owner | Plan review | Accepted tasks / current reservation |

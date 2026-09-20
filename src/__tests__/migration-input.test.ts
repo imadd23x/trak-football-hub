@@ -10,10 +10,11 @@ const fixtures: string[] = []
 function runMigrations(files: Record<string, string>, mode = '--all') {
   const fixture = mkdtempSync(join(tmpdir(), 'trak-migration-input-'))
   fixtures.push(fixture)
-  for (const directory of ['scripts', 'supabase/migrations', 'supabase/tests']) {
+  for (const directory of ['scripts/lib', 'supabase/migrations', 'supabase/tests']) {
     mkdirSync(join(fixture, directory), { recursive: true })
   }
   copyFileSync(join(root, 'scripts/test-db.mjs'), join(fixture, 'scripts/test-db.mjs'))
+  copyFileSync(join(root, 'scripts/lib/parent-history-upgrade.mjs'), join(fixture, 'scripts/lib/parent-history-upgrade.mjs'))
   const validator = 'scripts/migration-input.mjs'
   if (existsSync(join(root, validator))) copyFileSync(join(root, validator), join(fixture, validator))
   symlinkSync(join(root, 'node_modules'), join(fixture, 'node_modules'), 'dir')
@@ -55,7 +56,7 @@ describe('database runner migration input', () => {
     expect(result.stdout).toContain('Passed: privilege_and_consent_security.sql')
   }, 20_000)
 
-  for (const mode of ['--all', '--baseline']) {
+  for (const mode of ['--all', '--baseline', '--parent-history-upgrade-review']) {
     it(`rejects the #44/#68 version collision before executing SQL or filtering ${mode}`, () => {
       const first = '20260919170000_deny_policies_grant_nothing.sql'
       const second = '20260919170000_no_delete_policy_means_no_delete_grant.sql'

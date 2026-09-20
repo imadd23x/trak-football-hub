@@ -2,20 +2,22 @@ import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-// Explicit historical deployment snapshot, not a moving origin/main alias.
-export const historyUpgradeBase = '00910940f596d9fe9a7cd416dc741943d1df2cc9';
+// Explicit candidate schema snapshot (main plus the pending staff migrations), not a moving origin/main alias or
+// independent proof of which versions are applied to the hosted database.
+export const historyUpgradeBase = '74a4a35e6d2633eff35cc6bbf71cf6e6b5a7e482';
+export const historyUpgradeCount = 68;
 export const historyMigration = '20260918112323_parent_match_history.sql';
 
 export async function parentHistoryUpgradeOrder(root, candidateFiles) {
   const git = args => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const mainFiles = git(['ls-tree', '--name-only', `${historyUpgradeBase}:supabase/migrations`])
     .trim().split('\n').filter(file => file.endsWith('.sql')).sort();
-  if (mainFiles.length !== 62 || mainFiles.at(-1) !== '20260918133800_ai_quota_known_functions.sql') {
-    throw new Error('Unexpected migration inventory for pinned main 0091094');
+  if (mainFiles.length !== historyUpgradeCount || mainFiles.at(-1) !== '20260920114801_staff_invitation_delivery.sql') {
+    throw new Error('Unexpected migration inventory for pinned candidate 74a4a35');
   }
   const additions = candidateFiles.filter(file => !mainFiles.includes(file));
   if (additions.length !== 1 || additions[0] !== historyMigration) {
-    throw new Error('History upgrade requires exactly the pending history migration beyond pinned main');
+    throw new Error('History upgrade requires exactly the pending history migration beyond pinned candidate');
   }
   for (const file of mainFiles) {
     if (!candidateFiles.includes(file)) throw new Error(`Missing main migration: ${file}`);
@@ -42,6 +44,9 @@ export function requireHistoryUpgradeSuiteOutput(suite, result) {
   const expected = {
     'parent_match_history.sql': ['parent_match_history_assertions', 81],
     'pilot_view_security.sql': ['pilot_view_assertions', 282],
+    'privilege_and_consent_security.sql': ['privilege_consent_assertions', 151],
+    'staff_admission.sql': ['staff_assertions', 51],
+    'staff_delivery.sql': ['staff_delivery_assertions', 27],
   }[suite];
   if (expected) {
     const [key, count] = expected;

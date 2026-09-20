@@ -383,7 +383,9 @@ test('existing parent accepts a second child, recovers a failed family refresh a
 });
 
 
-for (const role of ['player', 'coach', 'club']) {
+// Staff signup is invitation-only. Its activation/password controls and the
+// public coach/club denial are exercised in staff-admission.spec.ts.
+for (const role of ['player']) {
   test(`${role} signup reveals passwords independently without sending a request`, async ({ page, context }, testInfo) => {
     const observed = await invitationsFixture(page, context);
     await page.goto(`/onboarding/${role}`);

@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { validateMigrationFiles } from './migration-input.mjs';
-import { historyUpgradeBase, historyMigration, parentHistoryUpgradeOrder, requireHistoryUpgradeSuiteOutput } from './lib/parent-history-upgrade.mjs';
+import { historyUpgradeBase, historyUpgradeCount, historyMigration, parentHistoryUpgradeOrder, requireHistoryUpgradeSuiteOutput } from './lib/parent-history-upgrade.mjs';
 
 // An in-memory database by construction. Never reads DB_URL or connects to a
 // Supabase project; SQL fixture guards also refuse an unmarked connection.
@@ -45,10 +45,10 @@ try {
   for (const file of migrations) {
     try {
       if (historyUpgrade && file === historyMigration) {
-        if (applied !== 62) throw new Error('History migration must follow all 62 pinned-main migrations');
+        if (applied !== historyUpgradeCount) throw new Error('History migration must follow all 68 pinned candidate migrations');
         const { rows } = await db.query("SELECT to_regprocedure('public.get_parent_match_summary(uuid)') IS NULL AND to_regprocedure('public.get_parent_match_page(uuid,date,timestamp with time zone,uuid,integer)') IS NULL AS absent");
         if (rows[0].absent !== true) throw new Error('History RPCs unexpectedly exist before pending migration');
-        console.log(`Upgrade boundary: ${applied} migrations from main ${historyUpgradeBase} applied; history RPCs absent; applying ${file} next.`);
+        console.log(`Upgrade boundary: ${applied} migrations from candidate ${historyUpgradeBase} applied; history RPCs absent; applying ${file} next.`);
       }
       if (file === securityMigration) await db.exec(await read('parent_invite_backfill_setup.sql'));
       if (file === pilotViewsMigration) await db.exec(await read('pilot_view_backfill_setup.sql'));
@@ -61,7 +61,7 @@ try {
   }
   console.log(`Replayed ${migrations.length} migrations${baseline || pilotViewsBaseline
     ? ' (vulnerable baseline; security assertions should fail)'
-    : historyUpgrade ? ' (exact main 0091094 first, then pending parent history)'
+    : historyUpgrade ? ' (exact candidate 74a4a35 first, then pending parent history)'
       : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
   const suites = baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
@@ -73,6 +73,7 @@ try {
     if (historyUpgrade && suite === 'parent_invite_security.sql') console.log('Parent invitation assertions: 55');
     for (const query of result) {
       if (query.rows?.[0]?.staff_delivery_assertions) console.log(`Staff delivery assertions: ${query.rows[0].staff_delivery_assertions}`);
+      if (query.rows?.[0]?.privilege_consent_assertions) console.log(`Privilege/consent assertions: ${query.rows[0].privilege_consent_assertions}`);
       if (query.rows?.[0]?.staff_assertions) console.log(`Staff assertions: ${query.rows[0].staff_assertions}`);
       if (query.rows?.[0]?.parent_match_history_assertions) console.log(`Parent history assertions: ${query.rows[0].parent_match_history_assertions}`);
       if (query.rows?.[0]?.pilot_view_assertions) console.log(`Operational view assertions: ${query.rows[0].pilot_view_assertions}`);

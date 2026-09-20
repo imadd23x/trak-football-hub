@@ -34,15 +34,34 @@ await context.route('**/*',async route=>{
  if(u.pathname==='/rest/v1/squad_players') return json([{id:u.searchParams.get('linked_player_id')?.slice(3)}]);
  if(u.pathname==='/rest/v1/coach_assessments') return json([{id:'assessment',created_at:'2026-09-01T12:00:00Z',coach_user_id:coach,coach_rating:0,work_rate:0,tactical:0,attitude:0,technical:0,physical:0,coachability:0}]);
  if(u.pathname==='/rest/v1/recognition_awards') return json([]);
- if(u.pathname==='/rest/v1/matches') {
+ if(u.pathname==='/rest/v1/rpc/get_parent_match_summary' && req.method()==='POST') return json([{total_count:1,rated_count:1,average_rating:0,wins:0,draws:1,losses:0}]);
+ if(u.pathname==='/rest/v1/matches' || (u.pathname==='/rest/v1/rpc/get_parent_match_page' && req.method()==='POST')) {
+   const child=u.pathname.endsWith('get_parent_match_page')?req.postDataJSON().p_child_id:u.searchParams.get('user_id')?.slice(3);
    if(failMatches) return json({message:'Synthetic network error'},503);
-   return json([{id:'match-'+u.searchParams.get('user_id'),match_date:'2026-09-01',created_at:'2026-09-18T12:00:00Z',opponent:u.searchParams.get('user_id')===`eq.${zara}`?'Zara Opposition':'Alex Opposition',team_score:0,opponent_score:0,computed_rating:0,competition:'Synthetic League',venue:'Test Pitch'}]);
+   return json([{id:'match-'+child,user_id:child,goals:0,assists:0,minutes_played:73,position:'mid',age_group:'U15',match_date:'2026-09-01',created_at:'2026-09-18T12:00:00Z',opponent:child===zara?'Zara Opposition':'Alex Opposition',team_score:0,opponent_score:0,computed_rating:0,competition:'Synthetic League',venue:'Test Pitch'}]);
  }
  unexpected.push(req.method()+' '+u.pathname); return json({message:'Unmocked request blocked'},500);
 });
  await page.goto('http://127.0.0.1:4189/parent/home');
  await expect(page.getByRole('heading',{name:'Alex Example'})).toBeVisible();
  await expect(page.getByText('Alex Opposition',{exact:true})).toBeVisible();
+ const openHomeMatch = page.getByRole('button',{name:/View match against Alex Opposition/});
+ await openHomeMatch.focus();
+ await page.keyboard.press('Enter');
+ let detail = page.getByRole('dialog',{name:'Match details'});
+ await expect(detail.getByLabel('Goals',{exact:true})).toContainText('0');
+ await expect(detail.getByLabel('Assists',{exact:true})).toContainText('0');
+ await expect(detail.getByLabel('Minutes played',{exact:true})).toContainText('73');
+ await expect(detail.getByText('0–0',{exact:true})).toBeVisible();
+ await expect(detail.getByText('Difficult',{exact:true})).toBeVisible();
+ expect(await detail.evaluate(el=>el.scrollWidth <= el.clientWidth)).toBe(true);
+ await expect(detail).toHaveCSS('opacity','1');
+ await page.screenshot({path:testInfo.outputPath('match-details-mobile.png'),fullPage:true});
+ await page.keyboard.press('Escape');
+ await expect(openHomeMatch).toBeFocused();
+ await page.getByRole('button',{name:/View coach assessment/}).click();
+ await expect(page.getByRole('dialog',{name:'Coach assessment'}).getByLabel('Technical',{exact:true})).toContainText('Difficult');
+ await page.keyboard.press('Escape');
  await page.getByRole('combobox').selectOption(zara);
  await expect(page.getByRole('heading',{name:'Zara Example'})).toBeVisible();
  await expect(page.getByText('Zara Opposition',{exact:true})).toBeVisible();
@@ -52,6 +71,11 @@ await context.route('**/*',async route=>{
  await expect(page.getByText('D 0–0',{exact:true})).toBeVisible();
  await expect(page.getByText('Difficult',{exact:true})).toBeVisible();
  await expect(page.getByText('1 Sept · Synthetic League · Test Pitch',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:/View match against Zara Opposition/}).click();
+ detail = page.getByRole('dialog',{name:'Match details'});
+ await expect(detail.getByText('Zara Example',{exact:true})).toBeVisible();
+ await expect(detail.getByLabel('Minutes played',{exact:true})).toContainText('73');
+ await page.keyboard.press('Escape');
  await page.screenshot({path:testInfo.outputPath('matches-mobile.png'),fullPage:true});
  failMatches=true;
  await page.reload();
@@ -63,6 +87,14 @@ await context.route('**/*',async route=>{
  await page.getByRole('combobox').selectOption(zara);
  await page.getByRole('button',{name:'Alerts',exact:true}).click();
  await expect(page.getByRole('combobox')).toHaveValue(zara);
+ await page.getByRole('button',{name:/View match against Zara Opposition/}).click();
+ await expect(page.getByRole('dialog',{name:'Match details'}).getByLabel('Goals',{exact:true})).toContainText('0');
+ await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:/View coach assessment/}).click();
+ await expect(page.getByRole('dialog',{name:'Coach assessment'}).getByLabel('Work Rate',{exact:true})).toContainText('Difficult');
+ await expect(page.getByRole('dialog',{name:'Coach assessment'})).toHaveCSS('opacity','1');
+ await page.screenshot({path:testInfo.outputPath('assessment-details-mobile.png'),fullPage:true});
+ await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'Profile',exact:true}).click();
  await expect(page.getByText('Following Zara Example · 2 children linked',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:/Account settings/}).click();
@@ -71,5 +103,5 @@ await context.route('**/*',async route=>{
  await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});
  expect(errors).toEqual([]);
  expect(unexpected).toEqual([]);
- expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/auth/v1/logout'].includes(write.path))).toBe(true);
+ expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_parent_match_summary', '/rest/v1/rpc/get_parent_match_page', '/auth/v1/logout'].includes(write.path))).toBe(true);
 });

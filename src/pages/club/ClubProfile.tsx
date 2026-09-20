@@ -1,3 +1,4 @@
+import { OwnAvatar } from '@/components/profile/OwnAvatar'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Settings as SettingsIcon } from 'lucide-react'
@@ -54,12 +55,9 @@ export default function ClubProfile() {
           className="w-[72px] h-[72px] rounded-[22px] mx-auto mb-4 overflow-hidden flex items-center justify-center"
           style={{ background: 'rgba(200,242,90,0.08)', border: '1px solid rgba(200,242,90,0.18)' }}
         >
-          {profile?.avatar_url
-            ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-            : <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 22, fontWeight: 600, color: '#C8F25A' }}>
+          <OwnAvatar reference={profile?.avatar_url} fallback={<span style={{ fontFamily: "'DM Mono', monospace", fontSize: 22, fontWeight: 600, color: '#C8F25A' }}>
                 {(profile?.full_name || 'A').charAt(0).toUpperCase()}
-              </span>
-          }
+              </span>} />
         </div>
         <p
           style={{

@@ -141,6 +141,12 @@ test('shared phone switches from player to existing parent on the invitation and
   await page.getByRole('button', { name: 'Sign in with password', exact: true }).click();
   await page.getByLabel('Your email address').fill(parentEmail);
   await page.getByLabel('Password', { exact: true }).fill('ExistingParent1!');
+  await page.getByRole('button', { name: 'Show password', exact: true }).click();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue('ExistingParent1!');
+  expect(observed.requests.some(request => request.path === '/auth/v1/token')).toBe(false);
+  await page.getByRole('button', { name: 'Hide password', exact: true }).click();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Link Alex Example', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Link Zara Example', exact: true })).toBeVisible();
@@ -222,6 +228,14 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
     if (request.method() === 'POST') {
       if (url.pathname === '/rest/v1/telemetry_events') return json(null, 201);
       if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') return json([]);
+      if (['/rest/v1/rpc/get_parent_match_summary', '/rest/v1/rpc/get_parent_match_page'].includes(url.pathname)) {
+        const child = children.find(item => linked.has(item.id) && item.id === (observed.body as { p_child_id?: string }).p_child_id);
+        if (!child) return reject();
+        return json(url.pathname.endsWith('get_parent_match_summary')
+          ? [{ total_count: 1, rated_count: 1, average_rating: 7, wins: 1, draws: 0, losses: 0 }]
+          : [{ id: child.id, match_date: '2026-09-01', created_at: '2026-09-02T12:00:00Z', opponent: child.opponent,
+            competition: 'Synthetic Adult League', venue: child.club, team_score: 2, opponent_score: 1, computed_rating: 7 }]);
+      }
       if (url.pathname === '/rest/v1/rpc/get_my_pending_parent_invites') return json(linked.has(zaraId) ? [] : [{
         invite_id: zaraInvite, player_user_id: zaraId, player_name: children[1].name,
         parent_email: parentEmail, expires_at: new Date(Date.now() + 86_400_000).toISOString(),
@@ -360,10 +374,41 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   const allowedPosts = new Set([
     '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent',
     '/rest/v1/rpc/get_my_pending_parent_invites', '/rest/v1/rpc/get_parent_invite_by_token',
-    '/rest/v1/rpc/accept_parent_invite',
+    '/rest/v1/rpc/accept_parent_invite', '/rest/v1/rpc/get_parent_match_summary', '/rest/v1/rpc/get_parent_match_page',
   ]);
   expect(observed.requests.filter(request => request.method !== 'GET')
     .every(request => request.method === 'POST' && allowedPosts.has(request.path))).toBe(true);
   expect(observed.unexpected).toEqual([]);
   expect(observed.errors).toEqual([]);
 });
+
+
+// Staff signup is invitation-only. Its activation/password controls and the
+// public coach/club denial are exercised in staff-admission.spec.ts.
+for (const role of ['player']) {
+  test(`${role} signup reveals passwords independently without sending a request`, async ({ page, context }, testInfo) => {
+    const observed = await invitationsFixture(page, context);
+    await page.goto(`/onboarding/${role}`);
+    const password = page.getByLabel('New password', { exact: true });
+    const confirmation = page.getByLabel('Confirm password', { exact: true });
+    await password.fill('SyntheticOnly1!');
+    await confirmation.fill('SyntheticOnly1!');
+    const toggle = page.getByRole('button', { name: 'Show new password', exact: true });
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(password).toHaveAttribute('type', 'text');
+    await expect(password).toHaveValue('SyntheticOnly1!');
+    await expect(confirmation).toHaveAttribute('type', 'password');
+    await page.getByRole('button', { name: 'Show confirm password', exact: true }).click();
+    await expect(confirmation).toHaveAttribute('type', 'text');
+    await page.getByRole('button', { name: 'Hide new password', exact: true }).click();
+    await expect(password).toHaveAttribute('type', 'password');
+    await expect(confirmation).toHaveValue('SyntheticOnly1!');
+    await confirmation.clear();
+    await expect(confirmation).toHaveAttribute('type', 'password');
+    await page.screenshot({ path: testInfo.outputPath(`${role}-password-toggle.png`), fullPage: true });
+    expect(observed.requests).toEqual([]);
+    expect(observed.unexpected).toEqual([]);
+    expect(observed.errors).toEqual([]);
+  });
+}

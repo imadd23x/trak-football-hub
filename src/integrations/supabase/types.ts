@@ -800,7 +800,36 @@ export type Database = {
         }[]
       }
       delete_my_account: { Args: never; Returns: undefined }
+      get_children_awaiting_consent: {
+        Args: never
+        Returns: {
+          player_user_id: string
+          full_name: string
+          age_years: number
+        }[]
+      }
       get_coach_id_by_invite_code: { Args: { p_code: string }; Returns: string }
+      get_parent_match_page: {
+        Args: {
+          p_child_id: string
+          p_after_match_date?: string | null
+          p_after_created_at?: string | null
+          p_after_id?: string | null
+          p_limit?: number | null
+        }
+        Returns: Json
+      }
+      get_parent_match_summary: {
+        Args: { p_child_id: string }
+        Returns: {
+          total_count: number
+          rated_count: number
+          average_rating: number | null
+          wins: number
+          draws: number
+          losses: number
+        }[]
+      }
       get_parent_invite_by_token: {
         Args: { p_token: string }
         Returns: {
@@ -838,6 +867,16 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       is_club_admin: { Args: never; Returns: boolean }
+      record_parental_consent: {
+        Args: {
+          p_player_user_id: string
+          p_relationship: string
+          p_purposes: Json
+          p_notice_version: string
+          p_consent_text: string
+        }
+        Returns: string
+      }
       remove_coach_from_org: { Args: { p_coach_user_id: string }; Returns: undefined }
       link_parent_to_players_by_email: {
         Args: { p_email: string }

@@ -143,7 +143,7 @@ def main() -> None:
                 assert migration_sql.count(target) == 1
                 migration_sql = migration_sql.replace(target, '')
             sql(migration_sql)
-        for suite in ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'staff_admission.sql', 'staff_delivery.sql']:
+        for suite in ['parent_invite_security.sql', 'pilot_view_security.sql', 'parent_match_history.sql', 'privilege_and_consent_security.sql', 'staff_admission.sql', 'staff_delivery.sql']:
             sql("SET trak.test_database='disposable';\n" + (ROOT / 'supabase/tests' / suite).read_text())
             print('Native suite passed:', suite, flush=True)
         for user in range(1, 31):
@@ -222,7 +222,7 @@ def main() -> None:
         revoke = f"SELECT public.revoke_staff_invite('{invite['invitation_id']}');"
         claim = f"SELECT public.claim_staff_invite_delivery('{invite['invitation_id']}','{invite['token']}');"
         denied(race(revoke, 2, claim, 2, 'revoke-before-email-claim'))
-        print('Passed: 13 native staff-admission/delivery races; all five SQL suites.', flush=True)
+        print('Passed: 13 native staff-admission/delivery races; all six SQL suites.', flush=True)
     finally:
         if started:
             run([str(pg / 'pg_ctl'), '-D', str(scratch / 'data'), '-m', 'fast', '-w', 'stop'])

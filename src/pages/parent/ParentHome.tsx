@@ -2,8 +2,9 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
-import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches } from '@/hooks/useParentData'
-import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
+import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatchSummary, useParentRecentMatches } from '@/hooks/useParentData'
+import { formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
+import { ParentMatchRecord, ParentAssessmentRecord } from '@/components/parent/ParentRecordDetails'
 import { BANDS } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
 
@@ -11,16 +12,18 @@ export default function ParentHome() {
   const navigate = useNavigate()
   const location = useLocation()
   const { selectedChild } = useParentChildren()
-  const matchQuery = useParentMatches()
+  const matchQuery = useParentRecentMatches()
+  const summaryQuery = useParentMatchSummary()
   const developmentQuery = useParentDevelopment()
   const consentQuery = useChildrenAwaitingConsent()
   const matches = matchQuery.data ?? []
+  const summary = summaryQuery.data
   const development = developmentQuery.data
   const assessment = development?.assessments[0]
   const award = development?.awards[0]
   const details = development?.details
-  const hasError = matchQuery.isError || developmentQuery.isError
-  const loading = matchQuery.isPending || developmentQuery.isPending
+  const hasError = matchQuery.isError || summaryQuery.isError || developmentQuery.isError
+  const loading = matchQuery.isPending || summaryQuery.isPending || developmentQuery.isPending
 
   return (
     <MobileShell>
@@ -39,7 +42,7 @@ export default function ParentHome() {
         )}
         <ParentChildSelector />
         <ParentFamilyContent>
-          {hasError ? <ParentLoadError onRetry={() => { void matchQuery.refetch(); void developmentQuery.refetch() }} />
+          {hasError ? <ParentLoadError onRetry={() => { void matchQuery.refetch(); void summaryQuery.refetch(); void developmentQuery.refetch() }} />
             : loading ? <ParentLoading /> : (
               <>
                 <div className="pb-5">
@@ -48,20 +51,24 @@ export default function ParentHome() {
                     {[details.position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
                   </p>}
                 </div>
-                {matches.length > 0 && (
+                {summary && summary.total_count > 0 && (
                   <section className="rounded-xl p-5 mb-4 bg-card border border-border" aria-label="Recorded matches summary">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <MetadataLabel text="RECORDED MATCHES" />
-                        <div className="mt-3"><ParentRating rating={averageRecordedRating(matches)} /></div>
+                        <div className="mt-3"><ParentRating rating={summary.average_rating} /></div>
+                        <p className="text-xs text-muted-foreground mt-2">Average of {summary.rated_count} rated {summary.rated_count === 1 ? 'match' : 'matches'} · all history</p>
                       </div>
-                      <div className="text-right"><MetadataLabel text="MATCHES" /><p className="text-3xl font-light mt-2 text-foreground">{matches.length}</p></div>
+                      <div className="text-right"><MetadataLabel text="MATCHES" /><p className="text-3xl font-light mt-2 text-foreground">{summary.total_count}</p></div>
                     </div>
                     <div className="flex gap-5 pt-4 mt-4 border-t border-border">
-                      {(['W', 'D', 'L'] as const).map(result => <div key={result} className="text-sm text-foreground">
-                        {matches.filter(match => matchResult(match) === result).length} <span className="text-muted-foreground">{result}</span>
+                      {([{ label: 'W', count: summary.wins }, { label: 'D', count: summary.draws }, { label: 'L', count: summary.losses }]).map(result => <div key={result.label} className="text-sm text-foreground">
+                        {result.count} <span className="text-muted-foreground">{result.label}</span>
                       </div>)}
                     </div>
+                    {summary.total_count > summary.wins + summary.draws + summary.losses && <p className="text-xs text-muted-foreground mt-3">
+                      {summary.total_count - summary.wins - summary.draws - summary.losses} without a recorded score
+                    </p>}
                   </section>
                 )}
                 <section className="mt-5" aria-label="Latest coach assessment">
@@ -70,7 +77,7 @@ export default function ParentHome() {
                     <div className="rounded-xl p-5 mt-2 bg-card border border-border">
                       <div className="flex items-center justify-between gap-2 mb-4">
                         <div>
-                          <p className="text-sm text-foreground">{development?.coachNames[assessment.coach_user_id] || 'Coach'}</p>
+                          <p className="text-sm text-foreground">{(assessment.coach_user_id && development?.coachNames[assessment.coach_user_id]) || 'Coach'}</p>
                           <p className="text-xs text-muted-foreground mt-1">{formatParentDate(assessment.created_at)}</p>
                         </div>
                         <ParentRating rating={assessment.coach_rating} missing="Not assessed" />
@@ -95,6 +102,9 @@ export default function ParentHome() {
                           </div>
                         })}
                       </div>
+                      <ParentAssessmentRecord assessment={assessment} coachName={(assessment.coach_user_id && development?.coachNames[assessment.coach_user_id]) || 'Coach'} className="mt-3 px-3 border border-border text-sm">
+                        View assessment details
+                      </ParentAssessmentRecord>
                     </div>
                   ) : <p className="py-4 text-sm text-muted-foreground">No coach assessments yet.</p>}
                 </section>
@@ -110,7 +120,7 @@ export default function ParentHome() {
                 <section className="mt-5" aria-label="Recent matches">
                   <MetadataLabel text="RECENT MATCHES" />
                   {matches.length ? <div className="rounded-xl mt-2 bg-card border border-border divide-y divide-border">
-                    {matches.slice(0, 5).map(match => <div key={match.id} className="flex items-center gap-3 p-4">
+                    {matches.map(match => <ParentMatchRecord key={match.id} match={match} className="flex items-center gap-3 p-4">
                       <span className="w-5 text-xs text-muted-foreground">{matchResult(match) ?? '—'}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground truncate">{match.opponent || match.competition || 'Match'}</p>
@@ -119,8 +129,12 @@ export default function ParentHome() {
                         </p>
                       </div>
                       <ParentRating rating={match.computed_rating} />
-                    </div>)}
-                  </div> : <p className="py-4 text-sm text-muted-foreground">No matches yet. Matches recorded by the coach will appear here.</p>}
+                    </ParentMatchRecord>)}
+                  </div> : <p className="py-4 text-sm text-muted-foreground">{summary?.total_count === 0
+                    ? 'No matches yet. Matches recorded by the coach will appear here.' : 'No recent matches available.'}</p>}
+                  <button onClick={() => navigate('/parent/matches')} className="mt-3 min-h-11 px-4 rounded-lg border border-border text-sm text-foreground focus-visible:ring-2 focus-visible:ring-primary">
+                    View match history
+                  </button>
                 </section>
               </>
             )}

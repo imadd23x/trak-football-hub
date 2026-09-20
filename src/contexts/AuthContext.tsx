@@ -269,13 +269,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       receivedAuthEvent = true;
-      // On the reset password page, suppress all auth redirects so the
-      // form stays visible. ResetPassword.tsx handles its own auth events.
-      if (window.location.pathname === '/reset-password') {
-        if (event === 'PASSWORD_RECOVERY') return;
-        if (event === 'SIGNED_IN') return;
-      }
-
       // Email confirmation now uses its own non-persistent Auth client.
       // Keep hydrating the app session on that route so returning to account
       // choice cannot leave loading=true after a suppressed INITIAL_SESSION.
@@ -291,7 +284,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (event === 'PASSWORD_RECOVERY') {
-        window.location.replace('/reset-password');
+        // Hydrate the account even on reset, so a cross-tab switch cannot
+        // leave the old family's profile/cache active when the form exits.
+        acceptSession(session);
+        if (window.location.pathname !== '/reset-password') window.location.replace('/reset-password');
         return;
       }
 
@@ -300,12 +296,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (disposed || receivedAuthEvent || generation.current !== initialGeneration) return;
-      // If we're on the reset password page, don't auto-redirect — let
-      // the ResetPassword component handle the PASSWORD_RECOVERY event.
-      if (window.location.pathname === '/reset-password') {
-        setLoading(false);
-        return;
-      }
       acceptSession(session);
     }).catch(() => {
       if (!disposed && !receivedAuthEvent && generation.current === initialGeneration) setLoading(false);

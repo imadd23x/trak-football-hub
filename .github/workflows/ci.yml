@@ -65,7 +65,7 @@ jobs:
         run: npm run test:db -- --parent-upgrade-review
 
       - name: Consent authority fault-injection controls
-        run: node --test tests/db/academy-consent-authority.test.mjs
+        run: node --test tests/db/academy-consent-authority.test.mjs tests/db/academy-consent-writes.test.mjs tests/db/academy-consent-reads.test.mjs
 
       - name: Native consent concurrency
         run: python3 scripts/test-academy-consent-native.py --existing-local

@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, MetadataLabel } from '@/components/trak'
 import { computeMatchScore } from '@/lib/rating-engine'
+import { goalsKey, assistsKey } from '@/lib/match-input-keys'
 import { trackEvent } from '@/lib/telemetry'
 import { validateMatchInput, MATCH_LIMITS } from '@/lib/match-input-rules'
 
@@ -28,8 +29,8 @@ type PlayerDetail = {
   minutes: number
   /* Exact counts. These were once `0 | 1 | 2` with 2 meaning "2+", so a
      hat-trick was stored as 2 and the only vocabulary the form had was the
-     rating bucket. The bucket still exists — goalsKey() below — but it is now
-     derived for the rating engine rather than being the thing recorded. */
+     rating bucket. The bucket still exists — match-input-keys.ts — but it is
+     now derived for the rating engine rather than being the thing recorded. */
   goals:   number
   assists: number
   card:    CardType
@@ -46,14 +47,6 @@ function mapPosition(raw: string | null) {
   if (p.includes('defender')   || ['def','cb','lb','rb'].includes(p)) return 'def'
   if (p.includes('attacker')   || ['att','cf','st','lw','rw'].includes(p)) return 'att'
   return 'mid'
-}
-
-/* The rating engine's vocabulary is '0', '1', '2+' — see rating-engine.ts,
-   which compares against those literals. Collapsing happens HERE, at the point
-   the rating is computed, so the exact count still reaches the database.
-   Three goals now rate identically to two and are stored as three. */
-function goalsKey(g: number): string {
-  return g >= 2 ? '2+' : String(g)
 }
 
 export default function CoachAddSession() {
@@ -273,8 +266,13 @@ export default function CoachAddSession() {
           body_condition:  'good',
           self_rating:     'average',
           position_inputs: {
-            goals:   goalsKey(d.goals),
-            assists: goalsKey(d.assists),
+            /* Position-aware, and assists have their own scale. The engine
+               reads '1'/'2'/'3+' for an attacker's goals but '1'/'2+' for
+               everyone's assists, so one shared helper for both would send an
+               attacker's third assist as '3+' — a key the assists branch has
+               no case for, which pays exactly nothing. */
+            goals:   goalsKey(pos, d.goals),
+            assists: assistsKey(d.assists),
           },
           is_friendly: competition === 'Friendly',
         })
@@ -289,8 +287,9 @@ export default function CoachAddSession() {
           p_position:        p.position  || 'Midfielder',
           p_age_group:       p.age != null ? String(p.age) : 'U19+',
           p_minutes_played:  d.minutes,
-          p_goals:           d.goals === 2 ? 2 : d.goals,
-          p_assists:         d.assists === 2 ? 2 : d.assists,
+          // The real numbers. The rating key is a band; the record is not.
+          p_goals:           d.goals,
+          p_assists:         d.assists,
           p_card_received:   d.card,
           p_body_condition:  'Average',
           p_self_rating:     'Average',

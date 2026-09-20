@@ -53,9 +53,9 @@ export default function LandingPage() {
     navigate(home, { replace: true });
   }, [signedInEmail, loading, user, profile, navigate]);
 
-  // /auth/confirm verifies the email, signs the person out on purpose, and
-  // sends them here. Without this they would arrive at a bare sign-in form with
-  // no sign that the confirmation worked, and try the email link again.
+  // /auth/confirm verifies the email in an isolated temporary session and
+  // offers this sign-in link without changing a remembered account. The notice
+  // explains the completed step so they do not reuse the confirmation link.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('confirmed') !== '1') return;

@@ -20,6 +20,17 @@ const DEV_ACCOUNTS = [
 // so a literal here ships to every visitor of the production site.
 
 type View = 'signin' | 'register';
+function homeForRole(role: string | undefined): string | undefined {
+  switch (role) {
+    case 'player': return '/player/home';
+    case 'coach': return '/coach/home';
+    case 'parent': return '/parent/home';
+    case 'club': return '/club/home';
+    default: return undefined;
+  }
+}
+const normalizedEmail = (email: string | undefined) => email?.trim().toLowerCase() ?? '';
+
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -28,23 +39,19 @@ export default function LandingPage() {
   const [view, setView] = useState<View>('signin');
   const { user, profile, loading } = useAuth();
 
-  useEffect(() => {
-    if (!loading && user) {
-      const homeMap: Record<string, string> = {
-        player: '/player/home',
-        coach: '/coach/home',
-        parent: '/parent/home',
-        club: '/club/home',
-      };
+  const [signedInEmail, setSignedInEmail] = useState<string | null>(null);
 
-      // A missing role must never fall through to the player home. An invited
-      // parent whose profile was never provisioned has no role, and this line
-      // used to point them straight at a child's dashboard. Players, coaches
-      // and clubs all get a profile at signup, so the only way to be signed in
-      // without one is an invitation that was not completed.
-      navigate(homeMap[profile?.role ?? ''] ?? '/parent-invite', { replace: true });
-    }
-  }, [loading, user, profile, navigate]);
+  useEffect(() => {
+    // A restored session or token refresh is not a navigation decision. Only a
+    // successful password submission here may continue its matching account.
+    if (!signedInEmail) return;
+    if (!user) { if (!loading) setSignedInEmail(null); return; }
+    if (normalizedEmail(user.email) !== signedInEmail) { setSignedInEmail(null); return; }
+    const home = homeForRole(profile?.role);
+    if (loading || !home) return;
+    setSignedInEmail(null);
+    navigate(home, { replace: true });
+  }, [signedInEmail, loading, user, profile, navigate]);
 
   // /auth/confirm verifies the email, signs the person out on purpose, and
   // sends them here. Without this they would arrive at a bare sign-in form with
@@ -101,18 +108,11 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* ── Sign in view ── */}
-        {view === 'signin' && (
-          <SignInForm onCreateAccount={() => setView('register')} />
-        )}
-
-        {/* ── Register view ── */}
-        {view === 'register' && (
-          <RegisterView
-            onRoleSelect={handleRoleSelect}
-            onBack={() => setView('signin')}
-          />
-        )}
+        {loading ? <p role="status" className="text-sm text-muted-foreground">Checking your account…</p>
+          : user ? <AccountChoice key={user.id} onSwitch={() => { setSignedInEmail(null); setView('signin'); }} />
+          : view === 'signin' ? <SignInForm onCreateAccount={() => setView('register')}
+            onSignedIn={email => setSignedInEmail(normalizedEmail(email))} />
+            : <RegisterView onRoleSelect={handleRoleSelect} onBack={() => setView('signin')} />}
 
         {/* ── Dev panel (localhost only) ── */}
         {IS_DEV && <DevLoginPanel />}
@@ -122,21 +122,78 @@ export default function LandingPage() {
   );
 }
 
+function AccountChoice({ onSwitch }: { onSwitch: () => void }) {
+  const { user, profile, signOut, refreshProfile } = useAuth();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState<'signout' | 'refresh' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const home = homeForRole(profile?.role);
+  const name = profile?.full_name?.trim() || user?.email || 'this account';
+
+  async function switchAccount() {
+    if (busy) return;
+    onSwitch(); setBusy('signout'); setError(null);
+    try {
+      const result = await signOut();
+      if (result.error) throw result.error;
+    } catch {
+      if (mounted.current) setError('Could not sign out. You are still signed in on this device. Try again.');
+    } finally { if (mounted.current) setBusy(null); }
+  }
+
+  async function checkAccess() {
+    if (busy) return;
+    setBusy('refresh'); setError(null);
+    try { await refreshProfile(); }
+    catch { if (mounted.current) setError('Could not check your account access. Try again.'); }
+    finally { if (mounted.current) setBusy(null); }
+  }
+
+  return <section aria-label="Choose an account" className="w-full space-y-4 text-foreground">
+    <div className="rounded-xl border border-border bg-card p-4 space-y-2 break-words">
+      <p className="text-sm text-muted-foreground">Signed in on this device</p>
+      <h2 className="text-lg">{name}</h2>
+      {user?.email && user.email !== name && <p className="text-sm text-muted-foreground">{user.email}</p>}
+    </div>
+    {home ? <button type="button" disabled={!!busy} onClick={() => navigate(home, { replace: true })}
+      className="w-full min-h-11 rounded-xl bg-primary text-primary-foreground p-3 font-medium break-words focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+      Continue as {name}
+    </button> : <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">Your account access is not available yet. Open your academy invitation or check access again.</p>
+      <button type="button" disabled={!!busy} onClick={() => { void checkAccess(); }}
+        className="w-full min-h-11 rounded-xl border border-border p-3 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">{busy === 'refresh' ? 'Checking access…' : 'Check access again'}</button>
+    </div>}
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    <button type="button" disabled={!!busy} onClick={() => { void switchAccount(); }}
+      className="w-full min-h-11 rounded-xl border border-border p-3 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+      {busy === 'signout' ? 'Signing out…' : 'Sign in with another account'}
+    </button>
+  </section>;
+}
+
 // ─── Sign in form ─────────────────────────────────────────────────────────────
 
-function SignInForm({ onCreateAccount }: { onCreateAccount: () => void }) {
+function SignInForm({ onCreateAccount, onSignedIn }: { onCreateAccount: () => void; onSignedIn: (email: string) => void }) {
   const { signIn } = useAuth();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw]     = useState(false);
   const [loading, setLoading]   = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    const { error } = await signIn(email, password);
-    setLoading(false);
-    if (error) toast.error(error.message);
+    if (loading) return;
+    setLoading(true); setError(null);
+    try {
+      const result = await signIn(email, password);
+      if (result.error) throw result.error;
+      onSignedIn(email);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not sign in. Try again.');
+    } finally { setLoading(false); }
   };
 
   const handleForgot = async () => {
@@ -188,6 +245,8 @@ function SignInForm({ onCreateAccount }: { onCreateAccount: () => void }) {
       >
         Forgot password?
       </button>
+
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       {/* CTA */}
       <button

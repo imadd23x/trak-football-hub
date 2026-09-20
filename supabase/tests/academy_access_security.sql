@@ -1,4 +1,4 @@
--- @trak-suite mode=--academy-access-review in-all=true
+-- @trak-suite mode=--coach-departure-review in-all=true
 -- F1/F6 compatibility: actual authenticated access, immutable academy IDs,
 -- legitimate linked-player edits, and independent-coach roster adoption.
 BEGIN;

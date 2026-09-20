@@ -141,6 +141,12 @@ test('shared phone switches from player to existing parent on the invitation and
   await page.getByRole('button', { name: 'Sign in with password', exact: true }).click();
   await page.getByLabel('Your email address').fill(parentEmail);
   await page.getByLabel('Password', { exact: true }).fill('ExistingParent1!');
+  await page.getByRole('button', { name: 'Show password', exact: true }).click();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue('ExistingParent1!');
+  expect(observed.requests.some(request => request.path === '/auth/v1/token')).toBe(false);
+  await page.getByRole('button', { name: 'Hide password', exact: true }).click();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Link Alex Example', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Link Zara Example', exact: true })).toBeVisible();
@@ -367,3 +373,32 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   expect(observed.unexpected).toEqual([]);
   expect(observed.errors).toEqual([]);
 });
+
+
+for (const role of ['player', 'coach', 'club']) {
+  test(`${role} signup reveals passwords independently without sending a request`, async ({ page, context }, testInfo) => {
+    const observed = await invitationsFixture(page, context);
+    await page.goto(`/onboarding/${role}`);
+    const password = page.getByLabel('New password', { exact: true });
+    const confirmation = page.getByLabel('Confirm password', { exact: true });
+    await password.fill('SyntheticOnly1!');
+    await confirmation.fill('SyntheticOnly1!');
+    const toggle = page.getByRole('button', { name: 'Show new password', exact: true });
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(password).toHaveAttribute('type', 'text');
+    await expect(password).toHaveValue('SyntheticOnly1!');
+    await expect(confirmation).toHaveAttribute('type', 'password');
+    await page.getByRole('button', { name: 'Show confirm password', exact: true }).click();
+    await expect(confirmation).toHaveAttribute('type', 'text');
+    await page.getByRole('button', { name: 'Hide new password', exact: true }).click();
+    await expect(password).toHaveAttribute('type', 'password');
+    await expect(confirmation).toHaveValue('SyntheticOnly1!');
+    await confirmation.clear();
+    await expect(confirmation).toHaveAttribute('type', 'password');
+    await page.screenshot({ path: testInfo.outputPath(`${role}-password-toggle.png`), fullPage: true });
+    expect(observed.requests).toEqual([]);
+    expect(observed.unexpected).toEqual([]);
+    expect(observed.errors).toEqual([]);
+  });
+}

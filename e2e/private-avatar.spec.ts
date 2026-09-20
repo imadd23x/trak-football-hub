@@ -2,8 +2,11 @@ import { test, expect } from '@playwright/test'
 
 // Production bundle + real router/AuthProvider/Storage SDK. All remote traffic is
 // intercepted; these tests never use a real account or write production data.
-for (const role of ['parent', 'player', 'coach', 'club']) {
-  test(`${role} private photo decodes, retries and survives upload/reload`, async ({ page, context }, testInfo) => {
+for (const { role, stall } of [
+  ...['parent', 'player', 'coach', 'club'].map(role => ({ role, stall: false })),
+  { role: 'parent', stall: true },
+]) {
+  test(`${role} private photo ${stall ? 'times out, cancels and retries' : 'decodes, retries and survives upload/reload'}`, async ({ page, context }, testInfo) => {
     const id = '11111111-1111-4111-8111-111111111111'
     const profile = { id, user_id: id, role, full_name: 'Synthetic Avatar User', nationality: null,
       invite_code: 'ABC123', avatar_url: `https://xbykbqolvqyqmipikuae.supabase.co/storage/v1/object/public/avatars/${id}` }
@@ -16,6 +19,9 @@ for (const role of ['parent', 'player', 'coach', 'club']) {
     await context.addInitScript(value => localStorage.setItem('sb-xbykbqolvqyqmipikuae-auth-token', JSON.stringify(value)), session)
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=', 'base64')
     let denyPhoto = false
+    let holdPhoto = stall
+    const cancelled: string[] = []
+    page.on('requestfailed', request => { if (request.url().includes('/storage/v1/object/avatars/')) cancelled.push(request.failure()?.errorText ?? 'unknown') })
     const unexpected: string[] = [], errors: string[] = [], reads: string[] = [], writes: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     await context.route('**/*', async route => {
@@ -32,6 +38,7 @@ for (const role of ['parent', 'player', 'coach', 'club']) {
         expect(request.headers().authorization).toBe(`Bearer ${token}`)
         if (method === 'GET') {
           reads.push(path)
+          if (holdPhoto) return new Promise<void>(() => {})
           return denyPhoto ? json({ message: 'Synthetic denied read' }, 403)
             : route.fulfill({ contentType: 'image/png', body: png, headers: { 'Cache-Control': 'no-store' } })
         }
@@ -64,6 +71,14 @@ for (const role of ['parent', 'player', 'coach', 'club']) {
       return photo.getAttribute('src')
     }
     await page.goto(`/${role}/profile`)
+    if (stall) {
+      await expect(page.getByRole('status')).toHaveText('Loading profile photo')
+      await expect(page.getByRole('button', { name: 'Retry profile photo' })).toBeVisible({ timeout: 25_000 })
+      await expect.poll(() => cancelled).toContain('net::ERR_ABORTED')
+      await page.screenshot({ path: testInfo.outputPath('private-photo-timeout.png') })
+      holdPhoto = false
+      await page.getByRole('button', { name: 'Retry profile photo' }).click()
+    }
     await decoded()
     await page.screenshot({ path: testInfo.outputPath(`${role}-profile-photo.png`), fullPage: true })
     expect(reads.length).toBeGreaterThan(0)

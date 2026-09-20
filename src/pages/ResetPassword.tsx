@@ -51,7 +51,7 @@ export default function ResetPassword() {
       toast.error(error.message)
       return
     }
-    toast.success('Password updated — signing you in')
+    toast.success('Password updated')
     setTimeout(() => navigate('/'), 1500)
   }
 

@@ -28,6 +28,9 @@ async function fixture(page: Page, context: BrowserContext, options: { remembere
     const json = (data: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
     const current = request.headers().authorization === `Bearer ${parentB.access_token}` ? parentB : parentA;
     if (url.pathname === '/auth/v1/user' && request.method() === 'GET') return json(current.user);
+    if (url.pathname === '/auth/v1/user' && request.method() === 'PUT') {
+      expect(request.postDataJSON()).toEqual({ password: 'SyntheticPass1!', code_challenge: null, code_challenge_method: null }); writes.push('password-update'); return json(current.user);
+    }
     if (url.pathname === '/auth/v1/logout') {
       writes.push('logout'); if (logoutFails) { logoutFails = false; return json({ message: 'Temporarily unavailable' }, 503); }
       return json({});
@@ -96,4 +99,14 @@ test('an unavailable profile can recover without being sent to a parent invitati
   state.restoreProfile(); await page.getByRole('button', { name: 'Check access again' }).click();
   await expect(page.getByRole('button', { name: 'Continue as Alex Parent' })).toBeVisible(); await expect(page).toHaveURL(`${app}/`);
   expect(state.writes).toEqual([]); expect(state.errors).toEqual([]); expect(state.unexpected).toEqual([]);
+});
+
+test('password reset returns to a deliberate account choice', async ({ page, context }) => {
+  const state = await fixture(page, context, { remembered: true }); await page.goto('/reset-password');
+  await page.getByLabel('New password', { exact: true }).fill('SyntheticPass1!');
+  await page.getByLabel('Confirm password', { exact: true }).fill('SyntheticPass1!');
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.getByRole('button', { name: 'Continue as Alex Parent' })).toBeVisible();
+  await expect(page).toHaveURL(`${app}/`); expect(state.writes).toEqual(['password-update']);
+  expect(state.errors).toEqual([]); expect(state.unexpected).toEqual([]);
 });

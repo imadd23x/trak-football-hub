@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useResetEmail } from '@/hooks/useResetEmail';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { IconRolePlayer, IconRoleCoach, IconRoleParent, IconRoleClub } from '@/components/icons/TrakIcons';
@@ -182,11 +183,12 @@ function SignInForm({ onCreateAccount, onSignedIn }: { onCreateAccount: () => vo
   const [showPw, setShowPw]     = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resetEmail = useResetEmail(email);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
-    setLoading(true); setError(null);
+    resetEmail.clear(); setLoading(true); setError(null);
     try {
       const result = await signIn(email, password);
       if (result.error) throw result.error;
@@ -196,14 +198,7 @@ function SignInForm({ onCreateAccount, onSignedIn }: { onCreateAccount: () => vo
     } finally { setLoading(false); }
   };
 
-  const handleForgot = async () => {
-    if (!email) { toast.error('Enter your email first'); return }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) toast.error(error.message);
-    else toast.success('Check your email for a reset link');
-  };
+  const handleForgot = () => { if (!loading) void resetEmail.send(() => email); };
 
   return (
     <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
@@ -240,12 +235,14 @@ function SignInForm({ onCreateAccount, onSignedIn }: { onCreateAccount: () => vo
       <button
         type="button"
         onClick={handleForgot}
-        className="text-[11px] text-white/35 hover:text-[#C8F25A] transition-colors self-end -mt-1 tracking-[0.04em]"
+        disabled={loading || resetEmail.busy}
+        className="min-h-11 px-2 text-xs text-muted-foreground hover:text-primary transition-colors self-end tracking-wide disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         style={{ fontFamily: "'DM Mono', monospace" }}
       >
         Forgot password?
       </button>
 
+      {resetEmail.feedback.kind !== 'idle' && <p aria-label="Password reset request" role={resetEmail.feedback.kind === 'error' ? 'alert' : 'status'} className="text-sm text-muted-foreground">{resetEmail.feedback.message}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       {/* CTA */}

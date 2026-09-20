@@ -26,6 +26,32 @@ export interface ParentMatch {
   opponent_score: number | null
 }
 
+export interface ParentMatchDetail extends ParentMatch {
+  goals: number | null
+  assists: number | null
+  minutes_played: number | null
+  position: string | null
+  age_group: string | null
+}
+
+// Fetch only the public match facts, with both identities checked. RLS remains
+// authoritative; a missing or denied row must never fall back to cached facts.
+export async function fetchParentMatchDetail(childId: string, matchId: string, signal: AbortSignal): Promise<ParentMatchDetail> {
+  const { data, error } = await supabase.from('matches')
+    .select('id, user_id, team_score, opponent_score, competition, venue, match_date, created_at, opponent, computed_rating, goals, assists, minutes_played, position, age_group')
+    .eq('user_id', childId).eq('id', matchId).abortSignal(signal).retry(false).maybeSingle()
+  if (error) throw error
+  const row: unknown = data
+  if (!isRecord(row) || row.id !== matchId || row.user_id !== childId
+    || !isNullableCount(row.goals) || !isNullableCount(row.assists) || !isNullableCount(row.minutes_played)
+    || !isNullableString(row.position) || !isNullableString(row.age_group)) {
+    throw new Error('Invalid or unavailable match details')
+  }
+  return { ...parseMatches([row], 1)[0], goals: row.goals,
+    assists: row.assists, minutes_played: row.minutes_played,
+    position: row.position, age_group: row.age_group }
+}
+
 export interface ParentMatchSummary {
   total_count: number
   rated_count: number
@@ -48,6 +74,7 @@ const MATCH_COLUMNS = 'id, team_score, opponent_score, competition, venue, match
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+const isNullableCount = (value: unknown): value is number | null => value === null || isCount(value)
 const isNullableNumber = (value: unknown): value is number | null => value === null || (typeof value === 'number' && Number.isFinite(value))
 const isNullableString = (value: unknown): value is string | null => value === null || typeof value === 'string'
 

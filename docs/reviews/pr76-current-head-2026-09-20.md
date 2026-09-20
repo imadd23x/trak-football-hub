@@ -1,4 +1,16 @@
-# PR #76 review — hold at 252b486
+# PR #76 review — rating corrected; remaining holds
+
+## Current verdict at 146bf16
+
+Independently reviewed `146bf167a1526ba6fe856973326af77ddab1ecaa` on September 20. **The rating hold is cleared.** `CoachAddSession` now calls #51's shared `goalsKey(position, count)` and `assistsKey(count)`, passing exact counts separately to the RPC. No rating weights changed.
+
+- The rendered match-write test plus key/rule tests pass: 53/53.
+- In a temporary archive of that exact commit, restoring the collapsed goal mapping makes the attacker brace test fail (`6.9 > 6.9`); independently routing assists through goalsKey makes the assists test fail at the same comparison. These are two isolated regressions, not a single broken setup.
+- No peer source was edited. [Mutation reproducer](pr76-rating-review.py): run `python3 /path/to/pr76-rating-review.py /absolute/path/to/pr76-checkout` with Node/dependencies available. It requires the reviewed exact head and removes only its own temporary archive.
+- The delta since `252b486` changes no SQL migrations, SQL suites or match-input rules. The 0–20 ceilings still conflict with Imad's required 0–10; the two integration fixture corrections below and final composed verification remain. No full release or production approval.
+
+## Historical baseline at 252b486
+
 
 Reviewed `252b4869cd0adca45ab94c117d208cc3e1d3d9ce`, September 20, 2026. No changes to Kostas's branch or production. This review covers the match-validation delta and its database composition, not the complete pilot or every coach-session failure mode.
 
@@ -49,7 +61,7 @@ The six new CHECK constraints intentionally remain `NOT VALID`; new writes are c
 
 #76's pure validator suite: 39 passed. The existing session-save path still ignores per-player RPC/attendance errors and can report success after a partial failure; that is pre-existing K-C work, not a new issue introduced by this delta. Current form minutes still step in 15-minute increments; one/five-minute substitute acceptance is verified at validator/RPC level, not selectable through that control. Do not mark all of UT-12 or the session reliability package complete from this PR.
 
-Confirm a single shared count/range contract with Tarek: #51 currently offers 0–6, the earlier testing plan said 0–10, and #76 proposes 0–20 with a contribution/time heuristic. The heuristic is a product validation rule, not a mathematical impossibility proof. Registry integration must use #42's discovery mechanism, preserving the suite pragma rather than adding a second runner.
+Imad's controlling count limit is 0–10. The baseline #51 offers 0–6 and #76 proposes 0–20 with a contribution/time heuristic; align both UI and backend with the settled range. The heuristic is a product validation rule, not a mathematical impossibility proof. Registry integration must use #42's discovery mechanism, preserving the suite pragma rather than adding a second runner.
 
 ## Reproduce the native findings
 

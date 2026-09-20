@@ -23,6 +23,8 @@ vi.mock('@/integrations/supabase/client', async () => {
   }
 })
 
+const originalCreateObjectURL = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+const originalRevokeObjectURL = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
 const url = 'https://test.supabase.co'
 const user = (id: string): User => ({ id, email: `${id}@synthetic.test.invalid`, aud: 'authenticated',
   app_metadata: {}, user_metadata: {}, created_at: '2026-09-18T00:00:00Z', email_confirmed_at: '2026-09-18T00:00:00Z' })
@@ -50,6 +52,9 @@ function Controls() {
 }
 beforeEach(async () => {
   vi.clearAllMocks()
+  let nextBlob = 0
+  URL.createObjectURL = vi.fn(() => `blob:private-avatar-${++nextBlob}`)
+  URL.revokeObjectURL = vi.fn()
   await supabase.auth.initialize()
   localStorage.setItem('sb-test-auth-token', JSON.stringify(session('a')))
   profiles = Object.fromEntries(['a', 'b'].map(id => [id, { id: `profile-${id}`, user_id: id, role: 'parent',
@@ -57,6 +62,10 @@ beforeEach(async () => {
   requests = []
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   server.use(
+    http.get(`${url}/storage/v1/object/avatars/:id`, ({ request }) => {
+      requests.push({ method: 'GET', path: 'avatar', authorization: request.headers.get('Authorization') })
+      return new HttpResponse(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'image/png' } })
+    }),
     http.get(`${url}/auth/v1/user`, ({ request }) => HttpResponse.json(user(request.headers.get('Authorization')?.includes('token-b') ? 'b' : 'a'))),
     http.post(`${url}/auth/v1/token`, () => HttpResponse.json(session('b'))),
     http.post(`${url}/auth/v1/logout`, ({ request }) => {
@@ -81,7 +90,13 @@ beforeEach(async () => {
     http.get(`${url}/rest/v1/player_parent_links`, () => HttpResponse.json([])),
   )
 })
-afterEach(() => { cleanup(); client.clear(); vi.restoreAllMocks() })
+afterEach(() => {
+  cleanup(); client.clear(); vi.restoreAllMocks()
+  for (const [key, descriptor] of [['createObjectURL', originalCreateObjectURL], ['revokeObjectURL', originalRevokeObjectURL]] as const) {
+    if (descriptor) Object.defineProperty(URL, key, descriptor)
+    else Reflect.deleteProperty(URL, key)
+  }
+})
 
 function mount() {
   return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/settings']}><AuthProvider>
@@ -128,7 +143,7 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
   })
 
   it('clears A photo and draft on a real SDK A-to-B transition, and clears same-account null avatars', async () => {
-    mount(); await ready(); expect(screen.getByAltText('Profile')).toHaveAttribute('src', profiles.a.avatar_url)
+    mount(); await ready(); await waitFor(() => expect(screen.getByAltText('Profile').getAttribute('src')).toMatch(/^blob:/))
     profiles.a.avatar_url = null
     fireEvent.click(screen.getByRole('button', { name: 'Refresh profile' }))
     await waitFor(() => expect(screen.queryByAltText('Profile')).not.toBeInTheDocument())
@@ -350,5 +365,89 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     profiles.a = original
     fireEvent.click(screen.getByRole('button', { name: 'Retry setup' }))
     await ready()
+  })
+})
+
+
+describe('private avatar regressions', () => {
+  it.each(['parent', 'player', 'coach', 'club'] as const)('downloads the %s photo with its own token instead of rendering a public URL', async role => {
+    profiles.a.role = role;
+    mount(); await ready();
+    await waitFor(() => expect(screen.getByAltText('Profile').getAttribute('src')).toMatch(/^blob:/));
+    expect(requests.filter(r => r.path === 'avatar')).toEqual([{ method: 'GET', path: 'avatar', authorization: 'Bearer token-a' }]);
+  });
+  it('shows retry on a denied private read and recovers without hiding the failure as an empty avatar', async () => {
+    let fail = true;
+    server.use(http.get(`${url}/storage/v1/object/avatars/a`, () => fail
+      ? HttpResponse.json({ message: 'denied' }, { status: 403 })
+      : new HttpResponse(new Uint8Array([1]), { headers: { 'Content-Type': 'image/png' } })));
+    mount(); await ready();
+    await screen.findByRole('button', { name: 'Retry profile photo' });
+    expect(screen.queryByAltText('Profile')).not.toBeInTheDocument();
+    fail = false; fireEvent.click(screen.getByRole('button', { name: 'Retry profile photo' }));
+    await waitFor(() => expect(screen.getByAltText('Profile').getAttribute('src')).toMatch(/^blob:/));
+  });
+  it('ignores a delayed A image after switching to B and releases visible blob URLs', async () => {
+    const held = deferred(); let started = false;
+    server.use(http.get(`${url}/storage/v1/object/avatars/a`, async () => { started = true; await held.promise;
+      return new HttpResponse(new Uint8Array([1]), { headers: { 'Content-Type': 'image/png' } }); }));
+    mount(); await ready(); await waitFor(() => expect(started).toBe(true));
+    await switchToB(); await act(async () => { held.resolve(); await held.promise; });
+    expect(screen.queryByAltText('Profile')).not.toBeInTheDocument();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+  it('does not persist a public or signed URL after an acknowledged upload', async () => {
+    server.use(http.post(`${url}/storage/v1/object/avatars/a`, () => HttpResponse.json({ Key: 'avatars/a' })));
+    const { container } = mount(); await ready();
+    await screen.findByAltText('Profile');
+    const original = screen.getByAltText('Profile').getAttribute('src');
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(['image'], 'photo.png', { type: 'image/png' })] } });
+    await waitFor(() => expect(messages.success).toHaveBeenCalledWith('Profile photo updated'));
+    expect(profiles.a.avatar_url).toMatch(/^avatars\/a\?v=\d+$/);
+    await waitFor(() => expect(screen.getByAltText('Profile').getAttribute('src')).not.toBe(original));
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(original);
+  });
+});
+
+
+describe('private photo content and lifecycle', () => {
+  it.each([
+    ['empty', new Uint8Array(), 'image/png'],
+    ['oversized', new Uint8Array(5 * 1024 * 1024 + 1), 'image/png'],
+    ['unsupported', new Uint8Array([1]), 'image/svg+xml'],
+  ] as const)('rejects %s downloads before displaying them', async (_label, bytes, mime) => {
+    server.use(http.get(`${url}/storage/v1/object/avatars/a`, () =>
+      new HttpResponse(bytes, { headers: { 'Content-Type': mime } })))
+    mount(); await ready()
+    await screen.findByRole('button', { name: 'Retry profile photo' })
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+    expect(screen.queryByAltText('Profile')).not.toBeInTheDocument()
+  })
+  it('recovers from an image decode error and releases blobs on retry and unmount', async () => {
+    const view = mount(); await ready()
+    const first = await screen.findByAltText('Profile')
+    const firstUrl = first.getAttribute('src')
+    fireEvent.error(first)
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry profile photo' }))
+    const second = await screen.findByAltText('Profile')
+    expect(second.getAttribute('src')).not.toBe(firstUrl)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(firstUrl)
+    const secondUrl = second.getAttribute('src')
+    view.unmount()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(secondUrl)
+  })
+  it.each([
+    ['unsupported', new File(['svg'], 'photo.svg', { type: 'image/svg+xml' }), 'Choose a JPEG, PNG, WebP or GIF image'],
+    ['empty', new File([], 'photo.png', { type: 'image/png' }), 'Choose a non-empty image'],
+    ['oversized', new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'photo.png', { type: 'image/png' }), 'Image must be under 5 MB'],
+  ] as const)('rejects %s uploads before any storage write', async (_label, file, message) => {
+    const uploads = vi.fn(() => HttpResponse.json({ Key: 'avatars/a' }))
+    server.use(http.post(`${url}/storage/v1/object/avatars/a`, uploads))
+    const { container } = mount(); await ready()
+    const input = container.querySelector('input[type="file"]')!
+    fireEvent.change(input, { target: { files: [file] } })
+    await waitFor(() => expect(messages.error).toHaveBeenCalledWith(message))
+    expect(uploads).not.toHaveBeenCalled()
+    expect(requests.filter(r => r.method === 'PATCH')).toEqual([])
   })
 })

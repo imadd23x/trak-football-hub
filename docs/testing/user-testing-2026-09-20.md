@@ -4,7 +4,7 @@ Source: Imad's `trak_use_cases_and_testing.md`, read September 20, 2026. This tr
 
 ## Decisions and priority
 
-**Latest September 20 decision:** the source document's **Trak Architecture for Academy, Coach, Player, and Parent Sign Up** section controls signup/invitations. This supersedes the earlier deferral of payment-triggered household activation, one shared household login and parent-created child usernames. Conflicting observations elsewhere do not override it. See [the controlling architecture and acceptance plan](../plans/academy-led-admission.md). The free-pilot payment/waiver question is pending; no answer is assumed. Removing a signup screen alone does not enforce admission at the backend.
+**Latest September 20 decision:** the source document's **Trak Architecture for Academy, Coach, Player, and Parent Sign Up** section controls signup/invitations. This supersedes the earlier deferral of payment-triggered household activation, one shared household login and parent-created child usernames. Conflicting observations elsewhere do not override it. See [the controlling architecture and acceptance plan](../plans/academy-led-admission.md). Imad confirmed fully waived academy enrolment for the entire pilot: no payments now or later, no billing integration or automatic conversion. Academy approval replaces the payment trigger while preserving household activation and consent. Removing a signup screen alone does not enforce admission at the backend.
 
 Under-18 approval in Greece and UAE is a Trak pilot policy pending legal review. No waiver, invitation or payment flow by itself establishes legal compliance. Existing independent-guardian consent behavior must be reconciled with the new household identity before release; do not silently rewrite historical guardian evidence. Private coach notes stay private unless explicitly shared.
 
@@ -69,7 +69,7 @@ Status **reported** means not yet reproduced in this branch. **Related** means e
 | UT-38 | Show evolution Series 2 lifecycle | Verification request; player/Tarek | Deterministic synthetic progression produces next series; inspect card history without rewriting real records |
 | UT-39 | Personalized confirmation-email greeting | Requested; auth/Imad | Escaped name, safe missing-name fallback, correct recipient/action for all roles; template change needs production approval |
 | UT-40 | Player recent matches potentially redundant | Suggestion; player/Tarek | Decide simplification; match-history route remains discoverable |
-| UT-41 | Payment webhook, one household login, child username/password, payment-lapse suspension | Authoritative architecture per latest Imad clarification; supersedes earlier deferral | Implement the academy-led admission plan; free-pilot payment/waiver decision pending. No public role self-registration or arbitrary coach roster admission |
+| UT-41 | Academy-approved waived enrolment, one household login, child username/password and consent-based access | Authoritative architecture per latest Imad clarification; payment trigger explicitly replaced for the free pilot | Implement the academy-led admission plan. No pilot payments now/later, payment details, billing integration or automatic conversion. No public role self-registration or arbitrary coach roster admission |
 
 ## Dependencies and next execution
 
@@ -116,3 +116,5 @@ Next priorities remain UT-21/22 shared-phone and confirmation behavior, UT-14 co
 ## Architecture clarification supersedes earlier signup assumptions
 
 Imad has now explicitly selected the architecture section over conflicting signup/invitation observations. The earlier free-pilot invitation-only deferral is historical, not the current instruction. PR #73 is held as a draft/transitional fix; its passing tests do not establish the target admission model. Password visibility, truthful errors, private avatars and record details remain applicable where they fit the new flow. The rest of the testing list remains active; only contradictory signup/admission requirements are superseded.
+
+Pilot enrolment decision resolved: fully waived academy-approved enrolment; no payments now or later for the pilot. The pilot exists to collect data/feedback. Do not introduce billing or treat a waived enrolment as a deferred charge.

@@ -6,16 +6,14 @@ Decision: Imad's September 20 clarification makes the section **“Trak Architec
 
 1. Platform owners provision academy administrators and send single-use activation links. There is no public administrator self-registration.
 2. Academy administrators invite coaches by email. Activation uses an expiring, single-use token bound to the recipient, role and academy. A coach cannot self-select an academy or join by a shared code.
-3. An academy enrolment/payment page collects the parent's name/email and children's names/DOBs. A verified successful payment webhook establishes eligibility and provisions one household account, then sends its single-use activation link. The household uses one shared login, as requested. Public parent/player self-registration is replaced.
+3. For this pilot, an academy-approved, fully waived enrolment establishes eligibility, provisions one household account and sends its single-use activation link. Collect the parent's name/email and children's names/DOBs without payment details. The household uses one shared login, as requested. Public parent/player self-registration is replaced.
 4. The household must complete the consent gate before accessing the ordinary dashboard or creating a child's login. The parent creates a child username/password; a child email is not required.
 5. The academy assigns eligible, consented children to coaches. Coaches select stable player identities from their assigned academy roster; arbitrary name-only development profiles are not admitted.
-6. Consent withdrawal or payment lapse suspends the affected child's access. This must apply to existing sessions and backend operations, not only the sign-in screen. Preserve records and decision history according to the separately reviewed retention requirements.
+6. Consent withdrawal suspends the affected child's access. This must apply to existing sessions and backend operations, not only the sign-in screen. Access also requires valid academy enrolment. Preserve records and decision history according to the separately reviewed retention requirements. There is no payment-lapse condition in this free pilot.
 
-## One immediate product question pending
+## Resolved pilot enrolment decision
 
-The pilot was previously free, while the now-controlling architecture requires payment before household activation. Imad has been asked whether the pilot should use an explicitly academy-approved, fully waived enrolment through the same activation/consent flow, or require an actual successful payment. Neither is assumed approved while the answer is pending. Implementation of payment-dependent admission waits for that answer; recipient-bound staff invitations, household/child boundaries and roster design can proceed independently.
-
-The reference to Stripe is an example, not a selected provider, merchant account or charge authorization. No real charges, provider changes or production migrations are authorized merely by this document.
+Imad confirmed: **“Full waived academy enrollment. No payments later, the pilot is simply to collect data/feedback.”** The entire pilot is free. There are no deferred charges, payment details, billing provider integration, payment webhooks or automatic conversion to a paid plan. Do not build a “charge later” path. Academy approval of the waived enrolment replaces the document's payment trigger for the pilot; all household activation, consent, child credentials and academy assignment requirements still apply. Future commercial billing requires a separate instruction and is not assumed here.
 
 ## Current implementation and implications
 
@@ -28,10 +26,10 @@ The reference to Stripe is an example, not a selected provider, merchant account
 
 ## Implementation sequence and acceptance
 
-1. Define admission states and server authority: owner/academy staff invitation, household eligibility/activation, child registration, consent and squad assignment. Keep minimal registration data separate from development access. Test that callers cannot forge roles, academy IDs, payment status or assignments.
+1. Define admission states and server authority: owner/academy staff invitation, household eligibility/activation, child registration, consent and squad assignment. Keep minimal registration data separate from development access. Test that callers cannot forge roles, academy IDs, waived-enrolment approval or assignments.
 2. Implement staff invitations and remove public coach/admin provisioning. Test recipient verification, expiry, single use, repeat clicks, wrong-role sessions and cross-academy attempts using real database roles and intercepted browser journeys.
-3. Implement idempotent enrolment and household activation after the pilot decision. Authenticate webhook signatures and deduplicate event/enrolment IDs; a return URL alone cannot grant access. Exercise duplicate, delayed, out-of-order and failed requests. One eligible household can have multiple children without duplicate accounts.
-4. Implement household consent and child credential creation/recovery. Test the required consent gate, independent child credentials, absence of child email, parent-managed reset, wrong-household denial and withdrawal/payment-lapse effects on already issued sessions. Resolve any multi-academy suspension ambiguity explicitly before coding that branch.
+3. Implement academy-approved waived enrolment and household activation. Only the authorised academy may approve enrolment; public forms, redirects or client-supplied eligibility flags cannot grant access. Deduplicate enrolment/activation requests and exercise duplicate, delayed and failed requests. One eligible household can have multiple children without duplicate accounts. Collect no payment details and schedule no charges.
+4. Implement household consent and child credential creation/recovery. Test the required consent gate, independent child credentials, absence of child email, parent-managed reset, wrong-household denial and withdrawal/enrolment-revocation effects on already issued sessions. Resolve any multi-academy suspension ambiguity explicitly before coding that branch.
 5. Implement academy assignment and coach selectors. Test that only eligible children appear, another academy cannot assign/read/write them, reassignment preserves history and departed coaches lose access.
 6. Migrate existing users deliberately and replace legacy routes/callers. Test all four roles with two academies, multiple children and shared devices; preserve private/shared feedback boundaries and history. Remaining non-auth observations in the testing inventory stay active.
 

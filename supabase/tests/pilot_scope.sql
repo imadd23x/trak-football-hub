@@ -181,6 +181,66 @@ SELECT pg_temp.sassert(
   'D3 pilot_rating_agreement_derived evaluates under a non-NULL org_id');
 
 
+-- ── E. The week window is configuration, and a stale one empties it ─
+-- 20260901000003 seeds pilot_config with `starts_on = CURRENT_DATE`, so the row
+-- records when the migration ran rather than when the pilot begins. On the live
+-- project that makes it 22 July, which puts 25 September in week 10 of a window
+-- that stops at week 8.
+--
+-- Nothing here can read the live value: a disposable database seeds starts_on to
+-- today and is therefore always correct. What these assertions pin is the
+-- COUPLING — that the scorecard's entire content depends on this one row, and
+-- that a stale value empties it SILENTLY rather than failing. That is the part
+-- worth protecting, because an empty scorecard on day one reads as "no data yet"
+-- and is indistinguishable from the thing you would expect to see anyway.
+
+INSERT INTO public.telemetry_events (user_id, role, event_type, created_at) VALUES
+  (pg_temp.sid(4), 'player', 'opened_app', now()),
+  (pg_temp.sid(4), 'player', 'opened_app', now() + interval '8 days');
+
+UPDATE public.pilot_config SET starts_on = CURRENT_DATE WHERE id;
+
+-- E0 is the control E2 needs. "The view is empty" is satisfied by a view that
+-- was never populated, so prove it holds rows before proving the date empties it.
+SELECT pg_temp.sassert(
+  (SELECT count(*) FROM public.pilot_retention) > 0,
+  'E0-control pilot_retention returns rows when starts_on is the true start date',
+  (SELECT count(*)::text FROM public.pilot_retention));
+
+SELECT pg_temp.sassert(
+  public.pilot_week(now()) = 1,
+  'E1 day one is week 1 when starts_on is the true start date',
+  public.pilot_week(now())::text);
+
+-- Nine weeks stale reproduces the live offset: 22 July against a 25 September
+-- start is week 10, one clear of the eight-week window.
+UPDATE public.pilot_config SET starts_on = CURRENT_DATE - 63 WHERE id;
+
+SELECT pg_temp.sassert(
+  public.pilot_week(now()) > (SELECT weeks FROM public.pilot_config WHERE id),
+  'E2 a stale starts_on puts today past the end of its own reporting window',
+  public.pilot_week(now())::text || ' > ' || (SELECT weeks::text FROM public.pilot_config WHERE id));
+
+SELECT pg_temp.sassert(
+  (SELECT count(*) FROM public.pilot_retention) = 0,
+  'E3 and empties pilot_retention entirely — scorecard metrics 6 and 7 vanish',
+  (SELECT count(*)::text FROM public.pilot_retention));
+
+SELECT pg_temp.sassert(
+  (SELECT count(*) FROM public.pilot_scorecard WHERE player_return_pct IS NOT NULL
+                                                  OR parent_return_pct IS NOT NULL) = 0,
+  'E4 taking the scorecard''s retention columns with it');
+
+-- The silence is the finding. If this ever starts failing because the scorecard
+-- errors or returns nothing at all, that is an improvement, not a regression.
+SELECT pg_temp.sassert(
+  (SELECT count(*) FROM public.pilot_scorecard) = (SELECT weeks FROM public.pilot_config WHERE id),
+  'E5 while still returning a full set of rows, which is why this fails silently',
+  (SELECT count(*)::text FROM public.pilot_scorecard));
+
+UPDATE public.pilot_config SET starts_on = CURRENT_DATE WHERE id;
+
+
 -- ── Report ──────────────────────────────────────────────────
 DO $test$
 DECLARE failures text; n_passed int; total int;

@@ -15,6 +15,9 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 // Lazy-loaded routes — split bundles so navigating between sections is fast
+const StaffActivation = lazy(() => import("./pages/StaffActivation"));
+const StaffInvitations = lazy(() => import("./pages/StaffInvitations"));
+const StaffInviteRequired = lazy(() => import("./pages/StaffInviteRequired"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const ParentInfoPage = lazy(() => import("./pages/ParentInfoPage"));
 const ParentOnboarding = lazy(() => import("./pages/ParentOnboarding"));
@@ -98,6 +101,10 @@ const App = () => (
             <Route path="/" element={<LandingPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/auth/confirm" element={<AuthConfirm />} />
+            <Route path="/staff-invite" element={<StaffActivation />} />
+            <Route path="/staff/invitations" element={<StaffInvitations />} />
+            <Route path="/onboarding/coach" element={<StaffInviteRequired />} />
+            <Route path="/onboarding/club" element={<StaffInviteRequired />} />
             <Route path="/onboarding/:role" element={<OnboardingPage />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/parent-info" element={<ParentInfoPage />} />

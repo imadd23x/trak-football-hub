@@ -87,7 +87,10 @@ const discardLegacyPendingProfile = () => {
 
 const readPendingProfileFromMetadata = (user: User): PendingProfileData | null => {
   const metadata = user.user_metadata as Record<string, unknown> | undefined;
-  return parsePendingProfile(metadata?.trak_onboarding);
+  const pending = parsePendingProfile(metadata?.trak_onboarding);
+  // Staff roles come only from the recipient-bound academy invitation RPC.
+  // Old editable metadata must not provision or repair a staff identity.
+  return pending?.role === 'coach' || pending?.role === 'club' ? null : pending;
 };
 
 async function writeProfileFromPendingData(
@@ -95,9 +98,9 @@ async function writeProfileFromPendingData(
   data: PendingProfileData,
   isCurrent: () => boolean,
 ): Promise<Profile | null> {
-  // All provisioning happens server-side in ONE atomic SECURITY DEFINER RPC.
-  // This fixes: club profile creation (blocked by RLS for direct inserts),
-  // player→coach linking, parent→child linking, and partial-failure states.
+  // Legacy parent/player provisioning uses one atomic server-side RPC. Staff use verified invitations.
+  // It handles legacy player→coach and parent→child linking atomically while
+  // household enrolment is being integrated. It must not create staff identities.
   if (!isCurrent()) return null;
   const { data: result, error } = await account.client.rpc('provision_my_profile' as any, {
     p: data as unknown as Record<string, unknown>,

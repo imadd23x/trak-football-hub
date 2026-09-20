@@ -21,14 +21,24 @@ const mutations = [
   ['academy authority', "o.id=p_org AND o.admin_user_id=p_issuer FOR SHARE", "o.id=p_org FOR SHARE", 'cross academy invite'],
 ];
 
-async function database(mode) {
+const deliveryMigration = '20260920114801_staff_invitation_delivery.sql';
+const deliveryMutations = [
+  ['recipient-scoped inspection', 'OR actor_email<>invite.recipient_email', '', 'wrong recipient sees no activation details'],
+  ['verified inspection', 'WHERE id=actor AND email_confirmed_at IS NOT NULL;', 'WHERE id=actor;', 'unverified recipient sees no activation details'],
+  ['duplicate dispatch', "'dispatch',false,'delivery_state',invite.delivery_state", "'dispatch',true,'delivery_state',invite.delivery_state", 'duplicate claim never dispatches'],
+  ['provider receipt binding', 'AND delivery_attempt_id=p_attempt_id FOR UPDATE', 'AND p_attempt_id IS NOT NULL FOR UPDATE', 'wrong receipt denied'],
+  ['provider receipt privileges', 'public.finish_staff_invite_delivery(uuid,uuid,text) TO service_role;', 'public.finish_staff_invite_delivery(uuid,uuid,text) TO service_role,authenticated;', 'issuer cannot forge provider success'],
+  ['daily email allowance', "AT TIME ZONE 'UTC'))>=50", "AT TIME ZONE 'UTC'))>=500", 'daily email allowance enforced'],
+];
+
+async function database(mode, targetMigration = migration) {
   const db = new PGlite();
   try {
     await db.exec(await read('supabase/tests/bootstrap.sql'));
     for (const file of validateMigrationFiles(await readdir(resolve(root, 'supabase/migrations')))) {
-      if (mode === 'baseline' && file === migration) continue;
+      if (mode === 'baseline' && file >= migration) continue;
       let sql = await read('supabase/migrations/' + file);
-      if (file === migration && Array.isArray(mode)) {
+      if (file === targetMigration && Array.isArray(mode)) {
         assert.equal(sql.split(mode[1]).length, 2, 'mutation must target exactly one runtime expression');
         sql = sql.replace(mode[1], mode[2]);
       }
@@ -55,6 +65,19 @@ for (const mutation of mutations) {
     const db = await database(mutation);
     try {
       await assert.rejects(db.exec(await read('supabase/tests/staff_admission.sql')), error => {
+        assert.equal(error.message, 'Staff admission assertions failed');
+        assert.ok(error.detail.split('\n').includes(mutation[3]), error.detail);
+        return true;
+      });
+    } finally { await db.close(); }
+  });
+}
+
+for (const mutation of deliveryMutations) {
+  test('delivery runtime mutation is detected: ' + mutation[0], async () => {
+    const db = await database(mutation, deliveryMigration);
+    try {
+      await assert.rejects(db.exec(await read('supabase/tests/staff_delivery.sql')), error => {
         assert.equal(error.message, 'Staff admission assertions failed');
         assert.ok(error.detail.split('\n').includes(mutation[3]), error.detail);
         return true;

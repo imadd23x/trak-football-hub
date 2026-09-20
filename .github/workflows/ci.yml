@@ -65,6 +65,9 @@ jobs:
       - name: Database security regressions
         run: npm run test:db
 
+      - name: Staff edge-function entry point
+        run: npx --yes deno@2.9.6 check --no-config --no-lock supabase/functions/send-staff-invite/index.ts
+
       - name: Staff admission regression controls
         run: npm run test:staff-guards
 
@@ -97,7 +100,7 @@ jobs:
       - name: Install test browser
         run: npx playwright install --with-deps chromium
 
-      - name: Parent invitation browser regressions
+      - name: Parent and staff invitation browser regressions
         run: npx playwright test --config playwright.pilot.config.ts
 
     env:
@@ -211,7 +214,7 @@ jobs:
           supabase db push --db-url "$DB_URL" --include-all --dry-run
           supabase db push --db-url "$DB_URL" --include-all
 
-      # Deploys all four functions. Values come from supabase/config.toml, so
+      # Deploys all functions. Values come from supabase/config.toml, so
       # that file is the source of truth for verify_jwt \u2014 not the dashboard.
       - name: Deploy edge functions
         run: supabase functions deploy --project-ref "$PROJECT_ID"

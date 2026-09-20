@@ -1,6 +1,6 @@
 project_id = "xbykbqolvqyqmipikuae"
 
-# All four functions are declared explicitly. `supabase functions deploy` applies
+# All functions are declared explicitly. `supabase functions deploy` applies
 # what is written here, so anything left out silently falls back to the CLI
 # default (verify_jwt = true) and a deploy can flip a setting that was changed in
 # the dashboard. Declaring every function keeps this file the source of truth.
@@ -28,4 +28,9 @@ verify_jwt = true
 # Invoked via supabase.functions.invoke(), which forwards the caller's session
 # JWT; the body then re-reads it and uses the service role for the invite itself.
 [functions.send-parent-invite]
+verify_jwt = true
+
+# Staff email issuance/claim use the verified caller's JWT. The service key
+# only delivers Auth mail and records the opaque delivery-attempt outcome.
+[functions.send-staff-invite]
 verify_jwt = true

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { ClubShell, ClubHeader, ClubCard, SectionLabel } from '@/components/club/ClubShell'
 import { supabase } from '@/integrations/supabase/client'
@@ -134,12 +135,13 @@ export default function ClubCoaches() {
     <ClubShell>
       <ClubHeader club={clubName} coaches={coaches.length} />
 
+      <Link to="/staff/invitations" className="inline-flex min-h-11 items-center text-primary mb-4">Invite a coach</Link>
       <SectionLabel>Connected Coaches</SectionLabel>
       <div className="mt-3 mb-6 space-y-3">
         {loading ? (
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>Loading…</div>
         ) : coaches.length === 0 ? (
-          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>No coaches connected yet. Share your academy code from your profile page.</div>
+          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>No coaches connected yet. Send a personal invitation to get started.</div>
         ) : (
           coaches.map(c => (
             <ClubCard key={c.userId} className="p-4">

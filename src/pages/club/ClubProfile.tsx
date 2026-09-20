@@ -1,21 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Settings as SettingsIcon, Copy, Check } from 'lucide-react'
+import { ChevronRight, Settings as SettingsIcon } from 'lucide-react'
 import { ClubShell, ClubCard, SectionLabel } from '@/components/club/ClubShell'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/integrations/supabase/client'
 import { IconHowItWorks } from '@/components/icons/TrakIcons'
-import { toast } from 'sonner'
 
 export default function ClubProfile() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
 
   const [orgName, setOrgName] = useState<string | null>(null)
-  const [joinCode, setJoinCode] = useState<string | null>(null)
   const [coachCount, setCoachCount] = useState(0)
   const [playerCount, setPlayerCount] = useState(0)
-  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (user) loadOrg()
@@ -24,14 +21,13 @@ export default function ClubProfile() {
   const loadOrg = async () => {
     const { data: org } = await supabase
       .from('organizations')
-      .select('id, name, join_code')
+      .select('id, name')
       .eq('admin_user_id', user!.id)
       .maybeSingle()
 
     if (!org) return
 
     setOrgName(org.name)
-    setJoinCode(org.join_code)
 
     // Count coaches in this org
     const { data: coaches } = await supabase
@@ -48,14 +44,6 @@ export default function ClubProfile() {
         .in('coach_user_id', coachIds)
       setPlayerCount(squad?.length ?? 0)
     }
-  }
-
-  const copyCode = () => {
-    if (!joinCode) return
-    navigator.clipboard.writeText(`TRK-${joinCode}`)
-    setCopied(true)
-    toast.success('Academy code copied')
-    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -125,28 +113,11 @@ export default function ClubProfile() {
         </ClubCard>
       )}
 
-      {/* Academy Join Code */}
-      {joinCode && (
-        <ClubCard className="p-5 mb-5">
-          <SectionLabel>Academy Join Code</SectionLabel>
-          <p className="mt-1" style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-            Share this code with coaches so they can join your academy.
-          </p>
-          <button
-            onClick={copyCode}
-            className="mt-3 w-full flex items-center justify-between px-4 py-3 rounded-[12px] transition-colors"
-            style={{ background: 'rgba(200,242,90,0.06)', border: '1px solid rgba(200,242,90,0.2)' }}
-          >
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 18, fontWeight: 500, color: '#C8F25A', letterSpacing: '0.08em' }}>
-              TRK-{joinCode}
-            </span>
-            {copied
-              ? <Check size={18} style={{ color: '#C8F25A' }} />
-              : <Copy size={18} style={{ color: 'rgba(200,242,90,0.5)' }} />
-            }
-          </button>
-        </ClubCard>
-      )}
+      <ClubCard className="p-5 mb-5">
+        <SectionLabel>Staff invitations</SectionLabel>
+        <p className="mt-2 text-sm text-muted-foreground">Invite coaches with a personal activation link.</p>
+        <button onClick={() => navigate('/staff/invitations')} className="mt-3 min-h-11 text-primary">Manage staff invitations</button>
+      </ClubCard>
 
       {/* Nav rows */}
       <div className="space-y-2.5 mb-8">

@@ -143,7 +143,7 @@ def main() -> None:
                 assert migration_sql.count(target) == 1
                 migration_sql = migration_sql.replace(target, '')
             sql(migration_sql)
-        for suite in ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'staff_admission.sql']:
+        for suite in ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'staff_admission.sql', 'staff_delivery.sql']:
             sql("SET trak.test_database='disposable';\n" + (ROOT / 'supabase/tests' / suite).read_text())
             print('Native suite passed:', suite, flush=True)
         for user in range(1, 31):
@@ -206,7 +206,23 @@ def main() -> None:
         assert result.returncode == 0, result.stderr
         assert sql(f"SELECT count(*) FROM public.organizations WHERE admin_user_id='{identity(15)}';").stdout.strip() == '1'
         assert sql("SELECT count(*) FROM trak_admission.staff_capabilities;").stdout.strip() == '0'
-        print('Passed: 10 native staff-admission races; all four SQL suites.', flush=True)
+        prepare = issue(25, 420).replace('issue_staff_invite', 'prepare_staff_invite_email')
+        result = race(prepare, 2, prepare, 2, 'duplicate-email-request')
+        assert result.returncode == 0 and response(result.stdout)['replayed'] is True, result.stderr
+        assert 'token' not in response(result.stdout)
+        assert sql(f"SELECT count(*) FROM trak_admission.staff_invites WHERE recipient_email='race-25@test.invalid';").stdout.strip() == '1'
+
+        first_prepare = issue(26, 421).replace('issue_staff_invite', 'prepare_staff_invite_email')
+        replacement = issue(26, 422).replace('issue_staff_invite', 'prepare_staff_invite_email')
+        denied(race(first_prepare, 2, replacement, 2, 'email-resend-allowance'), 'P0001')
+        assert sql("SELECT count(*) FROM trak_admission.staff_invites WHERE recipient_email='race-26@test.invalid' AND state='pending';").stdout.strip() == '1'
+        assert sql(f"SELECT count(*) FROM trak_admission.staff_invites WHERE request_id='{identity(422)}';").stdout.strip() == '0'
+
+        invite = call(2, issue(27, 423))
+        revoke = f"SELECT public.revoke_staff_invite('{invite['invitation_id']}');"
+        claim = f"SELECT public.claim_staff_invite_delivery('{invite['invitation_id']}','{invite['token']}');"
+        denied(race(revoke, 2, claim, 2, 'revoke-before-email-claim'))
+        print('Passed: 13 native staff-admission/delivery races; all five SQL suites.', flush=True)
     finally:
         if started:
             run([str(pg / 'pg_ctl'), '-D', str(scratch / 'data'), '-m', 'fast', '-w', 'stop'])

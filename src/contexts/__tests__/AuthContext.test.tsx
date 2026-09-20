@@ -315,3 +315,20 @@ describe('account-bound onboarding and auth lifecycle', () => {
     expect(localStorage.getItem('trak_pending_profile')).toBeNull()
   })
 })
+
+describe('academy-led staff admission', () => {
+  it.each(['coach', 'club'])('does not provision a %s role from user-editable onboarding metadata', async role => {
+    api.session = session('staff', { role, full_name: 'Untrusted staff name', nationality: null })
+    api.lookup.mockResolvedValue({ data: null, error: null })
+    mount()
+    await screen.findByLabelText('Unsubmitted assessment')
+    expect(api.provision).not.toHaveBeenCalled()
+  })
+  it('does not replay legacy staff metadata over an admitted coach profile', async () => {
+    api.session = session('staff', { role: 'coach', full_name: 'Old draft', coach_details: { academy_code: 'OLD' } })
+    api.lookup.mockResolvedValue({ data: { ...profile('staff'), role: 'coach' }, error: null })
+    mount()
+    await screen.findByLabelText('Unsubmitted assessment')
+    expect(api.provision).not.toHaveBeenCalled()
+  })
+})

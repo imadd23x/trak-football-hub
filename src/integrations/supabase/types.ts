@@ -754,6 +754,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      issue_staff_invite: {
+        Args: { p_request_id: string; p_role: string; p_email: string; p_organization_id?: string | null; p_academy_name?: string | null }
+        Returns: Json
+      }
+      prepare_staff_invite_email: {
+        Args: { p_request_id: string; p_role: string; p_email: string; p_organization_id?: string | null; p_academy_name?: string | null }
+        Returns: Json
+      }
+      accept_staff_invite: {
+        Args: { p_token: string; p_full_name: string }
+        Returns: Json
+      }
+      inspect_staff_invite: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      revoke_staff_invite: {
+        Args: { p_invitation_id: string }
+        Returns: undefined
+      }
+      staff_invitation_context: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      staff_invite_delivery_status: {
+        Args: { p_invitation_id: string }
+        Returns: Json
+      }
+      claim_staff_invite_delivery: {
+        Args: { p_invitation_id: string; p_token: string }
+        Returns: Json
+      }
+      finish_staff_invite_delivery: {
+        Args: { p_invitation_id: string; p_attempt_id: string; p_outcome: string }
+        Returns: undefined
+      }
       create_parent_invite: {
         Args: { p_email: string }
         Returns: {

@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "test": "vitest run src",
     "test:findings": "TRAK_FINDINGS=1 vitest run src/__tests__/player-surface-findings.test.ts",
+    "test:consent-timezones": "node scripts/test-consent-timezones.mjs",
     "test:db": "node scripts/test-db.mjs",
     "test:db:pilot-views": "node scripts/test-db.mjs --pilot-views-review",
     "test:watch": "vitest",

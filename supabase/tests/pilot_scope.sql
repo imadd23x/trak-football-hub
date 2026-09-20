@@ -238,7 +238,27 @@ SELECT pg_temp.sassert(
   'E5 while still returning a full set of rows, which is why this fails silently',
   (SELECT count(*)::text FROM public.pilot_scorecard));
 
+-- E6 is Kostas's sharpening of E4, and it is the more accurate statement of the
+-- defect. The metrics are not NULL for the pilot's weeks; the pilot's weeks are
+-- ABSENT. pilot_scorecard is generate_series(1, weeks), so a reader sees rows
+-- 1..8 carrying nulls and concludes "early days", when in fact the activity sits
+-- at week 9+ and there is no row describing it at all. Asserting the absence
+-- says what is wrong; asserting the nulls only says what is visible.
+SELECT pg_temp.sassert(
+  NOT EXISTS (SELECT 1 FROM public.pilot_scorecard WHERE week = public.pilot_week(now())),
+  'E6 and the week the activity actually falls in is absent from the scorecard entirely',
+  'activity is in week ' || public.pilot_week(now())::text
+    || '; scorecard covers weeks 1..' || (SELECT weeks::text FROM public.pilot_config WHERE id));
+
 UPDATE public.pilot_config SET starts_on = CURRENT_DATE WHERE id;
+
+-- The positive half of E6: once starts_on is right, the week the activity falls
+-- in IS among the rows. Without this, E6 is satisfied by a scorecard that never
+-- contains any week at all.
+SELECT pg_temp.sassert(
+  EXISTS (SELECT 1 FROM public.pilot_scorecard WHERE week = public.pilot_week(now())),
+  'E7-control and present once starts_on is the true start date',
+  'activity is in week ' || public.pilot_week(now())::text);
 
 
 -- ── Report ──────────────────────────────────────────────────

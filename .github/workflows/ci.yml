@@ -24,6 +24,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      staff-postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-staff-test
+          POSTGRES_DB: trak_staff_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d trak_staff_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +64,16 @@ jobs:
 
       - name: Database security regressions
         run: npm run test:db
+
+      - name: Staff admission regression controls
+        run: npm run test:staff-guards
+
+      - name: Native staff admission concurrency
+        run: npm run test:staff-native -- --existing-local
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGPASSWORD: synthetic-staff-test
 
       - name: Parent migration after deployed reporting migration
         run: npm run test:db -- --parent-upgrade-review

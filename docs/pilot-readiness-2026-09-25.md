@@ -4,6 +4,10 @@ This is the current delivery scope. Source code and recorded deployment/runtime 
 
 Source: [Imad's September 18 Slack plan](https://trakfootball.slack.com/archives/C0BLW846732/p1789675494856059). Correct repository: `kostasanastasioubusiness-lang/trak-football-hub`; initial implementation baseline `1fcb9238`. `t-bones29/trak-football-hub` is an outdated copy. Deployment: `trakfootball.com`, Supabase project `xbykbqolvqyqmipikuae`.
 
+## September 20 admission update
+
+The [academy-led admission decision](plans/academy-led-admission.md) now governs signup and invitations: owner-issued academy activation, academy-invited coaches, fully waived household enrolment, consent before child usernames/access, and academy assignment to squads. No payments or later charges. Legacy player self-registration, shared-code admission, independent parent onboarding and manual name-only player creation are paths to replace. The older admission journeys below are historical acceptance context and must be reconciled with that decision; they are not permission to admit real children through legacy paths. The synthetic demonstration and real-child gates remain separate.
+
 ## Confirmed decisions
 
 - September 25 is a phone demonstration with synthetic accounts. Real-child admission is a separate gate below.

@@ -21,6 +21,7 @@ vi.mock('@/contexts/AuthContext', () => ({
     refreshProfile: vi.fn(),
   }),
 }))
+vi.mock('@/lib/password-recovery', () => ({ checkPasswordAccount: async () => ({ id: 'settings-user', email: 'settings@example.test' }) }))
 vi.mock('@/lib/settings-account', async () => {
   const { supabase } = await import('@/integrations/supabase/client')
   return {
@@ -81,7 +82,7 @@ describe('settings controls reflect supported behavior', () => {
     }))
     mount()
     fireEvent.click(screen.getByRole('button', { name: 'Send reset email' }))
-    await waitFor(() => expect(state.success).toHaveBeenCalledWith('Check your email for a reset link'))
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Password reset request' })).toHaveTextContent('If this email is registered'))
     expect(requests).toEqual([expect.objectContaining({ email: 'settings@example.test' })])
   })
 

@@ -352,3 +352,46 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     await ready()
   })
 })
+
+
+describe('Settings reset email retains its account boundary', () => {
+  it('requests the Auth-verified email and describes an acknowledgement truthfully', async () => {
+    const emails: string[] = []
+    mount(); await ready()
+    server.use(http.get(`${url}/auth/v1/user`, () => HttpResponse.json({ ...user('a'), email: 'verified@family.test' })),
+      http.post(`${url}/auth/v1/recover`, async ({ request }) => { emails.push((await request.json() as { email: string }).email); return HttpResponse.json({}) }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send reset email' }))
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Password reset request' })).toHaveTextContent('If this email is registered'))
+    expect(emails).toEqual(['verified@family.test']); expect(messages.success).not.toHaveBeenCalled()
+  })
+  it('does not send for A after switching to B during verification', async () => {
+    const held = deferred(); let started = false; const emails: string[] = []
+    mount(); await ready()
+    server.use(http.get(`${url}/auth/v1/user`, async ({ request }) => {
+      if (request.headers.get('Authorization') === 'Bearer token-a') { started = true; await held.promise; return HttpResponse.json(user('a')) }
+      return HttpResponse.json(user('b'))
+    }), http.post(`${url}/auth/v1/recover`, async ({ request }) => { emails.push((await request.json() as { email: string }).email); return HttpResponse.json({}) }))
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Send reset email' })); await waitFor(() => expect(started).toBe(true))
+      await switchToB(); await act(async () => held.resolve()); expect(emails).toEqual([])
+      expect(screen.getByRole('button', { name: 'Send reset email' })).toBeEnabled(); expect(messages.error).not.toHaveBeenCalled()
+    } finally { held.resolve() }
+  })
+  it('bounds verification itself so a stalled Auth lookup does not lock every Settings action', async () => {
+    const held = deferred(); let started = false; let aborted = false; let expire: (() => void) | undefined
+    mount(); await ready()
+    const timer = globalThis.setTimeout
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation((handler, milliseconds, ...args) => {
+      if (milliseconds === 20_000 && typeof handler === 'function') expire = () => handler(...args)
+      return timer(handler, milliseconds, ...args)
+    })
+    const recover = vi.fn(() => HttpResponse.json({}))
+    server.use(http.get(`${url}/auth/v1/user`, async ({ request }) => { started = true; request.signal.addEventListener('abort', () => { aborted = true; held.resolve() }); await held.promise; return HttpResponse.json(user('a')) }), http.post(`${url}/auth/v1/recover`, recover))
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Send reset email' })); await waitFor(() => expect(started).toBe(true)); expect(expire).toBeTypeOf('function')
+      await act(async () => expire!()); expect(await screen.findByRole('alert')).toHaveTextContent('check your account'); expect(aborted).toBe(true)
+      expect(screen.getByRole('button', { name: 'Send reset email' })).toBeEnabled(); expect(screen.getByRole('button', { name: 'Synthetic Parent A' })).toBeEnabled()
+      await act(async () => held.resolve()); expect(recover).not.toHaveBeenCalled()
+    } finally { held.resolve() }
+  })
+})

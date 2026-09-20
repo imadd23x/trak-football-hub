@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { ArrowLeft, Pencil, Check, X, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
+import { useResetEmail } from '@/hooks/useResetEmail'
+import { checkPasswordAccount } from '@/lib/password-recovery'
 import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
 import { ParentConnections } from '@/components/parent/ParentConnections'
@@ -29,6 +31,7 @@ function AccountSettings({ userId }: { userId: string }) {
   const navigate = useNavigate()
   const { user, profile, signOut, refreshProfile } = useAuth()
   const role = profile?.role
+  const resetEmail = useResetEmail(`${userId}:${user?.email ?? ''}`)
   const mounted = useRef(false)
   useLayoutEffect(() => {
     mounted.current = true
@@ -155,16 +158,15 @@ function AccountSettings({ userId }: { userId: string }) {
   }
 
   const changePassword = async () => {
-    if (!user?.email || !begin('password')) return
+    if (!begin('password')) return
     try {
-      const account = await getSettingsAccount(userId, isCurrent)
-      const { error } = await supabase.auth.resetPasswordForEmail(account.user.email!, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      await resetEmail.send(async (isActive, signal) => {
+        const account = await checkPasswordAccount(signal)
+        await assertSettingsAccount(userId, () => isCurrent() && isActive())
+        if (account.id !== userId) throw new Error('Your account changed. Please try again.')
+        return account.email ?? ''
       })
-      if (error) throw error
-      if (isCurrent()) toast.success('Check your email for a reset link')
-    } catch { if (isCurrent()) toast.error('Could not send reset email') }
-    finally { finish() }
+    } finally { finish() }
   }
 
   const saveCoachProfile = async () => {
@@ -358,11 +360,12 @@ function AccountSettings({ userId }: { userId: string }) {
           <Row
             label="Password"
             right={
-              <button onClick={changePassword} disabled={!!pending} style={{ fontSize: 13, color: '#C8F25A' }}>
+              <button onClick={changePassword} disabled={!!pending} className="min-h-11 px-2 text-sm text-primary disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 Send reset email
               </button>
             }
           />
+          {resetEmail.feedback.kind !== 'idle' && <p aria-label="Password reset request" role={resetEmail.feedback.kind === 'error' ? 'alert' : 'status'} className="py-3.5 text-sm text-muted-foreground">{resetEmail.feedback.message}</p>}
         </Section>
 
         {roleData === 'loading' && <p role="status" className="text-sm text-muted-foreground mb-4">Loading profile…</p>}

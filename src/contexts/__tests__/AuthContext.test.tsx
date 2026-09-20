@@ -38,6 +38,8 @@ function client(shared: boolean, accessToken?: () => Promise<string>) {
   const current = async () => shared ? api.session : sessions.get(await accessToken!())
   return {
     auth: {
+      initialize: async () => ({ error: null }),
+      stopAutoRefresh: async () => undefined,
       onAuthStateChange: (listener: typeof api.listener) => {
         api.listener = listener
         return { data: { subscription: { unsubscribe: vi.fn() } } }
@@ -49,10 +51,14 @@ function client(shared: boolean, accessToken?: () => Promise<string>) {
       signInWithPassword: vi.fn(),
       signOut: () => api.signOut(),
     },
-    from: () => ({ select: () => ({ eq: (_: string, id: string) => ({
-      maybeSingle: () => api.lookup(id),
-    }) }) }),
-    rpc: async (name: string, payload: unknown) => api.provision((await current())?.user.id, name, payload),
+    from: () => ({ select: () => ({ eq: (_: string, id: string) => {
+      const query = { abortSignal: () => query, retry: () => query, maybeSingle: () => api.lookup(id) }
+      return query
+    } }) }),
+    rpc: (name: string, payload: unknown) => {
+      const request = (async () => api.provision((await current())?.user.id, name, payload))()
+      return Object.assign(request, { abortSignal: () => request })
+    },
     functions: { invoke: async (name: string) => api.invite((await current())?.user.id, name) },
   }
 }

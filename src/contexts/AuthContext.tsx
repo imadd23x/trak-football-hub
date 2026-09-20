@@ -46,6 +46,7 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  profileError: string | null;
   signUp: (email: string, password: string, pendingProfile?: PendingProfileData) => Promise<{ user: User | null; error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: (expectedUserId?: string) => Promise<{ error: Error | null }>;
@@ -97,6 +98,7 @@ async function writeProfileFromPendingData(
   account: OnboardingSession,
   data: PendingProfileData,
   isCurrent: () => boolean,
+  signal: AbortSignal,
 ): Promise<Profile | null> {
   // Legacy parent/player provisioning uses one atomic server-side RPC. Staff use verified invitations.
   // It handles legacy player→coach and parent→child linking atomically while
@@ -104,7 +106,7 @@ async function writeProfileFromPendingData(
   if (!isCurrent()) return null;
   const { data: result, error } = await account.client.rpc('provision_my_profile' as any, {
     p: data as unknown as Record<string, unknown>,
-  });
+  }).abortSignal(signal);
   if (error) throw error;
   if (!isCurrent()) return null;
 
@@ -126,7 +128,7 @@ async function writeProfileFromPendingData(
     let sent = false;
     let detail = '';
     try {
-      const { data: result, error } = await account.client.functions.invoke('send-parent-invite');
+      const { data: result, error } = await account.client.functions.invoke('send-parent-invite', { signal });
       let body = result as { sent?: boolean; via?: string; reason?: string; detail?: string } | null;
       if (error && !body) {
         // On a non-2xx the body is on the error's response, not in `data`.
@@ -161,7 +163,7 @@ async function writeProfileFromPendingData(
     .from('profiles')
     .select('*')
     .eq('user_id', account.user.id)
-    .maybeSingle();
+    .abortSignal(signal).retry(false).maybeSingle();
   if (profileError) throw profileError;
   if (!isCurrent()) return null;
   return (newProfile as unknown as Profile | null);
@@ -172,10 +174,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const activeSession = useRef<Session | null>(null);
   const generation = useRef(0);
   const mounted = useRef(false);
-  const hydration = useRef<{ generation: number; promise: Promise<void> } | null>(null);
+  const hydration = useRef<{ generation: number; promise: Promise<void>; controller: AbortController } | null>(null);
   const authTransition = useRef<Promise<unknown> | null>(null);
   const explicitSignOut = useRef(false);
 
@@ -195,45 +198,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchOrCreateProfile = (session: Session, version: number): Promise<void> => {
     if (hydration.current?.generation === version) return hydration.current.promise;
-    const isCurrent = () => mounted.current && generation.current === version
-      && activeSession.current?.user.id === session.user.id;
+    const controller = new AbortController();
+    const ownsAttempt = () => mounted.current && generation.current === version
+      && activeSession.current?.user.id === session.user.id && hydration.current?.controller === controller;
+    const isCurrent = () => ownsAttempt() && !controller.signal.aborted;
+    let timedOut = false;
+    let rejectCancelled!: (reason: Error) => void;
+    const cancelled = new Promise<never>((_resolve, reject) => { rejectCancelled = reject; });
+    const onAbort = () => rejectCancelled(new DOMException('Profile check cancelled', 'AbortError'));
+    controller.signal.addEventListener('abort', onAbort, { once: true });
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 20_000);
+    setProfileError(null);
     const promise = (async () => {
       try {
-        const account = await createOnboardingSession(session);
-        if (!isCurrent()) return;
-        const { data, error } = await account.client
-          .from('profiles').select('*').eq('user_id', account.user.id).maybeSingle();
-        if (error) throw error;
-        if (!isCurrent()) return;
-
-        const existing = data as unknown as Profile | null;
-        setProfile(existing);
-        // Keep an existing account usable during its idempotent repair.
-        if (existing) setLoading(false);
-        const pending = readPendingProfileFromMetadata(account.user);
-        if (pending && (!existing || pending.role === existing.role)) {
-          const created = await writeProfileFromPendingData(account, pending, isCurrent);
+        await Promise.race([cancelled, (async () => {
+          const account = await createOnboardingSession(session, controller.signal);
           if (!isCurrent()) return;
-          if (created) {
-            setProfile(created);
-            // Failure here is non-fatal: the next sign-in can repeat the
-            // idempotent repair. This request is bound to this account's JWT.
-            try { await account.clearPendingProfile(); } catch { /* retry next sign-in */ }
+          const { data, error } = await account.client
+            .from('profiles').select('*').eq('user_id', account.user.id)
+            .abortSignal(controller.signal).retry(false).maybeSingle();
+          if (error) throw error;
+          if (!isCurrent()) return;
+
+          const existing = data as unknown as Profile | null;
+          setProfile(existing);
+          // Keep a verified existing account usable during idempotent repair.
+          if (existing) setLoading(false);
+          const pending = readPendingProfileFromMetadata(account.user);
+          if (pending && (!existing || pending.role === existing.role)) {
+            const created = await writeProfileFromPendingData(account, pending, isCurrent, controller.signal);
+            if (!isCurrent()) return;
+            if (created) {
+              setProfile(created);
+              // A lost acknowledgement does not prove rollback. A later retry
+              // reads server state and repeats the existing idempotent repair.
+              try { await account.clearPendingProfile(); } catch { /* retry next check */ }
+            }
           }
-        }
+        })()]);
       } catch (err) {
-        if (!isCurrent()) return;
-        console.error('Failed to load account profile:', err);
-        const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
-        toast.error(`Account setup hit a problem: ${message || 'unknown error'}. Pull to refresh or sign in again to retry.`);
+        if (!ownsAttempt()) return;
+        const message = timedOut
+          ? 'Loading your account took too long. Try again or sign in again.'
+          : 'Could not load your account access. Try again or sign in again.';
+        setProfileError(message);
+        if (!timedOut) console.error('Failed to load account profile:', err);
+        toast.error(message);
       } finally {
-        if (isCurrent()) {
-          setLoading(false);
-          hydration.current = null;
-        }
+        clearTimeout(timer); controller.signal.removeEventListener('abort', onAbort);
+        if (ownsAttempt()) { setLoading(false); hydration.current = null; }
+        controller.abort();
       }
     })();
-    hydration.current = { generation: version, promise };
+    hydration.current = { generation: version, promise, controller };
     return promise;
   };
 
@@ -261,8 +278,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (sameAccount) return;
       if (previousUserId && previousUserId !== session?.user.id) queryClient.clear();
       const version = ++generation.current;
+      hydration.current?.controller.abort();
       hydration.current = null;
       setProfile(null);
+      setProfileError(null);
       setLoading(!!session);
       if (session) void fetchOrCreateProfile(session, version);
     };
@@ -305,6 +324,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       disposed = true;
       mounted.current = false;
       generation.current += 1;
+      hydration.current?.controller.abort();
       hydration.current = null;
       subscription.unsubscribe();
     };
@@ -348,6 +368,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     explicitSignOut.current = true;
     const version = ++generation.current;
+    hydration.current?.controller.abort();
     hydration.current = null;
     discardLegacyPendingProfile();
     try {
@@ -359,6 +380,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeSession.current = null;
         setUser(null);
         setProfile(null);
+        setProfileError(null);
         setLoading(false);
         queryClient.clear();
       }
@@ -376,7 +398,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, profileError, signUp, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

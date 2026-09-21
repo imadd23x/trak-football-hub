@@ -566,7 +566,14 @@ export default function PlayerEvolutionCard() {
                 <div>
                   <div style={{
                     fontFamily: "'DM Sans', sans-serif",
-                    fontWeight: 200, fontSize: 64, lineHeight: 0.9,
+                    // 0.9 gave a 58px box for 64px glyphs, so the digits spilled
+                    // out of it and over the position label below. On screen the
+                    // browser paints the label after the digits and it still reads;
+                    // in the exported PNG the overflow composites on top and
+                    // "MIDFIELDER · U15" is unreadable. 1.1 contains the glyphs.
+                    // The label moves down by ~13px as a result, which is the
+                    // spacing the design always looked like it had.
+                    fontWeight: 200, fontSize: 64, lineHeight: 1.1,
                     letterSpacing: '-0.04em', color: '#FFFFFF',
                   }}>
                     {ovr}

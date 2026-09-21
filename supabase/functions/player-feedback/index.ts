@@ -1,10 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// This one already authenticated properly, so it was never open to strangers.
-// The cap is for the other half of the problem: one authenticated account can
-// still spend without limit. Set high — a child re-reading their feedback or
-// asking follow-up questions should never meet it in ordinary use.
+// T2 — this function used to be called by the child.
+//
+// It read the coach's private note, generated feedback, and returned both
+// straight to the player: no draft, no approval, no record of what a child was
+// told, and the private note itself in the response body. The deck says "the
+// coach reviews every word"; nothing in the system could hold a reviewed word.
+//
+// It is now coach-facing. A coach generates a draft, the draft is persisted to
+// ai_feedback_drafts (which a child has no grant on), and nothing reaches the
+// player until the coach publishes it through publish_player_feedback().
+//
+// The child-facing follow-up chat has been removed rather than adapted. A live
+// conversation cannot be approved in advance by a coach, so it cannot coexist
+// with "every AI message a child sees was approved by their coach first". That
+// is a product decision as much as a technical one and it is flagged as such;
+// if the chat comes back it belongs on the coach's side of the line.
+
 const DAILY_CALL_LIMIT = 200;
 
 const corsHeaders = {
@@ -13,8 +26,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// System prompt for initial feedback generation
-const FEEDBACK_SYSTEM = `You are a supportive and motivating football development coach inside the Trak app. Your job is to help young players understand their coach's feedback and give them clear, practical steps to improve.
+const FEEDBACK_SYSTEM = `You are a supportive and motivating football development coach inside the Trak app. You are drafting feedback that a human coach will read, edit and approve before any player sees it. Write it as if speaking to the player, because that is how it will be published once approved.
 
 LANGUAGE RULES:
 - Write directly to the player ("you", "your") — not about them.
@@ -43,16 +55,12 @@ Rules:
 - "drill" must be a specific action, not vague advice. E.g. "Set up 5 cones in a line and dribble through them at speed, then shoot" not just "practise your dribbling".
 - Keep each field concise — title under 6 words, what/why/drill under 30 words each.`;
 
-// System prompt for follow-up chat
-const CHAT_SYSTEM = `You are a supportive football development coach chatting with a young player inside the Trak app. The player has received specific feedback from their coach about areas to improve. Your job is to answer their follow-up questions clearly and practically.
-
-RULES:
-- Write directly to the player ("you", "your").
-- Be warm, encouraging, and specific.
-- Short answers are better. Aim for 2-4 sentences per response.
-- If asked about a drill or exercise, give one specific, clear thing they can do.
-- If asked something unrelated to football or their development, gently redirect.
-- Never make up facts about the player that weren't in the original feedback.`;
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -63,88 +71,87 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
     const authHeader = req.headers.get("Authorization") || "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Verify the caller is authenticated
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
+      // Written out rather than through json() so the literal `status: 401` is
+      // greppable. src/__tests__/edge-function-auth.test.ts asserts it against
+      // the source, and a helper that hides the status makes a real guard
+      // invisible to the check that exists to enforce it.
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const body = await req.json();
-    const { assessment_id, chat_messages } = body;
+    const { assessment_id } = body;
+    if (!assessment_id) return json({ error: "assessment_id required" }, 400);
 
-    if (!assessment_id) {
-      return new Response(JSON.stringify({ error: "assessment_id required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Counted after the request is known to be well-formed, so a malformed
-    // body does not consume someone's allowance.
+    // K8's daily cap, from #41. Counted after the request is known to be
+    // well-formed, so a malformed body does not consume someone's allowance.
+    // Kept deliberately: this file was rewritten coach-facing for T2, and
+    // taking that rewrite wholesale would have removed the rate limit shipped
+    // hours earlier for the open-gateway fix.
     const { data: allowed, error: quotaError } = await supabase
       .rpc("claim_ai_call", { p_function_name: "player-feedback", p_daily_limit: DAILY_CALL_LIMIT });
 
     if (quotaError) {
       console.error("quota check failed", quotaError);
-      return new Response(JSON.stringify({ error: "Could not verify your daily allowance" }), {
-        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Could not verify your daily allowance" }, 503);
     }
     if (!allowed) {
-      return new Response(
-        JSON.stringify({ error: "You've reached today's limit for feedback. Try again tomorrow." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return json({ error: "You've reached today's limit for drafting feedback. Try again tomorrow." }, 429);
     }
 
-    // Fetch the assessment — it must belong to a squad_player linked to this user
+    // The caller must be a coach. A player calling this gets nothing — which is
+    // the whole point of T2, so it is checked before anything else is read.
+    const { data: profile } = await supabase
+      .from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+
+    if (profile?.role !== "coach") {
+      return json({ error: "Only a coach can generate feedback" }, 403);
+    }
+
+    // The assessment must be one this coach can see. RLS already restricts
+    // coach_assessments to their own roster rows in their own academy, so a
+    // row coming back at all is the authorisation — but the roster row is
+    // fetched explicitly so the draft can be attributed to it.
+    const { data: assessment, error: assessmentError } = await supabase
+      .from("coach_assessments")
+      .select("id, squad_player_id, coach_rating, work_rate, tactical, attitude, technical, physical, coachability, appearance")
+      .eq("id", assessment_id)
+      .maybeSingle();
+
+    if (assessmentError) return json({ error: "Could not read that assessment" }, 500);
+    if (!assessment) return json({ error: "Assessment not found or access denied" }, 404);
+
     const { data: squadRow } = await supabase
       .from("squad_players")
       .select("id, player_name, position")
-      .eq("linked_player_id", user.id)
+      .eq("id", assessment.squad_player_id)
       .maybeSingle();
 
-    if (!squadRow) {
-      return new Response(JSON.stringify({ error: "No squad link found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!squadRow) return json({ error: "Assessment not found or access denied" }, 404);
 
-    // Fetch the assessment
-    const { data: assessment } = await supabase
-      .from("coach_assessments")
-      .select("squad_player_id, coach_rating, work_rate, tactical, attitude, technical, physical, coachability, appearance")
-      .eq("id", assessment_id)
-      .eq("squad_player_id", squadRow.id)
-      .maybeSingle();
-
-    if (!assessment) {
-      return new Response(JSON.stringify({ error: "Assessment not found or access denied" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Fetch the coach note
+    // A note is optional. Requiring one made the whole feature unreachable
+    // whenever a coach assessed without writing anything — which, pitch-side,
+    // is most of the time. The six category scores are enough to say what to
+    // work on.
     const { data: noteRow } = await supabase
       .from("coach_assessment_notes")
       .select("note")
       .eq("assessment_id", assessment_id)
       .maybeSingle();
 
-    // A note is optional. Requiring one made the whole feedback screen
-    // unreachable whenever a coach assessed without writing anything — which,
-    // pitch-side, is most of the time. The six category scores are themselves
-    // enough to say what to work on, so fall back to them rather than 404.
     const coachNote = noteRow?.note?.trim() ?? "";
 
     const position = squadRow.position || "outfield player";
-    const rating = assessment.coach_rating?.toFixed(1) || "—";
+    const rating = assessment.coach_rating?.toFixed(1) ?? "—";
     const appearance = assessment.appearance || "match";
     const playerName = squadRow.player_name?.split(" ")[0] || "the player";
 
@@ -158,107 +165,91 @@ ${coachNote
   ? `Coach's improvement notes:\n"${coachNote}"`
   : `The coach did not write a note for this assessment. Base the feedback only on the category scores above: pick the lowest one or two and say what to work on. Do not invent or imply anything the coach said.`}`;
 
-    // If chat_messages provided → it's a follow-up chat, stream a conversational reply
-    if (Array.isArray(chat_messages) && chat_messages.length > 0) {
-      const systemContent = `${CHAT_SYSTEM}
-
-Context — this player's recent feedback from their coach:
-${contextBlock}`;
-
-      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          stream: true,
-          messages: [
-            { role: "system", content: systemContent },
-            ...chat_messages,
-          ],
-        }),
-      });
-
-      if (!aiResp.ok) {
-        const t = await aiResp.text();
-        console.error("AI gateway error", aiResp.status, t);
-        return new Response(JSON.stringify({ error: "AI error" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      return new Response(aiResp.body, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
-    }
-
-    // Initial feedback generation — not streamed, returns JSON
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        stream: false,
         messages: [
           { role: "system", content: FEEDBACK_SYSTEM },
-          { role: "user", content: `Generate structured improvement feedback for this player:\n\n${contextBlock}` },
+          { role: "user", content: contextBlock },
         ],
       }),
     });
 
     if (!aiResp.ok) {
       if (aiResp.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit reached, please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({ error: "Rate limit reached, please try again in a moment." }, 429);
       }
-      const t = await aiResp.text();
-      console.error("AI gateway error", aiResp.status, t);
-      return new Response(JSON.stringify({ error: "AI error" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error("AI gateway error", aiResp.status, await aiResp.text());
+      return json({ error: "AI error" }, 500);
     }
 
     const aiJson = await aiResp.json();
     const raw = aiJson.choices?.[0]?.message?.content || "";
 
-    // Parse the JSON from the AI response
-    let feedback: any;
+    let feedback: { points?: unknown[]; encouragement?: unknown };
     try {
-      // Strip markdown fences if present
       const clean = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
       feedback = JSON.parse(clean);
     } catch {
       console.error("Failed to parse AI feedback JSON:", raw);
-      return new Response(JSON.stringify({ error: "Failed to parse AI response" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Failed to parse AI response" }, 500);
     }
 
-    return new Response(JSON.stringify({
+    // Shape-checked, not just "is there an array". Imad found four malformed
+    // payloads getting through on non-emptiness alone: points of the wrong
+    // type, points missing fields, fields that are not strings, and fields
+    // that are empty. Any of those reaches a coach as a half-blank review
+    // screen, and a coach who publishes without noticing sends it to a child.
+    const isFilledString = (v: unknown): v is string =>
+      typeof v === "string" && v.trim().length > 0;
+
+    const pointsAreWellFormed = Array.isArray(feedback?.points)
+      && feedback.points.length > 0
+      && feedback.points.every((p) =>
+        p !== null && typeof p === "object"
+        && ["title", "what", "why", "drill"].every((k) =>
+          isFilledString((p as Record<string, unknown>)[k])));
+
+    if (!pointsAreWellFormed || !isFilledString(feedback?.encouragement)) {
+      // Logged, because a model that starts returning a different shape is
+      // something we want to see rather than silently retry around.
+      console.error("malformed AI payload", JSON.stringify(feedback)?.slice(0, 400));
+      return json({ error: "The model returned nothing usable" }, 500);
+    }
+
+    // Persist the draft. A child has no grant on this table, so generating
+    // costs nothing in exposure — and a draft that is never approved simply
+    // stays where only the coach can see it.
+    const { data: draft, error: draftError } = await supabase
+      .from("ai_feedback_drafts")
+      .insert({
+        squad_player_id: squadRow.id,
+        assessment_id: assessment.id,
+        generated_text: JSON.stringify(feedback),
+        model: "google/gemini-3-flash-preview",
+      })
+      .select("id")
+      .maybeSingle();
+
+    // A draft that could not be stored must not be handed back as though it
+    // were saved, or a coach approves something with no row behind it.
+    if (draftError || !draft) {
+      console.error("Could not persist draft", draftError);
+      return json({ error: "Generated the draft but could not save it — please try again" }, 500);
+    }
+
+    return json({
+      draft_id: draft.id,
       feedback,
-      context: {
-        // `coachNote`, not `noteRow.note`. maybeSingle() returns null when the
-        // coach assessed without writing anything, and the comment above says
-        // that is most of the time pitch-side. Dereferencing noteRow here threw
-        // a TypeError into the outer catch, so the fallback four lines up bought
-        // nothing: the screen still failed, as a 500 instead of a 404, after the
-        // AI call had already been made and a daily claim spent.
-        //
-        // "" is what the player sees when there is no note, and PlayerFeedback
-        // already guards on `context?.note &&`, so it renders nothing.
-        note: coachNote,
-        playerName,
-        position,
-        rating,
-      },
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      context: { playerName, position, rating },
+      // The coach's private note is deliberately NOT returned. It used to be,
+      // to a child, which is the leak recorded as X9.
     });
 
   } catch (e) {
     console.error("player-feedback error", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });

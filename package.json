@@ -25,6 +25,8 @@
     "prepare": "husky",
     "test:usecases": "node scripts/uc-check.mjs --stage=ci",
     "test:browser": "npm run build && playwright test --config playwright.pilot.config.ts",
+    "test:db:feedback": "node scripts/test-db.mjs --feedback-publication-review",
+    "test:db:journey": "node scripts/test-db.mjs --player-journey-review",
     "test:db:deletion": "node scripts/test-db.mjs --account-deletion-review",
     "test:db:isolation": "node scripts/test-db.mjs --academy-isolation-review",
     "test:db:roster-adoption": "node scripts/test-db.mjs --roster-adoption-review"

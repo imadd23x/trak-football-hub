@@ -90,8 +90,18 @@ INSERT INTO public.matches (id, user_id, position, competition, venue, age_group
 VALUES (pg_temp.pilot_id(301), pg_temp.pilot_id(3), 'CM', 'Friendly', 'Home', 'Adult', current_date, pg_temp.pilot_id(3), 'player');
 INSERT INTO public.coach_assessments (id, coach_user_id, squad_player_id, created_at)
 VALUES (pg_temp.pilot_id(401), pg_temp.pilot_id(1), pg_temp.pilot_id(201), current_date + interval '6 hours');
-INSERT INTO public.coach_calendar_events (coach_user_id, title, event_type, starts_at)
-VALUES (pg_temp.pilot_id(1), 'Synthetic report fixture', 'match', current_date + interval '12 hours');
+-- Published, because 20260919160000 counts only published fixtures: a coach
+-- cannot under-log a match nobody has been told about. Left unpublished this
+-- fixture makes pilot_match_coverage empty, and the suite's own "nonempty owner
+-- fixture" rule correctly refuses that.
+INSERT INTO public.coach_calendar_events (coach_user_id, title, event_type, starts_at, published)
+VALUES (pg_temp.pilot_id(1), 'Synthetic report fixture', 'match', current_date + interval '12 hours', true);
+-- A DRAFT of a future fixture, deliberately unpublished. Before 20260919160000
+-- this inflated the denominator and dragged reported coverage down the moment a
+-- coach typed next month's fixtures — week 7 read 0% for this reason. Kept as a
+-- decoy so the exclusion is falsifiable rather than assumed.
+INSERT INTO public.coach_calendar_events (coach_user_id, title, event_type, starts_at, published)
+VALUES (pg_temp.pilot_id(1), 'Unpublished draft fixture', 'match', current_date + interval '36 hours', false);
 INSERT INTO public.telemetry_events (id, user_id, role, event_type, metadata) VALUES
   (pg_temp.pilot_id(501), pg_temp.pilot_id(1), 'coach', 'assessment_submitted', '{"duration_ms":30000,"players":1,"mode":"full"}'),
   (pg_temp.pilot_id(502), pg_temp.pilot_id(1), 'coach', 'blind_rating_captured', '{"position":"CM","gut_band":"good","computed_band":"steady"}');
@@ -174,6 +184,35 @@ $test$;
 RESET ROLE;
 
 -- Defense in depth is independently checked, alongside real privilege tests.
+-- S3: the drafts exclusion, asserted rather than trusted. Two match fixtures
+-- exist for this coach and exactly one is published, so a view that lost the
+-- filter would count both. A bare "> 0" would not notice.
+SELECT pg_temp.pilot_assert(
+  (SELECT count(DISTINCT fixture_id) FROM public.pilot_match_coverage) = 1,
+  'pilot_match_coverage: unpublished draft fixtures are not counted');
+
+-- And the split reports the athlete number separately. The fixture's one match
+-- is logged_by_role = 'player', so a split that collapsed back into the
+-- combined figure would still show 100 here — the coach column is what
+-- distinguishes them.
+-- Guarded on existence, and the guard is the point rather than caution. The
+-- --pilot-views-baseline mode replays only the migrations BEFORE the lockdown
+-- so that this suite's security assertions are SEEN to fail; that is how we
+-- know they can. An unguarded reference to a view introduced later aborts the
+-- transaction on "relation does not exist" and the baseline stops proving
+-- anything — a suite that cannot fail for the intended reason, which is the
+-- failure mode this whole file exists to avoid.
+DO $s3$
+BEGIN
+  IF to_regclass('public.pilot_match_coverage_by_logger') IS NOT NULL THEN
+    PERFORM pg_temp.pilot_assert(
+      (SELECT logged_player = 1 AND logged_coach = 0 AND logged_any = 1
+         FROM public.pilot_match_coverage_by_logger LIMIT 1),
+      'pilot_match_coverage_by_logger: player and coach logging are reported apart');
+  END IF;
+END;
+$s3$;
+
 SELECT pg_temp.pilot_assert(c.reloptions @> ARRAY['security_invoker=true'], v.name || ': invoker security')
 FROM pg_temp.pilot_views v JOIN pg_class c ON c.oid = ('public.' || v.name)::regclass;
 SELECT pg_temp.pilot_assert(p.proconfig @> ARRAY['search_path=pg_catalog'], p.proname || ': fixed built-in search path')

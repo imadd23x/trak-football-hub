@@ -6,7 +6,9 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, MetadataLabel } from '@/components/trak'
 import { computeMatchScore } from '@/lib/rating-engine'
+import { goalsKey, assistsKey } from '@/lib/match-input-keys'
 import { trackEvent } from '@/lib/telemetry'
+import { validateMatchInput, MATCH_LIMITS } from '@/lib/match-input-rules'
 
 type SquadPlayer = {
   id: string
@@ -25,8 +27,12 @@ type PlayerDetail = {
   played:  boolean
   role:    'starter' | 'sub'
   minutes: number
-  goals:   0 | 1 | 2         // 2 means "2+"
-  assists: 0 | 1 | 2
+  /* Exact counts. These were once `0 | 1 | 2` with 2 meaning "2+", so a
+     hat-trick was stored as 2 and the only vocabulary the form had was the
+     rating bucket. The bucket still exists — match-input-keys.ts — but it is
+     now derived for the rating engine rather than being the thing recorded. */
+  goals:   number
+  assists: number
   card:    CardType
 }
 
@@ -41,10 +47,6 @@ function mapPosition(raw: string | null) {
   if (p.includes('defender')   || ['def','cb','lb','rb'].includes(p)) return 'def'
   if (p.includes('attacker')   || ['att','cf','st','lw','rw'].includes(p)) return 'att'
   return 'mid'
-}
-
-function goalsKey(g: 0 | 1 | 2): string {
-  return g === 2 ? '2+' : String(g)
 }
 
 export default function CoachAddSession() {
@@ -94,6 +96,21 @@ export default function CoachAddSession() {
   const [attended,    setAttended]    = useState<Set<string>>(new Set())
 
   const [saving, setSaving] = useState(false)
+
+  // Retry state (K5). A partial save used to be reported as a complete one, so
+  // these exist to make a second press finish the job rather than duplicate it:
+  // the session row is inserted once, attendance once, and each player's match
+  // is logged once. Without them, "try again" would create a second session and
+  // re-log every player who already succeeded.
+  //
+  // Known limit, stated rather than hidden: if the coach edits the score or
+  // opponent between a partial save and the retry, the already-written session
+  // row keeps the original values. The retry is meant for a transient failure
+  // pressed again immediately. Re-writing the session on retry would be the
+  // fuller fix; duplicating it would be worse than either.
+  const [savedSessionId,   setSavedSessionId]   = useState<string | null>(null)
+  const [attendanceSaved,  setAttendanceSaved]  = useState(false)
+  const [loggedPlayerIds,  setLoggedPlayerIds]  = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!user) return
@@ -156,7 +173,19 @@ export default function CoachAddSession() {
   const playedCount = Object.values(details).filter(d => d.played).length
 
   // ── validation ───────────────────────────────────────────────────────────────
-  const canSave = !saving && (
+  /* Only players marked as having played are checked. An untouched bench row
+     carries DEFAULT_DETAIL (90 minutes, no goals), which is valid anyway, but
+     checking it would mean a coach could be blocked by a row they never opened. */
+  const impossibleRecords = !isMatch ? [] : squad
+    .filter(p => details[p.id]?.played)
+    .filter(p => validateMatchInput({
+      minutes: details[p.id].minutes,
+      goals:   details[p.id].goals,
+      assists: details[p.id].assists,
+      teamScore: scoreUs === '' ? undefined : Number(scoreUs),
+    }).length > 0)
+
+  const canSave = !saving && impossibleRecords.length === 0 && (
     isMatch    ? opponent.trim().length > 0 && scoreUs !== '' && scoreThem !== ''
     : type === 'training' ? trainingFocus.size > 0
     : title.trim().length > 0
@@ -176,7 +205,11 @@ export default function CoachAddSession() {
           })()
         : title.trim()
 
-    const { data: session, error } = await supabase
+    // On a retry the session already exists; inserting again would give the
+    // coach two identical sessions for one match.
+    let sessionId = savedSessionId
+    if (!sessionId) {
+      const { data: session, error } = await supabase
       .from('coach_sessions')
       .insert({
         coach_user_id: user.id,
@@ -206,26 +239,39 @@ export default function CoachAddSession() {
       .select()
       .single()
 
-    if (error || !session) {
-      console.error('Session save failed:', error)
-      toast.error(error?.message ? `Could not save: ${error.message}` : 'Could not save session')
-      setSaving(false)
-      return
+      if (error || !session) {
+        console.error('Session save failed:', error)
+        toast.error(error?.message ? `Could not save: ${error.message}` : 'Could not save session')
+        setSaving(false)
+        return
+      }
+      sessionId = session.id
+      setSavedSessionId(sessionId)
     }
+
+    // Collected rather than thrown, so one player's rejection does not abandon
+    // the rest. Reported by name at the end — silently dropping them is the bug.
+    const failures: string[] = []
 
     if (isMatch) {
       // Collect players who played
       const playedPlayers = squad.filter(p => details[p.id]?.played)
 
       // session_attendance
-      if (playedPlayers.length > 0) {
-        await supabase.from('session_attendance').insert(
+      if (playedPlayers.length > 0 && !attendanceSaved) {
+        const { error: attErr } = await supabase.from('session_attendance').insert(
           playedPlayers.map(p => ({
-            session_id:      session.id,
+            session_id:      sessionId,
             squad_player_id: p.id,
             status:          'present',
           }))
         )
+        if (attErr) {
+          console.error('Attendance save failed:', attErr)
+          failures.push('attendance')
+        } else {
+          setAttendanceSaved(true)
+        }
       }
 
       // matches rows — only for linked players, deduplicated by linked_player_id
@@ -237,7 +283,11 @@ export default function CoachAddSession() {
         seenIds.add(p.linked_player_id)
         return true
       })
+      const nowLogged = new Set(loggedPlayerIds)
       for (const p of linkedPlayers) {
+        // Already written on an earlier attempt — logging again would give the
+        // child two match rows for one match.
+        if (nowLogged.has(p.linked_player_id!)) continue
         const d = details[p.id]
         const pos = mapPosition(p.position)
         const computed_rating = computeMatchScore({
@@ -252,13 +302,23 @@ export default function CoachAddSession() {
           body_condition:  'good',
           self_rating:     'average',
           position_inputs: {
-            goals:   goalsKey(d.goals),
-            assists: goalsKey(d.assists),
+            /* Position-aware, and assists have their own scale. The engine
+               reads '1'/'2'/'3+' for an attacker's goals but '1'/'2+' for
+               everyone's assists, so one shared helper for both would send an
+               attacker's third assist as '3+' — a key the assists branch has
+               no case for, which pays exactly nothing. */
+            goals:   goalsKey(pos, d.goals),
+            assists: assistsKey(d.assists),
           },
           is_friendly: competition === 'Friendly',
         })
 
-        await supabase.rpc('log_match_for_player', {
+        // The error was discarded here. A rejection — a departed coach, a
+        // roster row in another academy, a lost connection — left the child
+        // with no match row while the coach was told the match had saved.
+        // K1/K2/F5 added legitimate reasons for this RPC to refuse, so the
+        // silence got more dangerous, not less.
+        const { error: rpcErr } = await supabase.rpc('log_match_for_player', {
           p_user_id:         p.linked_player_id!,
           p_opponent:        opponent.trim(),
           p_team_score:      Number(scoreUs)   || 0,
@@ -268,15 +328,41 @@ export default function CoachAddSession() {
           p_position:        p.position  || 'Midfielder',
           p_age_group:       p.age != null ? String(p.age) : 'U19+',
           p_minutes_played:  d.minutes,
-          p_goals:           d.goals === 2 ? 2 : d.goals,
-          p_assists:         d.assists === 2 ? 2 : d.assists,
+          // The real numbers. The rating key is a band; the record is not.
+          p_goals:           d.goals,
+          p_assists:         d.assists,
           p_card_received:   d.card,
-          p_body_condition:  'Average',
-          p_self_rating:     'Average',
+          // Null, not 'Average'. These are the player's own account of the
+          // match and this is a coach logging it — nobody asked the child how
+          // they felt or how they rated themselves, so the record must not say
+          // they answered. Both columns are nullable; the previous values were
+          // invented for no reason.
+          //
+          // Score-neutral, deliberately: computeMatchScore only moves on
+          // self_rating 'excellent'/'good'/'poor' and body_condition
+          // 'fresh'/'tired'/'knock'. 'Average' and 'good' matched nothing and
+          // contributed 0, so no existing or future rating changes. The engine
+          // call above still passes its neutral values and is untouched.
+          //
+          // Cast because the generated types declare both as `string`: a
+          // Postgres function parameter carries no nullability, so the
+          // generator cannot know. The database accepts null and both columns
+          // are nullable. Cast narrowly rather than `as any` on the call, so
+          // the other fourteen arguments stay type-checked.
+          p_body_condition:  null as unknown as string,
+          p_self_rating:     null as unknown as string,
           p_computed_rating: computed_rating,
           p_match_date:      date,
         })
+
+        if (rpcErr) {
+          console.error(`Match log failed for ${p.player_name}:`, rpcErr)
+          failures.push(p.player_name)
+        } else {
+          nowLogged.add(p.linked_player_id!)
+        }
       }
+      setLoggedPlayerIds(nowLogged)
 
       trackEvent('match_logged', {
         actor: 'coach',
@@ -288,15 +374,36 @@ export default function CoachAddSession() {
       })
     } else {
       // Training / Other — simple attendance
-      if (attended.size > 0) {
-        await supabase.from('session_attendance').insert(
+      if (attended.size > 0 && !attendanceSaved) {
+        const { error: attErr } = await supabase.from('session_attendance').insert(
           [...attended].map(squad_player_id => ({
-            session_id: session.id,
+            session_id: sessionId,
             squad_player_id,
             status: 'present',
           }))
         )
+        if (attErr) {
+          console.error('Attendance save failed:', attErr)
+          failures.push('attendance')
+        } else {
+          setAttendanceSaved(true)
+        }
       }
+    }
+
+    // Only claim success for what actually saved. The session row is in either
+    // way, so the coach stays on this screen with their input intact and can
+    // press save again; the guards above make that finish the job rather than
+    // duplicate it.
+    if (failures.length > 0) {
+      const names = failures.join(', ')
+      toast.error(
+        `Saved, but ${failures.length} of these did not record: ${names}. ` +
+          `Press save again to retry just those — nothing will be duplicated.`,
+        { duration: 12000 },
+      )
+      setSaving(false)
+      return
     }
 
     toast.success(isMatch ? 'Match saved' : 'Session saved')
@@ -533,45 +640,48 @@ export default function CoachAddSession() {
                               </div>
                             </div>
 
-                            {/* Goals */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-[8px] tracking-[0.1em] uppercase text-white/30 w-[44px] flex-shrink-0"
-                                style={{ fontFamily: "'DM Mono', monospace" }}>GOALS</span>
-                              <div className="flex gap-1.5">
-                                {([0, 1, 2] as const).map(g => (
-                                  <button key={g} onClick={() => setDetail(p.id, { goals: g })}
-                                    className="px-2.5 py-1 rounded-full text-[10px] transition-colors"
-                                    style={{
-                                      background: d.goals === g ? 'rgba(200,242,90,0.12)' : 'rgba(255,255,255,0.04)',
-                                      color: d.goals === g ? '#C8F25A' : 'rgba(255,255,255,0.4)',
-                                      border: `1px solid ${d.goals === g ? 'rgba(200,242,90,0.3)' : 'rgba(255,255,255,0.07)'}`,
-                                      fontFamily: "'DM Mono', monospace",
-                                    }}>
-                                    {g === 2 ? '2+' : g}
-                                  </button>
-                                ))}
+                            {/* Goals and assists — steppers, not a 0/1/2+ picker.
+                                The old control could not express a hat-trick: it
+                                offered three buttons and stored "2+" as 2. */}
+                            {([
+                              { label: 'GOALS',   key: 'goals'   as const, value: d.goals,   max: MATCH_LIMITS.goalsMax },
+                              { label: 'ASSISTS', key: 'assists' as const, value: d.assists, max: MATCH_LIMITS.assistsMax },
+                            ]).map(({ label, key, value, max }) => (
+                              <div key={key} className="flex items-center gap-2">
+                                <span className="text-[8px] tracking-[0.1em] uppercase text-white/30 w-[44px] flex-shrink-0"
+                                  style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
+                                <button
+                                  aria-label={`One fewer ${key} for ${p.player_name}`}
+                                  onClick={() => setDetail(p.id, { [key]: Math.max(0, value - 1) })}
+                                  className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 text-sm">−</button>
+                                <span className="w-8 text-center text-[13px] text-white/88"
+                                  style={{ fontFamily: "'DM Mono', monospace" }}>
+                                  {value}
+                                </span>
+                                <button
+                                  aria-label={`One more ${key} for ${p.player_name}`}
+                                  onClick={() => setDetail(p.id, { [key]: Math.min(max, value + 1) })}
+                                  className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 text-sm">+</button>
                               </div>
-                            </div>
+                            ))}
 
-                            {/* Assists */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-[8px] tracking-[0.1em] uppercase text-white/30 w-[44px] flex-shrink-0"
-                                style={{ fontFamily: "'DM Mono', monospace" }}>ASSISTS</span>
-                              <div className="flex gap-1.5">
-                                {([0, 1, 2] as const).map(a => (
-                                  <button key={a} onClick={() => setDetail(p.id, { assists: a })}
-                                    className="px-2.5 py-1 rounded-full text-[10px] transition-colors"
-                                    style={{
-                                      background: d.assists === a ? 'rgba(200,242,90,0.12)' : 'rgba(255,255,255,0.04)',
-                                      color: d.assists === a ? '#C8F25A' : 'rgba(255,255,255,0.4)',
-                                      border: `1px solid ${d.assists === a ? 'rgba(200,242,90,0.3)' : 'rgba(255,255,255,0.07)'}`,
-                                      fontFamily: "'DM Mono', monospace",
-                                    }}>
-                                    {a === 2 ? '2+' : a}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                            {/* Why a save will be refused, before the coach taps it.
+                                The same rules run in the database, so this cannot
+                                be the only place they are applied — but a coach
+                                should not have to learn them from a rejection. */}
+                            {(() => {
+                              const problems = validateMatchInput({
+                                minutes: d.minutes, goals: d.goals, assists: d.assists,
+                                teamScore: scoreUs === '' ? undefined : Number(scoreUs),
+                              })
+                              if (problems.length === 0) return null
+                              return (
+                                <p role="alert" className="text-[10px] leading-snug text-[#F2705A] pl-[52px]"
+                                  style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                                  {problems[0].message}
+                                </p>
+                              )
+                            })()}
 
                             {/* Card */}
                             <div className="flex items-center gap-2">

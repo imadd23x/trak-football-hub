@@ -244,10 +244,29 @@ export default function PlayerFeedback() {
   const [context, setContext] = useState<FeedbackContext | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Distinct from both "loaded" and "failed": the coach has not approved
+  // anything yet, which is a normal state and not something to apologise for.
+  const [awaitingCoach, setAwaitingCoach] = useState(false)
+  // The coach's own published words (coach_shared_feedback). PlayerHome quotes
+  // these on its card and links here, so this screen must show them too —
+  // otherwise the card says "your coach left feedback" and one tap later this
+  // screen says the coach is still writing it.
+  const [coachWords, setCoachWords] = useState<string | null>(null)
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  // T2 — the child-facing AI chat is off for the pilot.
+  //
+  // A live conversation cannot be approved in advance by a coach, so it cannot
+  // coexist with the Gate 1 requirement that every AI message a child sees was
+  // approved by their coach first. The server no longer serves it either: the
+  // function is coach-only now, so leaving the composer visible would give a
+  // child a button that always fails.
+  //
+  // The UI is gated rather than deleted so the decision is reversible and
+  // visible. If it returns, it belongs on the coach's side of the line.
+  const CHILD_CHAT_ENABLED = false
   const [showChat, setShowChat] = useState(false)
 
   const chatBottomRef = useRef<HTMLDivElement>(null)
@@ -294,26 +313,47 @@ export default function PlayerFeedback() {
         const token = session?.access_token
         if (!token) throw new Error('Not authenticated')
 
-        const fnUrl = `${SUPABASE_FUNCTIONS_URL}/player-feedback`
+        // T2 — the player no longer generates anything. This screen reads what
+        // a coach has published and nothing else. Unapproved text lives in
+        // ai_feedback_drafts, which this account has no grant on, so there is
+        // no request a player could make that would return it.
+        const { data: row, error: readError } = await supabase
+          .from('player_feedback' as never)
+          .select('published_text, published_at')
+          .eq('assessment_id', assessmentId)
+          .is('superseded_at', null)
+          .maybeSingle() as { data: { published_text: string; published_at: string } | null; error: unknown }
 
-        const res = await fetch(fnUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({ assessment_id: assessmentId }),
-        })
+        if (readError) throw new Error("Couldn't load your feedback")
 
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}))
-          throw new Error(body.error || `Error ${res.status}`)
+        if (!row) {
+          // No approved AI breakdown. The coach may still have published their
+          // own words — the same row PlayerHome quotes. Same filter as there:
+          // RLS already limits a player to published rows on their own
+          // assessments, and the explicit published_at keeps a future policy
+          // change from quietly widening it.
+          const { data: shared, error: sharedError } = await supabase
+            .from('coach_shared_feedback' as never)
+            .select('body')
+            .eq('assessment_id', assessmentId)
+            .not('published_at', 'is', null)
+            .maybeSingle() as { data: { body?: string } | null; error: unknown }
+
+          // Fail closed, as PlayerHome does: if we cannot confirm the words
+          // are still published, show neither them nor "still writing".
+          if (sharedError) throw new Error("Couldn't load your feedback")
+
+          // Not an error: the coach has not approved anything for this
+          // assessment yet. Saying so plainly beats an empty screen or a
+          // failure the player cannot act on.
+          setFeedback(null)
+          setCoachWords(shared?.body?.trim() || null)
+          setAwaitingCoach(true)
+          return
         }
 
-        const json = await res.json()
-        setFeedback(json.feedback)
-        setContext(json.context)
+        setAwaitingCoach(false)
+        setFeedback(JSON.parse(row.published_text))
       } catch (e: any) {
         setError(e.message || 'Failed to load feedback')
       } finally {
@@ -504,8 +544,25 @@ export default function PlayerFeedback() {
       </div>
       <div className="flex-1 flex items-center justify-center px-8 text-center">
         <div className="space-y-3">
-          <p className="text-[15px] font-medium text-white/60">Couldn't load feedback</p>
-          <p className="text-[12px] text-white/35">{error || 'No feedback available for this assessment.'}</p>
+          {awaitingCoach && coachWords ? (
+            <>
+              <p className="text-[15px] font-medium text-white/60">From your coach</p>
+              <p className="text-[14px] text-white/80 leading-relaxed">"{coachWords}"</p>
+            </>
+          ) : awaitingCoach ? (
+            <>
+              <p className="text-[15px] font-medium text-white/60">Not ready yet</p>
+              <p className="text-[12px] text-white/35 leading-relaxed">
+                Your coach is still writing your feedback. It'll appear here once they've
+                finished — nothing has gone wrong.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-[15px] font-medium text-white/60">Couldn't load feedback</p>
+              <p className="text-[12px] text-white/35">{error || 'No feedback available for this assessment.'}</p>
+            </>
+          )}
           <button onClick={() => navigate(-1)}
             className="mt-4 px-5 py-2.5 rounded-[10px] text-[13px] font-medium text-black bg-[#C8F25A]">
             Go back
@@ -565,7 +622,7 @@ export default function PlayerFeedback() {
         </div>
 
         {/* Ask AI button */}
-        {!showChat && (
+        {CHILD_CHAT_ENABLED && !showChat && (
           <button
             onClick={() => setShowChat(true)}
             className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[12px] text-[14px] font-medium text-black bg-[#C8F25A] active:scale-[0.98] transition-transform"
@@ -576,7 +633,7 @@ export default function PlayerFeedback() {
         )}
 
         {/* Chat interface */}
-        {showChat && (
+        {CHILD_CHAT_ENABLED && showChat && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <span className="text-[9px] font-medium tracking-[0.14em] uppercase text-white/30"

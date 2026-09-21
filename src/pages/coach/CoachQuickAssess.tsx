@@ -9,6 +9,7 @@ import { scoreToBand } from '@/lib/rating-engine'
 import { BANDS } from '@/lib/types'
 import type { BandType } from '@/lib/types'
 import { deriveCardStats } from '@/lib/cardStats'
+import { needsCoachInput } from '@/lib/assessment-entry'
 import { trackEvent, startTimer } from '@/lib/telemetry'
 import { ChevronLeft, Check, MessageSquare } from 'lucide-react'
 
@@ -54,6 +55,7 @@ export default function CoachQuickAssess() {
   const [technical, setTechnical]       = useState(5)
   const [physical, setPhysical]         = useState(5)
   const [coachability, setCoachability] = useState(5)
+  const [touched, setTouched]           = useState(false)
 
   /* --- note --- */
   const [note, setNote] = useState('')
@@ -133,6 +135,23 @@ export default function CoachQuickAssess() {
   const total = players.length
   const displayIdx = Math.min(currentIdx + 1, total)
 
+  /* --- has the coach actually entered anything for this player? ---
+     A RETURNING player's sliders carry their previous scores, so leaving them
+     alone is a real judgement: "nothing changed". That is the design and it is
+     why the loop is fast.
+
+     A FIRST assessment has nothing to carry, so the six 5s on screen are the
+     control's default. Saving them writes "average on every metric" into a
+     child's record as a deliberate coach judgement that nobody made — and the
+     columns are NOT NULL DEFAULT 5, so nothing downstream can tell the
+     difference afterwards. Skip already exists for a player the coach does not
+     want to rate; this only stops the silent version. */
+  const needsInput = needsCoachInput({
+    hasPreviousScores: !!currentPlayer?._lastScores,
+    touched,
+  })
+  const onSlide = (set: (n: number) => void) => (v: number) => { set(v); setTouched(true) }
+
   /* --- seed sliders for whichever player is now on screen ---
      Starts from their previous assessment when there is one, so the coach
      adjusts what changed instead of re-entering six values from scratch.
@@ -147,6 +166,7 @@ export default function CoachQuickAssess() {
     setCoachability(prev?.coachability ?? 5)
     setNote('')
     setNoteOpen(false)
+    setTouched(false)
   }, [currentIdx, currentPlayer])
 
   /* --- advance to next player --- */
@@ -156,7 +176,10 @@ export default function CoachQuickAssess() {
 
   /* --- save assessment --- */
   const handleNext = async () => {
-    if (!user || !currentPlayer || saving) return
+    // Guarded here as well as on the button: the disabled attribute is a UI
+    // affordance, and this is the line that actually decides what reaches a
+    // child's record.
+    if (!user || !currentPlayer || saving || needsInput) return
     setSaving(true)
 
     const cardStats = deriveCardStats({ workRate, tactical, attitude, technical, physical, coachability })
@@ -395,18 +418,21 @@ export default function CoachQuickAssess() {
 
         {/* ---- 4. Sliders ---- */}
         <div className="rounded-[14px] bg-[rgba(0,0,0,0.25)] p-[14px_16px] space-y-5">
-          <SliderInput label="Work Rate"    value={workRate}     onChange={setWorkRate} />
-          <SliderInput label="Tactical"     value={tactical}     onChange={setTactical} />
-          <SliderInput label="Attitude"     value={attitude}     onChange={setAttitude} />
-          <SliderInput label="Technical"    value={technical}    onChange={setTechnical} />
-          <SliderInput label="Physical"     value={physical}     onChange={setPhysical} />
-          <SliderInput label="Coachability" value={coachability} onChange={setCoachability} />
+          <SliderInput label="Work Rate"    value={workRate}     onChange={onSlide(setWorkRate)} />
+          <SliderInput label="Tactical"     value={tactical}     onChange={onSlide(setTactical)} />
+          <SliderInput label="Attitude"     value={attitude}     onChange={onSlide(setAttitude)} />
+          <SliderInput label="Technical"    value={technical}    onChange={onSlide(setTechnical)} />
+          <SliderInput label="Physical"     value={physical}     onChange={onSlide(setPhysical)} />
+          <SliderInput label="Coachability" value={coachability} onChange={onSlide(setCoachability)} />
         </div>
 
         {/* ---- 5. Overall band preview ---- */}
         <div
           className="flex items-center justify-between px-4 py-3.5 rounded-[12px]"
-          style={{
+          style={needsInput ? {
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.07)',
+          } : {
             background: overallCfg.bg,
             border: `1px solid ${overallCfg.border}`,
             boxShadow: `0 0 20px ${overallCfg.bg}`,
@@ -419,15 +445,26 @@ export default function CoachQuickAssess() {
             OVERALL
           </span>
           <div className="flex items-center gap-2.5">
-            <span
-              className="text-[14px] font-semibold"
-              style={{ color: overallCfg.color }}
-            >
-              {overallCfg.word}
-            </span>
-            <span className="text-[13px] text-white/40 font-medium">
-              {(Math.round(avg * 10) / 10).toFixed(1)}
-            </span>
+            {/* Showing a band before any input states a conclusion about the
+                child that nothing supports yet — the same invention as saving
+                it. Held back until the coach has entered something. */}
+            {needsInput ? (
+              <span className="text-[13px] text-white/30 font-medium">
+                Not yet rated
+              </span>
+            ) : (
+              <>
+                <span
+                  className="text-[14px] font-semibold"
+                  style={{ color: overallCfg.color }}
+                >
+                  {overallCfg.word}
+                </span>
+                <span className="text-[13px] text-white/40 font-medium">
+                  {(Math.round(avg * 10) / 10).toFixed(1)}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -467,6 +504,12 @@ export default function CoachQuickAssess() {
         )}
 
         {/* ---- 7. Action buttons ---- */}
+        {needsInput && (
+          <p className="text-[11px] text-white/35 leading-relaxed px-0.5">
+            First assessment for this player — move a slider to rate them, or
+            Skip. Nothing is recorded until you do.
+          </p>
+        )}
         <div className="flex gap-3 pt-1">
           <button
             onClick={handleSkip}
@@ -481,7 +524,7 @@ export default function CoachQuickAssess() {
           </button>
           <button
             onClick={handleNext}
-            disabled={saving}
+            disabled={saving || needsInput}
             className="flex-[2] py-3.5 rounded-[10px] text-sm font-bold transition-opacity active:scale-[0.97] disabled:opacity-40"
             style={{ background: '#C8F25A', color: '#000' }}
           >

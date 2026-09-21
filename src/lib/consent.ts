@@ -2,15 +2,13 @@
  * UI helpers for the existing parental-consent implementation.
  *
  * The database is the authority — `consent_threshold_age()` and
- * `player_consent_required()` currently use the legacy threshold of 15.
- * The confirmed under-18 policy for both UAE and Greece still requires a
- * coordinated backend migration; this calendar fix does not implement it.
- * Keep the threshold in step with `20260912000001_parental_consent.sql`
- * until that migration lands.
+ * `player_consent_required()` decide. This constant lets the UI ask the same
+ * question without a round trip; `consent-threshold-agreement.test.ts` fails
+ * if it drifts from the last migration that defines the function.
  */
 
-/** Mirrors `public.consent_threshold_age()`. Change both together. */
-export const CONSENT_THRESHOLD_AGE = 15
+/** Mirrors `public.consent_threshold_age()` (20260921120000). Change both together. */
+export const CONSENT_THRESHOLD_AGE = 18
 
 /**
  * Bump whenever the wording below changes. Stored on every consent record so

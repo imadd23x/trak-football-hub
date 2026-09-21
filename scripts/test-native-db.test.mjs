@@ -110,12 +110,17 @@ test('assessment upgrade applies current main, academy repair, then the unchange
   const replayed = [...sql.matchAll(/^\\echo \[stage\] (\d{14}_.+\.sql)$/gm)].map(match => match[1]);
   assert.equal(migrationCount, files.length);
   assert.deepEqual([...replayed].sort(), files, 'all migration files run exactly once');
-  assert.deepEqual(replayed.slice(-3), [
-    '20260918062345_preserve_academy_access_and_fk_cleanup.sql',
-    '20260920152925_preserve_closed_academy_history.sql',
-    '20260918080430_index_coach_assessment_history.sql',
-  ]);
-  assert.ok(replayed.indexOf('20260918133800_ai_quota_known_functions.sql') < replayed.length - 2);
+  // Invariants, not positions: the older index replays last of all; the
+  // academy migration immediately precedes its forward repair; migrations
+  // newer than the repair (#84 onward) legitimately sit between the two.
+  const academy = '20260918062345_preserve_academy_access_and_fk_cleanup.sql';
+  const repair = '20260920152925_preserve_closed_academy_history.sql';
+  const index = '20260918080430_index_coach_assessment_history.sql';
+  assert.equal(replayed.at(-1), index, 'the older index is applied last');
+  assert.equal(replayed[replayed.indexOf(repair) - 1], academy, 'academy migration immediately precedes its repair');
+  assert.ok(replayed.slice(0, replayed.indexOf(academy)).every(file => file < repair),
+    'everything before the academy migration was deployed before the repair');
+  assert.ok(replayed.indexOf('20260918133800_ai_quota_known_functions.sql') < replayed.indexOf(academy));
   assert.equal(replayed.indexOf('20260917205027_secure_parent_invites.sql'),
     replayed.indexOf('20260918070209_restrict_pilot_operational_views.sql') + 1);
   assert.deepEqual(suites, ['parent_invite_security.sql', 'pilot_view_security.sql',

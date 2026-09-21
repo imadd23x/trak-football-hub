@@ -225,7 +225,7 @@ async function seed() {
   if (!(await preflight())) return
 
   const created = { squadRows: 0, linked: 0, unlinked: 0, fixtures: 0, sessions: 0, notes: 0,
-                    matches: 0, assessments: 0, awards: 0, parents: 0, consents: 0 }
+                    matches: 0, assessments: 0, awards: 0, parents: 0, consents: 0, sharedFeedback: 0 }
 
   /* --- director + organisation ------------------------------------------ */
   heading('Director and organisation')
@@ -460,6 +460,32 @@ async function seed() {
       }
     }
     log(`matches: ${created.matches}, assessments: ${created.assessments}`)
+
+    /* Shared feedback. K9 (#44) made coach_assessment_notes coach-private, so
+       the player and parent screens now read coach_shared_feedback. Publish
+       one for every assessment that carries a note and has none yet, or the
+       seeded history shows no feedback at all. Runs on every pass, not only
+       when an assessment is created, so an academy seeded before K9 is
+       backfilled too. The UNIQUE on assessment_id is the second guard. */
+    const { data: noted, error: notedErr } = await supabase
+      .from('coach_assessment_notes').select('assessment_id, note').eq('coach_user_id', coach.id)
+    if (notedErr) log(`notes lookup: ${notedErr.message}`)
+    const { data: shared, error: sharedErr } = await supabase
+      .from('coach_shared_feedback').select('assessment_id').eq('coach_user_id', coach.id)
+    if (sharedErr) log(`shared feedback lookup: ${sharedErr.message}`)
+    const alreadyShared = new Set((shared ?? []).map(s => s.assessment_id))
+    for (const row of noted ?? []) {
+      if (alreadyShared.has(row.assessment_id)) continue
+      const { error } = await supabase.from('coach_shared_feedback').insert({
+        assessment_id: row.assessment_id,
+        coach_user_id: coach.id,
+        body: row.note,
+        published_at: new Date().toISOString(),
+      })
+      if (error) log(`shared feedback: ${error.message}`)
+      else created.sharedFeedback++
+    }
+    log(`shared feedback published this run: ${created.sharedFeedback}`)
 
     /* awards */
     const { data: haveAwards } = await supabase

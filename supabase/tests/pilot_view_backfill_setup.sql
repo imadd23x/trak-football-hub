@@ -1,3 +1,4 @@
+-- @trak-fixture
 -- Poison legacy ACLs before the operational-view repair. Everything is inside
 -- the disposable database, which the runner destroys after the suite.
 DO $test$

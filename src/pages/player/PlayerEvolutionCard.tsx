@@ -44,6 +44,25 @@ type CardSnapshot = {
 type PosGroup = 'gk' | 'def' | 'mid' | 'att'
 type EvoState = 'active' | 'done' | 'locked'
 
+/**
+ * The card's design width, and the width the export is forced to.
+ *
+ * The card itself is fluid — `width: 100%, maxWidth: CARD_W` — so on a narrow
+ * phone it renders smaller, which is correct on screen. It was NOT correct in
+ * the export: `captureElementToPng` was called without `width`, so the PNG
+ * inherited whatever the device happened to give it. Measured against the
+ * built app before this change:
+ *
+ *   320px viewport ->  840x1122      three different images
+ *   390px viewport -> 1050x1401      of the same card, and at 320 the
+ *   414px viewport -> 1080x1440      SPIRIT row and the whole SERIES 01
+ *                                    footer were missing entirely
+ *
+ * PlayerPassport already did this correctly with `width: CARD_W` and says why
+ * in its own comment. This is the second caller catching up, not a new idea.
+ */
+const CARD_W = 360
+
 const TIERS: Record<Tier, {
   ring: string; label: string; glow: string
   shimmerOpacity: number
@@ -474,6 +493,10 @@ export default function PlayerEvolutionCard() {
     try {
       const blob = await captureElementToPng(cardRef.current, {
         background: '#0A0A0B',
+        // Without this the PNG is whatever width the phone gave the card.
+        // See CARD_W: three viewports produced three different images, and
+        // the narrowest dropped a stat row and the footer.
+        width: CARD_W,
       })
       if (!blob) {
         toast.error('Could not render your card — please try again')
@@ -512,7 +535,7 @@ export default function PlayerEvolutionCard() {
             ref={cardRef}
             className="relative"
             style={{
-              width: '100%', maxWidth: 360, aspectRatio: '3 / 4',
+              width: '100%', maxWidth: CARD_W, aspectRatio: '3 / 4',
               borderRadius: 24, padding: 2,
               background: `conic-gradient(from 140deg, ${tier.ring}, rgba(255,255,255,0.04) 35%, ${tier.ring} 65%, rgba(255,255,255,0.04) 95%)`,
               boxShadow: `0 0 60px ${tier.glow}, 0 20px 60px rgba(0,0,0,0.6)`,
@@ -659,7 +682,7 @@ export default function PlayerEvolutionCard() {
           <button
             onClick={handleShare}
             style={{
-              width: '100%', maxWidth: 360,
+              width: '100%', maxWidth: CARD_W,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               padding: '14px 0', borderRadius: 14, border: 'none', cursor: 'pointer',
               background: tier.label,

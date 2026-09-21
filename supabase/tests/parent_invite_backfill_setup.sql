@@ -1,3 +1,4 @@
+-- @trak-fixture
 -- The disposable runner executes this after the historical migrations and
 -- immediately before secure_parent_invites. These are synthetic fixtures.
 DO $test$

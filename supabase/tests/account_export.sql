@@ -66,12 +66,33 @@ INSERT INTO public.coach_assessment_notes (assessment_id, coach_user_id, note) V
    'PRIVATE-COACH-NOTE-CANARY');
 
 -- One match each, so "only mine" is distinguishable from "none".
+--
+-- team_score is set deliberately rather than left to its default of 0.
+-- @imadd23x caught this on review: #76 added
+-- matches_goals_within_team_score (goals <= team_score), and Child A's row
+-- scored a goal in a match the fixture said finished 0-0. The constraint was
+-- right and the fixture was wrong — a player cannot score more than their team
+-- did, and this suite had been asserting an export of an impossible record
+-- since before the rule existed.
+--
+-- Child B's row keeps goals = 0 and takes a score anyway, so the two rows are
+-- not accidentally symmetrical: the canary that matters is the OPPONENT name,
+-- and both must survive the constraints for the "only mine" assertions to mean
+-- anything.
+--
+-- minutes_played is set for the same reason, and it is a SECOND violation the
+-- review did not reach: matches_no_minutes_no_contribution refuses goals or
+-- assists from a player with no minutes, and minutes_played also defaults to
+-- 0. The first constraint aborted the insert before the second could fire, so
+-- fixing only team_score moved the failure rather than removing it. Both rows
+-- now describe a match somebody could actually have played.
 INSERT INTO public.matches
-  (user_id, opponent, match_date, position, competition, venue, age_group, goals, assists) VALUES
+  (user_id, opponent, match_date, position, competition, venue, age_group,
+   team_score, opponent_score, minutes_played, goals, assists) VALUES
   ('11111111-0000-0000-0000-000000000002', 'CHILD-A-OPPONENT', current_date,
-   'mid', 'League', 'Home', 'U15', 1, 0),
+   'mid', 'League', 'Home', 'U15', 2, 1, 90, 1, 0),
   ('11111111-0000-0000-0000-000000000003', 'CHILD-B-OPPONENT', current_date,
-   'def', 'League', 'Away', 'U15', 0, 1);
+   'def', 'League', 'Away', 'U15', 0, 3, 90, 0, 1);
 
 
 -- ── 1. Child A exports ──────────────────────────────────────────────────

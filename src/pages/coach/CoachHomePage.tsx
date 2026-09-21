@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { MobileShell, NavBar, MetadataLabel, BandPill } from '@/components/trak'
+import { MobileShell, NavBar, MetadataLabel, BandPill, LoadError} from '@/components/trak'
 import { toast } from 'sonner'
 import { Zap } from 'lucide-react'
 import { scoreToBand } from '@/lib/rating-engine'
@@ -28,6 +28,7 @@ export default function CoachHomePage() {
   const [playerCount, setPlayerCount] = useState(0)
   const [assessments, setAssessments] = useState<any[]>([])
   const [allAssessments, setAllAssessments] = useState<any[]>([])
+  const [loadFailed, setLoadFailed] = useState(false)
   const [sessionCount, setSessionCount] = useState(0)
   const [coachDetails, setCoachDetails] = useState<any>(null)
   const [inviteCode, setInviteCode] = useState('TRK-XXXX')
@@ -47,6 +48,14 @@ export default function CoachHomePage() {
     // A response from a previous run must not overwrite the current one's
     // state on an Auth refresh for the same account.
     let cancelled = false
+    /* Union of two fixes that arrived on this file from opposite directions,
+       and I caused the overlap: #44 (this PR) already tracked a failed roster
+       and analytics read via analyticsFailed, and #79 then added loadFailed
+       for the SAME screen because I did not check what this branch already
+       had. Neither is redundant now — analyticsFailed guards the band strip
+       and distribution, loadFailed covers the two reads #44 never checked
+       (recent assessments, session count) and suppresses their false zeros.
+       Taking either side whole would have dropped the other's coverage. */
     supabase.from('squad_players').select('id, player_name').eq('coach_user_id', user.id)
       .then(({ data, error }) => {
         if (cancelled) return
@@ -58,6 +67,7 @@ export default function CoachHomePage() {
         if (error) {
           console.error('Squad read failed:', error)
           setAnalyticsFailed(true)
+          setLoadFailed(true)
           return
         }
         const players = data || []
@@ -71,11 +81,13 @@ export default function CoachHomePage() {
             if (assessError) {
               console.error('Assessment read failed:', assessError)
               setAnalyticsFailed(true)
+              setLoadFailed(true)
               return
             }
             const allAssess = allData || []
             setAllAssessments(allAssess)
             setAnalyticsFailed(false)
+            setLoadFailed(false)
             const analytics = calculateSquadAnalytics(players, allAssess)
             setSquadAnalytics(analytics)
             trackEvent('squad_analytics_viewed', {})
@@ -85,9 +97,9 @@ export default function CoachHomePage() {
       .eq('coach_user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5)
-      .then(({ data }) => setAssessments(data || []))
+      .then(({ data, error }) => { if (error) { setLoadFailed(true); return } setAssessments(data || []) })
     supabase.from('coach_sessions').select('id', { count: 'exact' }).eq('coach_user_id', user.id)
-      .then(({ count }) => setSessionCount(count || 0))
+      .then(({ count, error }) => { if (error) { setLoadFailed(true); return } setSessionCount(count || 0) })
     supabase.from('coach_details').select('current_club, team, coach_role').eq('user_id', user.id).maybeSingle()
       .then(({ data }) => setCoachDetails(data))
     supabase.from('profiles').select('invite_code').eq('user_id', user.id).maybeSingle()
@@ -192,6 +204,16 @@ export default function CoachHomePage() {
           </span>
         </div>
 
+        {/* A failed load must not be reported as a season with nothing in it.
+            Shown above the stats rather than replacing them, so anything that
+            DID load still reaches the coach — partial truth beats a blank
+            screen, and beats a confident zero. */}
+        {loadFailed && (
+          <div className="mb-4">
+            <LoadError what="your squad" />
+          </div>
+        )}
+
         {/* Identity section */}
         <div className="py-2.5 pb-4">
           <p className="text-xs" style={{ color: 'rgba(255,255,255,0.22)' }}>{greeting}</p>
@@ -269,7 +291,7 @@ export default function CoachHomePage() {
                   color: '#C8F25A',
                 }}
               >
-                {playerCount}
+                {loadFailed && playerCount === 0 ? '—' : playerCount}
               </p>
               <p
                 className="text-[9px] mt-1.5 tracking-[0.04em]"
@@ -310,7 +332,7 @@ export default function CoachHomePage() {
                 className="text-[13px] font-medium mt-1.5"
                 style={{ fontFamily: "'DM Sans', sans-serif", color: 'rgba(255,255,255,0.45)' }}
               >
-                {allAssessments.length} total
+                {loadFailed && allAssessments.length === 0 ? 'Not available' : `${allAssessments.length} total`}
               </p>
             </div>
           </div>

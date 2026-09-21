@@ -225,7 +225,7 @@ async function seed() {
   if (!(await preflight())) return
 
   const created = { squadRows: 0, linked: 0, unlinked: 0, fixtures: 0, sessions: 0, notes: 0,
-                    matches: 0, assessments: 0, awards: 0, parents: 0, consents: 0 }
+                    matches: 0, assessments: 0, awards: 0, parents: 0, consents: 0, sharedFeedback: 0 }
 
   /* --- director + organisation ------------------------------------------ */
   heading('Director and organisation')
@@ -397,6 +397,15 @@ async function seed() {
     } else
     for (let n = 0; n < claimed.length; n++) {
       const r = claimed[n]
+      /* PlayerHome shows the feedback card only for the LATEST assessment
+         (order('created_at', {ascending:false})), so a note has to land on
+         the actual last one this player gets — not just the last fixture
+         day, since the %6 and %4 skips below can remove the match or the
+         assessment for any given f. Tarek measured that without this, the
+         existing 1-in-3 note sampling put a note on the true latest
+         assessment for only 2 of 15 seeded players. lastF is the highest f
+         that survives both skips, i.e. the last f with a real assessment row. */
+      const lastF = [...fixtureDays.keys()].filter(f => (n + f) % 6 && (n + f) % 4).at(-1)
       for (let f = 0; f < fixtureDays.length; f++) {
         /* one fixture in six goes unlogged, so coverage is not a flat 100% */
         if ((n + f) % 6 === 0) continue
@@ -443,11 +452,12 @@ async function seed() {
         if (aErr) log(`assessment for ${r.player_name}: ${aErr.message}`)
         else {
           created.assessments++
-          /* A written note on roughly every third assessment. PlayerHome only
-             renders the feedback card when an assessment HAS a note, so with
-             none the player has no route into /player/feedback at all — and
-             the H2 question, does written coach feedback land, is unaskable. */
-          if ((n + f) % 3 === 0 && aRow?.id) {
+          /* A written note on roughly every third assessment, plus always on
+             the last one (f === lastF) so every player's latest assessment
+             — the one PlayerHome actually shows — has a route into
+             /player/feedback, not just whichever player the %3 sampling
+             happens to hit. */
+          if (((n + f) % 3 === 0 || f === lastF) && aRow?.id) {
             const { error: nErr } = await supabase.from('coach_assessment_notes').insert({
               assessment_id: aRow.id,
               coach_user_id: coach.id,
@@ -460,6 +470,32 @@ async function seed() {
       }
     }
     log(`matches: ${created.matches}, assessments: ${created.assessments}`)
+
+    /* Shared feedback. K9 (#44) made coach_assessment_notes coach-private, so
+       the player and parent screens now read coach_shared_feedback. Publish
+       one for every assessment that carries a note and has none yet, or the
+       seeded history shows no feedback at all. Runs on every pass, not only
+       when an assessment is created, so an academy seeded before K9 is
+       backfilled too. The UNIQUE on assessment_id is the second guard. */
+    const { data: noted, error: notedErr } = await supabase
+      .from('coach_assessment_notes').select('assessment_id, note').eq('coach_user_id', coach.id)
+    if (notedErr) log(`notes lookup: ${notedErr.message}`)
+    const { data: shared, error: sharedErr } = await supabase
+      .from('coach_shared_feedback').select('assessment_id').eq('coach_user_id', coach.id)
+    if (sharedErr) log(`shared feedback lookup: ${sharedErr.message}`)
+    const alreadyShared = new Set((shared ?? []).map(s => s.assessment_id))
+    for (const row of noted ?? []) {
+      if (alreadyShared.has(row.assessment_id)) continue
+      const { error } = await supabase.from('coach_shared_feedback').insert({
+        assessment_id: row.assessment_id,
+        coach_user_id: coach.id,
+        body: row.note,
+        published_at: new Date().toISOString(),
+      })
+      if (error) log(`shared feedback: ${error.message}`)
+      else created.sharedFeedback++
+    }
+    log(`shared feedback published this run: ${created.sharedFeedback}`)
 
     /* awards */
     const { data: haveAwards } = await supabase

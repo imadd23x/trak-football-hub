@@ -105,7 +105,7 @@ const ordered = entries => entries.slice()
   .sort((a, b) => a.order - b.order || a.file.localeCompare(b.file)).map(e => e.file);
 const modes = [...new Set(['--all', '--baseline', '--pilot-views-review',
   '--pilot-views-baseline', '--parent-upgrade-review', '--coach-departure-baseline',
-  '--academy-upgrade-review', ...registry.keys()])];
+  '--academy-upgrade-review', '--assessment-upgrade-review', ...registry.keys()])];
 if (args.length > 1 || !modes.includes(mode)) {
   throw new Error(`Usage: node scripts/test-db.mjs [${modes.join(' | ')}]`);
 }
@@ -114,6 +114,7 @@ const pilotViewsBaseline = mode === '--pilot-views-baseline';
 const parentUpgrade = mode === '--parent-upgrade-review';
 const academyBaseline = mode === '--coach-departure-baseline';
 const academyUpgrade = mode === '--academy-upgrade-review';
+const assessmentUpgrade = mode === '--assessment-upgrade-review';
 const migrationFiles = validateMigrationFiles(await readdir(resolve(root, 'supabase/migrations')));
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
@@ -156,12 +157,13 @@ try {
   const description = baseline || pilotViewsBaseline || academyBaseline
     ? ' (vulnerable baseline; security assertions should fail)'
     : parentUpgrade ? ' (deployed reports first, then parent upgrade)'
-      : academyUpgrade ? ' (deployed main first, then academy repair)' : ' with backfill assertions';
+      : assessmentUpgrade ? ' (deployed main first, then academy repair, then assessment index)'
+        : academyUpgrade ? ' (deployed main first, then academy repair)' : ' with backfill assertions';
   console.log(`Replayed ${migrations.length} migrations${description}.`);
   const suites = registry.has(mode) ? ordered(registry.get(mode))
     : baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
-    : academyBaseline || academyUpgrade ? ordered(registry.get('--coach-departure-review'))
+    : academyBaseline || academyUpgrade || assessmentUpgrade ? ordered(registry.get('--coach-departure-review'))
     // --all runs every in-all suite, so a regression is caught by the command
     // everyone already runs rather than only by a bespoke one.
     : ordered(inAll);

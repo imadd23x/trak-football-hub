@@ -104,11 +104,41 @@ test('academy upgrade preserves dependencies before the older repair and its for
   assert.match(sql, /deployed main first, then academy repair/);
 });
 
+test('assessment upgrade applies current main, academy repair, then the unchanged older index', async () => {
+  const files = (await readdir(join(root, 'supabase/migrations'))).filter(file => file.endsWith('.sql')).sort();
+  const { sql, migrationCount, suites } = await buildReplayPlan(root, parseMode(['--assessment-upgrade-review']));
+  const replayed = [...sql.matchAll(/^\\echo \[stage\] (\d{14}_.+\.sql)$/gm)].map(match => match[1]);
+  assert.equal(migrationCount, files.length);
+  assert.deepEqual([...replayed].sort(), files, 'all migration files run exactly once');
+  // Invariants, not positions: the older index replays last of all; the
+  // academy migration immediately precedes its forward repair; migrations
+  // newer than the repair (#84 onward) legitimately sit between the two.
+  const academy = '20260918062345_preserve_academy_access_and_fk_cleanup.sql';
+  const repair = '20260920152925_preserve_closed_academy_history.sql';
+  const index = '20260918080430_index_coach_assessment_history.sql';
+  assert.equal(replayed.at(-1), index, 'the older index is applied last');
+  assert.equal(replayed[replayed.indexOf(repair) - 1], academy, 'academy migration immediately precedes its repair');
+  assert.ok(replayed.slice(0, replayed.indexOf(academy)).every(file => file < repair),
+    'everything before the academy migration was deployed before the repair');
+  assert.ok(replayed.indexOf('20260918133800_ai_quota_known_functions.sql') < replayed.indexOf(academy));
+  assert.equal(replayed.indexOf('20260917205027_secure_parent_invites.sql'),
+    replayed.indexOf('20260918070209_restrict_pilot_operational_views.sql') + 1);
+  assert.deepEqual(suites, ['parent_invite_security.sql', 'pilot_view_security.sql',
+    'privilege_and_consent_security.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql',
+    'coach_departure_review.sql', 'academy_access_security.sql',
+    'account_deletion_setup.sql', 'account_deletion_assertions.sql']);
+  assert.match(sql, /deployed main first, then academy repair and forward corrections, then assessment index/);
+});
+
 test('upgrade modes fail if their required historical migrations are missing', () => {
   assert.throws(() => migrationReplayOrder([], '--parent-upgrade-review'), /requires both original/);
   assert.throws(() => migrationReplayOrder([
     '20260917205027_secure_parent_invites.sql', '20260918070209_restrict_pilot_operational_views.sql',
   ], '--academy-upgrade-review'), /requires the original academy migration/);
+  assert.throws(() => migrationReplayOrder([
+    '20260917205027_secure_parent_invites.sql', '20260918070209_restrict_pilot_operational_views.sql',
+    '20260918062345_preserve_academy_access_and_fk_cleanup.sql',
+  ], '--assessment-upgrade-review'), /requires the original index migration/);
 });
 
 test('negative controls exclude the corresponding repair while retaining its failing suite', async () => {

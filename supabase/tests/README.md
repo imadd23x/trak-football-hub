@@ -34,6 +34,10 @@ For the optional Supabase security advisor, set `TRAK_TEST_SUPABASE_BIN` to the 
 
 `npm run test:db:runner` checks process deadlines/failures, environment isolation and replay selection without starting PostgreSQL. Native sequential SQL checks still do not establish concurrency, real Auth/Storage APIs, email delivery or live deployment.
 
+## Assessment index upgrade
+
+`npm run test:db -- --assessment-upgrade-review` checks the dependent PR37 migration in the intended release order: all current-main migrations, then the older academy repair, then the unchanged assessment index. It retains the report-before-P1 order and all six security suite files. `npm run test:db:query-plans` now uses that same ordering on native PostgreSQL 17 before its authenticated index-absent/index-present comparison; CI requires both checks. `npm run test:db:native -- --assessment-upgrade-review` is also available for the sequential upgrade alone. See the [refreshed PR37 evidence](../../docs/reviews/query-main-0091094-refresh.md). Fresh filename-order replay remains covered separately.
+
 ## Concurrent player linking
 
 `npm run test:db:concurrency` creates another private PostgreSQL 17 cluster, performs the real replay, then races two authenticated RPC connections. A third connection holds a table/row lock until both callers are observed waiting with distinct backend PIDs. It checks same-player calls with an empty roster and an existing stub, plus two different players competing for a stub. Assertions require correct returned-row ownership, no duplicates and retained stub history. A pair-scoped transaction lock makes repeated calls return the same row.

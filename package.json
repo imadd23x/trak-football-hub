@@ -18,6 +18,7 @@
     "test:db:native": "node scripts/test-native-db.mjs",
     "test:db:runner": "node --test scripts/test-native-db.test.mjs",
     "test:db:concurrency": "node scripts/test-link-concurrency.mjs",
+    "test:db:query-plans": "node scripts/test-query-performance.mjs",
     "test:db:pilot-views": "node scripts/test-db.mjs --pilot-views-review",
     "test:db:convergence": "node scripts/check-migration-convergence.mjs",
     "test:db:academy-history": "node scripts/test-academy-history.mjs",

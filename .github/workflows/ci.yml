@@ -59,6 +59,9 @@ jobs:
       - name: Academy repair after current main migrations
         run: npm run test:db -- --academy-upgrade-review
 
+      - name: Assessment index after current main and academy repair
+        run: npm run test:db -- --assessment-upgrade-review
+
       - name: Academy history convergence and mutation controls
         run: npm run test:db:academy-history
 
@@ -77,6 +80,20 @@ jobs:
         run: npm run test:db:concurrency
         env:
           TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+
+      - name: Native assessment query plan and result regressions
+        run: npm run test:db:query-plans
+        env:
+          TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+
+      - name: Preserve synthetic query plans
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-assessment-query-plans
+          path: /tmp/trak-query-report-*/report.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Native PostgreSQL academy upgrade after current main
         run: npm run test:db:native -- --academy-upgrade-review

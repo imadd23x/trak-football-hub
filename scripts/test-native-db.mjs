@@ -14,11 +14,12 @@ const outputLimit = 16 * 1024;
 const securityMigration = '20260917205027_secure_parent_invites.sql';
 const academyMigration = '20260918062345_preserve_academy_access_and_fk_cleanup.sql';
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
+const assessmentMigration = '20260918080430_index_coach_assessment_history.sql';
 const historyRepairMigration = '20260920152925_preserve_closed_academy_history.sql';
 
 export function parseMode(args) {
-  if (args.length > 1 || (args.length && !['--baseline', '--coach-departure-baseline', '--academy-upgrade-review'].includes(args[0]))) {
-    throw new Error('Usage: node scripts/test-native-db.mjs [--baseline | --coach-departure-baseline | --academy-upgrade-review]');
+  if (args.length > 1 || (args.length && !['--baseline', '--coach-departure-baseline', '--academy-upgrade-review', '--assessment-upgrade-review'].includes(args[0]))) {
+    throw new Error('Usage: node scripts/test-native-db.mjs [--baseline | --coach-departure-baseline | --academy-upgrade-review | --assessment-upgrade-review]');
   }
   return args[0] ?? 'all';
 }
@@ -27,20 +28,26 @@ export function parseMode(args) {
 // migrations. PR35 preceded P1 in deployment; PR34 is still unapplied on main.
 export function migrationReplayOrder(files, mode) {
   const migrations = [...files].sort();
-  if (mode === '--parent-upgrade-review' || mode === '--academy-upgrade-review') {
+  const assessmentUpgrade = mode === '--assessment-upgrade-review';
+  if (mode === '--parent-upgrade-review' || mode === '--academy-upgrade-review' || assessmentUpgrade) {
     if (!migrations.includes(securityMigration) || !migrations.includes(pilotViewsMigration)) {
       throw new Error('Upgrade review requires both original parent and pilot-view migration files');
     }
     migrations.splice(migrations.indexOf(securityMigration), 1);
     migrations.splice(migrations.indexOf(pilotViewsMigration) + 1, 0, securityMigration);
   }
-  if (mode === '--academy-upgrade-review') {
+  if (mode === '--academy-upgrade-review' || assessmentUpgrade) {
     if (!migrations.includes(academyMigration)) throw new Error('Academy upgrade review requires the original academy migration');
     migrations.splice(migrations.indexOf(academyMigration), 1);
     // The old migration is pending after the deployed dependency, but must
     // never run after the forward repair which reconciles their definitions.
     const forwardIndex = migrations.findIndex(file => file >= historyRepairMigration);
     migrations.splice(forwardIndex < 0 ? migrations.length : forwardIndex, 0, academyMigration);
+  }
+  if (assessmentUpgrade) {
+    if (!migrations.includes(assessmentMigration)) throw new Error('Assessment upgrade review requires the original index migration');
+    migrations.splice(migrations.indexOf(assessmentMigration), 1);
+    migrations.push(assessmentMigration);
   }
   return migrations;
 }
@@ -82,7 +89,7 @@ export async function buildReplayPlan(projectRoot, mode) {
     if (file === academyMigration) fixture('academy_orphan_backfill_assertions.sql');
   }
   const suites = mode === '--baseline' ? ['parent_invite_security.sql'] : [
-    ...(mode === 'all' || mode === '--academy-upgrade-review' ? ['parent_invite_security.sql', 'pilot_view_security.sql',
+    ...(mode === 'all' || mode === '--academy-upgrade-review' || mode === '--assessment-upgrade-review' ? ['parent_invite_security.sql', 'pilot_view_security.sql',
       'privilege_and_consent_security.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql'] : []),
     'coach_departure_review.sql', 'academy_access_security.sql',
     // These committed fixtures must stay LAST; earlier suites assume a clean DB.
@@ -93,7 +100,8 @@ export async function buildReplayPlan(projectRoot, mode) {
   for (const step of steps) {
     sql += `\\echo [stage] ${step.name}\n${await readFile(step.path, 'utf8')}\n`;
   }
-  const description = mode === '--academy-upgrade-review' ? '; deployed main first, then academy repair and forward corrections.'
+  const description = mode === '--assessment-upgrade-review' ? '; deployed main first, then academy repair and forward corrections, then assessment index.'
+    : mode === '--academy-upgrade-review' ? '; deployed main first, then academy repair and forward corrections.'
     : mode === 'all' ? ' with backfill assertions.' : '; vulnerable baseline MUST fail.';
   sql += `\\echo [native-db] Replayed ${migrations.length} migrations${description}\n`;
   for (const suite of suites) {

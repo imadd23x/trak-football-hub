@@ -511,4 +511,127 @@ SELECT pg_temp.assert_true(
 RESET ROLE;
 SELECT set_config('request.jwt.claims', NULL, true);
 
+
+-- ── Withdrawn consent retracts what was already published ────────────────
+--
+-- @imadd23x asked, approving #44, whether it was intended that these reads did
+-- not re-check consent the way #40's player_feedback does. It was not. 20260921110000
+-- closes it, and this is the proof.
+--
+-- A THIRD child is needed, with a date of birth. The two above have none, and
+-- player_consent_required() COALESCEs a NULL age to false — so consent is never
+-- REQUIRED for them and the new clause would be a silent no-op. A suite that
+-- added the assertion without the fixture would have passed against the
+-- unfixed policies.
+RESET ROLE;
+
+INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
+  ('a0000000-0000-0000-0000-0000000000c1', 'childC@k9.test',  now()),
+  ('b0000000-0000-0000-0000-0000000000c1', 'parentC@k9.test', now());
+INSERT INTO public.profiles (user_id, role, full_name) VALUES
+  ('a0000000-0000-0000-0000-0000000000c1', 'player', 'Child C'),
+  ('b0000000-0000-0000-0000-0000000000c1', 'parent', 'Parent C');
+
+-- Twelve years old: below any threshold the pilot might settle on, so this
+-- fixture does not silently stop testing anything if the number moves.
+INSERT INTO public.player_details (user_id, date_of_birth)
+VALUES ('a0000000-0000-0000-0000-0000000000c1', current_date - interval '12 years');
+
+INSERT INTO public.player_parent_links (player_user_id, parent_user_id)
+VALUES ('a0000000-0000-0000-0000-0000000000c1',
+        'b0000000-0000-0000-0000-0000000000c1');
+
+INSERT INTO public.squad_players (id, coach_user_id, linked_player_id, player_name, status)
+VALUES ('c0000000-0000-0000-0000-0000000000c1',
+        'a0000000-0000-0000-0000-000000000001',
+        'a0000000-0000-0000-0000-0000000000c1', 'Child C', 'active');
+
+-- Consent granted, so the assessment and its published feedback may exist at
+-- all — the INSERT policies have gated on consent since 20260912000001.
+-- Recorded AS the parent: the RPC reads auth.uid() and requires the caller to
+-- be the linked guardian. Purposes must include coaching_records, per
+-- 20260919120002, or the grant satisfies the gate without granting anything.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"b0000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+SELECT public.record_parental_consent(
+  'a0000000-0000-0000-0000-0000000000c1', 'parent',
+  '{"coaching_records": true}'::jsonb,
+  'test-notice-v1', 'Synthetic consent wording for the disposable harness.');
+RESET ROLE;
+SELECT set_config('request.jwt.claims', NULL, true);
+
+INSERT INTO public.coach_assessments (id, squad_player_id, coach_user_id, work_rate)
+VALUES ('d0000000-0000-0000-0000-0000000000c1',
+        'c0000000-0000-0000-0000-0000000000c1',
+        'a0000000-0000-0000-0000-000000000001', 7);
+INSERT INTO public.coach_shared_feedback (assessment_id, coach_user_id, body, published_at)
+VALUES ('d0000000-0000-0000-0000-0000000000c1',
+        'a0000000-0000-0000-0000-000000000001',
+        'CONSENT-WITHDRAWAL-CANARY', now());
+
+-- POSITIVE CONTROLS, while consent holds. Without these, the refusals below
+-- would pass for a fixture that was simply never readable.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback
+    WHERE body = 'CONSENT-WITHDRAWAL-CANARY') = 1,
+  'K9 control: with consent, the child reads their published feedback');
+
+SELECT set_config('request.jwt.claims',
+  '{"sub":"b0000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback
+    WHERE body = 'CONSENT-WITHDRAWAL-CANARY') = 1,
+  'K9 control: with consent, the linked parent reads it too');
+
+-- The guardian withdraws, as themselves.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"b0000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+SELECT public.withdraw_parental_consent('a0000000-0000-0000-0000-0000000000c1');
+RESET ROLE;
+SELECT set_config('request.jwt.claims', NULL, true);
+
+SELECT pg_temp.assert_true(
+  public.squad_player_consent_required('c0000000-0000-0000-0000-0000000000c1'),
+  'K9 control: withdrawal actually put the roster row back behind the gate');
+
+-- THE assertions. published_at is untouched; only access changes.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback
+    WHERE body = 'CONSENT-WITHDRAWAL-CANARY') = 0,
+  'K9: withdrawn consent stops the child reading feedback published while it held');
+
+SELECT set_config('request.jwt.claims',
+  '{"sub":"b0000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback
+    WHERE body = 'CONSENT-WITHDRAWAL-CANARY') = 0,
+  'K9: and stops the withdrawing parent reading it themselves');
+
+-- The coach must NOT be locked out of their own words. A coach who cannot see
+-- what they wrote cannot retract it, which is the one action withdrawal should
+-- make easier rather than impossible.
+SELECT set_config('request.jwt.claims',
+  '{"sub":"a0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback
+    WHERE body = 'CONSENT-WITHDRAWAL-CANARY') = 1,
+  'K9: the coach still reads their own feedback after withdrawal, so they can retract it');
+
+-- Nothing was deleted or unpublished: consent granted again restores access
+-- with no coach action. Withdrawal suspends, it does not rewrite.
+RESET ROLE;
+SELECT set_config('request.jwt.claims', NULL, true);
+SELECT pg_temp.assert_true(
+  (SELECT published_at IS NOT NULL FROM public.coach_shared_feedback
+    WHERE body = 'CONSENT-WITHDRAWAL-CANARY'),
+  'K9: withdrawal suspends access without unpublishing the row');
+
 ROLLBACK;

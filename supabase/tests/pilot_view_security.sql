@@ -1,3 +1,4 @@
+-- @trak-suite mode=--pilot-views-review in-all=true
 -- Synthetic fixtures only. Run after real migrations in a disposable database.
 -- Assertions use actual database roles; even unexpected successful writes are
 -- rolled back inside expect_denied so the vulnerable baseline can report all failures.

@@ -1,3 +1,4 @@
+-- @trak-fixture
 -- Minimal Supabase platform boundary for disposable PostgreSQL tests.
 -- App schema, functions, triggers, grants and RLS come from real migrations.
 -- No HTTP Auth, Storage service, production connection or real identities.

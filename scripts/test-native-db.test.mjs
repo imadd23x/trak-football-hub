@@ -76,8 +76,16 @@ test('academy upgrade preserves dependencies before the older repair and its for
   const replayed = stages.filter(file => /^\d{14}_/.test(file));
   assert.equal(migrationCount, files.length);
   assert.deepEqual([...replayed].sort(), files, 'no migration omitted, duplicated, or replaced');
-  assert.equal(replayed.at(-1), '20260920152925_preserve_closed_academy_history.sql');
-  assert.equal(replayed.at(-2), academy);
+  // The invariant is adjacency, not position: the old academy migration replays
+  // immediately before its forward repair, after everything deployed before that
+  // repair. "Repair is last" was only true until the next migration merged — #84's
+  // 20260921110000 sorts after it and legitimately follows it.
+  const repair = '20260920152925_preserve_closed_academy_history.sql';
+  assert.equal(replayed[replayed.indexOf(repair) - 1], academy, 'academy migration immediately precedes its forward repair');
+  assert.ok(replayed.slice(0, replayed.indexOf(academy)).every(file => file < repair),
+    'everything before the academy migration was deployed before the repair');
+  assert.ok(replayed.slice(replayed.indexOf(repair) + 1).every(file => file > repair),
+    'only migrations newer than the repair follow it');
   assert.ok(replayed.indexOf('20260918133800_ai_quota_known_functions.sql') < replayed.indexOf(academy));
   assert.equal(replayed.indexOf(parent), replayed.indexOf(pilot) + 1, 'preserve the deployed report-before-parent upgrade order');
   for (const [setup, migration, assertions] of [

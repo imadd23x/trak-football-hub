@@ -123,7 +123,14 @@ async function writeProfileFromPendingData(
     let sent = false;
     let detail = '';
     try {
-      const { data: result, error } = await account.client.functions.invoke('send-parent-invite');
+      // F-5: bind the send to the address THIS signup supplied. Without
+      // parent_email the handler guesses "any of the caller's own active
+      // invites" — safe for a fresh account, wrong the moment this account
+      // already had a pending invite for a different child (a duplicate-email
+      // signup, or a retried repair) and picks that one instead.
+      const { data: result, error } = await account.client.functions.invoke('send-parent-invite', {
+        body: { parent_email: data.parent_email },
+      });
       let body = result as { sent?: boolean; via?: string; reason?: string; detail?: string } | null;
       if (error && !body) {
         // On a non-2xx the body is on the error's response, not in `data`.

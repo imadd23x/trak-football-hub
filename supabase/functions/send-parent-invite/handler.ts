@@ -35,6 +35,8 @@ export const json = (body: Record<string, unknown>, status = 200) => new Respons
 const active = (invite: DeliveryInvite, now: number) =>
   invite.status === 'pending' && Date.parse(invite.expires_at) > now;
 
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
 /** Real request flow, with external clients injected so auth/RPC/email failures
  * can be tested without a Deno runtime or sending any email. */
 export async function handleInviteRequest(req: Request, deps: InviteDeliveryDependencies): Promise<Response> {
@@ -53,20 +55,28 @@ export async function handleInviteRequest(req: Request, deps: InviteDeliveryDepe
     if (roleError) return json({ sent: false, error: 'Could not verify your player account', detail: roleError.message }, 500);
     if (role !== 'player') return json({ sent: false, error: 'Only players can send parent invitations', reason: 'player_required' }, 403);
 
-    let body: { invite_id?: string; resend?: boolean };
+    let body: { invite_id?: string; resend?: boolean; parent_email?: string };
     try {
       const text = await req.text();
       const value: unknown = text.trim() ? JSON.parse(text) : {};
       if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid body');
       const input = value as Record<string, unknown>;
-      if (Object.keys(input).some(key => key !== 'invite_id' && key !== 'resend') ||
+      if (Object.keys(input).some(key => key !== 'invite_id' && key !== 'resend' && key !== 'parent_email') ||
           (input.invite_id !== undefined && (typeof input.invite_id !== 'string' ||
             !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.invite_id))) ||
           (input.resend !== undefined && typeof input.resend !== 'boolean') ||
-          (input.resend === true && !input.invite_id)) throw new Error('Invalid body');
+          (input.resend === true && !input.invite_id) ||
+          (input.parent_email !== undefined && (typeof input.parent_email !== 'string' ||
+            input.parent_email.trim() === '' || input.parent_email.length > 320)) ||
+          // Kept as two separate request shapes: an explicit resend picks one of the
+          // caller's own invites by ID from a list they can already see; a provisioning
+          // call narrows by address instead, because it has no ID to pick from and must
+          // never fall back to "any of this caller's active invites" — see below.
+          (input.parent_email !== undefined && (input.invite_id !== undefined || input.resend !== undefined)))
+        throw new Error('Invalid body');
       body = input as typeof body;
     } catch {
-      return json({ sent: false, error: 'Use an invitation ID and a boolean resend flag; resend requires an ID', reason: 'invalid_request' }, 400);
+      return json({ sent: false, error: 'Use an invitation ID and a boolean resend flag, or a parent_email; not both', reason: 'invalid_request' }, 400);
     }
 
     // This is a caller-authenticated RPC, never a service-role table lookup.
@@ -75,14 +85,22 @@ export async function handleInviteRequest(req: Request, deps: InviteDeliveryDepe
     if (lookupError) return json({ sent: false, error: 'Could not look up the invitation', detail: lookupError.message }, 500);
     const own = (rows ?? []).filter(invite => invite.player_user_id === caller.id);
     const now = deps.now ?? Date.now;
+    // parent_email is NEVER a destination — it only narrows which of the caller's
+    // OWN already-created invite rows may be selected. A caller with two pending
+    // invites for two different children (the duplicate-email-signup shape F-5
+    // found) must not have the wrong one picked implicitly; a supplied address
+    // that matches none of their own rows finds nothing, never "the next one".
+    const wantEmail = body.parent_email !== undefined ? normalizeEmail(body.parent_email) : null;
+    const matchesWant = (row: DeliveryInvite) => wantEmail === null || normalizeEmail(row.parent_email) === wantEmail;
     let invite = body.invite_id
       ? own.find(row => row.id === body.invite_id)
-      : own.find(row => active(row, now()));
+      : own.find(row => active(row, now()) && matchesWant(row));
     if (!invite) {
-      if (!body.invite_id && own.some(row => row.status === 'pending')) {
+      const relevant = own.filter(matchesWant);
+      if (!body.invite_id && relevant.some(row => row.status === 'pending')) {
         return json({ sent: false, reason: 'invite_expired', detail: 'This invitation expired. Resend it to create a new seven-day link.' }, 409);
       }
-      if (!body.invite_id && own.some(row => row.status === 'accepted')) return json({ sent: false, reason: 'already_accepted' });
+      if (!body.invite_id && relevant.some(row => row.status === 'accepted')) return json({ sent: false, reason: 'already_accepted' });
       return json({ sent: false, reason: 'no_invite' }, 404);
     }
     if (invite.status === 'accepted') return json({ sent: false, reason: 'already_accepted' });

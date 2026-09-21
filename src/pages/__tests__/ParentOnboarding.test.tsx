@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -285,5 +286,43 @@ describe('verified parent invitation flow', () => {
     expect(state.rpc).not.toHaveBeenCalledWith('provision_my_profile', expect.anything());
     expect(state.refresh).not.toHaveBeenCalled();
     expect(screen.queryByText('Consent next')).not.toBeInTheDocument();
+  });
+});
+
+
+describe('parent password visibility', () => {
+  it('reveals an existing parent password without submitting sign-in and hides it after changing methods', async () => {
+    state.user = null; state.role = null;
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole('button', { name: 'Sign in with password' }));
+    const password = screen.getByLabelText('Password');
+    await user.type(password, 'SyntheticOnly1!');
+    await user.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(password).toHaveAttribute('type', 'text');
+    expect(password).toHaveValue('SyntheticOnly1!');
+    expect(password).toHaveAttribute('autocomplete', 'current-password');
+    expect(state.signIn).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Use an email sign-in link' }));
+    await user.click(screen.getByRole('button', { name: 'Sign in with password' }));
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
+  });
+
+  it('reveals setup passwords independently without changing the verified account', async () => {
+    state.role = null;
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: 'Set up parent account' });
+    fillSetup();
+    await user.click(screen.getByRole('button', { name: 'Show new password' }));
+    expect(screen.getByLabelText('New password')).toHaveAttribute('type', 'text');
+    expect(screen.getByLabelText('Confirm password')).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText('New password')).toHaveValue('StrongNew1!');
+    await user.click(screen.getByRole('button', { name: 'Show confirm password' }));
+    expect(screen.getByLabelText('Confirm password')).toHaveAttribute('type', 'text');
+    expect(state.fetch).not.toHaveBeenCalled();
+    expect(state.updateUser).not.toHaveBeenCalled();
+    expect(state.rpc).not.toHaveBeenCalledWith('accept_parent_invite', expect.anything());
   });
 });

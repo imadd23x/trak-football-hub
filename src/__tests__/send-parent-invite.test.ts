@@ -81,16 +81,93 @@ describe('parent invite email request boundary', () => {
   });
 
   it.each([
-    { parent_email: 'attacker@example.test' },
     { player_user_id: 'someone-else' },
     { resend: true },
     { invite_id: 'invalid' },
     { invite_id: inviteId, resend: 'yes' },
+    { parent_email: '' },
+    { parent_email: '   ' },
+    { parent_email: 123 },
+    { parent_email: 'x@example.test'.padEnd(321, 'a') },
+    { parent_email: pending.parent_email, invite_id: inviteId },
+    { parent_email: pending.parent_email, resend: true },
   ])('rejects untrusted or malformed request fields: %j', async body => {
     const deps = dependencies();
     expect((await handleInviteRequest(request(body), deps)).status).toBe(400);
     expect(deps.listInvites).not.toHaveBeenCalled();
     expect(deps.sendInvite).not.toHaveBeenCalled();
+  });
+
+  describe('F-5: binding the send to the address this call supplied', () => {
+    const otherChildInvite: DeliveryInvite = {
+      ...pending,
+      id: otherId,
+      invite_token: '50000000-0000-4000-8000-000000000003',
+      parent_email: 'other-guardian@example.test',
+    };
+
+    it('POSITIVE: mails the invite whose stored address matches the supplied parent_email', async () => {
+      const deps = dependencies();
+      deps.listInvites.mockResolvedValue({ data: [otherChildInvite, pending], error: null });
+      const response = await handleInviteRequest(request({ parent_email: pending.parent_email }), deps);
+      expect(response.status).toBe(200);
+      expect(deps.sendInvite).toHaveBeenCalledWith(pending.parent_email, 'https://trakfootball.test/parent-invite');
+    });
+
+    it('CONTROL: the positive case really does send (a handler that never sends cannot pass the negative for the right reason)', async () => {
+      const deps = dependencies();
+      const response = await handleInviteRequest(request({ parent_email: pending.parent_email }), deps);
+      expect(response.status).toBe(200);
+      expect(deps.sendInvite).toHaveBeenCalledOnce();
+    });
+
+    it('NEGATIVE: never mails a different child\'s guardian when the supplied address does not match', async () => {
+      // The exact F-5 shape: the caller's only pending invite belongs to a
+      // different child (say, the account's earlier onboarding). A duplicate
+      // signup for a second child supplies its own parent_email, which does
+      // not exist among this caller's invites yet.
+      const deps = dependencies();
+      deps.listInvites.mockResolvedValue({ data: [otherChildInvite], error: null });
+      const response = await handleInviteRequest(request({ parent_email: 'new-guardian@example.test' }), deps);
+      expect(await response.json()).toMatchObject({ sent: false, reason: 'no_invite' });
+      expect(deps.sendInvite).not.toHaveBeenCalled();
+      expect(deps.sendInvite).not.toHaveBeenCalledWith(otherChildInvite.parent_email, expect.anything());
+    });
+
+    it('does not fall back to another active invite when the supplied address matches none', async () => {
+      const deps = dependencies();
+      deps.listInvites.mockResolvedValue({ data: [pending], error: null });
+      const response = await handleInviteRequest(request({ parent_email: 'nobody@example.test' }), deps);
+      expect(response.status).toBe(404);
+      expect(deps.sendInvite).not.toHaveBeenCalled();
+    });
+
+    it('matches the supplied address case-insensitively and trims it', async () => {
+      const deps = dependencies();
+      const response = await handleInviteRequest(
+        request({ parent_email: `  ${pending.parent_email.toUpperCase()}  ` }), deps,
+      );
+      expect(response.status).toBe(200);
+      expect(deps.sendInvite).toHaveBeenCalledWith(pending.parent_email, 'https://trakfootball.test/parent-invite');
+    });
+
+    it('reports the matching invite as expired rather than falling through to no_invite', async () => {
+      const deps = dependencies();
+      deps.listInvites.mockResolvedValue({ data: [{ ...pending, expires_at: '2026-09-17T00:00:00Z' }], error: null });
+      const response = await handleInviteRequest(request({ parent_email: pending.parent_email }), deps);
+      expect(await response.json()).toMatchObject({ sent: false, reason: 'invite_expired' });
+      expect(deps.sendInvite).not.toHaveBeenCalled();
+    });
+
+    it('reports already_accepted only when the matching invite is the one accepted', async () => {
+      const deps = dependencies();
+      deps.listInvites.mockResolvedValue({
+        data: [{ ...pending, status: 'accepted' }, otherChildInvite], error: null,
+      });
+      const response = await handleInviteRequest(request({ parent_email: pending.parent_email }), deps);
+      expect(await response.json()).toMatchObject({ sent: false, reason: 'already_accepted' });
+      expect(deps.sendInvite).not.toHaveBeenCalled();
+    });
   });
 
   it('does not mail or renew an invitation belonging to another player', async () => {

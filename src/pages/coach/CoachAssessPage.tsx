@@ -227,9 +227,25 @@ function CoachAssessmentForm() {
     [players, playerId],
   )
 
+  /* Parental consent. Since #80 every player under 18 needs a parent's
+     approval before a coach can assess them, and the database refuses the
+     insert until then. Ask the SAME predicate the RLS policy evaluates, when a
+     player is chosen, so the coach learns why before setting six sliders, not
+     from a raw row-level-security error after. The database stays the gate:
+     if this check fails we do not block on a guess. */
+  const [consentWait, setConsentWait] = useState(false)
+  useEffect(() => {
+    setConsentWait(false)
+    if (!playerId) return
+    let cancelled = false
+    void supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
+      .then(({ data, error }) => { if (!cancelled && !error) setConsentWait(data === true) })
+    return () => { cancelled = true }
+  }, [playerId])
+
   /* --- save --- */
   const handleSave = async () => {
-    if (!user || !playerId || saving || !formReady || saveRequest.current) return
+    if (!user || !playerId || saving || !formReady || consentWait || saveRequest.current) return
     const controller = new AbortController()
     saveRequest.current = controller
     const isCurrent = () => !controller.signal.aborted && currentScope.current === scope
@@ -264,7 +280,23 @@ function CoachAssessmentForm() {
       if (!isCurrent()) return
       if (saveError) {
         console.error('Save failed:', saveError)
-        toast.error(`Could not save assessment: ${saveError.message}`)
+        // 42501 is an RLS refusal. The likeliest cause is consent withdrawn or
+        // never given; re-ask the policy's own predicate rather than guess.
+        if (saveError.code === '42501') {
+          const { data: waiting, error: waitingError } = await supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
+          if (!isCurrent()) return
+          // If the re-check itself fails we cannot say why; do not claim a reason.
+          if (waitingError) {
+            toast.error('Not saved, and the reason could not be confirmed. Check your connection and try again.')
+          } else if (waiting === true) {
+            setConsentWait(true)
+            toast.error(`Not saved. ${selectedPlayer?.player_name ?? 'This player'} needs a parent's approval before they can be assessed.`)
+          } else {
+            toast.error('Not saved. You no longer have access to this player\'s record. They may have left your squad.')
+          }
+        } else {
+          toast.error(`Could not save assessment: ${saveError.message}`)
+        }
         setSaving(false)
         return
       }
@@ -394,6 +426,16 @@ function CoachAssessmentForm() {
                 {selectedPlayer.squad_number ? ` \u00B7 #${selectedPlayer.squad_number}` : ''}
               </p>
             </div>
+          </div>
+        ) : null}
+
+        {selectedPlayer && consentWait ? (
+          <div role="status" className="p-3 rounded-[12px] border border-[rgba(255,196,0,0.25)] bg-[rgba(255,196,0,0.06)]">
+            <p className="text-[13px] font-medium text-white/85">Waiting for a parent</p>
+            <p className="text-[12px] text-white/55 leading-relaxed mt-0.5">
+              You can assess {selectedPlayer.player_name} once a parent has approved their account.
+              If no parent is linked yet, the player can send the invite from their profile.
+            </p>
           </div>
         ) : null}
 
@@ -578,7 +620,7 @@ function CoachAssessmentForm() {
         {/* ---- 9. save button ---- */}
         <button
           onClick={handleSave}
-          disabled={!playerId || saving || !formReady}
+          disabled={!playerId || saving || !formReady || consentWait}
           className="w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity"
         >
           {saving ? 'Saving...' : 'Save Assessment \u2192'}

@@ -38,6 +38,28 @@ meeting, because it is the one a safeguarding lead will test. **Task T2 makes it
 true** — until T2 ships, either drop the sentence or say "the coach will review
 every word" as a roadmap statement, clearly marked.
 
+*Updated 18 Sept.* T2 is now **built and not yet merged** (#40). When it lands,
+this becomes the strongest claim on the slide rather than the weakest:
+
+- The AI produces a **draft** into `ai_feedback_drafts`, a table a player has no
+  grant on at all — unapproved text is unreachable structurally, not because a
+  policy is written correctly.
+- A coach reviews and edits every field, then publishes through
+  `publish_player_feedback()`, which re-checks ownership, requires the coach
+  role, and **refuses entirely when parental consent is required and absent**.
+- The player screen reads only the current published revision.
+- 16 database assertions cover it, including that a child reads no drafts by any
+  route and that a withdrawn guardian stops the child reading what was already
+  published.
+
+One consequence to be aware of before repeating the slide: **the child-facing AI
+chat is off.** A live conversation cannot be approved in advance by a coach, so
+it cannot coexist with "every AI message a child sees was approved by their
+coach first". If the deck or a demo shows a player chatting with an AI, that is
+no longer the product.
+
+Until #40 merges, the sentence is still untrue in production.
+
 ### 03 "The player receives feedback; AI turns it into an actionable plan" — **True, conditional on 02**
 
 The mechanism exists and works. But as written it describes text a coach has not
@@ -66,14 +88,37 @@ versioned. But the threshold is hard-coded to age 15 for Greece
 
 ### 06 "A longitudinal, permissioned development record the academy owns" — **Not yet, and this is the risky one**
 
-"Permissioned" is the claim academies are actually buying, and it is the one
-claim nobody has tested. Coach write policies check the coach's *role*, not
-*ownership* of the referenced player, session or academy (**X2**). Cross-academy
-isolation has never been exercised against a second academy in the database.
+*Updated 18 Sept, after K1/K2 shipped and U7 was run. Still not yet — but for a
+narrower reason than before, and the honest wording has changed.*
 
-I would not say "permissioned" to an academy until **K1 passes and U7 has been
-run with two real academies**. Everything else on this list is a wording problem.
-This one is a promise about their data.
+When this was written, coach write policies checked the coach's *role* rather
+than *ownership* (**X2**), and cross-academy isolation had never been exercised
+against a second academy. Both have moved:
+
+- **K1 and K2 are deployed**, along with F2–F5 from the departure audit.
+- **U7's read direction ran against the live project.** Signed in as a
+  Rehearsal FC coach, asking for City FC *by organization id*: zero rows on
+  `squad_players`, `coach_assessments` and `organizations`, with a working
+  control returning 21 of their own. That is the strong form — "what happens
+  when I ask for the other academy?" rather than "what do I get?".
+- **U7's write direction and U8 ran on a disposable database.** A coach from
+  academy B cannot assess, alter, delete, rename or log a match against academy
+  A's player, and cannot create a roster row inside another academy. A departed
+  coach reads and writes nothing. Verified by an owner/outsider differential:
+  the identical `UPDATE` succeeds for the owning coach and leaves the row
+  untouched for the outsider.
+
+**That is still not enough to say "permissioned development record" to an
+academy**, and the reason is worth stating rather than glossing. The live run
+covered one direction, two of three coaches, one age group, and reads only. The
+write direction was proven on a replayed database, not the production one.
+
+The claim that *is* supported, and which never needs retracting:
+
+> Isolation is enforced and verified on reads between two real academies.
+
+That is true, checkable, and does not promise more than has been tested. Use it
+until the live write direction has been exercised too.
 
 ### "No video hardware, no GPS vests, no public rankings, no scouting marketplace" — **True**
 
@@ -187,16 +232,77 @@ deliberately rather than as a side effect of adding a column.
 
 ## Summary for the deck
 
+Status as of 18 Sept. Two rows have moved; the other six have not.
+
 | Slide | Claim | Action |
 |---|---|---|
-| 3 | "The coach reviews every word" | **Cut or mark as roadmap** until T2 |
+| 3 | "The coach reviews every word" | **Built, not merged** (#40). True once it lands. Until then, cut it. |
 | 3 | "Academy sees consistency / coverage" | Don't demo that screen until K7 |
-| 3 | "Permissioned record" | **Don't say it** until K1 + U7 pass |
+| 3 | "Permissioned record" | **Still don't say it.** Say "isolation is enforced and verified on reads between two real academies" |
 | 4 | "Handled early" (child-data) | Soften to "built for it from the start" until P2 |
 | 4 | EU AI Act Art. 50 | Check a child is told the text is AI-written |
 | 6 | "No public sign-up" | Reword to "invited cohort" |
 | 6 | "Verified guardian permissions" | Reword to "recorded guardian consent" |
 | 6 | "Player comprehension and parent trust" | Narrow to coach habit, or say how |
 
+Two claims found since this was first written, neither on slides 3, 4 or 6, both
+worth knowing before any of this is said out loud:
+
+- **A coach who signs up without an academy code is linked to no academy.** The
+  academy dashboard cannot see that coach or any player they add. Demonstrated
+  by a failing end-to-end test, and it reproduces on every such signup.
+- **A one-letter misspelling costs a player their entire assessment history.**
+  Roster adoption matches on an exact name, so "Mohammad" versus "Mohammed"
+  lands the player on an empty row while the coach's row keeps the assessments,
+  linked to nobody. Also demonstrated by a failing test.
+
+Neither is a deck claim, but both would surface within minutes of an academy
+using the product, which makes them a reputational risk to anything said here.
+
 Everything else on slides 3, 4 and 6 is either true in the build or is a market
 claim outside the code.
+
+---
+
+## Open: the pilot has a success metric it cannot measure
+
+Not a slide claim, but it belongs here, because it is the thing an academy will
+eventually be told the pilot proved.
+
+`docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md` sets the pilot's
+headline measure:
+
+> Q4 metric: ≥60% of athletes log weekly, unprompted.
+
+**Athletes cannot log.** `/player/log` and `/player/logchoose` were removed on
+21 April 2026 by commit `3c12cbb`, an automated commit titled "Changes", with no
+rationale recorded. `PlayerLogForm` (228 lines) and `PlayerLogChoose` (46) went
+with them. The spec is dated 27 July — three months *after* the deletion — and
+still describes athlete logging as a product pillar in two places:
+
+- **P1. The athlete owns the record.**
+- **P4. The loop must close. Coach assesses → athlete sees → athlete logs →
+  coach sees.**
+
+UC-A02 tests it, is Tier 1 and Tier 2, and has failed since the harness existed.
+
+**The database never stopped supporting it.** `matches` still carries "Players
+can insert own matches", along with update, delete and read policies for the
+athlete's own rows, and `logged_by_role` exists to tell a self-log from a
+coach-log. Only the screens went. Restoring is UI work, not an architecture
+change — which makes this a genuine choice rather than a forced one.
+
+Two honest resolutions, and they lead to different pilots:
+
+1. **Coach-logged is the product.** Then P1, P4, UC-A02 and the Q4 metric are
+   all stale and need rewriting, and the pilot needs a different measure of
+   whether it worked — coach habit, which `pilot_scorecard` already tracks.
+2. **Athlete logging is still the product.** Then a Tier 1 capability is missing
+   and the headline metric is measuring a screen that does not exist.
+
+**Status: parked by Tarek on 18 Sept** until the merge queue is clear and `main`
+is green, on the grounds that neither path is safe to start while thirteen PRs
+sit unmerged. Recorded here so the decision is deliberate rather than forgotten.
+
+The spec also still carries, from July: *"Needs restating by Kostas before any
+external conversation."*

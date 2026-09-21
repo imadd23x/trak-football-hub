@@ -28,7 +28,7 @@ Quick orientation for AI agents and new contributors.
 | Error boundary | `src/components/trak/ErrorBoundary.tsx` |
 | Database migrations | `supabase/migrations/` (apply in filename order) |
 | Coach AI edge function | `supabase/functions/coach-assistant/` |
-| Prototype bets + capture docs | `01-the-bet/` |
+| Strategic review — workshop outputs and prototype bet | `StrategicReview/` (start at `README.md`) |
 
 ## Common Patterns
 

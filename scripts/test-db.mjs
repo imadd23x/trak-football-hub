@@ -53,11 +53,17 @@ try {
     : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
   const suites = baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
-    : ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql'];
+    // Union resolution, as with every previous conflict in this list: main
+    // brought player_age_timezone.sql (#72), this branch brings the other
+    // three. Dropping either side's suites is how a security assertion stops
+    // running while the suite file stays in the tree looking like coverage.
+    : ['parent_invite_security.sql', 'pilot_view_security.sql', 'privilege_and_consent_security.sql',
+       'player_age_timezone.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql'];
   for (const suite of suites) {
     const result = await db.exec(await read(suite));
     console.log(`Passed: ${suite}`);
     for (const query of result) {
+      if (query.rows?.[0]?.player_age_timezone_assertions) console.log(`Player age timezone assertions: ${query.rows[0].player_age_timezone_assertions}`);
       if (query.rows?.[0]?.pilot_view_assertions) console.log(`Operational view assertions: ${query.rows[0].pilot_view_assertions}`);
     }
   }

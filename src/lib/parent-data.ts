@@ -7,11 +7,12 @@ export interface ParentChild {
 }
 
 // Explicit projections keep private assessment fields out of the parent client.
+// Coach deletion retains history with a null author; generated types predate this.
 export type ParentAssessment = Pick<Tables<'coach_assessments'>,
-  'id' | 'created_at' | 'coach_user_id' | 'coach_rating' | 'work_rate' |
-  'tactical' | 'attitude' | 'technical' | 'physical' | 'coachability'>
+  'id' | 'created_at' | 'coach_rating' | 'work_rate' |
+  'tactical' | 'attitude' | 'technical' | 'physical' | 'coachability'> & { coach_user_id: string | null }
 export type ParentAward = Pick<Tables<'recognition_awards'>,
-  'id' | 'created_at' | 'coach_user_id' | 'award_type' | 'awarded_for' | 'note'>
+  'id' | 'created_at' | 'award_type' | 'awarded_for' | 'note'> & { coach_user_id: string | null }
 export type ParentDetails = Pick<Tables<'player_details'>, 'position' | 'current_club' | 'age_group'>
 export interface ParentMatch {
   id: string
@@ -32,11 +33,7 @@ export interface ParentDevelopment {
   coachNames: Record<string, string>
 }
 
-export interface AwaitingConsentChild {
-  player_user_id: string
-  full_name: string
-  age_years: number
-}
+export { fetchAwaitingConsent, type AwaitingConsentChild } from './parent-consent'
 
 // TanStack Query owns retries; avoid stacking PostgREST network backoff underneath it.
 export async function fetchParentChildren(parentId: string, signal: AbortSignal): Promise<ParentChild[]> {
@@ -84,9 +81,11 @@ export async function fetchParentDevelopment(childId: string, signal: AbortSigna
   ])
   if (assessmentResult.error) throw assessmentResult.error
   if (awardResult.error) throw awardResult.error
-  const assessments = assessmentResult.data ?? []
-  const awards = awardResult.data ?? []
-  const coachIds = [...new Set([...assessments, ...awards].map(row => row.coach_user_id))]
+  const assessments: ParentAssessment[] = assessmentResult.data ?? []
+  const awards: ParentAward[] = awardResult.data ?? []
+  // Filter only the optional name lookup, never the retained history records.
+  const coachIds = [...new Set([...assessments, ...awards].map(row => row.coach_user_id)
+    .filter((coachId): coachId is string => coachId !== null))]
   let coachNames: Record<string, string> = {}
   if (coachIds.length) {
     const { data, error } = await supabase.from('profiles').select('user_id, full_name')
@@ -95,14 +94,6 @@ export async function fetchParentDevelopment(childId: string, signal: AbortSigna
     coachNames = Object.fromEntries((data ?? []).map(profile => [profile.user_id, profile.full_name]))
   }
   return { details: detailsResult.data, assessments, awards, coachNames }
-}
-
-export async function fetchAwaitingConsent(signal: AbortSignal): Promise<AwaitingConsentChild[]> {
-  // This existing RPC is not yet in the generated Supabase function types.
-  const { data, error } = await supabase.rpc('get_children_awaiting_consent' as never)
-    .returns<AwaitingConsentChild[]>().abortSignal(signal).retry(false)
-  if (error) throw error
-  return data ?? []
 }
 
 export function averageRecordedRating(matches: ParentMatch[]): number | null {

@@ -48,7 +48,7 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string, pendingProfile?: PendingProfileData) => Promise<{ user: User | null; error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<{ error: Error | null }>;
+  signOut: (expectedUserId?: string) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -359,7 +359,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error as Error | null };
   });
 
-  const signOut = () => runAuthTransition(async () => {
+  const signOut = (expectedUserId?: string) => runAuthTransition(async () => {
+    // A delayed Settings operation can queue behind another account's sign-in.
+    // Check when this operation executes, before touching that account or SDK.
+    if (expectedUserId && activeSession.current?.user.id !== expectedUserId) {
+      return { error: new Error('Your account changed. Please try again.') };
+    }
     explicitSignOut.current = true;
     const version = ++generation.current;
     hydration.current = null;

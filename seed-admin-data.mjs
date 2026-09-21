@@ -1,26 +1,33 @@
 /**
  * Seed script — populates the admin dashboard with realistic test data.
- * Run: node seed-admin-data.mjs
+ * Run: node seed-admin-data.mjs (explicit TRAK_TEST_* environment)
+ * Target instructions: docs/testing/test-project-boundary.md
  */
 
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = 'https://xbykbqolvqyqmipikuae.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhieWticW9sdnF5cW1pcGlrdWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjgyNzMsImV4cCI6MjA4OTk0NDI3M30.fsBzOaVqYPt18z_73Fti_30xB3SEO6Hc4SjPq8X-P1c'
+import { requireTestTarget } from './scripts/testing/supabase-test-target.mjs'
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+// Test-only executable: no production/default target and no operator exception.
+let target
+try {
+  if (process.argv.length > 2) throw new Error('seed-admin-data.mjs accepts no CLI target override')
+  target = requireTestTarget(process.env)
+} catch (error) { console.error(error.message); process.exit(1) }
 
 const now = Date.now()
 const daysAgo = (d) => new Date(now - d * 86400000).toISOString()
 
-// Never literals. These accounts live in whatever project VITE_SUPABASE_URL
-// points at, and this repository is public.
+// Never literals. These accounts live in the explicitly selected test project,
+// and this repository is public.
 const OLD_PW = process.env.TRAK_DEV_OLD_PASSWORD
 const NEW_PW = process.env.TRAK_DEV_PASSWORD
 if (!OLD_PW || !NEW_PW) {
   console.error('Set TRAK_DEV_OLD_PASSWORD and TRAK_DEV_PASSWORD in the environment.')
   process.exit(1)
 }
+
+const supabase = createClient(target.url, target.key)
 
 async function signIn(email) {
   // Try old password first, then new

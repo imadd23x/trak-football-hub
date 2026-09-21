@@ -7,7 +7,8 @@
  * an empty set. Rehearsing against empty views teaches nothing; the point is to
  * see the scorecard populated before a real child's data exists.
  *
- * Run:   node seed-pilot-rehearsal.mjs
+ * Test target: node seed-pilot-rehearsal.mjs (explicit TRAK_TEST_* environment)
+ * Target/mode instructions: docs/testing/test-project-boundary.md
  * Reset: node seed-pilot-rehearsal.mjs --purge
  *
  * Everything it creates lives under the @rehearsal.trak.dev domain and the
@@ -18,35 +19,22 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync } from 'node:fs'
+import { requireRehearsalTarget } from './scripts/testing/supabase-test-target.mjs'
 
-/* ── config ──────────────────────────────────────────────────────────────── */
-
-function env(key, fallback) {
-  if (process.env[key]) return process.env[key]
-  try {
-    const line = readFileSync('.env', 'utf8')
-      .split('\n')
-      .find(l => l.startsWith(`${key}=`))
-    if (line) return line.slice(key.length + 1).trim().replace(/^["']|["']$/g, '')
-  } catch { /* no .env — fall through */ }
-  return fallback
-}
-
-// The project standardised on VITE_SUPABASE_PUBLISHABLE_KEY; VITE_SUPABASE_ANON_KEY
-// is accepted as an alias so either naming works.
-const SUPABASE_URL = env('VITE_SUPABASE_URL')
-const SUPABASE_ANON_KEY = env('VITE_SUPABASE_PUBLISHABLE_KEY') || env('VITE_SUPABASE_ANON_KEY')
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY (env or .env).')
-  process.exit(1)
-}
+/* Target selection precedes credentials, client creation and every write.
+ * The default requires an explicitly approved isolated test project. Production
+ * rehearsal is a separate operator-only CLI action; see the boundary runbook. */
+let target
+try { target = requireRehearsalTarget(process.env, process.argv.slice(2)) }
+catch (error) { console.error(error.message); process.exit(1) }
+const SUPABASE_URL = target.url
+const SUPABASE_ANON_KEY = target.key
+console.log(`Target: ${target.mode} (${target.projectRef})`)
 
 const DOMAIN = 'rehearsal.trak.dev'
 // Never commit this. The repository is public, and these accounts are created
-// in whatever project VITE_SUPABASE_URL points at — which the runbook points at
-// the pilot project. A literal here is a working credential for a live account
+// in the explicitly selected project, including the separate production
+// rehearsal operator mode. A literal here is a working credential for a live account
 // holding children's data, readable by anyone.
 const PW = process.env.TRAK_REHEARSAL_PASSWORD
 if (!PW || PW.length < 16) {

@@ -6,6 +6,7 @@ import vm from 'node:vm'
 import { randomUUID } from 'node:crypto'
 
 const source = readFileSync(process.argv[3] ?? new URL('../../seed-pilot-rehearsal.mjs', import.meta.url), 'utf8')
+const targetGuardSource = readFileSync(new URL('./supabase-test-target.mjs', import.meta.url), 'utf8')
 const scenario = process.argv[2]
 const password = randomUUID()
 const domain = 'rehearsal.trak.dev'
@@ -124,14 +125,19 @@ const client = { auth, from, async rpc(name, args) {
 
 async function run() {
   const logs = []
-  const fakeProcess = { env: { VITE_SUPABASE_URL: 'https://synthetic.invalid', VITE_SUPABASE_PUBLISHABLE_KEY: 'synthetic-key', TRAK_REHEARSAL_PASSWORD: password }, argv: ['node', 'seed-pilot-rehearsal.mjs'], exitCode: 0, exit(code) { this.exitCode = code; throw new Error(`EXIT ${code}`) } }
+  const fakeProcess = { env: { TRAK_TEST_PROJECT_REF: 'abcdefghijklmnopqrst', TRAK_TEST_SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co', TRAK_TEST_PUBLISHABLE_KEY: 'sb_publishable_fixture_key', TRAK_REHEARSAL_PASSWORD: password }, argv: ['node', 'seed-pilot-rehearsal.mjs'], exitCode: 0, exit(code) { this.exitCode = code; throw new Error(`EXIT ${code}`) } }
   class ClockDate extends Date {
     constructor(...args) { super(...(args.length ? args : [clockTime])) }
     static now() { return clockTime }
   }
-  const context = vm.createContext({ Date: ClockDate, process: fakeProcess, console: { log: (...values) => logs.push(values.join(' ')), error: (...values) => logs.push(values.join(' ')), table: value => logs.push(JSON.stringify(value)) }, setTimeout: callback => { callback(); return 1 } })
+  const context = vm.createContext({ URL, Buffer, Date: ClockDate, process: fakeProcess, console: { log: (...values) => logs.push(values.join(' ')), error: (...values) => logs.push(values.join(' ')), table: value => logs.push(JSON.stringify(value)) }, setTimeout: callback => { callback(); return 1 } })
   const module = new vm.SourceTextModule(source, { context, identifier: 'seed-pilot-rehearsal.mjs' })
-  await module.link(specifier => {
+  await module.link(async specifier => {
+    if (specifier === './scripts/testing/supabase-test-target.mjs') {
+      const guard = new vm.SourceTextModule(targetGuardSource, { context })
+      await guard.link(() => { throw new Error('Target guard must have no imports') })
+      return guard
+    }
     if (!['@supabase/supabase-js', 'node:fs'].includes(specifier)) throw new Error(`Unexpected import ${specifier}`)
     return new vm.SyntheticModule(specifier === 'node:fs' ? ['readFileSync'] : ['createClient'], function () {
       if (specifier === 'node:fs') this.setExport('readFileSync', () => { throw new Error('No fixture .env') })

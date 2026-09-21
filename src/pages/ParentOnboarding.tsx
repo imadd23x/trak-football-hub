@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -113,9 +114,9 @@ export default function ParentOnboarding() {
         <label className="block text-sm">Your email address
           <Input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required className="mt-2" />
         </label>
-        {signInMethod === 'password' ? <label className="block text-sm">Password
-          <Input type="password" autoComplete="current-password" value={signInPassword} onChange={event => setSignInPassword(event.target.value)} required className="mt-2" />
-        </label> : <label className="flex gap-3 items-center text-sm">
+        {signInMethod === 'password' ? <div className="block text-sm"><label htmlFor="parent-sign-in-password">Password</label>
+          <PasswordInput id="parent-sign-in-password" label="Password" autoComplete="current-password" value={signInPassword} onChange={event => setSignInPassword(event.target.value)} required className="mt-2" />
+        </div> : <label className="flex gap-3 items-center text-sm">
           <input type="checkbox" checked={newAccount} onChange={event => setNewAccount(event.target.checked)} />
           Create a new parent account
         </label>}
@@ -156,8 +157,8 @@ export default function ParentOnboarding() {
         </div> : <form onSubmit={event => { event.preventDefault(); void accept(state.invites[0], true); }} className="space-y-4">
           <p className="text-sm text-muted-foreground">Set up your parent account to connect {state.invites.map(invite => invite.player_name).join(', ')}. This connects all active invitations sent to your verified email.</p>
           <Input aria-label="Full name" placeholder="Full name" autoComplete="name" value={name} onChange={event => setName(event.target.value)} required minLength={2} maxLength={80} />
-          <Input aria-label="New password" type="password" placeholder={PASSWORD_HINT} autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} required />
-          <Input aria-label="Confirm password" type="password" placeholder="Confirm password" autoComplete="new-password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} required />
+          <PasswordInput label="New password" placeholder={PASSWORD_HINT} autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} required />
+          <PasswordInput label="Confirm password" placeholder="Confirm password" autoComplete="new-password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} required />
           <Button type="submit" disabled={submitting || switchingAccount}>{submitting ? 'Saving...' : 'Set up parent account'}</Button>
         </form>}
       </>}

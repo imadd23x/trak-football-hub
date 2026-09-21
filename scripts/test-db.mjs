@@ -167,6 +167,7 @@ try {
     const result = await db.exec(await read(suite));
     console.log(`Passed: ${suite}`);
     for (const query of result) {
+      if (query.rows?.[0]?.player_age_timezone_assertions) console.log(`Player age timezone assertions: ${query.rows[0].player_age_timezone_assertions}`);
       if (query.rows?.[0]?.pilot_view_assertions) console.log(`Operational view assertions: ${query.rows[0].pilot_view_assertions}`);
     }
   }

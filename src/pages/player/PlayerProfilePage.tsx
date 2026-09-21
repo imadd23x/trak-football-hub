@@ -9,6 +9,7 @@ import { trackEvent } from '@/lib/telemetry'
 import { bandForScore } from '@/lib/rating-engine'
 import RatingTrendChart from '@/components/player/RatingTrendChart'
 import { ParentInviteCard } from '@/components/player/ParentInviteCard'
+import { CoachLinkCard } from '@/components/player/CoachLinkCard'
 
 type TrendFilter = 'last5' | 'last10' | 'all'
 
@@ -128,6 +129,9 @@ export default function PlayerProfilePage() {
           </div>
           <ChevronRight size={18} className="text-white/40" />
         </button>
+
+        {/* Coach connection — the only place a player can link after signup */}
+        <CoachLinkCard />
 
         {/* Parent access */}
         <ParentInviteCard />

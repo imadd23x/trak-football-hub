@@ -63,13 +63,15 @@ use_cases:
       - No decimal number is rendered anywhere in the UI
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # ENFORCED 2026-09-21. Its test passed on every uc:check run since the
+  # 2026-09-21 merges; Imad approved promoting it (Tarek's offer, #77 thread).
   - id: UC-A04
     actor: athlete
     title: View match history and match detail
     requirement: REQ-001
-    status: pending
+    status: enforced
     tier: [1]
-    spec_version: 1
+    spec_version: 2
     given: A signed-in athlete with previously logged matches
     when: They open the match history screen
     then:
@@ -165,13 +167,15 @@ use_cases:
       - Saving is refused while the name is empty
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # ENFORCED 2026-09-21. Its test passed on every uc:check run since the
+  # 2026-09-21 merges; Imad approved promoting it (Tarek's offer, #77 thread).
   - id: UC-C03
     actor: coach
     title: View the squad
     requirement: REQ-002
-    status: pending
+    status: enforced
     tier: [1]
-    spec_version: 1
+    spec_version: 2
     given: A signed-in coach
     when: They open the squad screen
     then:
@@ -323,13 +327,15 @@ use_cases:
       - The read is rejected rather than returning an empty result
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # ENFORCED 2026-09-21. Its test passed on every uc:check run since the
+  # 2026-09-21 merges; Imad approved promoting it (Tarek's offer, #77 thread).
   - id: UC-X02
     actor: system
     title: A failed load never renders as a false empty state
     requirement: REQ-004
-    status: pending
+    status: enforced
     tier: [1]
-    spec_version: 1
+    spec_version: 2
     given: Any data-backed screen
     when: The request fails or the network is unavailable
     then:

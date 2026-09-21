@@ -73,8 +73,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 const day = 86400000
 const today = new Date()
 const dateOnly = d => d.toISOString().slice(0, 10)
-const daysAgo = n => dateOnly(new Date(today.getTime() - n * day))
-const isoDaysAgo = n => new Date(today.getTime() - n * day).toISOString()
 const pick = (arr, i) => arr[i % arr.length]
 
 let step = 0
@@ -83,6 +81,20 @@ const heading = msg => console.log(`\n${++step}. ${msg}`)
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
+function requireSuccess(error, context) {
+  if (error) throw new Error(`${context}: ${error.message ?? 'request failed'}`)
+}
+
+async function retryAuth(operation) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const result = await operation()
+    const retryable = result.error?.status === 429 || result.error?.status >= 500
+    if (!retryable || attempt === 3) return result
+    await sleep(1500 * 2 ** attempt)
+  }
+}
+
+// Purge keeps its existing authentication behavior; seed requires completion.
 async function signInOrUp(email) {
   let { data } = await supabase.auth.signInWithPassword({ email, password: PW })
   if (data?.user) return data.user
@@ -102,6 +114,25 @@ async function signInOrUp(email) {
   return retry.data?.user ?? null
 }
 
+async function seedAccount(email) {
+  const first = await retryAuth(() => supabase.auth.signInWithPassword({ email, password: PW }))
+  if (first.data?.user) return first.data.user
+  // Only invalid credentials can mean an account has not been created yet.
+  // A network/throttling failure must never turn into another signup request.
+  if (first.error && first.error.code !== 'invalid_credentials' &&
+      !/invalid login credentials/i.test(first.error.message ?? '')) {
+    requireSuccess(first.error, `sign-in ${email}`)
+  }
+  const signup = await retryAuth(() => supabase.auth.signUp({ email, password: PW }))
+  if (signup.error && !/already registered/i.test(signup.error.message)) {
+    requireSuccess(signup.error, `sign-up ${email}`)
+  }
+  const retry = await retryAuth(() => supabase.auth.signInWithPassword({ email, password: PW }))
+  requireSuccess(retry.error, `sign-in ${email}`)
+  if (!retry.data?.user) throw new Error(`sign-in ${email}: no authenticated user returned`)
+  return retry.data.user
+}
+
 /**
  * The one supported way to create a profile.
  *
@@ -113,21 +144,19 @@ async function signInOrUp(email) {
  */
 async function provision(payload) {
   const { data, error } = await supabase.rpc('provision_my_profile', { p: payload })
-  if (error) {
-    log(`provision ${payload.role} "${payload.full_name}": ${error.message}`)
-    return null
-  }
+  requireSuccess(error, `provision ${payload.role} "${payload.full_name}"`)
   const warnings = data?.warnings ?? []
-  for (const w of warnings) log(`  warning: ${w}`)
+  if (warnings.length) throw new Error(`provision ${payload.full_name}: ${warnings.join('; ')}`)
   return data ?? {}
 }
 
 async function myProfile(userId) {
   // Filter explicitly: a club admin can read every profile, so an unfiltered
   // maybeSingle() would error rather than return the caller's own row.
-  const { data } = await supabase.from('profiles')
+  const { data, error } = await supabase.from('profiles')
     .select('user_id, role, full_name, invite_code')
     .eq('user_id', userId).maybeSingle()
+  requireSuccess(error, 'profile lookup')
   return data
 }
 
@@ -173,6 +202,7 @@ async function preflight() {
     console.error('  Apply 20260901000002_pilot_measurement_columns.sql first.\n')
     return false
   }
+  if (mErr?.code !== '42501') requireSuccess(mErr, 'matches preflight')
   log('matches.match_date present')
 
   // telemetry_events is insert-only, so a select returns zero rows when the
@@ -183,6 +213,7 @@ async function preflight() {
     console.error('  Apply 20260901000001_pilot_telemetry.sql first.\n')
     return false
   }
+  if (tErr?.code !== '42501') requireSuccess(tErr, 'telemetry preflight')
   log('telemetry_events present')
   return true
 }
@@ -218,19 +249,22 @@ async function purge() {
 
 /* ── seed ────────────────────────────────────────────────────────────────── */
 
+let seedProgress
+
 async function seed() {
   console.log(`\n=== Rehearsal academy: ${ORG_NAME} ===`)
-  console.log(`All accounts use the password: ${PW}\n`)
+  log('Using TRAK_REHEARSAL_PASSWORD from the environment; credentials are not printed.')
 
-  if (!(await preflight())) return
+  if (!(await preflight())) throw new Error('Required rehearsal schema is missing')
 
+  const verified = { rosterRows: 0, plannedLinks: 0, linkedPlayers: 0, unlinkedPlayers: 0, parents: 0, consents: 0, latestFeedback: 0, extraRosterRows: 0 }
   const created = { squadRows: 0, linked: 0, unlinked: 0, fixtures: 0, sessions: 0, notes: 0,
                     matches: 0, assessments: 0, awards: 0, parents: 0, consents: 0, sharedFeedback: 0 }
+  seedProgress = { verified, created }
 
   /* --- director + organisation ------------------------------------------ */
   heading('Director and organisation')
-  const director = await signInOrUp(`director@${DOMAIN}`)
-  if (!director) return
+  const director = await seedAccount(`director@${DOMAIN}`)
 
   await provision({
     role: 'club',
@@ -238,18 +272,18 @@ async function seed() {
     club_details: { academy_name: ORG_NAME },
   })
 
-  const { data: org } = await supabase
+  const { data: org, error: orgError } = await supabase
     .from('organizations').select('id, name, join_code')
     .eq('admin_user_id', director.id).maybeSingle()
-  if (!org) { console.error('  organisation was not created — stopping.'); return }
+  requireSuccess(orgError, 'organisation lookup')
+  if (!org) throw new Error('Organisation was not created — stopping')
   log(`${org.name} — academy join code ${org.join_code}`)
 
   let nameIdx = 0
 
   for (const squad of SQUADS) {
     heading(`Coach ${squad.coachName} — ${squad.team}`)
-    const coach = await signInOrUp(squad.coachEmail)
-    if (!coach) continue
+    const coach = await seedAccount(squad.coachEmail)
 
     await provision({
       role: 'coach',
@@ -259,7 +293,7 @@ async function seed() {
 
     const coachProfile = await myProfile(coach.id)
     const coachCode = coachProfile?.invite_code
-    if (!coachCode) { log('coach has no invite code — skipping squad'); continue }
+    if (!coachCode) throw new Error('Coach has no invite code — stopping')
     log(`coach code TRK-${coachCode}`)
 
     /* Players. Half sign up for themselves through the real signup path, which
@@ -274,16 +308,17 @@ async function seed() {
     // Names already on this coach's roster. Without this the unlinked rows are
     // re-inserted on every run, because squad_players has no natural key and
     // nothing stops a coach holding two players with the same name.
-    const { data: priorRoster } = await supabase
+    const { data: priorRoster, error: rosterReadError } = await supabase
       .from('squad_players').select('player_name').eq('coach_user_id', coach.id)
+    requireSuccess(rosterReadError, 'existing roster')
     const alreadyOnRoster = new Set((priorRoster ?? []).map(r => r.player_name))
 
+    const expectedPlayers = new Map()
     for (const { i, name } of names) {
       if (i % 2 === 0) {
         const slug = name.toLowerCase().replace(/[^a-z]+/g, '.')
         // link_player_to_coach is itself idempotent, so re-running is safe.
-        const playerUser = await signInOrUp(`${slug}@${DOMAIN}`)
-        if (!playerUser) continue
+        const playerUser = await seedAccount(`${slug}@${DOMAIN}`)
         await provision({
           role: 'player',
           full_name: name,
@@ -295,10 +330,11 @@ async function seed() {
           },
           coach_invite_code: coachCode,
         })
+        expectedPlayers.set(name, playerUser.id)
         created.linked++
       } else {
         if (alreadyOnRoster.has(name)) continue
-        await signInOrUp(squad.coachEmail)
+        await seedAccount(squad.coachEmail)
         // squad_players has no organization_id — org scoping is derived through
         // the coach. Errors are logged, never swallowed: a silent failure here
         // is what made the first seeding run look like it had worked.
@@ -310,38 +346,123 @@ async function seed() {
           age_group: squad.ageGroup,
           status: 'active',
         })
-        if (error) log(`roster row "${name}": ${error.message}`)
+        if (error) requireSuccess(error, `roster row "${name}"`)
         else created.unlinked++
       }
     }
 
     /* everything below is the coach's own data */
-    await signInOrUp(squad.coachEmail)
-    const { data: roster } = await supabase
+    await seedAccount(squad.coachEmail)
+    const { data: allRoster, error: rosterError } = await supabase
       .from('squad_players').select('id, player_name, position, linked_player_id')
       .eq('coach_user_id', coach.id)
+    requireSuccess(rosterError, 'roster verification')
+    const roster = names.map(({ i, name }) => {
+      const matches = (allRoster ?? []).filter(row => row.player_name === name)
+      if (matches.length !== 1) throw new Error(`${squad.team}: expected one roster row for ${name}, found ${matches.length}`)
+      const row = matches[0]
+      if (i % 2 === 0 && row.linked_player_id !== expectedPlayers.get(name)) {
+        throw new Error(`${squad.team}: unexpected linked identity for ${name}`)
+      }
+      return row
+    })
+    verified.rosterRows += roster.length
+    verified.plannedLinks += expectedPlayers.size
+    verified.linkedPlayers += roster.filter(row => row.linked_player_id).length
+    verified.unlinkedPlayers += roster.filter(row => !row.linked_player_id).length
+    verified.extraRosterRows += allRoster.length - roster.length
+    log(`${allRoster.length - roster.length} additional roster rows preserved outside the required fixtures`)
     created.squadRows += roster?.length ?? 0
     log(`roster: ${roster?.length ?? 0} rows (${created.linked} claimed, ${created.unlinked} awaiting signup)`)
 
+    const claimed = roster.filter(r => r.linked_player_id)
+
+    /* parents — every claimed player gets one, and the parent grants consent.
+       Every seeded player is U15/U17, so once consent_threshold_age() is 18
+       (#80) a player with no consent row cannot be assessed: the "coach
+       assesses a player" demo step would refuse on stage. The grant goes
+       through the same RPC the parent screen calls, with the same wording. */
+    for (const r of claimed) {
+      const slug = r.player_name.toLowerCase().replace(/[^a-z]+/g, '.')
+      const parentEmail = `parent.${slug}@${DOMAIN}`
+
+      const playerAcct = await seedAccount(`${slug}@${DOMAIN}`)
+      if (playerAcct.id !== r.linked_player_id) throw new Error(`Synthetic login does not own the linked roster identity for ${r.player_name}`)
+      const invitation = await supabase.rpc('create_parent_invite', { p_email: parentEmail })
+      requireSuccess(invitation.error, `parent invitation for ${r.player_name}`)
+
+      const parentUser = await seedAccount(parentEmail)
+      await provision({ role: 'parent', full_name: `Parent of ${r.player_name}` })
+      const { data: link, error: linkError } = await supabase.from('player_parent_links')
+        .select('player_user_id').eq('parent_user_id', parentUser.id).eq('player_user_id', playerAcct.id).maybeSingle()
+      requireSuccess(linkError, `parent link for ${r.player_name}`)
+      if (!link) throw new Error(`Parent is not linked to ${r.player_name}`)
+      created.parents++
+      verified.parents++
+
+      // Re-running must not stack a new consent on top of a standing one.
+      const { data: standing, error: readErr } = await supabase
+        .from('parental_consents').select('id')
+        .eq('player_user_id', playerAcct.id).is('withdrawn_at', null).is('superseded_by', null).limit(1)
+      requireSuccess(readErr, `consent check for ${r.player_name}`)
+      if (!standing?.length) {
+        const { error } = await supabase.rpc('record_parental_consent', {
+          p_player_user_id: playerAcct.id,
+          p_relationship: 'parent',
+          p_purposes: { coaching_records: true, recognition: true, parent_visibility: true },
+          p_notice_version: CONSENT_NOTICE_VERSION,
+          p_consent_text: CONSENT_STATEMENT,
+        })
+        if (error) requireSuccess(error, `consent for ${r.player_name}`)
+        else created.consents++
+      }
+      const { data: activeConsent, error: activeConsentError } = await supabase.from('parental_consents')
+        .select('purposes').eq('player_user_id', playerAcct.id)
+        .is('withdrawn_at', null).is('superseded_by', null).limit(1)
+      requireSuccess(activeConsentError, `consent purpose verification for ${r.player_name}`)
+      if (!['coaching_records', 'recognition', 'parent_visibility'].every(purpose => activeConsent?.[0]?.purposes?.[purpose] === true)) {
+        throw new Error(`Consent for ${r.player_name} does not include all rehearsal purposes; existing choices were preserved. Review the synthetic guardian consent before rerunning` )
+      }
+      await seedAccount(`${slug}@${DOMAIN}`)
+      const consent = await supabase.rpc('my_consent_status')
+      requireSuccess(consent.error, `consent verification for ${r.player_name}`)
+      if (consent.data?.granted !== true) throw new Error(`No effective coaching consent for ${r.player_name}`)
+      verified.consents++
+    }
+    await seedAccount(squad.coachEmail)
+    log(`parents linked: ${created.parents}, consents granted this run: ${created.consents}`)
+
     /* fixtures — the denominator for match coverage */
     const fixtureDays = [41, 34, 27, 20, 13, 6]
-    const { data: haveFix } = await supabase
-      .from('coach_calendar_events').select('id').eq('coach_user_id', coach.id).limit(1)
-    if (!haveFix?.length) {
-      for (let i = 0; i < fixtureDays.length; i++) {
-        const { error } = await supabase.from('coach_calendar_events').insert({
-          coach_user_id: coach.id,
-          title: `vs ${pick(OPPONENTS, i)}`,
-          event_type: 'match',
-          starts_at: isoDaysAgo(fixtureDays[i]),
-          venue: i % 2 === 0 ? 'Home' : 'Away',
-          opponent: pick(OPPONENTS, i),
-          published: true,
-          source: 'manual',
-        })
-        if (error) log(`fixture ${i + 1}: ${error.message}`)
-        else created.fixtures++
-      }
+    const { data: haveFix, error: fixtureError } = await supabase
+      .from('coach_calendar_events').select('id, title, opponent, event_type, starts_at').eq('coach_user_id', coach.id)
+    requireSuccess(fixtureError, 'existing fixtures')
+    const matchingFixtures = i => haveFix.filter(row => row.title === `vs ${pick(OPPONENTS, i)}` &&
+      row.opponent === pick(OPPONENTS, i) && row.event_type === 'match')
+    const anchors = fixtureDays.flatMap((offset, i) => {
+      const matches = matchingFixtures(i)
+      if (matches.length > 1) throw new Error(`Ambiguous rehearsal fixture ${pick(OPPONENTS, i)}; existing records were preserved`)
+      return matches.map(row => new Date(row.starts_at).getTime() + offset * day)
+    })
+    if (anchors.some(value => !Number.isFinite(value)) || new Set(anchors.map(value => dateOnly(new Date(value)))).size > 1) {
+      throw new Error('Existing rehearsal fixtures do not identify one consistent date series; inspect before rerunning')
+    }
+    const anchorTime = anchors[0] ?? today.getTime()
+    const fixtureDate = f => new Date(anchorTime - fixtureDays[f] * day)
+    for (let i = 0; i < fixtureDays.length; i++) {
+      if (matchingFixtures(i).length) continue
+      const { error } = await supabase.from('coach_calendar_events').insert({
+        coach_user_id: coach.id,
+        title: `vs ${pick(OPPONENTS, i)}`,
+        event_type: 'match',
+        starts_at: fixtureDate(i).toISOString(),
+        venue: i % 2 === 0 ? 'Home' : 'Away',
+        opponent: pick(OPPONENTS, i),
+        published: true,
+        source: 'manual',
+      })
+      requireSuccess(error, `fixture ${i + 1}`)
+      created.fixtures++
     }
     log(`fixtures: ${created.fixtures}`)
 
@@ -350,53 +471,56 @@ async function seed() {
        calendar is the plan, a session is the thing that happened. Without
        these the dropdown is empty and a coach's first assessment looks
        blocked, even though the field is optional. */
-    const { data: haveSessions } = await supabase
-      .from('coach_sessions').select('id').eq('coach_user_id', coach.id).limit(1)
-    if (!haveSessions?.length) {
-      for (let i = 0; i < fixtureDays.length; i++) {
-        const { error } = await supabase.from('coach_sessions').insert({
-          coach_user_id: coach.id,
-          session_type: 'match',
-          title: `vs ${pick(OPPONENTS, i)}`,
-          session_date: daysAgo(fixtureDays[i]),
-          competition: 'League',
-          venue: i % 2 === 0 ? 'Home' : 'Away',
-        })
-        if (error) log(`session ${i + 1}: ${error.message}`)
-        else created.sessions++
-      }
-      // a couple of training sessions too, so the dropdown is not all matches
-      for (let i = 0; i < 2; i++) {
-        const { error } = await supabase.from('coach_sessions').insert({
-          coach_user_id: coach.id,
-          session_type: 'training',
-          title: i === 0 ? 'Pressing shape' : 'Finishing under pressure',
-          session_date: daysAgo(fixtureDays[i] + 3),
-          training_type: 'Tactical',
-          venue: 'Home',
-        })
-        if (!error) created.sessions++
-      }
-      log(`sessions: ${created.sessions}`)
-    } else {
-      log('sessions already present — reusing')
+    const { data: haveSessions, error: sessionsError } = await supabase
+      .from('coach_sessions').select('id, title').eq('coach_user_id', coach.id)
+    requireSuccess(sessionsError, 'existing sessions')
+    for (let i = 0; i < fixtureDays.length; i++) {
+      if (haveSessions.some(row => row.title === `vs ${pick(OPPONENTS, i)}`)) continue
+      const { error } = await supabase.from('coach_sessions').insert({
+        coach_user_id: coach.id,
+        session_type: 'match',
+        title: `vs ${pick(OPPONENTS, i)}`,
+        session_date: dateOnly(fixtureDate(i)),
+        competition: 'League',
+        venue: i % 2 === 0 ? 'Home' : 'Away',
+      })
+      if (error) requireSuccess(error, `session ${i + 1}`)
+      else created.sessions++
     }
+    // a couple of training sessions too, so the dropdown is not all matches
+    for (let i = 0; i < 2; i++) {
+      const title = i === 0 ? 'Pressing shape' : 'Finishing under pressure'
+      if (haveSessions.some(row => row.title === title)) continue
+      const { error } = await supabase.from('coach_sessions').insert({
+        coach_user_id: coach.id,
+        session_type: 'training',
+        title,
+        session_date: dateOnly(new Date(fixtureDate(i).getTime() - 3 * day)),
+        training_type: 'Tactical',
+        venue: 'Home',
+      })
+      requireSuccess(error, `training session ${title}`)
+      created.sessions++
+    }
+    log(`sessions: ${created.sessions}`)
 
     /* matches + assessments for the claimed players.
        Guarded: neither is naturally idempotent, and re-running the script used
        to stack a fresh set on top of the last, inflating the assessment rate
        the rehearsal is meant to demonstrate. */
-    const claimed = (roster ?? []).filter(r => r.linked_player_id)
-    const { count: existingAssessments } = await supabase
-      .from('coach_assessments')
-      .select('id', { count: 'exact', head: true })
-      .eq('coach_user_id', coach.id)
-
-    if (existingAssessments && existingAssessments > 0) {
-      log(`matches and assessments already present (${existingAssessments}) — skipping`)
-    } else
-    for (let n = 0; n < claimed.length; n++) {
-      const r = claimed[n]
+    for (const r of claimed) {
+      // A later claim must not change every following player's fixture pattern.
+      const n = Math.floor(names.findIndex(row => row.name === r.player_name) / 2)
+      // Matches are readable by their player, not by a coach. Switch back to
+      // the coach only after the lookup succeeds; failed auth stops the run.
+      await seedAccount(`${r.player_name.toLowerCase().replace(/[^a-z]+/g, '.')}@${DOMAIN}`)
+      const { data: existingMatches, error: matchReadError } = await supabase.from('matches')
+        .select('match_date, opponent, logged_by').eq('user_id', r.linked_player_id)
+      requireSuccess(matchReadError, `matches for ${r.player_name}`)
+      await seedAccount(squad.coachEmail)
+      const { data: existingAssessments, error: assessmentReadError } = await supabase.from('coach_assessments')
+        .select('id, created_at').eq('coach_user_id', coach.id).eq('squad_player_id', r.id)
+      requireSuccess(assessmentReadError, `assessments for ${r.player_name}`)
       /* PlayerHome shows the feedback card only for the LATEST assessment
          (order('created_at', {ascending:false})), so a note has to land on
          the actual last one this player gets — not just the last fixture
@@ -410,29 +534,34 @@ async function seed() {
         /* one fixture in six goes unlogged, so coverage is not a flat 100% */
         if ((n + f) % 6 === 0) continue
         const rating = 4.5 + ((n * 7 + f * 3) % 45) / 10
-        const { error } = await supabase.rpc('log_match_for_player', {
-          p_user_id: r.linked_player_id,
-          p_opponent: pick(OPPONENTS, f),
-          p_team_score: (f + n) % 4,
-          p_opponent_score: (f * 2 + n) % 3,
-          p_competition: 'League',
-          p_venue: f % 2 === 0 ? 'Home' : 'Away',
-          p_position: r.position ?? 'Midfielder',
-          p_age_group: squad.ageGroup,
-          p_minutes_played: [90, 90, 75, 60, 90, 45][f % 6],
-          p_goals: (n + f) % 5 === 0 ? 1 : 0,
-          p_assists: (n + f) % 7 === 0 ? 1 : 0,
-          p_card_received: (n + f) % 11 === 0 ? 'Yellow' : 'None',
-          p_body_condition: 'Average',
-          p_self_rating: 'Average',
-          p_computed_rating: Math.round(rating * 10) / 10,
-          p_match_date: daysAgo(fixtureDays[f]),
-        })
-        if (error) log(`match for ${r.player_name}: ${error.message}`)
-        else created.matches++
+        const matchDate = dateOnly(fixtureDate(f))
+        if (!existingMatches.some(row => row.match_date === matchDate && row.opponent === pick(OPPONENTS, f) && row.logged_by === coach.id)) {
+          const { error } = await supabase.rpc('log_match_for_player', {
+            p_user_id: r.linked_player_id,
+            p_opponent: pick(OPPONENTS, f),
+            p_team_score: (f + n) % 4,
+            p_opponent_score: (f * 2 + n) % 3,
+            p_competition: 'League',
+            p_venue: f % 2 === 0 ? 'Home' : 'Away',
+            p_position: r.position ?? 'Midfielder',
+            p_age_group: squad.ageGroup,
+            p_minutes_played: [90, 90, 75, 60, 90, 45][f % 6],
+            p_goals: (n + f) % 5 === 0 ? 1 : 0,
+            p_assists: (n + f) % 7 === 0 ? 1 : 0,
+            p_card_received: (n + f) % 11 === 0 ? 'Yellow' : 'None',
+            p_body_condition: 'Average',
+            p_self_rating: 'Average',
+            p_computed_rating: Math.round(rating * 10) / 10,
+            p_match_date: matchDate,
+          })
+          if (error) requireSuccess(error, `match for ${r.player_name}`)
+          else created.matches++
+        }
 
         /* assessment inside the 48h window for most, missed for some */
         if ((n + f) % 4 === 0) continue
+        const assessmentDate = new Date(fixtureDate(f).getTime() + day)
+        if (existingAssessments.some(row => dateOnly(new Date(row.created_at)) === dateOnly(assessmentDate))) continue
         const base = 4 + ((n * 3 + f * 2) % 6)
         const { data: aRow, error: aErr } = await supabase.from('coach_assessments').insert({
           coach_user_id: coach.id,
@@ -447,71 +576,80 @@ async function seed() {
           flag: 'fair',
           organization_id: org.id,
           coach_name_snapshot: squad.coachName,
-          created_at: isoDaysAgo(fixtureDays[f] - 1),
+          created_at: assessmentDate.toISOString(),
         }).select('id').maybeSingle()
-        if (aErr) log(`assessment for ${r.player_name}: ${aErr.message}`)
-        else {
-          created.assessments++
-          /* A written note on roughly every third assessment, plus always on
-             the last one (f === lastF) so every player's latest assessment
-             — the one PlayerHome actually shows — has a route into
-             /player/feedback, not just whichever player the %3 sampling
-             happens to hit. */
-          if (((n + f) % 3 === 0 || f === lastF) && aRow?.id) {
-            const { error: nErr } = await supabase.from('coach_assessment_notes').insert({
-              assessment_id: aRow.id,
-              coach_user_id: coach.id,
-              note: pick(COACH_NOTES, n + f),
-            })
-            if (nErr) log(`note for ${r.player_name}: ${nErr.message}`)
-            else created.notes++
-          }
+        requireSuccess(aErr, `assessment for ${r.player_name}`)
+        if (!aRow?.id) throw new Error(`Assessment for ${r.player_name} returned no row`)
+        created.assessments++
+        /* A written note on roughly every third assessment, plus always on
+           the last one (f === lastF) so every player's latest assessment
+           — the one PlayerHome actually shows — has a route into
+           /player/feedback, not just whichever player the %3 sampling
+           happens to hit. */
+        if ((n + f) % 3 === 0 || f === lastF) {
+          const { error: nErr } = await supabase.from('coach_assessment_notes').insert({
+            assessment_id: aRow.id,
+            coach_user_id: coach.id,
+            note: pick(COACH_NOTES, n + f),
+          })
+          if (nErr) requireSuccess(nErr, `note for ${r.player_name}`)
+          else created.notes++
         }
       }
     }
     log(`matches: ${created.matches}, assessments: ${created.assessments}`)
 
-    /* Latest-assessment notes, backfilled. The loop above is skipped once the
-       coach has any assessment, so the lastF note only lands on a FRESH seed.
-       The live rehearsal academy already had 78 assessments on 21 Sep with a
-       note on the latest one for 0 of 28 players (read-only count), so without
-       this the "player sees coach feedback" step shows nothing to anyone.
+    /* Latest-assessment notes, backfilled on every pass (#92). Existing
+       manual assessments may be newer than the fixture history, so repairing
+       that history alone does not make the actual latest feedback visible.
        PlayerHome shows feedback for the latest assessment only; give each
        claimed player's latest one a note if it has none. Runs on every pass,
        before publishing, so these notes are published below too. */
-    for (let n = 0; n < claimed.length; n++) {
-      const r = claimed[n]
+    const latestIds = []
+    for (const r of claimed) {
+      // A later claim must not change every following player's fixture pattern.
+      const n = Math.floor(names.findIndex(row => row.name === r.player_name) / 2)
       const { data: latest, error: latestErr } = await supabase
         .from('coach_assessments').select('id')
         .eq('coach_user_id', coach.id).eq('squad_player_id', r.id)
         .order('created_at', { ascending: false }).limit(1).maybeSingle()
-      if (latestErr) { log(`latest assessment for ${r.player_name}: ${latestErr.message}`); continue }
-      if (!latest) continue
+      requireSuccess(latestErr, `latest assessment for ${r.player_name}`)
+      if (!latest) throw new Error(`No assessment for ${r.player_name}`)
+      latestIds.push(latest.id)
       const { data: hasNote, error: hasNoteErr } = await supabase
         .from('coach_assessment_notes').select('assessment_id').eq('assessment_id', latest.id).maybeSingle()
-      if (hasNoteErr) { log(`note lookup for ${r.player_name}: ${hasNoteErr.message}`); continue }
+      requireSuccess(hasNoteErr, `note lookup for ${r.player_name}`)
       if (hasNote) continue
       const { error: nErr } = await supabase.from('coach_assessment_notes').insert({
         assessment_id: latest.id,
         coach_user_id: coach.id,
         note: pick(COACH_NOTES, n),
       })
-      if (nErr) log(`latest note for ${r.player_name}: ${nErr.message}`)
+      if (nErr) requireSuccess(nErr, `latest note for ${r.player_name}`)
       else created.notes++
     }
 
     /* Shared feedback. K9 (#44) made coach_assessment_notes coach-private, so
        the player and parent screens now read coach_shared_feedback. Publish
-       one for every assessment that carries a note and has none yet, or the
-       seeded history shows no feedback at all. Runs on every pass, not only
-       when an assessment is created, so an academy seeded before K9 is
-       backfilled too. The UNIQUE on assessment_id is the second guard. */
+       one for each noted canonical rehearsal assessment with no shared row.
+       Extra roster rows and their private notes remain outside this seed's
+       publication scope. An existing draft needs a coach's decision; never
+       overwrite it or claim that it is visible to the child. */
+    const { data: canonicalAssessments, error: canonicalError } = await supabase.from('coach_assessments')
+      .select('id').eq('coach_user_id', coach.id).in('squad_player_id', roster.map(row => row.id))
+    requireSuccess(canonicalError, 'canonical assessment lookup')
+    const canonicalIds = (canonicalAssessments ?? []).map(row => row.id)
     const { data: noted, error: notedErr } = await supabase
-      .from('coach_assessment_notes').select('assessment_id, note').eq('coach_user_id', coach.id)
-    if (notedErr) log(`notes lookup: ${notedErr.message}`)
+      .from('coach_assessment_notes').select('assessment_id, note')
+      .eq('coach_user_id', coach.id).in('assessment_id', canonicalIds)
+    requireSuccess(notedErr, 'notes lookup')
     const { data: shared, error: sharedErr } = await supabase
-      .from('coach_shared_feedback').select('assessment_id').eq('coach_user_id', coach.id)
-    if (sharedErr) log(`shared feedback lookup: ${sharedErr.message}`)
+      .from('coach_shared_feedback').select('assessment_id, published_at')
+      .eq('coach_user_id', coach.id).in('assessment_id', canonicalIds)
+    requireSuccess(sharedErr, 'shared feedback lookup')
+    if ((shared ?? []).some(row => row.published_at == null)) {
+      throw new Error(`${squad.team}: an existing rehearsal feedback draft is unpublished; its content was preserved. Review publication before rerunning`)
+    }
     const alreadyShared = new Set((shared ?? []).map(s => s.assessment_id))
     for (const row of noted ?? []) {
       if (alreadyShared.has(row.assessment_id)) continue
@@ -521,16 +659,23 @@ async function seed() {
         body: row.note,
         published_at: new Date().toISOString(),
       })
-      if (error) log(`shared feedback: ${error.message}`)
+      if (error) requireSuccess(error, 'shared feedback')
       else created.sharedFeedback++
     }
+    const { data: published, error: publishedError } = await supabase.from('coach_shared_feedback')
+      .select('assessment_id, published_at').eq('coach_user_id', coach.id).in('assessment_id', latestIds)
+    requireSuccess(publishedError, 'latest feedback verification')
+    if (new Set((published ?? []).filter(row => row.published_at != null).map(row => row.assessment_id)).size !== latestIds.length) throw new Error(`${squad.team}: incomplete latest feedback`)
+    verified.latestFeedback += latestIds.length
     log(`shared feedback published this run: ${created.sharedFeedback}`)
 
     /* awards */
-    const { data: haveAwards } = await supabase
-      .from('recognition_awards').select('id').eq('coach_user_id', coach.id).limit(1)
-    if (!haveAwards?.length && roster?.length) {
+    const { data: haveAwards, error: awardsError } = await supabase
+      .from('recognition_awards').select('id, awarded_for').eq('coach_user_id', coach.id)
+    requireSuccess(awardsError, 'existing awards')
+    if (roster.length) {
       for (let w = 0; w < 4; w++) {
+        if (haveAwards.some(row => row.awarded_for === pick(AWARD_NOTES, w))) continue
         const target = roster[(w * 3) % roster.length]
         const { error } = await supabase.from('recognition_awards').insert({
           coach_user_id: coach.id,
@@ -539,55 +684,17 @@ async function seed() {
           awarded_for: pick(AWARD_NOTES, w),
           organization_id: org.id,
           coach_name_snapshot: squad.coachName,
-          created_at: isoDaysAgo(w * 7 + 2),
+          created_at: new Date(anchorTime - (w * 7 + 2) * day).toISOString(),
         })
-        if (error) log(`award ${w + 1}: ${error.message}`)
+        if (error) requireSuccess(error, `award ${w + 1}`)
         else created.awards++
       }
     }
-
-    /* parents — every claimed player gets one, and the parent grants consent.
-       Every seeded player is U15/U17, so once consent_threshold_age() is 18
-       (#80) a player with no consent row cannot be assessed: the "coach
-       assesses a player" demo step would refuse on stage. The grant goes
-       through the same RPC the parent screen calls, with the same wording. */
-    for (const r of claimed) {
-      const slug = r.player_name.toLowerCase().replace(/[^a-z]+/g, '.')
-      const parentEmail = `parent.${slug}@${DOMAIN}`
-
-      const playerAcct = await signInOrUp(`${slug}@${DOMAIN}`)
-      if (!playerAcct) continue
-      await supabase.rpc('create_parent_invite', { p_email: parentEmail })
-
-      const parentUser = await signInOrUp(parentEmail)
-      if (!parentUser) continue
-      await provision({ role: 'parent', full_name: `Parent of ${r.player_name}` })
-      created.parents++
-
-      // Re-running must not stack a new consent on top of a standing one.
-      const { data: standing, error: readErr } = await supabase
-        .from('parental_consents').select('id')
-        .eq('player_user_id', playerAcct.id).is('withdrawn_at', null).limit(1)
-      if (readErr) { log(`consent check for ${r.player_name}: ${readErr.message}`); continue }
-      if (standing?.length) continue
-
-      const { error } = await supabase.rpc('record_parental_consent', {
-        p_player_user_id: playerAcct.id,
-        p_relationship: 'parent',
-        p_purposes: { coaching_records: true, recognition: true, parent_visibility: true },
-        p_notice_version: CONSENT_NOTICE_VERSION,
-        p_consent_text: CONSENT_STATEMENT,
-      })
-      if (error) log(`consent for ${r.player_name}: ${error.message}`)
-      else created.consents++
-    }
-    await signInOrUp(squad.coachEmail)
-    log(`parents linked: ${created.parents}, consents granted this run: ${created.consents}`)
   }
 
   /* --- a specialist coach with no squad of their own -------------------- */
   heading(`Coach ${EXTRA_COACH.name} — specialist`)
-  const gkCoach = await signInOrUp(EXTRA_COACH.email)
+  const gkCoach = await seedAccount(EXTRA_COACH.email)
   if (gkCoach) {
     await provision({
       role: 'coach',
@@ -597,10 +704,14 @@ async function seed() {
     log('added — gives the club view a coach with no assessments, which is a real case')
   }
 
+  if (verified.rosterRows !== 30 || verified.plannedLinks !== 15 || verified.parents !== verified.linkedPlayers || verified.consents !== verified.linkedPlayers || verified.latestFeedback !== verified.linkedPlayers) throw new Error('Incomplete rehearsal roster or families')
   console.log('\n=== Done ===')
+  log('Verified required fixtures (additional roster rows are preserved):')
+  console.table(verified)
+  log('Successful operations this run; linked/parents include accounts reused:')
   console.table(created)
   console.log(`
-Sign in with any of these — password ${PW}
+Sign in with the password supplied in TRAK_REHEARSAL_PASSWORD:
 
   Director   director@${DOMAIN}
   Coach      ${SQUADS[0].coachEmail}   (${SQUADS[0].team})
@@ -633,5 +744,16 @@ Reset with:  node seed-pilot-rehearsal.mjs --purge
 if (process.argv.includes('--purge')) {
   await purge()
 } else {
-  await seed()
+  try {
+    await seed()
+  } catch (error) {
+    console.error(`Rehearsal incomplete: ${String(error?.message ?? error).split(PW).join('[redacted]')}`)
+    console.error('Stopped before further writes. Correct the reported failure and rerun; no completion is claimed.')
+    if (seedProgress) {
+      console.error('Last confirmed progress (not a completed academy):')
+      console.table(seedProgress.verified)
+      console.table(seedProgress.created)
+    }
+    process.exitCode = 1
+  }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toInstant, localParts, isTimeTBC, normalizeInstant } from '../event-time'
+import { toInstant, localParts, isTimeTBC, normalizeInstant, calendarFields, calendarFieldsFromInstant, displayEventTime } from '../event-time'
 
 describe('event time round-trip', () => {
   it('gives back the wall clock the coach typed, whatever zone the run is in', () => {
@@ -151,5 +151,104 @@ describe('normalizeInstant — input forms Kostas found rejected or misread (PR3
     expect(normalizeInstant('2026-02-31T10:00:00z')).toBeNull()
     expect(normalizeInstant('2026-02-31T10:00:00+04')).toBeNull()
     expect(normalizeInstant('2026-02-31 10:00:00')).toBeNull()
+  })
+})
+
+describe('calendar columns (PR41 contract)', () => {
+  it('stores the day and wall clock the coach typed, unconverted', () => {
+    expect(calendarFields('2026-03-01', '18:00')).toEqual({
+      event_date: '2026-03-01',
+      start_time: '18:00:00',
+    })
+  })
+
+  it('records an unknown time as NULL rather than midnight', () => {
+    // An instant cannot express "1 March, time to be confirmed"; encoding it as
+    // local midnight is what moved the date across timezones.
+    expect(calendarFields('2026-03-01', null)).toEqual({
+      event_date: '2026-03-01',
+      start_time: null,
+    })
+  })
+
+  it('refuses the same input toInstant refuses, so the columns cannot disagree', () => {
+    expect(calendarFields('2026-02-31', '10:00')).toBeNull()
+    expect(calendarFields('not a date', null)).toBeNull()
+    expect(calendarFields('2026-03-01', '25:00')).toBeNull()
+  })
+
+  it('reads the calendar columns in preference to the instant', () => {
+    expect(displayEventTime({
+      event_date: '2026-03-01', start_time: '18:00:00',
+      starts_at: '2026-02-28T20:00:00.000Z',
+    })).toEqual({ date: '2026-03-01', time: '18:00' })
+  })
+
+  it('falls back to the instant for a row written before the backfill', () => {
+    const iso = toInstant('2026-03-01', '18:00')!
+    expect(displayEventTime({ starts_at: iso })).toEqual({ date: '2026-03-01', time: '18:00' })
+  })
+
+  it('reports an untimed legacy row as TBC', () => {
+    const iso = toInstant('2026-03-01', null)!
+    expect(displayEventTime({ starts_at: iso }).time).toBeNull()
+  })
+})
+
+describe('calendarFieldsFromInstant — the importer path (Imad, PR42 review)', () => {
+  it('derives the calendar day and wall clock from an instant', () => {
+    const iso = toInstant('2026-03-01', '18:00')!
+    expect(calendarFieldsFromInstant(iso)).toEqual({
+      event_date: '2026-03-01',
+      start_time: '18:00:00',
+    })
+  })
+
+  it('reads midnight as time-unknown, the same rule the backfill uses', () => {
+    const iso = toInstant('2026-03-01', null)!
+    expect(calendarFieldsFromInstant(iso)).toEqual({
+      event_date: '2026-03-01',
+      start_time: null,
+    })
+  })
+
+  it('returns null rather than throwing on no instant', () => {
+    expect(calendarFieldsFromInstant(null)).toBeNull()
+  })
+
+  it('round-trips through displayEventTime', () => {
+    const iso = toInstant('2026-12-31', '23:30')!
+    const cols = calendarFieldsFromInstant(iso)!
+    expect(displayEventTime(cols)).toEqual({ date: '2026-12-31', time: '23:30' })
+  })
+})
+
+describe('calendarFieldsFromInstant with parse-schedule\'s time_known flag', () => {
+  it('trusts an explicit true over the midnight heuristic', () => {
+    // The case the flag exists for: a schedule that genuinely says "midnight
+    // friendly". Without the flag this is indistinguishable from "time TBC",
+    // and nothing downstream can recover which it was.
+    const midnight = toInstant('2026-03-01', '00:00')!
+    expect(calendarFieldsFromInstant(midnight, true)).toEqual({
+      event_date: '2026-03-01',
+      start_time: '00:00:00',
+    })
+  })
+
+  it('trusts an explicit false even when a time is present', () => {
+    const evening = toInstant('2026-03-01', '18:00')!
+    expect(calendarFieldsFromInstant(evening, false)?.start_time).toBeNull()
+  })
+
+  it('falls back to the midnight heuristic when no flag is supplied', () => {
+    // Rows from an older parser response, which carry no flag at all.
+    expect(calendarFieldsFromInstant(toInstant('2026-03-01', '00:00')!)?.start_time).toBeNull()
+    expect(calendarFieldsFromInstant(toInstant('2026-03-01', '18:00')!)?.start_time).toBe('18:00:00')
+  })
+
+  it('treats undefined and null as "no flag", not as false', () => {
+    const evening = toInstant('2026-03-01', '18:00')!
+    expect(calendarFieldsFromInstant(evening, undefined)?.start_time).toBe('18:00:00')
+    expect(calendarFieldsFromInstant(evening, null)?.start_time).toBe('18:00:00')
   })
 })

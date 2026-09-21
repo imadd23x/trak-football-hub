@@ -9,8 +9,30 @@ import { ageGroupCeiling, ageGroupMatches, lowestEligibleAgeGroup } from '@/lib/
 // The age itself comes from ageFromDateOfBirth in consent.ts — there is no
 // second implementation here, and its timezone behaviour is #38's to prove.
 
-/** A YYYY-MM-DD that is exactly `years` old today, offset by `days`. */
-const dob = (years: number, days = 0) => {
+/**
+ * A YYYY-MM-DD whose age is `years`, with their birthday `-days` ago.
+ *
+ * Built from the UTC calendar day, which is the clock #38 makes
+ * `ageFromDateOfBirth` read on both sides, to match the database's
+ * `current_date`.
+ *
+ * The default puts the birthday a week back so that the assertions which are
+ * NOT about the boundary — playing up, playing down, the lowest eligible band —
+ * cannot be disturbed by a one-day clock disagreement. That is a free
+ * robustness win and nothing depends on it.
+ *
+ * The boundary assertion below is a different matter and is deliberately exact.
+ * It is RED on main today and green under #38, and that is the correct
+ * behaviour for it: main's `ageFromDateOfBirth` parses UTC midnight and then
+ * compares with LOCAL getters, so west of Greenwich it is a day out at every
+ * hour. Widening this assertion to hide that was my first instinct and it was
+ * wrong — it would have removed the only assertion in the repository that
+ * catches the defect, on the argument that the defect makes it fail.
+ *
+ * #42 therefore depends on #38. See the boundary test for why that is the
+ * cheap direction.
+ */
+const dob = (years: number, days = -7) => {
   const n = new Date()
   const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + days))
   return `${d.getUTCFullYear() - years}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
@@ -45,7 +67,19 @@ describe('ageGroupMatches', () => {
   it('is exact at the boundary', () => {
     // Under 17 means under 17: someone who turned 17 today is not eligible,
     // and someone whose 17th birthday is tomorrow still is.
-    expect(ageGroupMatches(dob(17), 'U17')).toBe(false)
+    //
+    // This assertion fails on main west of Greenwich and passes under #38, so
+    // #38 must merge first. I briefly replaced it with a three-day window to
+    // make this branch green on its own, and Imad was right to push back:
+    // widening it removes the only assertion anywhere that catches the
+    // mixed-clock defect, and the justification for widening was that the
+    // defect makes it fail. A test that fails because the code is broken is
+    // doing its job.
+    //
+    // Verified under #38 at 241357d in UTC, Asia/Dubai, America/New_York,
+    // America/Los_Angeles, America/Sao_Paulo, Pacific/Auckland and
+    // Pacific/Kiritimati — green in all seven.
+    expect(ageGroupMatches(dob(17, 0), 'U17')).toBe(false)
     expect(ageGroupMatches(dob(17, 1), 'U17')).toBe(true)
   })
 

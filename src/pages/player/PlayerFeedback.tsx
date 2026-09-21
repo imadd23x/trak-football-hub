@@ -247,6 +247,11 @@ export default function PlayerFeedback() {
   // Distinct from both "loaded" and "failed": the coach has not approved
   // anything yet, which is a normal state and not something to apologise for.
   const [awaitingCoach, setAwaitingCoach] = useState(false)
+  // The coach's own published words (coach_shared_feedback). PlayerHome quotes
+  // these on its card and links here, so this screen must show them too —
+  // otherwise the card says "your coach left feedback" and one tap later this
+  // screen says the coach is still writing it.
+  const [coachWords, setCoachWords] = useState<string | null>(null)
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -322,10 +327,27 @@ export default function PlayerFeedback() {
         if (readError) throw new Error("Couldn't load your feedback")
 
         if (!row) {
+          // No approved AI breakdown. The coach may still have published their
+          // own words — the same row PlayerHome quotes. Same filter as there:
+          // RLS already limits a player to published rows on their own
+          // assessments, and the explicit published_at keeps a future policy
+          // change from quietly widening it.
+          const { data: shared, error: sharedError } = await supabase
+            .from('coach_shared_feedback' as never)
+            .select('body')
+            .eq('assessment_id', assessmentId)
+            .not('published_at', 'is', null)
+            .maybeSingle() as { data: { body?: string } | null; error: unknown }
+
+          // Fail closed, as PlayerHome does: if we cannot confirm the words
+          // are still published, show neither them nor "still writing".
+          if (sharedError) throw new Error("Couldn't load your feedback")
+
           // Not an error: the coach has not approved anything for this
           // assessment yet. Saying so plainly beats an empty screen or a
           // failure the player cannot act on.
           setFeedback(null)
+          setCoachWords(shared?.body?.trim() || null)
           setAwaitingCoach(true)
           return
         }
@@ -522,7 +544,12 @@ export default function PlayerFeedback() {
       </div>
       <div className="flex-1 flex items-center justify-center px-8 text-center">
         <div className="space-y-3">
-          {awaitingCoach ? (
+          {awaitingCoach && coachWords ? (
+            <>
+              <p className="text-[15px] font-medium text-white/60">From your coach</p>
+              <p className="text-[14px] text-white/80 leading-relaxed">"{coachWords}"</p>
+            </>
+          ) : awaitingCoach ? (
             <>
               <p className="text-[15px] font-medium text-white/60">Not ready yet</p>
               <p className="text-[12px] text-white/35 leading-relaxed">

@@ -37,6 +37,11 @@ build/
 .DS_Store
 Thumbs.db
 
+# Cloud-sync conflict copies ("file 2.sql", "file 3.ts"). iCloud Drive syncs
+# ~/Desktop by default, so a checkout there produces these on sync conflicts.
+# scripts/test-db.mjs refuses to run when one lands in supabase/migrations.
+* [0-9].*
+
 # Claude
 .claude/
 test-results/

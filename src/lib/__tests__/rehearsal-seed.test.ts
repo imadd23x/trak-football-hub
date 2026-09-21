@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
 interface SeedResult {
+  logs: string[]
   exitCode: number
   done: boolean
   disclosedPassword: boolean
@@ -145,7 +146,9 @@ describe('actual rehearsal seed CLI with synthetic authenticated Supabase respon
   })
   it('retries transient signup throttling without losing a required player', () => {
     const result = run('signup-retry')
-    expect(result.exitCode).toBe(0)
+    // Preserve the actual CLI diagnostic if the reviewer's intermittent failure
+    // recurs; a bare exit-code mismatch cannot identify where a run stopped.
+    expect(result.exitCode, result.logs.join('\n')).toBe(0)
     expect(result.signupAttempts).toBe(3)
     expect(result.playerAccounts).toBe(15)
     expect(result.after.squad_players).toBe(30)

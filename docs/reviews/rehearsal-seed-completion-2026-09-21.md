@@ -49,3 +49,38 @@ Read-only reconciliation reported 26 of the 30 canonical rows, seven unrelated r
 The reported historical canonical fixtures identify a September 1 anchor. Later manual assessments must retain their identities/dates and remain the latest where applicable. Existing unrelated calendar records do not define a new seed anchor.
 
 No production seed or Auth mutation was performed for this change. **Explicit live authorization is required before running this script against the shared project.** After an authorized run, verify the counts, each linked player's effective consent and latest published feedback with actual authenticated roles, then execute the routed journeys. The synthetic backend tests do not prove hosted Supabase policy behavior, real Auth throttling/email delivery, browser journeys, performance under load or concurrent seed-process safety. Full current CI and independent review remain release requirements.
+
+## PR #97 review follow-up
+
+Tarek's [review](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/97#issuecomment-5765881244)
+required his test-only commit `b64fbaceca068f51d3e96f4b22232b9530d9c7e4`.
+It was cherry-picked with provenance as `eda549f`. The fixture places an account
+outside the rehearsal domain on an intended roster slot; that account must
+receive zero consents, matches and assessments and the seed must stop.
+
+Independent mutation removed the actual CLI's ownership guard. The new test
+failed with exactly one match written into the foreign account, while consent
+and assessment counts stayed zero. The CLI was restored byte-for-byte and the
+test passed. Focused verification now covers 17 actual-CLI scenarios plus the
+two existing consent mirror checks. This follow-up does not change production
+seed behavior.
+
+The reported one-off throttling-retry failure was not reproduced in 100 fresh
+fixture processes or 20 complete test-file runs (two runs concurrently: 340
+scenario executions). A temporary instrumented fixture traced the target
+account as absent, signup 429, signup 429, created on attempt three, then reused
+on every later login. The only retry delays were 1500 and 3000 milliseconds,
+executed by the fixture's fake timer. Trace and repeat results are in
+`/private/tmp/trak-seed-auth-trace.json`,
+`/private/tmp/trak-seed-retry-repeat.json`, and
+`/private/tmp/trak-seed-fullfile-repeat.json`.
+
+No cause is established for the reviewer's original flake, so this is not a
+claim that it was fixed. The retry assertion now includes the fixture's already
+redacted CLI log on failure so a recurrence identifies the failed operation.
+No production retry changes or arbitrary timeout increases were made.
+
+All 20 current CI checks pass on the follow-up tree, including 687 source tests
+(nine skipped), native PostgreSQL and 10 browser cases. Results:
+`/private/tmp/trak-pilot-evidence-20260921/seed-review-followup/results.json`.
+Neither the repeat runs nor these CI results establish hosted Auth or seed behavior.

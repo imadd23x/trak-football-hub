@@ -303,13 +303,17 @@ describe('a departed coach keeps nothing', () => {
     }
   })
 
-  it('F3: a coach cannot link a player by asserting their user id', () => {
+  it('F3: direct roster inserts constrain the asserted player id', () => {
     // K1 checked that the referenced roster row belonged to the writer, but a
     // coach could create a new row carrying another academy's child's
     // linked_player_id — so the ownership check passed on a relationship the
     // coach invented. link_player_to_coach() always sets linked_player_id to
-    // auth.uid(), so "only the caller may be linked" admits every real linkage.
-    const inserts = live.filter(p => p.table === 'squad_players' && ['INSERT', 'UPDATE'].includes(p.op))
+    // auth.uid(), so "only the caller may be linked" admits real INSERTs.
+    // UPDATE must also allow a coach to edit an unchanged legitimate child
+    // link. Requiring child ID = coach auth.uid() there rejects normal edits.
+    // The self-link trigger denies retargeting; actual UPDATE denial AND
+    // legitimate-edit regressions run in academy_access_security.sql in CI.
+    const inserts = live.filter(p => p.table === 'squad_players' && p.op === 'INSERT')
     expect(inserts.length).toBeGreaterThan(0)
     for (const p of inserts) {
       expect(

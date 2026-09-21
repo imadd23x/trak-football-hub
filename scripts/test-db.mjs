@@ -3,12 +3,14 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { migrationReplayOrder } from './test-native-db.mjs';
 import { validateMigrationFiles } from './migration-input.mjs';
 
 // An in-memory database by construction. Never reads DB_URL or connects to a
 // Supabase project; SQL fixture guards also refuse an unmarked connection.
 const root = fileURLToPath(new URL('../', import.meta.url));
 const securityMigration = '20260917205027_secure_parent_invites.sql';
+const academyMigration = '20260918062345_preserve_academy_access_and_fk_cleanup.sql';
 const pilotViewsMigration = '20260918070209_restrict_pilot_operational_views.sql';
 const args = process.argv.slice(2);
 const mode = args[0] ?? '--all';
@@ -102,13 +104,16 @@ for (const file of suiteFiles) {
 const ordered = entries => entries.slice()
   .sort((a, b) => a.order - b.order || a.file.localeCompare(b.file)).map(e => e.file);
 const modes = [...new Set(['--all', '--baseline', '--pilot-views-review',
-  '--pilot-views-baseline', '--parent-upgrade-review', ...registry.keys()])];
+  '--pilot-views-baseline', '--parent-upgrade-review', '--coach-departure-baseline',
+  '--academy-upgrade-review', ...registry.keys()])];
 if (args.length > 1 || !modes.includes(mode)) {
   throw new Error(`Usage: node scripts/test-db.mjs [${modes.join(' | ')}]`);
 }
 const baseline = mode === '--baseline';
 const pilotViewsBaseline = mode === '--pilot-views-baseline';
 const parentUpgrade = mode === '--parent-upgrade-review';
+const academyBaseline = mode === '--coach-departure-baseline';
+const academyUpgrade = mode === '--academy-upgrade-review';
 const migrationFiles = validateMigrationFiles(await readdir(resolve(root, 'supabase/migrations')));
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
@@ -123,9 +128,12 @@ try {
   // migrations in filename order and fails his boundary assertion for the
   // wrong reason. Cost me twenty minutes chasing a count mismatch that was
   // this word.
-  let migrations = migrationFiles
+  // The upgrade-review reorders live in migrationReplayOrder(), shared with the
+  // native-Postgres runner so both replay the same deployed-first order.
+  let migrations = migrationReplayOrder(migrationFiles
     .filter(file => (!baseline || file < securityMigration)
-      && (!pilotViewsBaseline || file < pilotViewsMigration)).sort();
+      && (!pilotViewsBaseline || file < pilotViewsMigration)
+      && (!academyBaseline || file < academyMigration)), mode);
 
   // Version uniqueness and filename shape are validated by the shared
   // validateMigrationFiles() above, from Imad's #68, not by a second loop
@@ -133,31 +141,27 @@ try {
   // is how they stop agreeing later, and his also catches cloud-sync conflict
   // copies, which mine did not. It runs over the WHOLE directory before any
   // filtering, so a --baseline run cannot hide a collision by excluding it.
-  if (parentUpgrade) {
-    // PR35 was deployed before PR33. Replay that actual order as well as the
-    // fresh-install order, retaining original filenames and immutable SQL.
-    if (!migrations.includes(securityMigration) || !migrations.includes(pilotViewsMigration)) {
-      throw new Error('Parent upgrade review requires both original migration files');
-    }
-    migrations.splice(migrations.indexOf(securityMigration), 1);
-    migrations.splice(migrations.indexOf(pilotViewsMigration) + 1, 0, securityMigration);
-  }
   for (const file of migrations) {
     try {
       if (file === securityMigration) await db.exec(await read('parent_invite_backfill_setup.sql'));
+      if (file === academyMigration) await db.exec(await read('academy_orphan_backfill_setup.sql'));
       if (file === pilotViewsMigration) await db.exec(await read('pilot_view_backfill_setup.sql'));
       await db.exec(await readFile(resolve(root, 'supabase/migrations', file), 'utf8'));
       if (file === securityMigration) await db.exec(await read('parent_invite_backfill_assertions.sql'));
+      if (file === academyMigration) await db.exec(await read('academy_orphan_backfill_assertions.sql'));
     } catch (error) {
       throw new Error(`Migration ${file}: ${error.message}`, { cause: error });
     }
   }
-  console.log(`Replayed ${migrations.length} migrations${baseline || pilotViewsBaseline
+  const description = baseline || pilotViewsBaseline || academyBaseline
     ? ' (vulnerable baseline; security assertions should fail)'
-    : parentUpgrade ? ' (deployed reports first, then parent upgrade)' : ' with both backfill fixtures'}.`);
+    : parentUpgrade ? ' (deployed reports first, then parent upgrade)'
+      : academyUpgrade ? ' (deployed main first, then academy repair)' : ' with backfill assertions';
+  console.log(`Replayed ${migrations.length} migrations${description}.`);
   const suites = registry.has(mode) ? ordered(registry.get(mode))
     : baseline ? ['parent_invite_security.sql']
     : mode.startsWith('--pilot-views') ? ['pilot_view_security.sql']
+    : academyBaseline || academyUpgrade ? ordered(registry.get('--coach-departure-review'))
     // --all runs every in-all suite, so a regression is caught by the command
     // everyone already runs rather than only by a bespoke one.
     : ordered(inAll);
@@ -169,9 +173,10 @@ try {
     for (const query of result) {
       if (query.rows?.[0]?.player_age_timezone_assertions) console.log(`Player age timezone assertions: ${query.rows[0].player_age_timezone_assertions}`);
       if (query.rows?.[0]?.pilot_view_assertions) console.log(`Operational view assertions: ${query.rows[0].pilot_view_assertions}`);
+      if (query.rows?.[0]?.account_deletion_checks_passed) console.log(`Account deletion assertions: ${query.rows[0].account_deletion_checks_passed}`);
     }
   }
-  if (baseline || pilotViewsBaseline) throw new Error('Vulnerable baseline unexpectedly passed its security assertions');
+  if (baseline || pilotViewsBaseline || academyBaseline) throw new Error('Vulnerable baseline unexpectedly passed its security assertions');
 } catch (error) {
   console.error(error.message);
   const detail = error.detail || error.cause?.detail;

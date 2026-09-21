@@ -153,6 +153,39 @@ BEGIN
 END;
 $test$;
 
+-- ── 4. my_link_outcome reports what actually happened ──────────────────────
+--
+-- The fix for the misspelling case is not a cleverer guess — it is that the
+-- player is told. Paired assertions, because a suite made only of "this said
+-- nothing" also passes when the function is broken and returns nothing.
+
+DO $test$
+DECLARE v_mo jsonb; v_yu jsonb; v_sq uuid;
+BEGIN
+  -- The misspelt player: landed on a fresh row, coach still holds unclaimed
+  -- rows carrying the history. Must be told something may be missing.
+  PERFORM pg_temp.become(pg_temp.rid(21));
+  SELECT id INTO v_sq FROM public.squad_players WHERE linked_player_id = pg_temp.rid(21);
+  v_mo := public.my_link_outcome(v_sq);
+  PERFORM pg_temp.rassert((v_mo->>'may_have_missed_history')::boolean IS TRUE,
+    'the misspelt player is warned that history may be missing',
+    coalesce(v_mo::text, 'null'));
+
+  -- POSITIVE CONTROL: the player who adopted cleanly must NOT be warned.
+  -- Without this, a function that always returns true would pass above.
+  PERFORM pg_temp.become(pg_temp.rid(20));
+  SELECT id INTO v_sq FROM public.squad_players WHERE linked_player_id = pg_temp.rid(20);
+  v_yu := public.my_link_outcome(v_sq);
+  PERFORM pg_temp.rassert((v_yu->>'may_have_missed_history')::boolean IS FALSE,
+    'CONTROL: the player who adopted cleanly is not warned',
+    coalesce(v_yu::text, 'null'));
+
+  PERFORM pg_temp.rassert((v_yu->>'assessments')::integer = 2,
+    'CONTROL: the adopted player is reported as having their assessments',
+    coalesce(v_yu->>'assessments', 'null'));
+END;
+$test$;
+
 -- ── Report ─────────────────────────────────────────────────────────────────
 
 DO $test$

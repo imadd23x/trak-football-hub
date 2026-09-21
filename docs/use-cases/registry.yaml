@@ -5,13 +5,27 @@
 version: 1
 owner: "@kostasanastasioubusiness-lang"
 use_cases:
+  # PARKED 2026-09-21. Imad confirmed coach-only match logging for the pilot;
+  # academy-led admission has no athlete self-reporting path. The route these
+  # assert (/player/log) does not exist and is not planned, so the assertions
+  # were failing against an absent feature rather than against a defect.
+  #
+  # `parked` is the harness's existing third status, not a new one invented
+  # here — it is already in the UseCaseStatus type, the support test and
+  # uc-report's sections. Only uc-check.mjs did not know it, which is fixed
+  # alongside this.
+  #
+  # The disposition is stated, not silenced. `parked` would make useCase()
+  # skip the suite, and a permanently skipped test reads as coverage; the file
+  # is deleted instead. `then` keeps the PO's original words so the decision
+  # stays auditable if athlete logging is ever revived.
   - id: UC-A02
     actor: athlete
     title: Log a match with position inputs and live band preview
     requirement: REQ-001
-    status: pending
+    status: parked
     tier: [1, 2]
-    spec_version: 1
+    spec_version: 2
     given: A signed-in pilot athlete on mobile web
     when: They complete the match log form and tap save
     then:
@@ -20,13 +34,27 @@ use_cases:
       - No decimal number is rendered anywhere in the UI
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # PARKED 2026-09-21. Imad confirmed coach-only match logging for the pilot;
+  # academy-led admission has no athlete self-reporting path. The route these
+  # assert (/player/log) does not exist and is not planned, so the assertions
+  # were failing against an absent feature rather than against a defect.
+  #
+  # `parked` is the harness's existing third status, not a new one invented
+  # here — it is already in the UseCaseStatus type, the support test and
+  # uc-report's sections. Only uc-check.mjs did not know it, which is fixed
+  # alongside this.
+  #
+  # The disposition is stated, not silenced. `parked` would make useCase()
+  # skip the suite, and a permanently skipped test reads as coverage; the file
+  # is deleted instead. `then` keeps the PO's original words so the decision
+  # stays auditable if athlete logging is ever revived.
   - id: UC-A03
     actor: athlete
     title: See band result after saving a match
     requirement: REQ-001
-    status: pending
+    status: parked
     tier: [1]
-    spec_version: 1
+    spec_version: 2
     given: An athlete who has just saved a match
     when: The result screen renders
     then:
@@ -35,13 +63,15 @@ use_cases:
       - No decimal number is rendered anywhere in the UI
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # ENFORCED 2026-09-21. Its test passed on every uc:check run since the
+  # 2026-09-21 merges; Imad approved promoting it (Tarek's offer, #77 thread).
   - id: UC-A04
     actor: athlete
     title: View match history and match detail
     requirement: REQ-001
-    status: pending
+    status: enforced
     tier: [1]
-    spec_version: 1
+    spec_version: 2
     given: A signed-in athlete with previously logged matches
     when: They open the match history screen
     then:
@@ -137,13 +167,15 @@ use_cases:
       - Saving is refused while the name is empty
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # ENFORCED 2026-09-21. Its test passed on every uc:check run since the
+  # 2026-09-21 merges; Imad approved promoting it (Tarek's offer, #77 thread).
   - id: UC-C03
     actor: coach
     title: View the squad
     requirement: REQ-002
-    status: pending
+    status: enforced
     tier: [1]
-    spec_version: 1
+    spec_version: 2
     given: A signed-in coach
     when: They open the squad screen
     then:
@@ -295,13 +327,15 @@ use_cases:
       - The read is rejected rather than returning an empty result
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # ENFORCED 2026-09-21. Its test passed on every uc:check run since the
+  # 2026-09-21 merges; Imad approved promoting it (Tarek's offer, #77 thread).
   - id: UC-X02
     actor: system
     title: A failed load never renders as a false empty state
     requirement: REQ-004
-    status: pending
+    status: enforced
     tier: [1]
-    spec_version: 1
+    spec_version: 2
     given: Any data-backed screen
     when: The request fails or the network is unavailable
     then:

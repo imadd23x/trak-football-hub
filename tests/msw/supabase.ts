@@ -81,3 +81,23 @@ export function authHandlers(): HttpHandler[] {
     ),
   ]
 }
+
+/**
+ * A SECURITY DEFINER function called through PostgREST. `reply` receives the
+ * posted arguments and returns either the function's result, or an error the
+ * way Postgres raises one — `{ status, body }` — so a RAISE EXCEPTION can be
+ * reproduced rather than approximated.
+ */
+export function rpc(
+  name: string,
+  reply: (args: Record<string, unknown>) => unknown | { status: number; body: object },
+): HttpHandler {
+  return http.post(`${SUPABASE_URL}/rest/v1/rpc/${name}`, async ({ request }) => {
+    const args = (await request.json().catch(() => ({}))) as Record<string, unknown>
+    const out = reply(args) as { status?: number; body?: object }
+    if (out && typeof out === 'object' && 'status' in out && 'body' in out) {
+      return HttpResponse.json(out.body as object, { status: out.status as number })
+    }
+    return HttpResponse.json(out ?? null)
+  })
+}

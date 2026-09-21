@@ -119,6 +119,7 @@ const App = () => (
             <Route path="/coach/squad" element={<RouteGuard allowedRole="coach"><CoachSquadPage /></RouteGuard>} />
             <Route path="/coach/squad/add" element={<RouteGuard allowedRole="coach"><CoachAddPlayer /></RouteGuard>} />
             <Route path="/coach/assess" element={<RouteGuard allowedRole="coach"><CoachAssessPage /></RouteGuard>} />
+            <Route path="/coach/feedback/:assessmentId" element={<RouteGuard allowedRole="coach"><CoachReviewFeedback /></RouteGuard>} />
             <Route path="/coach/sessions" element={<RouteGuard allowedRole="coach"><CoachSessionsChooser /></RouteGuard>} />
             <Route path="/coach/sessions/list" element={<RouteGuard allowedRole="coach"><CoachSessionsPage /></RouteGuard>} />
             {/* Quick match log now resolves to the full session screen, preset to Match.
@@ -168,3 +169,4 @@ const App = () => (
 );
 
 export default App;
+import CoachReviewFeedback from '@/pages/coach/CoachReviewFeedback'

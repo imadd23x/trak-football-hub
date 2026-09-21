@@ -1,15 +1,15 @@
 {
   "UC-A02": {
-    "spec_version": 1,
-    "hash": "4552182b87c50345d9568ec79a416592350e0d62b51065b9bac267d64c003b74"
+    "spec_version": 2,
+    "hash": "f84e768e305a34181e09a03cad5acd3cbc75b05dd3255758ee5d852b784b3a74"
   },
   "UC-A03": {
-    "spec_version": 1,
-    "hash": "97d4e14dec2bc95f0804fe394ebd013933224ce8347f32ddc6eabcb7ff6b3b2f"
+    "spec_version": 2,
+    "hash": "a5cf4360b4df80c236a1651388f272f0e4324f994f2cadc4d37e7608190c8a8a"
   },
   "UC-A04": {
-    "spec_version": 1,
-    "hash": "2eded4c49f104f7d6665c6b7c1fc1eb160372c79d56152d0d97dde80e934d017"
+    "spec_version": 2,
+    "hash": "b861ef9a1e1ae12fd68e42b50ea4bafa1ff202b56870ef407a58999676d8baa6"
   },
   "UC-A06": {
     "spec_version": 1,
@@ -36,8 +36,8 @@
     "hash": "1d95bc5155b3e940c5fdc042994fbe596100ab6b197516a2f80d759bd17d6ffc"
   },
   "UC-C03": {
-    "spec_version": 1,
-    "hash": "e7421e3cc54d252488650e909f95b7dcad12edfe96f8570e0dc35ec2a3e63f02"
+    "spec_version": 2,
+    "hash": "9c693a6eb6d317052d8fe969c90ad4368107cad4913eaae21b764791a7a3fc33"
   },
   "UC-C04": {
     "spec_version": 1,
@@ -80,7 +80,7 @@
     "hash": "8691d7ea7505b7ac2e986a958c68ef3fe0079f4a3b3fe306a4284016b0d289a2"
   },
   "UC-X02": {
-    "spec_version": 1,
-    "hash": "49b47720b0687084d36424c58d13f3389b004a7c9886ec83a8070b9a89297b90"
+    "spec_version": 2,
+    "hash": "6391d28e3e927865740d54e58e114e2b68af244bb5ef0fc1a92847abb2c3f479"
   }
 }

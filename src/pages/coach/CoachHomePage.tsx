@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { MobileShell, NavBar, MetadataLabel, BandPill } from '@/components/trak'
+import { MobileShell, NavBar, MetadataLabel, BandPill, LoadError} from '@/components/trak'
 import { toast } from 'sonner'
 import { Zap, Star, Check, Circle, Minus } from 'lucide-react'
 import { scoreToBand } from '@/lib/rating-engine'
@@ -28,6 +28,7 @@ export default function CoachHomePage() {
   const [playerCount, setPlayerCount] = useState(0)
   const [assessments, setAssessments] = useState<any[]>([])
   const [allAssessments, setAllAssessments] = useState<any[]>([])
+  const [loadFailed, setLoadFailed] = useState(false)
   const [sessionCount, setSessionCount] = useState(0)
   const [coachDetails, setCoachDetails] = useState<any>(null)
   const [inviteCode, setInviteCode] = useState('TRK-XXXX')
@@ -35,15 +36,23 @@ export default function CoachHomePage() {
 
   useEffect(() => {
     if (!user) return
+    /* Every number on this dashboard is a claim about the coach's own season.
+       Each load below used to discard its error, so a failed request rendered
+       as 0 players, 0 assessments and 0 sessions — a confident report that
+       nothing they did exists. CLAUDE.md: "a failed request is not an empty
+       result". The four are independent, so any one failing marks the whole
+       screen as unable-to-say rather than pretending the rest is the truth. */
     supabase.from('squad_players').select('id, player_name').eq('coach_user_id', user.id)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { setLoadFailed(true); return }
         const players = data || []
         setPlayerCount(players.length)
         // Fetch all assessments for analytics
         supabase.from('coach_assessments').select('id, squad_player_id, coach_rating, created_at')
           .eq('coach_user_id', user.id)
           .order('created_at', { ascending: false })
-          .then(({ data: allData }) => {
+          .then(({ data: allData, error: allError }) => {
+            if (allError) { setLoadFailed(true); return }
             const allAssess = allData || []
             setAllAssessments(allAssess)
             const analytics = calculateSquadAnalytics(players, allAssess as any)
@@ -55,9 +64,9 @@ export default function CoachHomePage() {
       .eq('coach_user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5)
-      .then(({ data }) => setAssessments(data || []))
+      .then(({ data, error }) => { if (error) { setLoadFailed(true); return } setAssessments(data || []) })
     supabase.from('coach_sessions').select('id', { count: 'exact' }).eq('coach_user_id', user.id)
-      .then(({ count }) => setSessionCount(count || 0))
+      .then(({ count, error }) => { if (error) { setLoadFailed(true); return } setSessionCount(count || 0) })
     supabase.from('coach_details').select('current_club, team, coach_role').eq('user_id', user.id).maybeSingle()
       .then(({ data }) => setCoachDetails(data))
     supabase.from('profiles').select('invite_code').eq('user_id', user.id).maybeSingle()
@@ -117,6 +126,16 @@ export default function CoachHomePage() {
             TRAK
           </span>
         </div>
+
+        {/* A failed load must not be reported as a season with nothing in it.
+            Shown above the stats rather than replacing them, so anything that
+            DID load still reaches the coach — partial truth beats a blank
+            screen, and beats a confident zero. */}
+        {loadFailed && (
+          <div className="mb-4">
+            <LoadError what="your squad" />
+          </div>
+        )}
 
         {/* Identity section */}
         <div className="py-2.5 pb-4">
@@ -195,7 +214,7 @@ export default function CoachHomePage() {
                   color: '#C8F25A',
                 }}
               >
-                {playerCount}
+                {loadFailed && playerCount === 0 ? '—' : playerCount}
               </p>
               <p
                 className="text-[9px] mt-1.5 tracking-[0.04em]"
@@ -236,7 +255,7 @@ export default function CoachHomePage() {
                 className="text-[13px] font-medium mt-1.5"
                 style={{ fontFamily: "'DM Sans', sans-serif", color: 'rgba(255,255,255,0.45)' }}
               >
-                {allAssessments.length} total
+                {loadFailed && allAssessments.length === 0 ? 'Not available' : `${allAssessments.length} total`}
               </p>
             </div>
           </div>

@@ -52,8 +52,11 @@ beforeEach(async () => {
   vi.clearAllMocks()
   await supabase.auth.initialize()
   localStorage.setItem('sb-test-auth-token', JSON.stringify(session('a')))
+  // A bare object key — what a real upload stores since F-3 (the avatars
+  // bucket has been private since 26 May; a raw public/synthetic URL is not
+  // a shape resolveAvatarUrl() recognises, so it never reaches the sign step).
   profiles = Object.fromEntries(['a', 'b'].map(id => [id, { id: `profile-${id}`, user_id: id, role: 'parent',
-    full_name: `Synthetic Parent ${id.toUpperCase()}`, nationality: null, avatar_url: id === 'a' ? 'https://synthetic.invalid/avatar-a.png' : null }]))
+    full_name: `Synthetic Parent ${id.toUpperCase()}`, nationality: null, avatar_url: id === 'a' ? 'a' : null }]))
   requests = []
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   server.use(
@@ -79,6 +82,10 @@ beforeEach(async () => {
     http.get(`${url}/rest/v1/player_details`, ({ request }) => rowResponse(request, { position: 'Midfielder', shirt_number: 0 })),
     http.get(`${url}/rest/v1/squad_players`, () => HttpResponse.json([])),
     http.get(`${url}/rest/v1/player_parent_links`, () => HttpResponse.json([])),
+    // Settings resolves every avatar_url through createSignedUrl(); the
+    // storage-js client prefixes this relative field with its own base url.
+    http.post(`${url}/storage/v1/object/sign/avatars/:key`, ({ params }) =>
+      HttpResponse.json({ signedURL: `/object/sign/avatars/${params.key}?token=synthetic` })),
   )
 })
 afterEach(() => { cleanup(); client.clear(); vi.restoreAllMocks() })
@@ -128,11 +135,14 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
   })
 
   it('clears A photo and draft on a real SDK A-to-B transition, and clears same-account null avatars', async () => {
-    mount(); await ready(); expect(screen.getByAltText('Profile')).toHaveAttribute('src', profiles.a.avatar_url)
+    mount(); await ready()
+    // Signing is an extra round-trip the raw stored value never needed, so
+    // this first appearance is awaited rather than asserted synchronously.
+    await waitFor(() => expect(screen.getByAltText('Profile')).toHaveAttribute('src', expect.stringContaining('/object/sign/avatars/a?token=synthetic')))
     profiles.a.avatar_url = null
     fireEvent.click(screen.getByRole('button', { name: 'Refresh profile' }))
     await waitFor(() => expect(screen.queryByAltText('Profile')).not.toBeInTheDocument())
-    profiles.a.avatar_url = 'https://synthetic.invalid/avatar-a.png'
+    profiles.a.avatar_url = 'a'
     fireEvent.click(screen.getByRole('button', { name: 'Refresh profile' }))
     await screen.findByAltText('Profile')
     chooseName('Unsubmitted A draft')
@@ -278,6 +288,21 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     expect(screen.getByRole('button', { name: 'Synthetic Parent B' })).toBeInTheDocument()
     expect(messages.success).not.toHaveBeenCalled()
     expect(messages.error).not.toHaveBeenCalled()
+  })
+
+  it('F-3: persists the bare object key, not a public-bucket URL, and shows the signed preview', async () => {
+    server.use(http.post(`${url}/storage/v1/object/avatars/a`, () => HttpResponse.json({ Key: 'avatars/a' })))
+    const { container } = mount(); await ready()
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(['image'], 'avatar.png', { type: 'image/png' })] } })
+    await waitFor(() => expect(messages.success).toHaveBeenCalledWith('Profile photo updated'))
+    // The `avatars` bucket has been private since 26 May; getPublicUrl()'s
+    // output 404s everywhere it is rendered even though this save and the
+    // upload both report success. The stored value must be the bare key that
+    // resolveAvatarUrl() at every read site can actually sign.
+    expect(requests.filter(r => r.method === 'PATCH')).toEqual([
+      { method: 'PATCH', path: 'profiles', authorization: 'Bearer token-a', body: { avatar_url: 'a' } },
+    ])
+    await waitFor(() => expect(screen.getByAltText('Profile')).toHaveAttribute('src', expect.stringContaining('/object/sign/avatars/a?token=synthetic')))
   })
 
   it('binds upload to A and does not start its profile write after B signs in', async () => {

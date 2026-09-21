@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
+import { resolveAvatarUrl } from '@/lib/avatar-url'
 import { ParentConnections } from '@/components/parent/ParentConnections'
 import { supabase } from '@/integrations/supabase/client'
 import { POSITIONS, COACH_ROLES, AGE_GROUPS } from '@/lib/constants'
@@ -55,7 +56,9 @@ function AccountSettings({ userId }: { userId: string }) {
   const [displayName, setDisplayName] = useState(profile?.full_name ?? '')
   const [nameDraft, setNameDraft] = useState(profile?.full_name ?? '')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null)
+  // Never the raw `profiles.avatar_url` value — it is a storage key or a
+  // legacy URL, not something an <img> can load. The effect below signs it.
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [coachClub, setCoachClub] = useState('')
   const [coachTeam, setCoachTeam] = useState('')
   const [coachRoleVal, setCoachRoleVal] = useState('')
@@ -69,7 +72,27 @@ function AccountSettings({ userId }: { userId: string }) {
   const [loadAttempt, setLoadAttempt] = useState(0)
 
   useEffect(() => { setDisplayName(profile?.full_name ?? '') }, [profile?.full_name])
-  useEffect(() => { setAvatarUrl(profile?.avatar_url ?? null) }, [profile?.avatar_url])
+  // F-3: `profiles.avatar_url` holds a bare storage key going forward (a
+  // legacy public URL for anyone who uploaded before this fix), never
+  // something renderable as-is — the `avatars` bucket has been private since
+  // 26 May. Sign it into a URL that actually loads; null (no avatar, or a
+  // signing failure) falls through to the initials placeholder rather than a
+  // broken image.
+  useEffect(() => {
+    let cancelled = false
+    const current = () => mounted.current && !cancelled
+    if (!profile?.avatar_url) { setAvatarUrl(null); return }
+    void (async () => {
+      const { client } = await getSettingsAccount(userId, current)
+      const signed = await resolveAvatarUrl(
+        profile.avatar_url,
+        (path, expiresIn) => client.storage.from('avatars').createSignedUrl(path, expiresIn),
+        message => console.error('[avatar] could not sign stored avatar:', message),
+      )
+      if (current()) setAvatarUrl(signed)
+    })()
+    return () => { cancelled = true }
+  }, [userId, profile?.avatar_url])
 
   // Stable identity/role dependencies preserve unfinished drafts on token refresh.
   useEffect(() => {
@@ -225,14 +248,22 @@ function AccountSettings({ userId }: { userId: string }) {
         .upload(userId, file, { upsert: true, contentType: file.type })
       if (uploadError) throw uploadError
       await assertSettingsAccount(userId, isCurrent)
-      const { data: { publicUrl } } = client.storage.from('avatars').getPublicUrl(userId)
-      const urlWithBust = `${publicUrl}?t=${Date.now()}`
-      const { data, error } = await client.from('profiles').update({ avatar_url: urlWithBust })
+      // F-3: store the bare object key, not getPublicUrl()'s output — the
+      // `avatars` bucket is private, so a "public" URL 404s everywhere it is
+      // rendered even though the upload and this save both report success.
+      // No cache-buster: a signed URL is minted fresh per render below and
+      // per read at every other call site, so there is nothing to bust.
+      const { data, error } = await client.from('profiles').update({ avatar_url: userId })
         .eq('user_id', userId).select('user_id').maybeSingle()
       if (error) throw error
       if (data?.user_id !== userId) throw new Error('Profile photo save was not confirmed')
       await assertSettingsAccount(userId, isCurrent)
-      setAvatarUrl(urlWithBust)
+      const signed = await resolveAvatarUrl(
+        userId,
+        (path, expiresIn) => client.storage.from('avatars').createSignedUrl(path, expiresIn),
+        message => console.error('[avatar] could not sign the upload for preview:', message),
+      )
+      if (isCurrent()) setAvatarUrl(signed)
       await refreshProfile()
       if (isCurrent()) toast.success('Profile photo updated')
     } catch (error) {

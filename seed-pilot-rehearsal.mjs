@@ -57,6 +57,13 @@ if (!PW || PW.length < 16) {
 const ORG_NAME = 'Rehearsal FC'
 const JOIN_CODE = 'REHRS'
 
+// Mirrors src/lib/consent.ts (CONSENT_NOTICE_VERSION, CONSENT_STATEMENT) — a
+// .mjs cannot import the TS module. Change both together, as the app does.
+const CONSENT_NOTICE_VERSION = '2026-09-12.1'
+const CONSENT_STATEMENT =
+  'I confirm I hold parental responsibility for this child and I authorise the processing I have selected above. ' +
+  'I understand I can withdraw at any time from my profile, and that withdrawing stops future processing.'
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
@@ -218,7 +225,7 @@ async function seed() {
   if (!(await preflight())) return
 
   const created = { squadRows: 0, linked: 0, unlinked: 0, fixtures: 0, sessions: 0, notes: 0,
-                    matches: 0, assessments: 0, awards: 0, parents: 0 }
+                    matches: 0, assessments: 0, awards: 0, parents: 0, consents: 0 }
 
   /* --- director + organisation ------------------------------------------ */
   heading('Director and organisation')
@@ -474,9 +481,12 @@ async function seed() {
       }
     }
 
-    /* parents — every third claimed player gets one */
-    for (let n = 0; n < claimed.length; n += 3) {
-      const r = claimed[n]
+    /* parents — every claimed player gets one, and the parent grants consent.
+       Every seeded player is U15/U17, so once consent_threshold_age() is 18
+       (#80) a player with no consent row cannot be assessed: the "coach
+       assesses a player" demo step would refuse on stage. The grant goes
+       through the same RPC the parent screen calls, with the same wording. */
+    for (const r of claimed) {
       const slug = r.player_name.toLowerCase().replace(/[^a-z]+/g, '.')
       const parentEmail = `parent.${slug}@${DOMAIN}`
 
@@ -485,13 +495,29 @@ async function seed() {
       await supabase.rpc('create_parent_invite', { p_email: parentEmail })
 
       const parentUser = await signInOrUp(parentEmail)
-      if (parentUser) {
-        await provision({ role: 'parent', full_name: `Parent of ${r.player_name}` })
-        created.parents++
-      }
+      if (!parentUser) continue
+      await provision({ role: 'parent', full_name: `Parent of ${r.player_name}` })
+      created.parents++
+
+      // Re-running must not stack a new consent on top of a standing one.
+      const { data: standing, error: readErr } = await supabase
+        .from('parental_consents').select('id')
+        .eq('player_user_id', playerAcct.id).is('withdrawn_at', null).limit(1)
+      if (readErr) { log(`consent check for ${r.player_name}: ${readErr.message}`); continue }
+      if (standing?.length) continue
+
+      const { error } = await supabase.rpc('record_parental_consent', {
+        p_player_user_id: playerAcct.id,
+        p_relationship: 'parent',
+        p_purposes: { coaching_records: true, recognition: true, parent_visibility: true },
+        p_notice_version: CONSENT_NOTICE_VERSION,
+        p_consent_text: CONSENT_STATEMENT,
+      })
+      if (error) log(`consent for ${r.player_name}: ${error.message}`)
+      else created.consents++
     }
     await signInOrUp(squad.coachEmail)
-    log(`parents linked: ${created.parents}`)
+    log(`parents linked: ${created.parents}, consents granted this run: ${created.consents}`)
   }
 
   /* --- a specialist coach with no squad of their own -------------------- */

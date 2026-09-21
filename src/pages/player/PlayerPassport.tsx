@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { scoreToBand } from '@/lib/rating-engine'
 import { toast } from 'sonner'
-import html2canvas from 'html2canvas'
+import { captureElementToPng, shareOrSaveImage } from '@/lib/card-export'
 
 type BandKey = 'exceptional' | 'standout' | 'good' | 'steady' | 'mixed' | 'developing' | 'difficult'
 
@@ -155,47 +155,26 @@ export default function PlayerPassport() {
     setLoading(false)
   }
 
-  // ── html2canvas capture ───────────────────────────────────────────────────
-  const captureCard = async (): Promise<Blob | null> => {
-    if (!cardRef.current) return null
-    // Render at true CARD_W geometry: drop the fit-to-viewport transform for
-    // the duration of the capture so the PNG is identical on every device.
-    const wrap = scaleRef.current
-    const prev = wrap?.style.transform ?? ''
-    try {
-      if (wrap) wrap.style.transform = 'none'
-      await document.fonts.ready
-      const canvas = await html2canvas(cardRef.current, {
-        backgroundColor: '#0D0D0F',
-        scale: 3,
-        useCORS: true,
-        logging: false,
-        scrollX: 0,
-        scrollY: -window.scrollY,
-        width: CARD_W,
-        windowWidth: CARD_W,
-      })
-      return await new Promise(res => canvas.toBlob(b => res(b), 'image/png'))
-    } catch { return null }
-    finally { if (wrap) wrap.style.transform = prev }
-  }
+  // ── capture ───────────────────────────────────────────────────────────────
+  // The capture itself lives in card-export.ts, shared with the Evolution Card.
+  // Render at true CARD_W geometry: the fit-to-viewport transform comes off for
+  // the duration of the capture so the PNG is identical on every device.
+  const captureCard = () => captureElementToPng(cardRef.current, {
+    background: '#0D0D0F',
+    scale: 3,
+    width: CARD_W,
+    unscale: scaleRef.current,
+  })
 
   const handleShare = async () => {
     setExporting(true)
     try {
-      const blob = await captureCard()
-      if (!blob) throw new Error('failed')
-      const file = new File([blob], 'trak-passport.png', { type: 'image/png' })
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: `${profile?.full_name ?? 'Player'} · TRAK Passport` })
-        return
-      }
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a'); a.href = url; a.download = 'trak-passport.png'; a.click()
-      URL.revokeObjectURL(url)
-      toast.success('Passport saved as image')
-    } catch (e: any) {
-      if (e?.name !== 'AbortError') toast.error('Could not export passport')
+      const outcome = await shareOrSaveImage(await captureCard(), {
+        filename: 'trak-passport.png',
+        title: `${profile?.full_name ?? 'Player'} · TRAK Passport`,
+      })
+      if (outcome === 'saved') toast.success('Passport saved as image')
+      if (outcome === 'failed') toast.error('Could not export passport')
     } finally { setExporting(false) }
   }
 

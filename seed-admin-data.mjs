@@ -13,8 +13,14 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 const now = Date.now()
 const daysAgo = (d) => new Date(now - d * 86400000).toISOString()
 
-const OLD_PW = 'TrakDev123'
-const NEW_PW = 'TrakDev123!'
+// Never literals. These accounts live in whatever project VITE_SUPABASE_URL
+// points at, and this repository is public.
+const OLD_PW = process.env.TRAK_DEV_OLD_PASSWORD
+const NEW_PW = process.env.TRAK_DEV_PASSWORD
+if (!OLD_PW || !NEW_PW) {
+  console.error('Set TRAK_DEV_OLD_PASSWORD and TRAK_DEV_PASSWORD in the environment.')
+  process.exit(1)
+}
 
 async function signIn(email) {
   // Try old password first, then new

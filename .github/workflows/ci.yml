@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -43,6 +43,9 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Consent calendar timezones
+        run: npm run test:consent-timezones
 
       - name: Database security regressions
         run: npm run test:db
@@ -224,7 +227,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'

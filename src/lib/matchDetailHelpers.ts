@@ -1,14 +1,9 @@
 import { type Band } from '@/lib/clubMock'
+import { BANDS } from '@/lib/types'
+import { bandForScore } from '@/lib/rating-engine'
 
-export const BAND_COLORS: Record<Band, string> = {
-  Exceptional: '#C8F25A',
-  Standout: '#86efac',
-  Good: '#4ade80',
-  Steady: '#60a5fa',
-  Mixed: '#fb923c',
-  Developing: '#a78bfa',
-  Difficult: 'rgba(255,255,255,0.4)',
-}
+export const BAND_COLORS: Record<Band, string> =
+  Object.fromEntries(BANDS.map(b => [b.word, b.color])) as Record<Band, string>
 
 // Self-rating mapping
 export const SELF_RATING_BAND: Record<string, Band> = {
@@ -18,13 +13,13 @@ export const SELF_RATING_BAND: Record<string, Band> = {
   poor: 'Mixed',
 }
 
-// Map a 1–10 coach category score to a band word
+// Map a 0–10 coach category score to a band word.
+//
+// This used to carry its own ladder, and it disagreed with scoreToBand below
+// the midpoint: a 4 read "Developing" here and "Mixed" everywhere else, a 3
+// read "Difficult" here and "Developing" everywhere else. Same child, same
+// number, a different answer on the match-detail screen. Now there is one
+// ladder and this is a spelling change on top of it.
 export function categoryScoreToBand(score: number): Band {
-  if (score >= 9) return 'Exceptional'
-  if (score >= 8) return 'Standout'
-  if (score >= 7) return 'Good'
-  if (score >= 6) return 'Steady'
-  if (score >= 5) return 'Mixed'
-  if (score >= 4) return 'Developing'
-  return 'Difficult'
+  return bandForScore(score).word as Band
 }

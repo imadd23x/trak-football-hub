@@ -147,8 +147,8 @@ VALUES (pg_temp.cid(204), pg_temp.cid(1), 'Sixteen Year Old', pg_temp.cid(7), 'U
 -- These pass today and describe exactly how far the gate extends.
 
 SELECT pg_temp.cassert(
-  public.consent_threshold_age() = 15,
-  'A1. Threshold is 15 (the fixture is under it)',
+  public.consent_threshold_age() = 18,
+  'A1. Threshold is 18 (the fixture is under it)',
   'threshold is ' || public.consent_threshold_age());
 
 SELECT pg_temp.cassert(
@@ -330,30 +330,17 @@ SELECT pg_temp.cassert(
 
 
 -- ── Section D: the band between the two thresholds ─────────
--- Two numbers now govern consent and they are not the same number.
+-- Until 20260921120000, two numbers governed consent and they were not the
+-- same number: consent_threshold_age() said 15 (Greece, and the only one any
+-- write policy consulted) while trak_consent (#70) said 18. Between them —
+-- 15, 16, 17 — a verified parent could record a decision, including a
+-- WITHDRAWAL, and what a coach could write did not change.
 --
---   public.consent_threshold_age()   15   statutory, Greece, and the ONLY one
---                                         any write policy consults
---   trak_consent (#70)               18   Imad's pilot product policy, both
---                                         markets, deliberately stricter
---
--- They agree below 15 and at 18+. Between them — 15, 16, 17 — the product
--- policy says a guardian decides and the live gate says nobody needs to. I
--- measured the disagreement across every age from 12 to 19 on main + #70; it is
--- exactly these three.
---
--- These assertions PASS today and describe the live behaviour, in the manner of
--- section A. They are not a complaint about the policy, which is a reasonable
--- choice. They exist because #53 is the inventory for the write-path cutover,
--- and this is the band the cutover has to act on. When the gates are wired to
--- the authority, or when consent_threshold_age() moves to 18, D2 and D3 flip —
--- and whoever changes them reads this comment.
---
--- What makes it worth pinning rather than noting: nothing outside #70's own
--- migration references trak_consent. So in this band a verified parent can
--- record a decision, including a WITHDRAWAL, and what a coach may write does
--- not change. An unenforced withdrawal is worse than none — it is a promise to
--- a parent that nothing keeps.
+-- That migration moves consent_threshold_age() to 18 for both markets, so the
+-- band is closed: D2 and D3 flipped from documenting the gap to guarding
+-- against its return. If either goes red again, the statutory function and
+-- the product policy have drifted apart; read 20260921120000 before touching
+-- the number.
 
 SELECT pg_temp.cassert(
   public.player_age_years(pg_temp.cid(7)) = 16,
@@ -361,8 +348,8 @@ SELECT pg_temp.cassert(
   'age is ' || coalesce(public.player_age_years(pg_temp.cid(7))::text, 'NULL'));
 
 SELECT pg_temp.cassert(
-  public.squad_player_consent_required(pg_temp.cid(204)) IS FALSE,
-  'D2. Consent is NOT required for a 16-year-old — above 15, below the 18 policy',
+  public.squad_player_consent_required(pg_temp.cid(204)) IS TRUE,
+  'D2. Consent IS required for a 16-year-old — the 15-17 band is closed',
   'threshold is ' || public.consent_threshold_age());
 
 -- The consequence, stated as the write rather than as the predicate, because
@@ -386,12 +373,12 @@ SET LOCAL ROLE service_role;
 SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 SELECT pg_temp.cassert(
-  EXISTS (SELECT 1 FROM public.coach_assessments WHERE id = pg_temp.cid(403)),
-  'D3. A coach may assess that child with no consent record of any kind');
+  NOT EXISTS (SELECT 1 FROM public.coach_assessments WHERE id = pg_temp.cid(403)),
+  'D3. A coach may NOT assess that child while no consent record exists');
 
 SELECT pg_temp.cassert(
   NOT EXISTS (SELECT 1 FROM public.parental_consents WHERE player_user_id = pg_temp.cid(7)),
-  'D4-control and no consent record exists for them, so D3 is not consent working');
+  'D4-control and no consent record exists for them, so D3 is the gate refusing, not consent missing');
 
 RESET ROLE;
 

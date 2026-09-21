@@ -8,8 +8,8 @@ import {
 
 /**
  * Keep calendar ages consistent with the database's UTC current_date. The
- * existing fifteenth-birthday policy tests stay until the coordinated backend
- * migration changes the pilot threshold to 18.
+ * threshold is 18 for both pilot markets since 20260921120000; the boundary
+ * tests below sit on the eighteenth birthday.
  */
 describe('ageFromDateOfBirth', () => {
   afterEach(() => vi.useRealTimers())
@@ -115,14 +115,19 @@ describe('needsParentalConsent', () => {
     expect(needsParentalConsent('2012-09-13')).toBe(true) // 13
   })
 
+  it('is true at 16, which the old Greek threshold of 15 let through', () => {
+    freeze('2026-09-12T12:00:00Z')
+    expect(needsParentalConsent('2010-09-12')).toBe(true) // exactly 16
+  })
+
   it('is false on the day the child reaches the threshold', () => {
     freeze('2026-09-12T12:00:00Z')
-    expect(needsParentalConsent('2011-09-12')).toBe(false) // exactly 15
+    expect(needsParentalConsent('2008-09-12')).toBe(false) // exactly 18
   })
 
   it('is true on the last day before the threshold', () => {
     freeze('2026-09-11T12:00:00Z')
-    expect(needsParentalConsent('2011-09-12')).toBe(true) // 14
+    expect(needsParentalConsent('2008-09-12')).toBe(true) // 17
   })
 
   it('preserves the existing missing-DOB result until the backend consent migration', () => {
@@ -136,7 +141,7 @@ describe('consent purposes', () => {
     expect(CONSENT_PURPOSES.filter(p => !p.required).length).toBeGreaterThan(0)
   })
 
-  it('keeps the existing threshold until the coordinated under-18 migration', () => {
-    expect(CONSENT_THRESHOLD_AGE).toBe(15)
+  it('treats anyone under 18 as a child, for the UAE and Greece alike', () => {
+    expect(CONSENT_THRESHOLD_AGE).toBe(18)
   })
 })

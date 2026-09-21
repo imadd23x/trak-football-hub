@@ -30,6 +30,23 @@ export interface CaptureOptions {
   unscale?: HTMLElement | null
 }
 
+/**
+ * html2canvas finds each font's baseline by putting a 1x1 <img> inline after
+ * sample text and reading its offsetTop (FontMetrics.parseMetrics, measured in
+ * the LIVE document, not the clone). Tailwind's preflight makes every img
+ * `display: block`, so the probe drops onto its own line and the "baseline"
+ * becomes a whole line height. Every glyph is then drawn too low, by an amount
+ * that grows with font size: the exported cards had names sliced through by
+ * overflow:hidden and "74" printed over "MIDFIELDER" while the screen was fine.
+ *
+ * The rule matches only that probe, by the fixed src html2canvas 1.4.1 gives it,
+ * and exists only for the duration of a capture. A test pins the src against
+ * the installed library so an upgrade that changes it fails loudly.
+ */
+const BASELINE_PROBE_FIX =
+  'img[src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"]' +
+  '{display:inline !important}'
+
 /** Renders `el` to a PNG blob, or null if it could not be captured. */
 export async function captureElementToPng(
   el: HTMLElement | null,
@@ -38,7 +55,12 @@ export async function captureElementToPng(
   if (!el) return null
   const { background = '#0D0D0F', scale = 3, width, unscale } = opts
   const previousTransform = unscale?.style.transform ?? ''
+  const probeFix = typeof document === 'undefined' ? null : document.createElement('style')
   try {
+    if (probeFix) {
+      probeFix.textContent = BASELINE_PROBE_FIX
+      document.head.appendChild(probeFix)
+    }
     if (unscale) unscale.style.transform = 'none'
     // Without this the card can rasterise in a fallback face.
     if (typeof document !== 'undefined' && document.fonts?.ready) await document.fonts.ready
@@ -55,6 +77,7 @@ export async function captureElementToPng(
   } catch {
     return null
   } finally {
+    probeFix?.remove()
     if (unscale) unscale.style.transform = previousTransform
   }
 }

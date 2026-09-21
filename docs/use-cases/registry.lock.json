@@ -1,11 +1,11 @@
 {
   "UC-A02": {
-    "spec_version": 1,
-    "hash": "4552182b87c50345d9568ec79a416592350e0d62b51065b9bac267d64c003b74"
+    "spec_version": 2,
+    "hash": "f84e768e305a34181e09a03cad5acd3cbc75b05dd3255758ee5d852b784b3a74"
   },
   "UC-A03": {
-    "spec_version": 1,
-    "hash": "97d4e14dec2bc95f0804fe394ebd013933224ce8347f32ddc6eabcb7ff6b3b2f"
+    "spec_version": 2,
+    "hash": "a5cf4360b4df80c236a1651388f272f0e4324f994f2cadc4d37e7608190c8a8a"
   },
   "UC-A04": {
     "spec_version": 1,

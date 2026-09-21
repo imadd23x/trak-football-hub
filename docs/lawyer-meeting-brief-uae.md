@@ -253,6 +253,42 @@ off. It is on today.
 > published contact for a parent with a problem, and no 72-hour-equivalent
 > procedure. What is required here, and what is the notification deadline?
 
+### 6a. The one question where the answer changes a line of code
+
+Erasure has existed and been tested for some time. **Data export did not exist
+at all until 19 September**, when it was built — and building it surfaced a
+question we had been talking past.
+
+Under GDPR the two rights are different. **Article 15 (access)** covers
+everything held *about* a person. **Article 20 (portability)** covers data the
+person *"provided"*. The product holds both kinds about a child:
+
+| The child provided it | An adult observed it |
+| --- | --- |
+| date of birth, name, position, club, shirt number | six-metric coach assessments and the overall rating |
+| matches they logged themselves | recognition awards |
+| | AI-written feedback about them |
+
+**A coach's assessment of a child is an observation the coach made, not data the
+child provided.** So it is arguably Article 15 and not Article 20 — and we have
+been saying "export" as though the two were one thing.
+
+> **Discuss:** Does the applicable UAE regime draw the access/portability
+> distinction at all, and if so, do a coach's assessments of a child fall inside
+> a portability request or only an access request?
+
+The engineering does not need the answer to proceed, and is built so the answer
+costs one line: the split is declared once in
+`export_scope_includes_observations()` and every section of the export consults
+it. **It currently defaults to including observations**, on the reasoning that an
+export which silently omits a child's assessments is a rights failure, whereas
+including them is a scope debate. If that default is wrong, one boolean changes.
+
+One thing is excluded regardless of the answer, and asserted rather than assumed:
+**`coach_assessment_notes` never appears in a child's export.** Those are the
+coach's private notes; a portability right does not reopen a confidentiality
+decision.
+
 ---
 
 ## 7. What we are asking for
@@ -267,9 +303,12 @@ off. It is on today.
    open. We believe we know the answer and are already fixing it; we want to
    know whether it is a blocker or a defect.
 4. **The right age threshold**, or confirmation that the concept does not apply.
-5. **A pilot agreement we can put in front of an academy**, from the
+5. **Whether coach observations belong in a portability request** (section 6a) —
+   the only open question whose answer changes code rather than paperwork, and
+   it is already reduced to one boolean.
+6. **A pilot agreement we can put in front of an academy**, from the
    specification we have.
-6. **The minimum document set** — terms, privacy policy, retention, breach
+7. **The minimum document set** — terms, privacy policy, retention, breach
    contact — with a do-now versus do-later split and rough cost.
 
 We would rather be told the pilot cannot start on the current timeline than

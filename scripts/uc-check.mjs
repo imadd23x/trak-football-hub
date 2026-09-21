@@ -63,6 +63,15 @@ function findTestFiles() {
   return found
 }
 
+/**
+ * The harness has always had three statuses — the 2026-09-07 design says
+ * "exactly `enforced` | `pending` | `parked`", and `parked` is already in the
+ * UseCaseStatus type, tests/support/registry.test.ts, useCase()'s skip branch
+ * and uc-report's sections. This file was the one place that did not know,
+ * which is why a parked entry silently fell out of every branch below.
+ */
+const STATUSES = new Set(['enforced', 'pending', 'parked'])
+
 const registry = loadRegistry()
 
 if (writeLockMode) {
@@ -89,6 +98,16 @@ for (const uc of registry.use_cases) {
     if (uc[field] === undefined || uc[field] === null || uc[field] === '') {
       fail(`${uc.id} is missing required field "${field}"`)
     }
+  }
+  // Every branch below compares `status` to a literal, so an unrecognised
+  // value is not an error anywhere — it is simply neither enforced nor
+  // pending, and the use case drops out of the enforced run, the pending run
+  // and the debt count at once, silently. That was already true of `parked`
+  // before UC-A02/A03 used it, so the set is checked rather than assumed.
+  // A misspelling is a developer mistake rather than a product decision, so it
+  // uses plain fail() and never escalates to OPEN-QUESTIONS.md.
+  if (!STATUSES.has(uc.status)) {
+    fail(`${uc.id} has unknown status "${uc.status}" — expected one of: ${[...STATUSES].join(', ')}`)
   }
   if (uc.status === 'enforced' && !tests.has(uc.id)) {
     // Unlike the two checks above, this one genuinely implicates a specific

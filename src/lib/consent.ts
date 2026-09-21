@@ -1,12 +1,12 @@
 /**
- * Parental consent for players below the digital-consent age.
+ * UI helpers for the existing parental-consent implementation.
  *
- * Greek digital-consent age is 15. Below it a holder of parental
- * responsibility must authorise, and we must be able to show what they
- * agreed to and when. The database is the authority — `consent_threshold_age()`
- * and `player_consent_required()` enforce it. These values exist so the UI can
- * ask the same question before a round trip, and must be kept in step with
- * `20260912000001_parental_consent.sql`.
+ * The database is the authority — `consent_threshold_age()` and
+ * `player_consent_required()` currently use the legacy threshold of 15.
+ * The confirmed under-18 policy for both UAE and Greece still requires a
+ * coordinated backend migration; this calendar fix does not implement it.
+ * Keep the threshold in step with `20260912000001_parental_consent.sql`
+ * until that migration lands.
  */
 
 /** Mirrors `public.consent_threshold_age()`. Change both together. */
@@ -18,19 +18,30 @@ export const CONSENT_THRESHOLD_AGE = 15
  */
 export const CONSENT_NOTICE_VERSION = '2026-09-12.1'
 
-/** Whole years, the way an age threshold is read in law. */
-export const ageFromDateOfBirth = (dob: string | Date): number | null => {
-  const birth = dob instanceof Date ? dob : new Date(dob)
-  if (Number.isNaN(birth.getTime())) return null
+/** Whole years from a valid YYYY-MM-DD, using the database's UTC calendar day. */
+export const ageFromDateOfBirth = (dob: string): number | null => {
+  if (dob.length !== 10) return null
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob)
+  if (!parts) return null
+
+  const year = Number(parts[1])
+  const month = Number(parts[2])
+  const day = Number(parts[3])
+  if (year < 1 || month < 1 || month > 12 || day < 1) return null
+
+  // Validate calendar components directly: Date parsing normalizes Feb 31.
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  if (day > daysInMonth[month - 1]) return null
 
   const today = new Date()
-  let age = today.getFullYear() - birth.getFullYear()
-  const monthDelta = today.getMonth() - birth.getMonth()
-  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birth.getDate())) age--
-  return age
+  const monthDelta = today.getUTCMonth() + 1 - month
+  let age = today.getUTCFullYear() - year
+  if (monthDelta < 0 || (monthDelta === 0 && today.getUTCDate() < day)) age--
+  return age < 0 ? null : age
 }
 
-export const needsParentalConsent = (dob: string | Date): boolean => {
+export const needsParentalConsent = (dob: string): boolean => {
   const age = ageFromDateOfBirth(dob)
   return age !== null && age < CONSENT_THRESHOLD_AGE
 }

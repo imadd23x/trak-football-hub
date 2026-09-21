@@ -3,6 +3,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { validateMigrationFiles } from './migration-input.mjs';
 
 // An in-memory database by construction. Never reads DB_URL or connects to a
 // Supabase project; SQL fixture guards also refuse an unmarked connection.
@@ -108,16 +109,30 @@ if (args.length > 1 || !modes.includes(mode)) {
 const baseline = mode === '--baseline';
 const pilotViewsBaseline = mode === '--pilot-views-baseline';
 const parentUpgrade = mode === '--parent-upgrade-review';
+const migrationFiles = validateMigrationFiles(await readdir(resolve(root, 'supabase/migrations')));
 const db = new PGlite();
 const read = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
 try {
   await db.exec(await read('bootstrap.sql'));
   const { rows } = await db.query('SELECT version() AS version');
   console.log(`Disposable database: ${rows[0].version}`);
-  const migrations = (await readdir(resolve(root, 'supabase/migrations')))
-    .filter(file => file.endsWith('.sql')
-      && (!baseline || file < securityMigration)
+  // `let`, not `const`: the upgrade-review modes REPLACE this list rather than
+  // filter it — Imad's --parent-history-upgrade-review reorders it so a pending
+  // migration applies after a pinned main. Declaring it const makes that
+  // reassignment a silent no-op when the two branches merge, which leaves the
+  // migrations in filename order and fails his boundary assertion for the
+  // wrong reason. Cost me twenty minutes chasing a count mismatch that was
+  // this word.
+  let migrations = migrationFiles
+    .filter(file => (!baseline || file < securityMigration)
       && (!pilotViewsBaseline || file < pilotViewsMigration)).sort();
+
+  // Version uniqueness and filename shape are validated by the shared
+  // validateMigrationFiles() above, from Imad's #68, not by a second loop
+  // here. I wrote one before his existed; two implementations that agree today
+  // is how they stop agreeing later, and his also catches cloud-sync conflict
+  // copies, which mine did not. It runs over the WHOLE directory before any
+  // filtering, so a --baseline run cannot hide a collision by excluding it.
   if (parentUpgrade) {
     // PR35 was deployed before PR33. Replay that actual order as well as the
     // fresh-install order, retaining original filenames and immutable SQL.
@@ -152,6 +167,7 @@ try {
     const result = await db.exec(await read(suite));
     console.log(`Passed: ${suite}`);
     for (const query of result) {
+      if (query.rows?.[0]?.player_age_timezone_assertions) console.log(`Player age timezone assertions: ${query.rows[0].player_age_timezone_assertions}`);
       if (query.rows?.[0]?.pilot_view_assertions) console.log(`Operational view assertions: ${query.rows[0].pilot_view_assertions}`);
     }
   }

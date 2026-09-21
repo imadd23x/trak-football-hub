@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -292,8 +293,8 @@ const PlayerOnboarding = () => {
             {NATIONALITIES.map(c => <option key={c} value={c}>{c}</option>)}
           </StyledSelect>
           <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="bg-card" />
-          <Input type="password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
-          <Input type="password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
+          <PasswordInput label="New password" autoComplete="new-password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
+          <PasswordInput label="Confirm password" autoComplete="new-password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
           <Button onClick={handleStep1} className="w-full mt-2">Next</Button>
         </>
       )}
@@ -453,8 +454,8 @@ const CoachOnboarding = () => {
             {NATIONALITIES.map(c => <option key={c} value={c}>{c}</option>)}
           </StyledSelect>
           <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="bg-card" />
-          <Input type="password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
-          <Input type="password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
+          <PasswordInput label="New password" autoComplete="new-password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
+          <PasswordInput label="Confirm password" autoComplete="new-password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
           <Button onClick={handleStep1} className="w-full mt-2">Next</Button>
         </>
       )}
@@ -541,8 +542,8 @@ const ClubOnboarding = () => {
       <Input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="bg-card" />
       <Input placeholder="Academy / club name" value={academy} onChange={e => setAcademy(e.target.value)} className="bg-card" />
       <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="bg-card" />
-      <Input type="password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
-      <Input type="password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
+      <PasswordInput label="New password" autoComplete="new-password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
+      <PasswordInput label="Confirm password" autoComplete="new-password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
       <Button onClick={handleSubmit} disabled={loading} className="w-full mt-2">
         {loading ? 'Creating account…' : 'Create Administrator Account'}
       </Button>

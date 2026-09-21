@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { MobileShell, MetadataLabel, CategoryBar, BandPill } from '@/components/trak'
+import { MobileShell, MetadataLabel, CategoryBar, BandPill, LoadError} from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
 import { BANDS } from '@/lib/types'
 import { ChevronLeft, Trophy } from 'lucide-react'
@@ -18,30 +18,86 @@ export default function CoachPlayerProfilePage() {
   const [player, setPlayer] = useState<any>(null)
   const [assessments, setAssessments] = useState<any[]>([])
   const [notesById, setNotesById] = useState<Record<string, string>>({})
+  /* Four states, not one.
+     `if (!player) return <spinner>` conflated every pre-data condition into a
+     spinner that never stops: a failed read set `player` to null and the coach
+     waited forever with no error and no retry. A player who genuinely does not
+     exist — deleted, or another coach's — got the same forever-spinner, so
+     "loading", "failed" and "not found" were one indistinguishable state. */
+  const [playerState, setPlayerState] = useState<'loading' | 'failed' | 'missing' | 'found'>('loading')
+  const [assessmentsFailed, setAssessmentsFailed] = useState(false)
 
-  useEffect(() => {
+  const loadPlayer = useCallback(async () => {
     if (!id || !user) return
-    supabase.from('squad_players').select('*').eq('id', id).eq('coach_user_id', user.id).maybeSingle().then(({ data }) => setPlayer(data))
-    supabase.from('coach_assessments').select('*').eq('squad_player_id', id).eq('coach_user_id', user.id)
-      .order('created_at', { ascending: false })
-      .then(async ({ data }) => {
-        const list = data || []
-        setAssessments(list)
-        if (list.length) {
-          const { data: notes } = await supabase.from('coach_assessment_notes')
-            .select('assessment_id, note')
-            .in('assessment_id', list.map((a: any) => a.id))
-          const map: Record<string, string> = {}
-          notes?.forEach((n: any) => { map[n.assessment_id] = n.note })
-          setNotesById(map)
-        }
-      })
+    const { data, error } = await supabase.from('squad_players').select('*')
+      .eq('id', id).eq('coach_user_id', user.id).maybeSingle()
+    if (error) { setPlayerState('failed'); return }
+    if (!data)  { setPlayerState('missing'); return }
+    setPlayer(data)
+    setPlayerState('found')
   }, [id, user])
 
-  if (!player) return (
+  /* `playerState` is written by loadPlayer and by nothing else, deliberately.
+     The two loaders run concurrently, so a second writer would race: a
+     mutation that made THIS function escalate its failure to playerState was
+     masked five times out of five, because loadPlayer resolved last and put it
+     back to 'found'. An assessments failure is reported through
+     assessmentsFailed instead, which no other loader touches. Keep it that
+     way — a shared state field here is a bug that hides itself. */
+  const loadAssessments = useCallback(async () => {
+    if (!id || !user) return
+    const { data, error } = await supabase.from('coach_assessments').select('*')
+      .eq('squad_player_id', id).eq('coach_user_id', user.id)
+      .order('created_at', { ascending: false })
+    if (error) { setAssessmentsFailed(true); return }
+    setAssessmentsFailed(false)
+    const list = data || []
+    setAssessments(list)
+    if (list.length) {
+      const { data: notes } = await supabase.from('coach_assessment_notes')
+        .select('assessment_id, note')
+        .in('assessment_id', list.map((a: any) => a.id))
+      const map: Record<string, string> = {}
+      notes?.forEach((n: any) => { map[n.assessment_id] = n.note })
+      setNotesById(map)
+    }
+  }, [id, user])
+
+  useEffect(() => { void loadPlayer(); void loadAssessments() }, [loadPlayer, loadAssessments])
+
+  if (playerState === 'loading') return (
     <MobileShell>
       <div className="flex items-center justify-center h-[60vh]">
         <div className="w-6 h-6 border-2 border-[#C8F25A] border-t-transparent rounded-full animate-spin" />
+      </div>
+    </MobileShell>
+  )
+
+  if (playerState === 'failed') return (
+    <MobileShell>
+      <div className="px-5 pt-6">
+        <LoadError what="this player" onRetry={() => { setPlayerState('loading'); void loadPlayer() }} />
+      </div>
+    </MobileShell>
+  )
+
+  /* Distinct from a failure on purpose. "We could not ask" and "this player is
+     not on your squad" call for different actions from the coach, and telling
+     them to retry a read that succeeded would send them round a loop. */
+  if (playerState === 'missing') return (
+    <MobileShell>
+      <div className="px-5 pt-6 text-center">
+        <p className="text-[14px] text-white/70">We couldn't find that player.</p>
+        <p className="mt-1 text-[12px] text-white/40">
+          They may have been removed from your squad.
+        </p>
+        <button
+          onClick={() => navigate('/coach/squad')}
+          className="mt-4 px-4 py-2 rounded-[10px] text-[12px] text-white/70 border border-white/[0.07] active:bg-white/[0.04]"
+          style={{ fontFamily: "'DM Mono', monospace" }}
+        >
+          Back to squad
+        </button>
       </div>
     </MobileShell>
   )
@@ -88,11 +144,21 @@ export default function CoachPlayerProfilePage() {
               )}
               <span className="h-5 px-2.5 rounded-full bg-white/[0.06] border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase text-white/45 inline-flex items-center"
                 style={{ fontFamily: "'DM Mono', monospace" }}>
-                {assessments.length} assessments
+                {assessmentsFailed && assessments.length === 0
+                  ? 'assessments unavailable'
+                  : `${assessments.length} assessments`}
               </span>
             </div>
           </div>
         </div>
+
+        {/* The player stays on screen. Losing the whole page because one of
+            two reads failed would be the same over-correction avoided on Home:
+            the coach can still see who they opened. */}
+        {assessmentsFailed && (
+          <LoadError what="this player's assessments"
+            onRetry={() => { void loadAssessments() }} />
+        )}
 
         {/* Latest assessment */}
         {latest && (

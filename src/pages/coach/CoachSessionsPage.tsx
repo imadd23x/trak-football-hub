@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { MobileShell, NavBar } from '@/components/trak'
+import { MobileShell, NavBar, LoadError } from '@/components/trak'
 import { Plus } from 'lucide-react'
 
 export default function CoachSessionsPage() {
@@ -10,16 +10,35 @@ export default function CoachSessionsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [sessions, setSessions] = useState<any[]>([])
+  /* Three states, not two. `[]` alone cannot distinguish "the coach has logged
+     nothing" from "we could not ask" — and the empty copy below is a factual
+     claim about sessions the coach created themselves. */
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [retrying, setRetrying] = useState(false)
 
-  useEffect(() => {
+  const loadSessions = useCallback(async () => {
     if (!user) return
-    supabase
+    const { data, error } = await supabase
       .from('coach_sessions')
       .select('*')
       .eq('coach_user_id', user.id)
       .order('session_date', { ascending: false })
-      .then(({ data }) => setSessions(data || []))
+    if (error) {
+      // Keep whatever was already on screen. Blanking the list on a failed
+      // refresh would itself be the false empty state this guards against.
+      setLoadFailed(true)
+      return
+    }
+    setLoadFailed(false)
+    setSessions(data || [])
   }, [user])
+
+  useEffect(() => { void loadSessions() }, [loadSessions])
+
+  const retry = async () => {
+    setRetrying(true)
+    try { await loadSessions() } finally { setRetrying(false) }
+  }
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -42,7 +61,11 @@ export default function CoachSessionsPage() {
 
       {/* Sessions list */}
       <div className="flex-1 overflow-y-auto px-5 pb-24">
-        {sessions.length === 0 ? (
+        {loadFailed && sessions.length === 0 ? (
+          <div className="mt-4">
+            <LoadError what="your sessions" onRetry={retry} retrying={retrying} />
+          </div>
+        ) : sessions.length === 0 ? (
           <p className="text-white/45 text-sm mt-4">No sessions logged yet.</p>
         ) : (
           <div className="space-y-0">

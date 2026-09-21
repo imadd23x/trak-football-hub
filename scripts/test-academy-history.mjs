@@ -6,33 +6,35 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { validateMigrationFiles } from './migration-input.mjs';
-import { migrationReplayOrder } from './test-native-db.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const directory = resolve(root, 'supabase/migrations');
 const files = validateMigrationFiles(await readdir(directory));
 const academy = '20260918062345_preserve_academy_access_and_fk_cleanup.sql';
 const repair = '20260920152925_preserve_closed_academy_history.sql';
-const coach = [
-  '20260918135500_private_notes_and_shared_feedback.sql',
-  '20260918163000_academy_scoped_assessment_reads.sql',
-  '20260918224500_org_pin_allows_referential_cleanup.sql',
-  '20260919140000_export_my_account.sql',
-  '20260919150000_parent_reads_published_feedback.sql',
-  '20260919160000_split_match_coverage_by_logger.sql',
-  '20260919170000_no_delete_policy_means_no_delete_grant.sql',
-  '20260920104500_restore_shared_feedback_deny_policy.sql',
-];
-for (const file of [academy, repair, ...coach]) assert.ok(files.includes(file), `Missing dependency ${file}`);
+// The one #44 file this script reads by name: the old roster trigger it mutates.
+const orgPin = '20260918224500_org_pin_allows_referential_cleanup.sql';
+for (const file of [academy, repair, orgPin]) assert.ok(files.includes(file), `Missing dependency ${file}`);
+// "Later" is everything that landed after the academy migration's version,
+// not a frozen list of #44's eight files. The frozen list broke main the
+// moment #84 merged: its migration references coach_shared_feedback (created
+// by #44), sorted into "released", and ran before the table existed in both
+// pinned histories. Anything newer than the academy migration must replay
+// after it in the coach-first history, whichever PR it came from.
+// Plain version split. The parent-upgrade reorder the old `released` list
+// carried is exercised by its own CI step (--parent-upgrade-review); its
+// pivot migration sorts after the academy one, so it cannot be applied to
+// the earlier half alone and is not this script's question.
+const earlier = files.filter(file => file < academy);
+const later = files.filter(file => file > academy && file !== repair);
+assert.ok(later.length >= 8, `Expected #44's migrations among the later set, found ${later.length}`);
 const read = name => readFile(resolve(directory, name), 'utf8');
 const test = name => readFile(resolve(root, 'supabase/tests', name), 'utf8');
 const correction = await read(repair);
-const dependencies = new Set([academy, repair, ...coach]);
-const released = migrationReplayOrder(files.filter(file => !dependencies.has(file)), '--parent-upgrade-review');
 const histories = [
   ['fresh', files],
-  ['coach_then_academy', [...released, ...coach, academy, repair]],
-  ['academy_then_coach', [...released, academy, ...coach, repair]],
+  ['coach_then_academy', [...earlier, ...later, academy, repair]],
+  ['academy_then_coach', [...earlier, academy, ...later, repair]],
 ];
 const suites = ['academy_access_security.sql', 'org_referential_cleanup.sql'];
 const signatures = [];
@@ -76,7 +78,7 @@ for (const [label, order] of histories) {
     await expectMutation(db, 'genuine first attribution removed',
       removeRange(correction, "  -- Preserve #44", '  -- Real FK cleanup'),
       suites[1], /an unattributed assessment is adopted/);
-    const oldRoster = triggerDefinition(await read(coach[2]), 'set_squad_player_org_id');
+    const oldRoster = triggerDefinition(await read(orgPin), 'set_squad_player_org_id');
     await expectMutation(db, 'roster closure guard removed', oldRoster,
       suites[0], /coach cannot read closed history/);
     // Recreate the old trigger's forgeable-marker state in this disposable DB.

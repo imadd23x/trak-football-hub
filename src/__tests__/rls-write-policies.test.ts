@@ -377,6 +377,117 @@ describe('a departed coach keeps nothing', () => {
     }
   })
 
+  it('K9: no live policy lets a player read a coach note', () => {
+    // April made coach_assessment_notes coach-only; May added an unconditional
+    // player SELECT and nobody noticed, because the table has no publication
+    // concept that would have made the policy look wrong. 8 notes existed live,
+    // 4 readable by a linked player.
+    const playerReads = live.filter(
+      p =>
+        p.table === 'coach_assessment_notes' &&
+        ['SELECT', 'ALL'].includes(p.op) &&
+        p.body.includes('linked_player_id'),
+    )
+    expect(
+      playerReads.map(p => `${p.name} (${p.file})`),
+      'a policy on coach_assessment_notes still resolves to a player. Private coach notes are ' +
+        'not publishable in place — shared feedback belongs in coach_shared_feedback.',
+    ).toEqual([])
+  })
+
+  it('K9: a player only reads shared feedback that was explicitly published', () => {
+    const playerReads = live.filter(
+      p =>
+        p.table === 'coach_shared_feedback' &&
+        ['SELECT', 'ALL'].includes(p.op) &&
+        p.body.includes('linked_player_id'),
+    )
+    expect(playerReads.length, 'no player read policy on coach_shared_feedback').toBeGreaterThan(0)
+    for (const p of playerReads) {
+      expect(
+        p.body.includes('published_at IS NOT NULL'),
+        `Policy "${p.name}" (${p.file}) lets a player read shared feedback without checking ` +
+          `published_at, so a coach's unpublished draft is visible to the child it is about.`,
+      ).toBe(true)
+    }
+  })
+
+  it('K9: writing shared feedback needs the coach role and a current roster row', () => {
+    const writes = live.filter(
+      p => p.table === 'coach_shared_feedback' && ['INSERT', 'UPDATE', 'ALL'].includes(p.op),
+    )
+    expect(writes.length, 'no write policy on coach_shared_feedback').toBeGreaterThan(0)
+    for (const p of writes) {
+      expect(
+        p.body.includes('is_coach()'),
+        `Policy "${p.name}" (${p.file}) does not require the coach role.`,
+      ).toBe(true)
+      expect(
+        p.body.includes('squad_player_is_mine('),
+        `Policy "${p.name}" (${p.file}) does not route through squad_player_is_mine(), so a ` +
+          `departed or transferred coach can still publish feedback to a former player.`,
+      ).toBe(true)
+    }
+  })
+
+  it('K9: no migration copies a private note into shared feedback', () => {
+    // "No auto-copy" is the part that cannot be expressed as a policy. If some
+    // future migration backfills coach_shared_feedback.body from
+    // coach_assessment_notes.note, every private note ever written becomes
+    // publishable in bulk and the separation stops meaning anything.
+    const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
+    const offenders = files.filter(f => {
+      const sql = readFileSync(join(MIGRATIONS, f), 'utf8')
+      const writesFeedback = /INSERT\s+INTO\s+(?:public\.)?coach_shared_feedback|UPDATE\s+(?:public\.)?coach_shared_feedback/i
+      return writesFeedback.test(sql) && /coach_assessment_notes/i.test(sql)
+    })
+    expect(
+      offenders,
+      'a migration writes coach_shared_feedback while referencing coach_assessment_notes. ' +
+        'Shared feedback is written by a coach for a child to read; it is never derived from ' +
+        'the private note.',
+    ).toEqual([])
+  })
+
+  it('K7: the academy read policy resolves the COACH org, not the club admin org', () => {
+    // squad_player_in_my_org(uuid) sounds like a coach helper and is not: it
+    // resolves my_organization_id(), which is organizations.admin_user_id =
+    // auth.uid() — the club admin. Using it in a coach policy silently grants
+    // nothing, because it returns NULL for every coach.
+    const academy = live.filter(
+      p => p.table === 'coach_assessments' && ['SELECT', 'ALL'].includes(p.op) &&
+           /my_coach_org|squad_player_in_my_coach_org/.test(p.body),
+    )
+    expect(academy.length, 'no academy-scoped read policy on coach_assessments').toBeGreaterThan(0)
+    for (const p of academy) {
+      expect(
+        /squad_player_in_my_org\s*\(/.test(p.body),
+        `Policy "${p.name}" (${p.file}) uses squad_player_in_my_org(), which resolves the CLUB ` +
+          `ADMIN's organisation and is NULL for a coach. Use squad_player_in_my_coach_org().`,
+      ).toBe(false)
+      expect(
+        p.body.includes('is_coach()'),
+        `Policy "${p.name}" (${p.file}) does not require the coach role.`,
+      ).toBe(true)
+    }
+  })
+
+  it('K7: widening assessment reads does not widen the private note', () => {
+    // A colleague seeing a band must not become a colleague reading what the
+    // assessing coach wrote to themselves. K9 made notes coach-private and K7
+    // must not quietly undo it.
+    const notes = live.filter(
+      p => p.table === 'coach_assessment_notes' && ['SELECT', 'ALL'].includes(p.op),
+    )
+    for (const p of notes) {
+      expect(
+        /my_coach_org|organization_id/.test(p.body),
+        `Policy "${p.name}" (${p.file}) makes coach notes academy-visible. Notes are private to ` +
+          `the coach who wrote them; only coach_shared_feedback is shareable.`,
+      ).toBe(false)
+    }
+  })
+
   it("a roster row's academy comes from the row, not from its coach's current club", () => {
     const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
     let latest = ''

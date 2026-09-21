@@ -10,7 +10,8 @@ Source: [Imad's September 18 Slack plan](https://trakfootball.slack.com/archives
 - UAE first, Greece on the same build. Guardian consent is required below 18 in **both** countries as Trak's pilot policy, pending legal review. This supersedes the earlier "Greek behaviour unchanged" wording.
 - For real minors, permit minimal roster setup only before online guardian approval. Development records wait for approval. Academy-collected/offline consent is not in this release. Historical synthetic assessments can demonstrate roster adoption without an exception for real children.
 - Imad coordinates and merges releases. Kostas or Tarek must approve Imad's PRs; Imad then merges them. This clarifies the earlier no-self-merge wording.
-- Coach notes need distinct private and shared storage. AI feedback is invisible to children until a coach approves it.
+- Restore privacy for all existing coach notes. Future feedback is shared only by explicit coach publication; do not automatically copy historical private notes into shared storage. Kostas owns K9; P4 consumes only explicitly shared feedback. AI feedback is invisible to children until a coach approves it.
+- Imad/Codex commits and runs regression checks in `imadd23x/trak-football-hub` before proposing changes to the canonical repository. All coding-agent coordination and review requests go to Slack `#coding-agent-reviews`.
 - No billing, redesign, notifications, character module, medals, multi-sport or new academy-requested features. Slide 5 financial assumptions remain with Chris.
 
 ## Ownership and deliverables

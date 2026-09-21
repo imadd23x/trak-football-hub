@@ -14,8 +14,9 @@ function runMigrations(files: Record<string, string>, mode = '--all') {
     mkdirSync(join(fixture, directory), { recursive: true })
   }
   copyFileSync(join(root, 'scripts/test-db.mjs'), join(fixture, 'scripts/test-db.mjs'))
-  const validator = 'scripts/migration-input.mjs'
-  if (existsSync(join(root, validator))) copyFileSync(join(root, validator), join(fixture, validator))
+  for (const dependency of ['scripts/migration-input.mjs', 'scripts/test-native-db.mjs']) {
+    if (existsSync(join(root, dependency))) copyFileSync(join(root, dependency), join(fixture, dependency))
+  }
   symlinkSync(join(root, 'node_modules'), join(fixture, 'node_modules'), 'dir')
   writeFileSync(join(fixture, 'supabase/tests/bootstrap.sql'), 'SELECT 1;')
   // Keep suite declarations when the registry runner lands (#42). These tests

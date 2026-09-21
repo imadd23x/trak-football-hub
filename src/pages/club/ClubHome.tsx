@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ClubShell, ClubHeader, ClubCard, SectionLabel, Pill } from '@/components/club/ClubShell'
+import { ClubShell, ClubCard, SectionLabel } from '@/components/club/ClubShell'
+import { LoadError } from '@/components/trak/LoadError'
+import { AcademyDashboardHeader } from './AcademyDashboardHeader'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { scoreToBand } from '@/lib/rating-engine'
@@ -28,126 +30,179 @@ export default function ClubHome() {
   const [assessmentsThisWeek, setAssessmentsThisWeek] = useState(0)
   const [clubName, setClubName] = useState('Academy')
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [retry, setRetry] = useState(0)
+  const [ownerId, setOwnerId] = useState<string>()
+  const userId = user?.id
 
-  useEffect(() => { if (user) loadData() }, [user])
+  useEffect(() => {
+    const controller = new AbortController()
+    const { signal } = controller
+    setOwnerId(userId)
+    setCoaches([])
+    setTotalPlayers(0)
+    setAssessmentsThisWeek(0)
+    setClubName('Academy')
+    setLoading(true)
+    setLoadFailed(false)
+    if (!userId) return () => controller.abort()
 
-  const loadData = async () => {
-    // 1. Fetch org name from organizations table
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id, name')
-      .eq('admin_user_id', user!.id)
-      .maybeSingle()
+    const loadData = async () => {
+      // 1. Fetch org name from organizations table
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .eq('admin_user_id', userId)
+        .abortSignal(signal)
+        .maybeSingle()
 
-    if (org?.name) setClubName(org.name)
+      if (signal.aborted) return
+      if (orgError) throw orgError
+      if (!org) throw new Error('Academy not available')
+      if (org?.name) setClubName(org.name)
 
-    // 2. Fetch coaches in this org
-    const { data: coachDetails } = await supabase
-      .from('coach_details')
-      .select('user_id, current_club, team, coach_role')
+      // 2. Fetch coaches in this org
+      const { data: coachDetails, error: coachError } = await supabase
+        .from('coach_details')
+        .select('user_id, current_club, team, coach_role')
+        .abortSignal(signal)
 
-    if (!coachDetails || coachDetails.length === 0) { setLoading(false); return }
+      if (signal.aborted) return
+      if (coachError) throw coachError
+      if (!coachDetails || coachDetails.length === 0) { setLoading(false); return }
 
-    const coachIds = coachDetails.map(c => c.user_id)
+      const coachIds = coachDetails.map(c => c.user_id)
 
-    // 3. Fetch profiles for coach names
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('user_id, full_name')
-      .in('user_id', coachIds)
+      // 3. Fetch profiles for coach names
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', coachIds)
+        .abortSignal(signal)
+      if (signal.aborted) return
+      if (profileError) throw profileError
 
-    const nameMap: Record<string, string> = {}
-    for (const p of profiles ?? []) { nameMap[p.user_id] = p.full_name || 'Coach' }
+      const nameMap: Record<string, string> = {}
+      for (const p of profiles ?? []) { nameMap[p.user_id] = p.full_name || 'Coach' }
 
-    // 4. Fetch all squad_players across all coaches
-    const { data: squadPlayers } = await supabase
-      .from('squad_players')
-      .select('id, coach_user_id, linked_player_id')
-      .in('coach_user_id', coachIds)
+      // 4. Fetch all squad_players across all coaches
+      const { data: squadPlayers, error: squadError } = await supabase
+        .from('squad_players')
+        .select('id, coach_user_id, linked_player_id')
+        .in('coach_user_id', coachIds)
+        .abortSignal(signal)
+      if (signal.aborted) return
+      if (squadError) throw squadError
 
-    // 5. Fetch all assessments (for band distribution + this-week count)
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
-    const { data: assessments } = await supabase
-      .from('coach_assessments')
-      .select('squad_player_id, work_rate, tactical, attitude, technical, physical, coachability, created_at')
-      .in('squad_player_id', (squadPlayers ?? []).map(s => s.id))
+      // 5. Fetch all assessments (for band distribution + this-week count)
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+      const squadIds = (squadPlayers ?? []).map(s => s.id)
+      const { data: assessments, error: assessmentError } = squadIds.length > 0 ? await supabase
+        .from('coach_assessments')
+        .select('squad_player_id, work_rate, tactical, attitude, technical, physical, coachability, created_at')
+        .in('squad_player_id', squadIds)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .abortSignal(signal)
+        : { data: null, error: null }
+      if (signal.aborted) return
+      if (assessmentError) throw assessmentError
 
-    // Build map: squad_player_id → latest assessment
-    const latestAssessment: Record<string, NonNullable<typeof assessments>[0]> = {}
-    for (const a of assessments ?? []) {
-      if (!latestAssessment[a.squad_player_id]) latestAssessment[a.squad_player_id] = a
+      // Build map: squad_player_id → latest assessment
+      const latestAssessment: Record<string, NonNullable<typeof assessments>[0]> = {}
+      for (const a of assessments ?? []) {
+        if (!latestAssessment[a.squad_player_id]) latestAssessment[a.squad_player_id] = a
+      }
+
+      // Weekly count
+      const weekCount = (assessments ?? []).filter(a => (a.created_at ?? '') >= weekAgo).length
+      setAssessmentsThisWeek(weekCount)
+
+      // Total players on the academy roster.
+      // Must count squad rows, not linked accounts — the per-squad counts below
+      // use mySquad.length, so counting only signed-up players made the headline
+      // contradict the sum of the squads beneath it.
+      setTotalPlayers((squadPlayers ?? []).length)
+
+      // Build per-coach data
+      const rows: CoachRow[] = coachDetails.map(cd => {
+        const mySquad = (squadPlayers ?? []).filter(s => s.coach_user_id === cd.user_id)
+        const mySquadIds = new Set(mySquad.map(s => s.id))
+
+        const myWeekAssessments = (assessments ?? []).filter(a => mySquadIds.has(a.squad_player_id) && (a.created_at ?? '') >= weekAgo).length
+
+        // Band distribution from latest assessment per player
+        const bandDist: Record<string, number> = {}
+        for (const sp of mySquad) {
+          const a = latestAssessment[sp.id]
+          if (!a) continue
+          const scores = [a.work_rate, a.tactical, a.attitude, a.technical, a.physical, a.coachability]
+            .filter((score): score is number => score != null)
+          if (scores.length === 0) continue
+          const avg = scores.reduce((s, n) => s + n, 0) / scores.length
+          const band = scoreToBand(avg)
+          bandDist[band] = (bandDist[band] || 0) + 1
+        }
+
+        return {
+          userId: cd.user_id,
+          name: nameMap[cd.user_id] || 'Coach',
+          team: cd.team || '—',
+          currentClub: cd.current_club || '—',
+          coachRole: cd.coach_role || 'Coach',
+          playerCount: mySquad.length,
+          assessmentsThisWeek: myWeekAssessments,
+          bandDist,
+        }
+      })
+
+      setCoaches(rows)
+      setLoading(false)
     }
 
-    // Weekly count
-    const weekCount = (assessments ?? []).filter(a => (a.created_at ?? '') >= weekAgo).length
-    setAssessmentsThisWeek(weekCount)
-
-    // Total players on the academy roster.
-    // Must count squad rows, not linked accounts — the per-squad counts below
-    // use mySquad.length, so counting only signed-up players made the headline
-    // contradict the sum of the squads beneath it.
-    setTotalPlayers((squadPlayers ?? []).length)
-
-    // Build per-coach data
-    const rows: CoachRow[] = coachDetails.map(cd => {
-      const mySquad = (squadPlayers ?? []).filter(s => s.coach_user_id === cd.user_id)
-      const mySquadIds = new Set(mySquad.map(s => s.id))
-
-      const myWeekAssessments = (assessments ?? []).filter(a => mySquadIds.has(a.squad_player_id) && (a.created_at ?? '') >= weekAgo).length
-
-      // Band distribution from latest assessment per player
-      const bandDist: Record<string, number> = {}
-      for (const sp of mySquad) {
-        const a = latestAssessment[sp.id]
-        if (!a) continue
-        const scores = [a.work_rate, a.tactical, a.attitude, a.technical, a.physical, a.coachability].filter(Boolean) as number[]
-        if (scores.length === 0) continue
-        const avg = scores.reduce((s, n) => s + n, 0) / scores.length
-        const band = scoreToBand(avg)
-        bandDist[band] = (bandDist[band] || 0) + 1
-      }
-
-      return {
-        userId: cd.user_id,
-        name: nameMap[cd.user_id] || 'Coach',
-        team: cd.team || '—',
-        currentClub: cd.current_club || '—',
-        coachRole: cd.coach_role || 'Coach',
-        playerCount: mySquad.length,
-        assessmentsThisWeek: myWeekAssessments,
-        bandDist,
-      }
+    void loadData().catch(() => {
+      if (signal.aborted) return
+      setLoadFailed(true)
+      setLoading(false)
     })
+    return () => controller.abort()
+  }, [userId, retry])
 
-    setCoaches(rows)
-    setLoading(false)
-  }
+  // Hide the previous account's state even before effect cleanup runs.
+  const currentAccount = ownerId === userId
+  const pending = !currentAccount || loading
+  const failed = currentAccount && loadFailed
+  const ready = !pending && !failed
 
   // Top 3 bands for display
   const TOP_BANDS = ['exceptional', 'standout', 'good', 'steady']
 
   return (
     <ClubShell>
-      <ClubHeader club={clubName} coaches={coaches.length} />
+      <AcademyDashboardHeader club={currentAccount ? clubName : 'Academy'} coaches={ready ? coaches.length : null} />
 
       {/* Academy-wide stats */}
       <ClubCard className="p-5 mb-5">
         <SectionLabel>Total Players</SectionLabel>
         <div className="mt-3 flex items-end justify-between">
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: 64, lineHeight: 1, color: '#C8F25A' }}>
-            {loading ? '—' : totalPlayers}
+            {ready ? totalPlayers : '—'}
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between px-4 py-3"
           style={{ background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12 }}>
           <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>Assessments this week</span>
-          <span style={{ color: 'rgba(255,255,255,0.88)', fontSize: 16 }}>{loading ? '—' : assessmentsThisWeek}</span>
+          <span style={{ color: 'rgba(255,255,255,0.88)', fontSize: 16 }}>{ready ? assessmentsThisWeek : '—'}</span>
         </div>
       </ClubCard>
 
       <SectionLabel>Squads</SectionLabel>
       <div className="mt-3 space-y-3">
-        {loading ? (
+        {failed ? (
+          <div className="[&_button]:min-h-11">
+            <LoadError what="your academy overview" onRetry={() => setRetry(value => value + 1)} />
+          </div>
+        ) : pending ? (
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>Loading…</div>
         ) : coaches.length === 0 ? (
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>No coaches connected yet. Share your academy code with coaches to get started.</div>

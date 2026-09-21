@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ClubShell, ClubHeader, ClubCard, SectionLabel } from '@/components/club/ClubShell'
+import { ClubShell, ClubCard, SectionLabel } from '@/components/club/ClubShell'
+import { LoadError } from '@/components/trak/LoadError'
+import { AcademyDashboardHeader } from './AcademyDashboardHeader'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { scoreToBand } from '@/lib/rating-engine'
@@ -35,112 +37,160 @@ export default function ClubSquads() {
   const [loading, setLoading] = useState(true)
   const [coachCount, setCoachCount] = useState(0)
   const [clubName, setClubName] = useState('Academy')
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [retry, setRetry] = useState(0)
+  const [ownerId, setOwnerId] = useState<string>()
+  const userId = user?.id
 
-  useEffect(() => { if (user) loadData() }, [user])
+  useEffect(() => {
+    const controller = new AbortController()
+    const { signal } = controller
+    setOwnerId(userId)
+    setPlayers([])
+    setOrphanedPlayers([])
+    setAgeGroups([])
+    setFilter('All')
+    setCoachCount(0)
+    setClubName('Academy')
+    setLoading(true)
+    setLoadFailed(false)
+    if (!userId) return () => controller.abort()
 
-  const loadData = async () => {
-    // Fetch org name
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id, name')
-      .eq('admin_user_id', user!.id)
-      .maybeSingle()
+    const loadData = async () => {
+      // Fetch org name
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .eq('admin_user_id', userId)
+        .abortSignal(signal)
+        .maybeSingle()
 
-    if (org?.name) setClubName(org.name)
+      if (signal.aborted) return
+      if (orgError) throw orgError
+      if (!org) throw new Error('Academy not available')
+      if (org?.name) setClubName(org.name)
 
-    // Fetch all squad players (RLS scoped to org)
-    const { data: squadData } = await supabase
-      .from('squad_players')
-      .select('id, player_name, position, age, age_group, linked_player_id, coach_user_id, status')
-      .order('player_name')
+      // Fetch all squad players (RLS scoped to org)
+      const { data: squadData, error: squadError } = await supabase
+        .from('squad_players')
+        .select('id, player_name, position, age, age_group, linked_player_id, coach_user_id, status')
+        .order('player_name')
+        .abortSignal(signal)
 
-    if (!squadData) { setLoading(false); return }
+      if (signal.aborted) return
+      if (squadError) throw squadError
+      if (!squadData) throw new Error('Roster not available')
 
-    const coachIds = [...new Set(squadData.filter(s => s.coach_user_id).map(s => s.coach_user_id!))]
-    setCoachCount(coachIds.length)
+      const coachIds = [...new Set(squadData.filter(s => s.coach_user_id).map(s => s.coach_user_id!))]
 
-    // Fetch coach names
-    const coachNameMap: Record<string, string> = {}
-    if (coachIds.length > 0) {
-      const { data: coachProfiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name')
-        .in('user_id', coachIds)
-      for (const p of coachProfiles ?? []) { coachNameMap[p.user_id] = p.full_name || 'Coach' }
-    }
-
-    // Fetch latest assessment per squad player for band
-    const squadIds = squadData.map(s => s.id)
-    const { data: assessments } = await supabase
-      .from('coach_assessments')
-      .select('squad_player_id, work_rate, tactical, attitude, technical, physical, coachability')
-      .in('squad_player_id', squadIds)
-      .order('created_at', { ascending: false })
-
-    const latestAssessment: Record<string, NonNullable<typeof assessments>[0]> = {}
-    for (const a of assessments ?? []) {
-      if (!latestAssessment[a.squad_player_id]) latestAssessment[a.squad_player_id] = a
-    }
-
-    // Fetch match counts for linked players
-    const linkedIds = squadData.filter(s => s.linked_player_id).map(s => s.linked_player_id!)
-    const matchCountMap: Record<string, number> = {}
-    if (linkedIds.length > 0) {
-      const { data: matchRows } = await supabase
-        .from('matches')
-        .select('user_id')
-        .in('user_id', linkedIds)
-      for (const m of matchRows ?? []) {
-        matchCountMap[m.user_id] = (matchCountMap[m.user_id] || 0) + 1
+      // Fetch coach names
+      const coachNameMap: Record<string, string> = {}
+      if (coachIds.length > 0) {
+        const { data: coachProfiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('user_id, full_name')
+          .in('user_id', coachIds)
+          .abortSignal(signal)
+        if (signal.aborted) return
+        if (profileError) throw profileError
+        for (const p of coachProfiles ?? []) { coachNameMap[p.user_id] = p.full_name || 'Coach' }
       }
-    }
 
-    const rows: PlayerRow[] = squadData.map(sp => {
-      const a = latestAssessment[sp.id]
-      let latestBand = 'steady'
-      if (a) {
-        const scores = [a.work_rate, a.tactical, a.attitude, a.technical, a.physical, a.coachability].filter(Boolean) as number[]
-        if (scores.length > 0) {
-          latestBand = scoreToBand(scores.reduce((s, n) => s + n, 0) / scores.length)
+      // Fetch latest assessment per squad player for band
+      const squadIds = squadData.map(s => s.id)
+      const { data: assessments, error: assessmentError } = squadIds.length > 0 ? await supabase
+        .from('coach_assessments')
+        .select('squad_player_id, work_rate, tactical, attitude, technical, physical, coachability')
+        .in('squad_player_id', squadIds)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .abortSignal(signal)
+        : { data: null, error: null }
+      if (signal.aborted) return
+      if (assessmentError) throw assessmentError
+
+      const latestAssessment: Record<string, NonNullable<typeof assessments>[0]> = {}
+      for (const a of assessments ?? []) {
+        if (!latestAssessment[a.squad_player_id]) latestAssessment[a.squad_player_id] = a
+      }
+
+      // Fetch match counts for linked players
+      const linkedIds = squadData.filter(s => s.linked_player_id).map(s => s.linked_player_id!)
+      const matchCountMap: Record<string, number> = {}
+      if (linkedIds.length > 0) {
+        const { data: matchRows, error: matchError } = await supabase
+          .from('matches')
+          .select('user_id')
+          .in('user_id', linkedIds)
+          .abortSignal(signal)
+        if (signal.aborted) return
+        if (matchError) throw matchError
+        for (const m of matchRows ?? []) {
+          matchCountMap[m.user_id] = (matchCountMap[m.user_id] || 0) + 1
         }
       }
-      const bandCfg = getBandConfig(latestBand)
-      const matchCount = sp.linked_player_id ? (matchCountMap[sp.linked_player_id] || 0) : 0
 
-      return {
-        id: sp.id,
-        name: sp.player_name,
-        position: sp.position || '—',
-        ageGroup: (sp as any).age_group ?? (sp.age != null ? String(sp.age) : '—'),
-        coachName: sp.coach_user_id ? (coachNameMap[sp.coach_user_id] || 'Coach') : 'No coach',
-        latestBand: bandCfg.word,
-        latestBandColor: bandCfg.color,
-        matchCount,
-        status: sp.status || 'active',
-      }
+      const rows: PlayerRow[] = squadData.map(sp => {
+        const a = latestAssessment[sp.id]
+        let latestBand: string | null = null
+        if (a) {
+          const scores = [a.work_rate, a.tactical, a.attitude, a.technical, a.physical, a.coachability]
+            .filter((score): score is number => score != null)
+          if (scores.length > 0) {
+            latestBand = scoreToBand(scores.reduce((s, n) => s + n, 0) / scores.length)
+          }
+        }
+        const bandCfg = latestBand === null ? null : getBandConfig(latestBand)
+        const matchCount = sp.linked_player_id ? (matchCountMap[sp.linked_player_id] || 0) : 0
+
+        return {
+          id: sp.id,
+          name: sp.player_name,
+          position: sp.position || '—',
+          ageGroup: sp.age_group ?? (sp.age != null ? String(sp.age) : '—'),
+          coachName: sp.coach_user_id ? (coachNameMap[sp.coach_user_id] || 'Coach') : 'No coach',
+          latestBand: bandCfg?.word ?? 'Unassessed',
+          latestBandColor: bandCfg?.color ?? '',
+          matchCount,
+          status: sp.status || 'active',
+        }
+      })
+
+      // Separate orphaned players (coach departed / no coach)
+      const orphaned = rows.filter(r => r.status === 'coach_departed')
+      const active = rows.filter(r => r.status !== 'coach_departed')
+
+      setOrphanedPlayers(orphaned)
+      setPlayers(active)
+      setCoachCount(coachIds.length)
+
+      // Collect unique age groups for filter
+      const groups = ['All', ...Array.from(new Set(rows.map(r => r.ageGroup).filter(g => g !== '—'))).sort()]
+      setAgeGroups(groups)
+      setLoading(false)
+    }
+
+    void loadData().catch(() => {
+      if (signal.aborted) return
+      setLoadFailed(true)
+      setLoading(false)
     })
+    return () => controller.abort()
+  }, [userId, retry])
 
-    // Separate orphaned players (coach departed / no coach)
-    const orphaned = rows.filter(r => r.status === 'coach_departed')
-    const active = rows.filter(r => r.status !== 'coach_departed')
-
-    setOrphanedPlayers(orphaned)
-    setPlayers(active)
-
-    // Collect unique age groups for filter
-    const groups = ['All', ...Array.from(new Set(rows.map(r => r.ageGroup).filter(g => g !== '—'))).sort()]
-    setAgeGroups(groups)
-    setLoading(false)
-  }
+  const currentAccount = ownerId === userId
+  const pending = !currentAccount || loading
+  const failed = currentAccount && loadFailed
+  const ready = !pending && !failed
 
   const filtered = filter === 'All' ? players : players.filter(p => p.ageGroup === filter)
 
   return (
     <ClubShell>
-      <ClubHeader club={clubName} coaches={coachCount} />
+      <AcademyDashboardHeader club={currentAccount ? clubName : 'Academy'} coaches={ready ? coachCount : null} />
 
       {/* Orphaned players alert */}
-      {orphanedPlayers.length > 0 && (
+      {ready && orphanedPlayers.length > 0 && (
         <>
           <SectionLabel>
             <span className="flex items-center gap-1.5">
@@ -176,7 +226,7 @@ export default function ClubSquads() {
 
       <SectionLabel>Filter by age group</SectionLabel>
       <div className="mt-3 mb-5 flex gap-2 flex-wrap">
-        {ageGroups.map(g => {
+        {(ready ? ageGroups : []).map(g => {
           const active = filter === g
           return (
             <button key={g} onClick={() => setFilter(g)} className="px-3 py-1.5 rounded-full text-xs"
@@ -189,9 +239,13 @@ export default function ClubSquads() {
         })}
       </div>
 
-      <SectionLabel>{loading ? '—' : filtered.length} Players</SectionLabel>
+      <SectionLabel>{ready ? filtered.length : '—'} Players</SectionLabel>
       <div className="mt-3 space-y-2">
-        {loading ? (
+        {failed ? (
+          <div className="[&_button]:min-h-11">
+            <LoadError what="your academy squads" onRetry={() => setRetry(value => value + 1)} />
+          </div>
+        ) : pending ? (
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>Loading…</div>
         ) : filtered.length === 0 ? (
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>No players found.</div>
@@ -209,8 +263,8 @@ export default function ClubSquads() {
                 </div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{p.coachName}</div>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-[11px]"
-                style={{ color: p.latestBandColor, background: `${p.latestBandColor}1F`, border: `1px solid ${p.latestBandColor}40` }}>
+              <span className="px-2.5 py-1 rounded-full text-[11px] text-muted-foreground border border-border"
+                style={p.latestBandColor ? { color: p.latestBandColor, background: `${p.latestBandColor}1F`, border: `1px solid ${p.latestBandColor}40` } : undefined}>
                 {p.latestBand}
               </span>
             </ClubCard>

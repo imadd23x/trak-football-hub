@@ -1,17 +1,29 @@
 -- T2 — nothing an AI writes reaches a child until a coach has approved it.
 --
--- VERSION NOTE. This was 20260919130000, which sorts BEFORE 20260919193112
--- (#68) — a migration already applied in production. A pending migration that
--- sorts before a deployed one cannot be applied in order, so this branch's
--- Supabase preview sat in MIGRATIONS_FAILED and, because the project allows
--- three concurrent branches, held a slot that stopped every other PR getting a
--- preview database. Renumbered to sort after everything on main and after the
--- three pending migrations in #70, #72 and #74, so merge order cannot
--- reintroduce it. Do not renumber it backwards.
+-- VERSION NOTE, corrected. An earlier version of this comment said the
+-- renumber explained why this branch's Supabase preview was failing. That was
+-- wrong and is retracted; the truth is the other way round.
 --
--- A fresh PGlite replay cannot see this: it applies the whole directory in
--- filename order from empty, where an out-of-order insertion is invisible. It
--- is only visible against a database that already has history.
+-- This file has been renumbered TWICE, both times by me:
+--   20260918120000  ->  20260919130000  ->  20260920140000
+-- The preview applied 20260918120000 and recorded it. Renaming the file left
+-- that database holding a version the repository does not contain, which is
+-- exactly the state that produces "Remote migration versions not found in
+-- local migrations directory". Kostas read the console and measured it.
+--
+-- The content also changed after that apply — revision 2 below closes five
+-- holes Imad found on native PostgreSQL. So the preview holds revision 1 of a
+-- migration the repository now carries as revision 2 under a third name.
+--
+-- Renaming an applied migration is what CLAUDE.md forbids and what #44 was
+-- corrected for twice. Nothing deployed has ever carried this migration —
+-- main does not contain it — so the only database affected is a disposable
+-- preview, which is a materially smaller blast radius than #44's, but the
+-- mistake is the same one.
+--
+-- NOT renamed a third time. The number is now stable and sorts after
+-- everything on main and after #70, #72 and #74. Do not renumber it again in
+-- either direction; if this ever needs changing, add a forward migration.
 --
 -- Today `player-feedback` persists nothing at all: it reads the coach's
 -- private note, generates text, and returns it straight to the caller. There

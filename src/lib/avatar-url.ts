@@ -24,8 +24,18 @@
  *
  * `resolve()` accepts BOTH a bare storage path and a legacy public URL, so no
  * data migration is required and no call site has to be changed in step with
- * any other. The one row in production today holds a legacy URL; it resolves
- * correctly through the same path as a future bare key.
+ * any other. Every row in production today holds a legacy URL; each resolves
+ * through the same path as a future bare key.
+ *
+ * Measured read-only against the live project on 21 September: 4 profiles carry
+ * an avatar, all 4 hold a `/object/public/avatars/…` URL, none holds a signed
+ * one. (This comment previously said "the one row"; it was four. The earlier
+ * number was never re-measured after it was first written.)
+ *
+ * All four are `trak.dev` / `rehearsal.trak.dev` accounts, so there is no user
+ * data to repair — the defect is forward-looking. The upload succeeds and the
+ * toast reports success, so the first academy coach to set a photo sees a
+ * broken image and no error anywhere.
  */
 
 /** Where avatars live. One bucket, one object per user, keyed by user id. */

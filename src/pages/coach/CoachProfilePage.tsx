@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, TrakCard, MetadataLabel, InviteCodeDisplay } from '@/components/trak'
 import { IconProfile } from '@/components/icons/TrakIcons'
 import { formatCoachCode, generateCode } from '@/lib/invite-codes'
-import { useAvatarUrl } from '@/hooks/useAvatarUrl'
+import { useAvatarUrl } from '@/hooks/use-avatar-url'
 
 export default function CoachProfilePage() {
   const { user, profile } = useAuth()

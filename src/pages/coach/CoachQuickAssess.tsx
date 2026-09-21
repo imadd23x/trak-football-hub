@@ -143,7 +143,7 @@ export default function CoachQuickAssess() {
     setConsentWait(false)
     if (!currentPlayerId) return
     let cancelled = false
-    void supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: currentPlayerId } as never)
+    void supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: currentPlayerId } as never)
       .then(({ data, error }) => { if (!cancelled && !error) setConsentWait(data === true) })
     return () => { cancelled = true }
   }, [currentPlayerId])
@@ -218,7 +218,7 @@ export default function CoachQuickAssess() {
       console.error('Save failed:', insertError)
       // 42501 is an RLS refusal; re-ask the policy's predicate, never "try again".
       if (insertError.code === '42501') {
-        const { data: waiting, error: waitingError } = await supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: currentPlayer.id } as never)
+        const { data: waiting, error: waitingError } = await supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: currentPlayer.id } as never)
         // If the re-check itself fails we cannot say why; do not claim a reason.
         if (waitingError) {
           toast.error('Not saved, and the reason could not be confirmed. Check your connection and try again.')

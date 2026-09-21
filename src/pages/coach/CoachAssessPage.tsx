@@ -238,7 +238,7 @@ function CoachAssessmentForm() {
     setConsentWait(false)
     if (!playerId) return
     let cancelled = false
-    void supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
+    void supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
       .then(({ data, error }) => { if (!cancelled && !error) setConsentWait(data === true) })
     return () => { cancelled = true }
   }, [playerId])
@@ -283,7 +283,7 @@ function CoachAssessmentForm() {
         // 42501 is an RLS refusal. The likeliest cause is consent withdrawn or
         // never given; re-ask the policy's own predicate rather than guess.
         if (saveError.code === '42501') {
-          const { data: waiting, error: waitingError } = await supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
+          const { data: waiting, error: waitingError } = await supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
           if (!isCurrent()) return
           // If the re-check itself fails we cannot say why; do not claim a reason.
           if (waitingError) {

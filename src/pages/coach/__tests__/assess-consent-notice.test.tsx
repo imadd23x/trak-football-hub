@@ -1,7 +1,7 @@
 /**
  * Consent is 18 since #80, so on Monday every academy player is under the
  * threshold and a coach cannot assess them until a parent approves. The
- * database refuses (RLS WITH CHECK on squad_player_consent_required), and this
+ * database refuses (RLS WITH CHECK on the internal consent predicate), and this
  * screen used to show that refusal verbatim, after the coach had set six sliders:
  *
  *   Could not save assessment: new row violates row-level security policy
@@ -30,7 +30,7 @@ function setup({ consentRequired, insertRefused = false }: { consentRequired: bo
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach', nationality: 'AE', invite_code: 'ABCD' }]),
     table('squad_players', [{ id: 'squad-1', coach_user_id: COACH.id, player_name: 'Omar Synthetic', position: 'Midfielder', linked_player_id: 'player-1' }]),
     table('coach_sessions', []), table('coach_details', []), table('coach_assessments', []),
-    http.post(`${SUPABASE_URL}/rest/v1/rpc/squad_player_consent_required`, async ({ request }) => {
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_player_consent_required`, async ({ request }) => {
       calls.consentChecks.push(await request.json())
       if (consentRequired === 'error') return HttpResponse.json({ message: 'synthetic failure' }, { status: 500 })
       // After a refused save the screen re-asks; by then consent has been withdrawn.

@@ -63,7 +63,7 @@ function ChildConsent({ parentId, childId, childName }: { parentId: string; chil
     {(state === 'confirm' || state === 'writing') && <>
       <p className="text-sm text-foreground">Withdraw your approval for {childName}? This does not delete their account or past records. It does not withdraw another guardian’s approval.</p>
       <div className="flex flex-col gap-2">
-        <Button variant="destructive" className="min-h-11 h-auto whitespace-normal" disabled={state === 'writing'} onClick={() => { void withdraw() }}>
+        <Button variant="outline" className="min-h-11 h-auto whitespace-normal border-destructive hover:bg-destructive/10" disabled={state === 'writing'} onClick={() => { void withdraw() }}>
           {state === 'writing' ? 'Withdrawing…' : `Confirm withdrawal for ${childName}`}
         </Button>
         <Button variant="outline" className="min-h-11" disabled={state === 'writing'} onClick={() => setState('active')}>Keep consent</Button>

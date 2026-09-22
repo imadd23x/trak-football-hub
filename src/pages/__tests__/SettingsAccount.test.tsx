@@ -86,6 +86,7 @@ beforeEach(async () => {
     http.get(`${url}/rest/v1/player_parent_links`, () => HttpResponse.json([])),
     // Settings resolves every avatar_url through createSignedUrl(); the
     // storage-js client prefixes this relative field with its own base url.
+    http.delete(`${url}/storage/v1/object/avatars`, () => HttpResponse.json([])),
     http.post(`${url}/storage/v1/object/sign/avatars/:key`, ({ params }) =>
       HttpResponse.json({ signedURL: `/object/sign/avatars/${params.key}?token=synthetic` })),
   )
@@ -499,5 +500,49 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     profiles.a = original
     fireEvent.click(screen.getByRole('button', { name: 'Retry setup' }))
     await ready()
+  })
+})
+
+
+describe('avatar cleanup before account deletion', () => {
+  it('stops before deleting the account if Storage cleanup fails', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    let deletions=0
+    server.use(
+      http.delete(`${url}/storage/v1/object/avatars`, () => HttpResponse.json({ message:'unavailable' },{status:500})),
+      http.post(`${url}/rest/v1/rpc/delete_my_account`, () => { deletions++; return HttpResponse.json(null) }),
+    )
+    mount(); await ready(); fireEvent.click(screen.getByRole('button',{name:'Delete my account'}))
+    await waitFor(() => expect(messages.error).toHaveBeenCalled())
+    expect(deletions).toBe(0)
+    expect(localStorage.getItem('trak_deleted_account:a')).toBeNull()
+  })
+  it('removes only the initiating account key before the deletion RPC', async () => {
+    vi.spyOn(window,'confirm').mockReturnValue(true)
+    const order:string[]=[]
+    server.use(
+      http.delete(`${url}/storage/v1/object/avatars`,async ({request}) => {
+        expect(request.headers.get('Authorization')).toBe('Bearer token-a')
+        expect(await request.json()).toEqual({prefixes:['a']});order.push('storage');return HttpResponse.json([])
+      }),
+      http.post(`${url}/rest/v1/rpc/delete_my_account`,()=>{order.push('account');return HttpResponse.json(null)}),
+    )
+    mount(); await ready();fireEvent.click(screen.getByRole('button',{name:'Delete my account'}))
+    await screen.findByRole('heading',{name:'Signed out landing'})
+    expect(order).toEqual(['storage','account'])
+  })
+  it('does not delete either account after an account switch during Storage cleanup', async () => {
+    vi.spyOn(window,'confirm').mockReturnValue(true)
+    const held=deferred();let started=false;let deletions=0
+    server.use(
+      http.delete(`${url}/storage/v1/object/avatars`,async ({request}) => {
+        expect(request.headers.get('Authorization')).toBe('Bearer token-a');started=true;await held.promise;return HttpResponse.json([])
+      }),
+      http.post(`${url}/rest/v1/rpc/delete_my_account`,()=>{deletions++;return HttpResponse.json(null)}),
+    )
+    mount();await ready();fireEvent.click(screen.getByRole('button',{name:'Delete my account'}))
+    await waitFor(()=>expect(started).toBe(true));await switchToB()
+    await act(async()=>{held.resolve();await held.promise;await new Promise(resolve=>setTimeout(resolve,20))})
+    expect(deletions).toBe(0);expect(screen.getByTestId('identity')).toHaveTextContent('b:b')
   })
 })

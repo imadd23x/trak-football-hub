@@ -13,6 +13,7 @@ test('acknowledged deletion survives reload and retries only logout', async ({ p
       sessionStorage.setItem('deletion-fixture-initialized', '1');
     }
   }, { access_token: token, refresh_token: 'synthetic-refresh', expires_in: 3600, expires_at: exp, token_type: 'bearer', user });
+  let avatarRemovals = 0;
   let deletions = 0, profileReads = 0, logoutFails = true;
   const unexpected: string[] = [], errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -32,8 +33,15 @@ test('acknowledged deletion survives reload and retries only logout', async ({ p
     }
     if (['/rest/v1/player_parent_links', '/rest/v1/rpc/get_children_awaiting_consent'].includes(url.pathname)) return json([]);
     if (url.pathname === '/rest/v1/telemetry_events') return json(null, 201);
+    if (url.pathname === '/storage/v1/object/avatars' && request.method() === 'DELETE') {
+      expect(request.headers().authorization).toBe(`Bearer ${token}`);
+      expect(request.postDataJSON()).toEqual({ prefixes: [id] });
+      avatarRemovals++;
+      return json([]);
+    }
     if (url.pathname === '/rest/v1/rpc/delete_my_account' && request.method() === 'POST') {
       expect(request.headers().authorization).toBe(`Bearer ${token}`);
+      expect(avatarRemovals).toBe(1);
       deletions++;
       return json(null);
     }
@@ -58,6 +66,7 @@ test('acknowledged deletion survives reload and retries only logout', async ({ p
   await expect(page.getByRole('heading', { name: 'Account deleted' })).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => localStorage.getItem('sb-xbykbqolvqyqmipikuae-auth-token'))).toBeNull();
   expect(deletions).toBe(1);
+  expect(avatarRemovals).toBe(1);
   expect(unexpected).toEqual([]);
   expect(errors).toEqual([]);
 });

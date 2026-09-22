@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
-import { resolveAvatarUrl } from '@/lib/avatar-url'
+import { avatarObjectPath, resolveAvatarUrl } from '@/lib/avatar-url'
 import { ParentConnections } from '@/components/parent/ParentConnections'
 import { supabase } from '@/integrations/supabase/client'
 import { POSITIONS, COACH_ROLES, AGE_GROUPS } from '@/lib/constants'
@@ -228,6 +228,19 @@ function AccountSettings({ userId }: { userId: string }) {
     ) || !begin('delete')) return
     try {
       const { client } = await getSettingsAccount(userId, isCurrent)
+      // Always clean the canonical key, even if its profile reference was lost.
+      // A legacy reference may add only a path inside this same user's folder.
+      const storedKey = avatarObjectPath(profile?.avatar_url)
+      const keys = [userId]
+      if (storedKey?.startsWith(`${userId}/`)) keys.push(storedKey)
+      const { error: cleanupError } = await client.storage.from('avatars').remove(keys)
+      if (cleanupError) {
+        if (isCurrent()) toast.error('Could not remove your profile photo. Your account has not been deleted. Please try again.')
+        return
+      }
+      await assertSettingsAccount(userId, isCurrent)
+      setAvatarUrl(null)
+      // The database independently refuses deletion if any owned avatar remains.
       const { error } = await client.rpc('delete_my_account')
       if (error) throw error
       // Record the acknowledged identity even if another account took over;

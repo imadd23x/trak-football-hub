@@ -78,6 +78,15 @@ describe('academy dashboard correctness and recovery', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it.each(['/club/home', '/club/squads'])('counts academy coaches without players on %s', async route => {
+    server.use(table('coach_details', [
+      { user_id: COACH, team: 'U15', coach_role: 'Head Coach' },
+      { user_id: 'coach-with-no-roster', team: 'Goalkeepers', coach_role: 'Coach' },
+    ]))
+    await loadRoute(route, route === '/club/home' ? 'coach_assessments' : 'matches')
+    expect(screen.getByText('2 Coaches')).toBeInTheDocument()
+  })
+
   it('shows a retryable home error, not zero players and no connected coaches, after a 403', async () => {
     server.use(tableError('coach_details', 403, { code: '42501', message: 'synthetic permission denial' }))
     await loadRoute('/club/home', 'coach_details')
@@ -176,7 +185,7 @@ describe('academy dashboard correctness and recovery', () => {
     ['/club/home', 'organizations'], ['/club/home', 'coach_details'],
     ['/club/home', 'profiles'], ['/club/home', 'squad_players'], ['/club/home', 'coach_assessments'],
     ['/club/squads', 'organizations'], ['/club/squads', 'squad_players'],
-    ['/club/squads', 'profiles'], ['/club/squads', 'coach_assessments'], ['/club/squads', 'matches'],
+    ['/club/squads', 'coach_details'], ['/club/squads', 'profiles'], ['/club/squads', 'coach_assessments'], ['/club/squads', 'matches'],
   ])('%s recovers after a failed required %s query', async (route, failedTable) => {
     let failedCalls = 0
     server.use(http.get(endpoint(failedTable), ({ request }) => {
@@ -262,7 +271,7 @@ describe('academy dashboard correctness and recovery', () => {
       await screen.findByText(route === '/club/home'
         ? 'No coaches connected yet. Share your academy code with coaches to get started.' : 'No players found.')
       const callsAfterNextLoad = [...downstreamAccounts]
-      expect(callsAfterNextLoad).toEqual([nextAdmin])
+      expect(callsAfterNextLoad).toEqual(route === '/club/home' ? [nextAdmin] : [nextAdmin, nextAdmin])
 
       await act(async () => { release(); await oldReply })
       await waitFor(() => expect(oldReleased).toBe(true))

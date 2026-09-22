@@ -70,6 +70,16 @@ export default function ClubSquads() {
       if (!org) throw new Error('Academy not available')
       if (org?.name) setClubName(org.name)
 
+      // Count academy memberships, including coaches without assigned players,
+      // using the same definition as Home. RLS scopes this read to the academy.
+      const { data: academyCoaches, error: coachError } = await supabase
+        .from('coach_details')
+        .select('user_id')
+        .abortSignal(signal)
+      if (signal.aborted) return
+      if (coachError) throw coachError
+      if (!academyCoaches) throw new Error('Academy coaches not available')
+
       // Fetch all squad players (RLS scoped to org)
       const { data: squadData, error: squadError } = await supabase
         .from('squad_players')
@@ -162,7 +172,7 @@ export default function ClubSquads() {
 
       setOrphanedPlayers(orphaned)
       setPlayers(active)
-      setCoachCount(coachIds.length)
+      setCoachCount(academyCoaches.length)
 
       // Collect unique age groups for filter
       const groups = ['All', ...Array.from(new Set(rows.map(r => r.ageGroup).filter(g => g !== '—'))).sort()]

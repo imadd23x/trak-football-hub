@@ -1,4 +1,4 @@
--- @trak-suite mode=--avatar-storage-review in-all=false
+-- @trak-suite mode=--avatar-access-review in-all=false
 -- Acceptance test for the avatars bucket policies. RED on main by design;
 -- whichever avatar-policy migration lands flips this to in-all=true.
 --
@@ -39,6 +39,13 @@ $test$;
 CREATE FUNCTION pg_temp.as_user(p uuid) RETURNS void LANGUAGE plpgsql AS $test$
 BEGIN PERFORM set_config('request.jwt.claims', jsonb_build_object('role','authenticated','sub',p::text)::text, true); END;
 $test$;
+
+-- Real accounts own the photos (a later migration refuses objects whose owner
+-- account does not exist, which is correct and must not be bypassed here).
+INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
+  (pg_temp.aid(1), 'owner-one@avatar.test', now()), (pg_temp.aid(2), 'owner-two@avatar.test', now());
+INSERT INTO public.profiles (user_id, role, full_name) VALUES
+  (pg_temp.aid(1), 'player', 'Owner One'), (pg_temp.aid(2), 'player', 'Owner Two');
 
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', false)
   ON CONFLICT (id) DO UPDATE SET public = false;

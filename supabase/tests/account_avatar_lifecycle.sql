@@ -38,6 +38,13 @@ DO $$ DECLARE refused boolean:=false; BEGIN
  INSERT INTO avatar_checks VALUES('pre-deletion JWT cannot recreate an avatar',refused);
 END $$;
 RESET ROLE;
+-- Storage tests permissions in a rolled-back user transaction, then persists
+-- metadata using elevated privileges. RLS alone does not govern that phase.
+DO $$ DECLARE refused boolean:=false; BEGIN
+ BEGIN INSERT INTO storage.objects(bucket_id,name) VALUES('avatars','98300000-0000-0000-0000-000000000002');
+ EXCEPTION WHEN insufficient_privilege THEN refused:=true; END;
+ INSERT INTO avatar_checks VALUES('elevated Storage completion cannot recreate deleted-account metadata',refused);
+END $$;
 INSERT INTO avatar_checks SELECT 'both Auth accounts removed after no-object deletion',
  NOT EXISTS(SELECT 1 FROM auth.users WHERE id IN('98300000-0000-0000-0000-000000000001','98300000-0000-0000-0000-000000000002'));
 DO $$ DECLARE failures text; BEGIN

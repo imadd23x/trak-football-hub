@@ -93,8 +93,8 @@ try {
     }
     throw new Error('Concurrent operation never reached the expected lock wait: '+name);
   };
-  // Upload metadata holds the policy's shared Auth-row lock until commit.
-  await control.sql(`BEGIN; ${actor(1)} INSERT INTO storage.objects(bucket_id,name) VALUES('avatars','${uid(1)}')`);
+  // Elevated Storage completion holds the trigger's Auth-row lock until commit.
+  await control.sql(`BEGIN; INSERT INTO storage.objects(bucket_id,name) VALUES('avatars','${uid(1)}')`);
   const deletion=query(`SET application_name='avatar_delete_wait'; BEGIN; SET LOCAL statement_timeout='10s'; ${actor(1)} SELECT public.delete_my_account(); COMMIT;`)
     .then(()=>({ok:true}),error=>({ok:false,error:error.message}));
   await waitForLock('avatar_delete_wait');
@@ -112,8 +112,21 @@ try {
   await control.sql('COMMIT');
   const u=await upload;
   const second=await query(`SELECT (SELECT count(*) FROM auth.users WHERE id='${uid(2)}')||':'||(SELECT count(*) FROM storage.objects WHERE name='${uid(2)}')`);
-  if(u.ok||!u.error.includes('row-level security')||second.stdout.trim()!=='0:0') throw new Error('Deletion-first allowed a stale upload: '+JSON.stringify({u,state:second.stdout}));
+  if(u.ok||!u.error.includes('Avatar account no longer exists')||second.stdout.trim()!=='0:0') throw new Error('Deletion-first allowed a stale upload: '+JSON.stringify({u,state:second.stdout}));
   console.log('[avatar-concurrency] deletion-first: upload waited, refused; account0/avatar0');
+  // Storage's initial RLS permission probe rolls back. Account deletion may
+  // commit before its later elevated metadata write; JWT policies cannot stop
+  // that write. Exercise this exact split and preserve the failed state.
+  await query(`INSERT INTO auth.users(id,email,email_confirmed_at) VALUES('${uid(3)}','avatar-race3@test.invalid',now());
+    INSERT INTO public.profiles(user_id,role,full_name) VALUES('${uid(3)}','parent','Split Completion');`);
+  await query(`BEGIN; ${actor(3)} INSERT INTO storage.objects(bucket_id,name) VALUES('avatars','${uid(3)}'); ROLLBACK;`);
+  await query(`BEGIN; ${actor(3)} SELECT public.delete_my_account(); COMMIT;`);
+  const completion=await query(`INSERT INTO storage.objects(bucket_id,name) VALUES('avatars','${uid(3)}')`)
+    .then(()=>({ok:true}),error=>({ok:false,error:error.message}));
+  const split=await query(`SELECT (SELECT count(*) FROM auth.users WHERE id='${uid(3)}')||':'||(SELECT count(*) FROM storage.objects WHERE name='${uid(3)}')`);
+  if(completion.ok||!completion.error.includes('Avatar account no longer exists')||split.stdout.trim()!=='0:0') throw new Error('Elevated completion recreated a deleted avatar: '+JSON.stringify({completion,state:split.stdout}));
+  console.log('[avatar-concurrency] rolled-back permission probe, deletion, elevated completion: refused; account0/avatar0');
+
 
 } catch (error) {
   failure = error;

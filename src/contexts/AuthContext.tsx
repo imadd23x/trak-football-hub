@@ -8,6 +8,15 @@ import { useQueryClient } from '@tanstack/react-query';
 
 type UserRole = 'player' | 'coach' | 'parent' | 'club';
 const PENDING_PROFILE_KEY = 'trak_pending_profile';
+const DELETED_ACCOUNT_PREFIX = 'trak_deleted_account:';
+// Acknowledged server deletion is terminal for this identity. Keep only the
+// identifier, never a token or profile, so reload cannot reopen cached data.
+const deletedAccounts = new Set<string>();
+function accountWasDeleted(id: string): boolean {
+  try { return deletedAccounts.has(id) || localStorage.getItem(DELETED_ACCOUNT_PREFIX + id) === '1'; }
+  catch { return deletedAccounts.has(id); }
+}
+
 
 interface PendingProfileData {
   role: UserRole;
@@ -49,6 +58,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, pendingProfile?: PendingProfileData) => Promise<{ user: User | null; error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: (expectedUserId?: string) => Promise<{ error: Error | null }>;
+  completeAccountDeletion: (expectedUserId: string) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -182,6 +192,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hydration = useRef<{ generation: number; promise: Promise<void> } | null>(null);
   const authTransition = useRef<Promise<unknown> | null>(null);
   const explicitSignOut = useRef(false);
+  const [deletedAccountId, setDeletedAccountId] = useState<string | null>(null);
+  const [finishingDeletion, setFinishingDeletion] = useState(false);
 
   // The SDK removes its shared session after the logout HTTP response. A
   // concurrent password sign-in can otherwise save B before A deletes it.
@@ -198,6 +210,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const fetchOrCreateProfile = (session: Session, version: number): Promise<void> => {
+    if (accountWasDeleted(session.user.id)) return Promise.resolve();
     if (hydration.current?.generation === version) return hydration.current.promise;
     const isCurrent = () => mounted.current && generation.current === version
       && activeSession.current?.user.id === session.user.id;
@@ -260,6 +273,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       initialized = true;
       activeSession.current = session;
       setUser(session?.user ?? null);
+      const deleted = session && accountWasDeleted(session.user.id);
+      setDeletedAccountId(deleted ? session.user.id : null);
+      if (deleted) {
+        generation.current += 1;
+        hydration.current = null;
+        setProfile(null);
+        setLoading(false);
+        queryClient.clear();
+        return;
+      }
       // Token refresh, tab refocus and metadata changes must not unmount a
       // coach's unfinished form or start duplicate provisioning operations.
       if (sameAccount) return;
@@ -271,8 +294,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session) void fetchOrCreateProfile(session, version);
     };
 
+    const onDeletionInAnotherTab = (event: StorageEvent) => {
+      if (event.key === DELETED_ACCOUNT_PREFIX + activeSession.current?.user.id && event.newValue === '1') {
+        acceptSession(activeSession.current);
+      }
+    };
+    window.addEventListener('storage', onDeletionInAnotherTab);
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       receivedAuthEvent = true;
+      if (session && accountWasDeleted(session.user.id)) {
+        acceptSession(session);
+        return;
+      }
       // On the reset password page, suppress all auth redirects so the
       // form stays visible. ResetPassword.tsx handles its own auth events.
       if (window.location.pathname === '/reset-password') {
@@ -305,6 +338,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (disposed || receivedAuthEvent || generation.current !== initialGeneration) return;
+      if (session && accountWasDeleted(session.user.id)) {
+        acceptSession(session);
+        return;
+      }
       // If we're on the reset password page, don't auto-redirect — let
       // the ResetPassword component handle the PASSWORD_RECOVERY event.
       if (window.location.pathname === '/reset-password') {
@@ -326,6 +363,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       generation.current += 1;
       hydration.current = null;
       subscription.unsubscribe();
+      window.removeEventListener('storage', onDeletionInAnotherTab);
     };
   }, [queryClient]);
 
@@ -386,7 +424,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const error = cause instanceof Error ? cause : new Error('Sign-out failed');
       if (mounted.current && generation.current === version) {
         setLoading(false);
-        toast.error('Could not sign out. You are still signed in on this device. Check your connection and try again.');
+        toast.error(activeSession.current && accountWasDeleted(activeSession.current.user.id)
+          ? 'Your account was deleted. Reconnect and retry to finish signing out on this device.'
+          : 'Could not sign out. You are still signed in on this device. Check your connection and try again.');
       }
       return { error };
     } finally {
@@ -394,9 +434,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  const completeAccountDeletion = async (expectedUserId: string) => {
+    try {
+      localStorage.setItem(DELETED_ACCOUNT_PREFIX + expectedUserId, '1');
+      deletedAccounts.delete(expectedUserId);
+    } catch { deletedAccounts.add(expectedUserId); }
+    if (activeSession.current?.user.id === expectedUserId) {
+      generation.current += 1;
+      hydration.current = null;
+      setDeletedAccountId(expectedUserId);
+      setProfile(null);
+      queryClient.clear();
+    }
+    setFinishingDeletion(true);
+    try { return await signOut(expectedUserId); }
+    finally { if (mounted.current) setFinishingDeletion(false); }
+  };
+
+  const retryDeletedSignOut = async () => {
+    if (!deletedAccountId || finishingDeletion) return;
+    setFinishingDeletion(true);
+    try { await signOut(deletedAccountId); }
+    finally { if (mounted.current) setFinishingDeletion(false); }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, refreshProfile }}>
-      {children}
+    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, completeAccountDeletion, refreshProfile }}>
+      {deletedAccountId ? <main className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+        <section className="max-w-sm space-y-4" aria-labelledby="deleted-account-heading">
+          <h1 id="deleted-account-heading" className="text-xl font-semibold">Account deleted</h1>
+          <p>Your sign-in and profile were removed. Some academy history and consent records may be retained.</p>
+          <p>Finish signing out on this device. If your connection is unavailable, reconnect and retry.</p>
+          <button type="button" className="min-h-11 rounded-lg border px-4 py-2" disabled={finishingDeletion}
+            onClick={() => { void retryDeletedSignOut(); }}>
+            {finishingDeletion ? 'Signing out…' : 'Finish signing out'}
+          </button>
+        </section>
+      </main> : children}
     </AuthContext.Provider>
   );
 };

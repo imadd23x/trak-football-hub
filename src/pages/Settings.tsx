@@ -28,7 +28,7 @@ type Operation = 'name' | 'coach' | 'player' | 'avatar' | 'delete' | 'password' 
 
 function AccountSettings({ userId }: { userId: string }) {
   const navigate = useNavigate()
-  const { user, profile, signOut, refreshProfile } = useAuth()
+  const { user, profile, signOut, completeAccountDeletion, refreshProfile } = useAuth()
   const role = profile?.role
   const mounted = useRef(false)
   useLayoutEffect(() => {
@@ -230,9 +230,9 @@ function AccountSettings({ userId }: { userId: string }) {
       const { client } = await getSettingsAccount(userId, isCurrent)
       const { error } = await client.rpc('delete_my_account')
       if (error) throw error
-      await assertSettingsAccount(userId, isCurrent)
-      // RouteGuard owns navigation after a confirmed sign-out.
-      await signOut(userId)
+      // Record the acknowledged identity even if another account took over;
+      // the provider only finalizes logout when that identity is still current.
+      await completeAccountDeletion(userId)
     } catch { if (isCurrent()) toast.error('Could not delete account. Please contact support.') }
     finally { finish() }
   }

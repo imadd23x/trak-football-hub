@@ -1,6 +1,6 @@
 # Password recovery callback and account boundary
 
-Scope: the frozen pilot candidate `9324361` had a reset form that accepted any cached session, ignored recovery URL errors, waited indefinitely after its one retry, and submitted through the mutable shared Auth client. This follow-up changes the reset page, its Auth lifecycle integration, a small eagerly registered client hook, and focused tests. It changes no database, backend configuration, API key, invitation, or consent contract.
+Standalone scope: canonical main `9114f4c` has a reset form that accepted any cached session, ignored recovery URL errors, waited indefinitely after its one retry, and submitted through the mutable shared Auth client. This follow-up changes the reset page, its Auth lifecycle integration, a small eagerly registered client hook, and focused tests. It changes no database, backend configuration, API key, invitation, or consent contract.
 
 ## Acceptance and implementation
 
@@ -19,7 +19,7 @@ The initial actual-SDK/MSW regression run reproduced five failures and passed th
 
 Independent review found that the first PUT implementation accepted any 2xx body and lacked a deadline. Four new regression cases failed before those findings were fixed. Retained mutation evidence also demonstrates failure when server identity verification, successful-response identity verification, or the immediate listener timing is removed.
 
-Final local validation: all23 current CI command checks plus default smoke pass; source872 passed/9 existing skips, pilot browser20/20, default smoke11/11. Focused recovery/AuthContext42/42 were also independently rerun. Exact logs are recorded in the local review artifact: `artifacts/2026-09-22-password-recovery/`. Source tests use the real application client and installed Auth SDK with synthetic MSW endpoints; no hosted password is changed by these tests.
+Standalone validation on `9114f4c` plus this patch: all 20 canonical CI commands pass; source 690 passed/9 existing skips, and focused recovery/AuthContext 39/39 pass. The canonical pilot browser check passes (10 scenarios). All 83 existing migration files are unchanged. Exact standalone logs are in `artifacts/2026-09-22-standalone-candidates/recovery/`; earlier integration and red/mutation evidence remains in `artifacts/2026-09-22-password-recovery/`. Source tests use the real application client and installed Auth SDK with synthetic MSW endpoints; no hosted password is changed by these tests.
 
 ## Rollout, rollback, and limits
 
@@ -28,3 +28,7 @@ This is a local candidate until independent review and the release gate are sati
 No migration or data rollback is needed. If a release introduces a recovery regression, revert this frontend commit or disable the affected reset path while preparing a correction; the previous page's known session-selection and loading failures must not be called pilot-ready.
 
 `PASSWORD_RECOVERY` is an SDK lifecycle signal, not server-enforced recovery-only authority. The Auth service permits authenticated password changes according to its own rules. This change prevents accidental client account substitution; it does not promise session revocation or make claims about attackers who already possess valid tokens. It covers the application's current implicit callback flow, not PKCE. Reloading after the SDK consumed the callback, or opening a bare reset route in another tab, loses this deliberately in-memory context and requires a fresh link. A dispatched request may commit even if the browser later aborts it; the page reports that uncertainty.
+
+## Hosted acceptance — 22 September 2026
+
+The same recovery implementation in composed candidate `351f0ba` passed an actual emailed recovery link, one password update, existing-account academy invitation acceptance and a fresh login in the isolated test project. The original invitation was clicked by Imad, so this is not a fresh-user invitation claim. A later two-context browser run (`6a0150d1-9a84-4554-b053-0830f116550e`) proved a reused link is rejected and an ordinary signed-in session cannot use the bare reset route; no password update or email was sent by these negative controls. Evidence lives in `artifacts/2026-09-21-test-project-setup/MAIL-BROWSER-RESULTS.md` and `mail-negative-results/`. Production remains unchanged.

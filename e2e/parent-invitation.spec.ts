@@ -248,6 +248,12 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
     // No password/profile writes, provisioning, consent, logout or email calls
     // are permitted. An unexpected request must fail, not silently succeed.
     if (request.method() !== 'GET') return reject();
+    if (url.pathname === '/rest/v1/parental_consents') {
+      if (url.searchParams.get('parent_user_id') !== `eq.${parentId}`
+        || !linked.has((url.searchParams.get('player_user_id') ?? '').slice(3))
+        || url.searchParams.get('withdrawn_at') !== 'is.null') return reject();
+      return json([]);
+    }
     if (url.pathname === '/rest/v1/player_parent_links') {
       if (url.searchParams.get('parent_user_id') !== `eq.${parentId}`) return reject();
       memberships.push({ ids: [...linked], failed: failMembership });

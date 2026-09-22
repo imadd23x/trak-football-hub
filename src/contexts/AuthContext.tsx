@@ -412,6 +412,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // overwrite a newer account if another auth event has already arrived.
       if (mounted.current && generation.current === version) {
         activeSession.current = null;
+        setDeletedAccountId(null);
         setUser(null);
         setProfile(null);
         setLoading(false);

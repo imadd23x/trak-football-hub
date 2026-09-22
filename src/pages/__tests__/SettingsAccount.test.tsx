@@ -437,6 +437,18 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     expect(screen.queryByRole('button', { name: 'Delete my account' })).not.toBeInTheDocument()
   })
 
+  it('finishes a deleted session even on the confirmation callback route', async () => {
+    localStorage.setItem('trak_deleted_account:a', '1')
+    window.history.replaceState({}, '', '/auth/confirm')
+    try {
+      mount()
+      await screen.findByRole('heading', { name: 'Account deleted' })
+      fireEvent.click(screen.getByRole('button', { name: 'Finish signing out' }))
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Account deleted' })).not.toBeInTheDocument())
+      expect((await supabase.auth.getSession()).data.session).toBeNull()
+    } finally { window.history.replaceState({}, '', '/') }
+  })
+
   it('does not apply a deleted identity marker to a different signed-in account', async () => {
     localStorage.setItem('trak_deleted_account:a', '1')
     mount()

@@ -1,7 +1,7 @@
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../../../../tests/msw/server'
 import { SUPABASE_URL, table, tableError } from '../../../../tests/msw/supabase'
 import { renderApp } from '../../../../tests/support/render-app'
@@ -274,4 +274,78 @@ describe('academy dashboard correctness and recovery', () => {
       release()
     }
   })
+})
+
+
+it('routed home ignores a late assessment response after switching academy even when transport cancellation loses the race', async () => {
+  const nextAdmin = 'academy-assessment-next-test'
+  const oldStorage = localStorage.getItem('sb-test-auth-token')!
+  signInAs({ id: nextAdmin })
+  const nextSession = JSON.parse(localStorage.getItem('sb-test-auth-token')!)
+  localStorage.setItem('sb-test-auth-token', oldStorage)
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  let requested = false
+  let completed = false
+  const requestAccount = (request: Request) =>
+    authUserForToken((request.headers.get('Authorization') ?? '').replace(/^Bearer /, ''))?.id
+  // Cancellation is cooperative. Let this one HTTP response finish after abort
+  // to test routed account isolation independently of transport abort.
+  // AuthContext/RouteGuard also unmount the old dashboard during hydration;
+  let intercepted = 0
+  let consumed = false
+  const originalFetch = globalThis.fetch
+  const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+    const url = input instanceof Request ? input.url : String(input)
+    if (!url.startsWith(endpoint('coach_assessments'))) return originalFetch(input, init)
+    intercepted++
+    return originalFetch(input, { ...init, signal: new AbortController().signal }).then(response => {
+      consumed = true
+      return response
+    })
+  })
+  server.use(
+    http.post(`${SUPABASE_URL}/auth/v1/token`, () => HttpResponse.json(nextSession)),
+    http.get(endpoint('profiles'), ({ request }) => {
+      const filter = new URL(request.url).searchParams.get('user_id')
+      if (filter?.startsWith('in.')) return HttpResponse.json([{ user_id: COACH, full_name: 'Old Academy Coach' }])
+      const id = filter === `eq.${ADMIN}` ? ADMIN : nextAdmin
+      return HttpResponse.json([{ id, user_id: id, role: 'club', full_name: 'Synthetic Director' }])
+    }),
+    http.get(endpoint('organizations'), ({ request }) => {
+      const id = requestAccount(request)
+      return HttpResponse.json([{ id: `org-${id}`, name: id === ADMIN ? 'Old Academy' : 'Next Academy', admin_user_id: id }])
+    }),
+    http.get(endpoint('coach_details'), ({ request }) => HttpResponse.json(requestAccount(request) === ADMIN
+      ? [{ user_id: COACH, team: 'Old squad', coach_role: 'Head Coach' }] : [])),
+    http.get(endpoint('coach_assessments'), async () => {
+      requested = true
+      await held
+      completed = true
+      return HttpResponse.json([assessment('old-late-assessment', 9, new Date().toISOString())])
+    }),
+  )
+  try {
+    renderApp('/club/home')
+    await waitFor(() => expect(requested).toBe(true))
+    const oldHeading = await screen.findByRole('heading', { name: 'Old Academy' })
+    await act(async () => {
+      const result = await supabase.auth.signInWithPassword({ email: `${nextAdmin}@example.test`, password: 'synthetic-only' })
+      expect(result.error).toBeNull()
+    })
+    await screen.findByRole('heading', { name: 'Next Academy' })
+    await screen.findByText('No coaches connected yet. Share your academy code with coaches to get started.')
+    expect(oldHeading.isConnected).toBe(false)
+    await act(async () => { release(); await held })
+    await waitFor(() => { expect(completed).toBe(true); expect(consumed).toBe(true); expect(intercepted).toBe(1) })
+    // Let the real SDK consume the completed HTTP body and React commit updates.
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+    expect(screen.getByText('Total Players').nextElementSibling).toHaveTextContent('0')
+    expect(screen.getByText('Assessments this week').nextElementSibling).toHaveTextContent('0')
+    expect(screen.queryByText('Old Academy Coach · Head Coach')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Next Academy' })).toBeInTheDocument()
+  } finally {
+    release()
+    fetchSpy.mockRestore()
+  }
 })

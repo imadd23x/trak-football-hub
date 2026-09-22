@@ -47,12 +47,23 @@ INSERT INTO public.player_details (user_id, position) VALUES
   ('11111111-0000-0000-0000-000000000002', 'Midfielder'),
   ('11111111-0000-0000-0000-000000000003', 'Defender');
 
+-- Academy membership must exist before roster insertion so pinned ownership
+-- records the original academy. Use real removal later, not a status-only mock.
+INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
+ ('11111111-0000-0000-0000-000000000005','admin@export.test',now());
+INSERT INTO public.profiles(user_id,role,full_name) VALUES
+ ('11111111-0000-0000-0000-000000000005','club','Export Academy Admin');
+INSERT INTO public.organizations(id,admin_user_id,name,join_code) VALUES
+ ('44444444-0000-0000-0000-000000000001','11111111-0000-0000-0000-000000000005','Export Academy','EXPORT-ACADEMY');
+INSERT INTO public.coach_details(user_id,organization_id) VALUES
+ ('11111111-0000-0000-0000-000000000001','44444444-0000-0000-0000-000000000001');
+
 -- Both children on the same coach's roster.
 INSERT INTO public.squad_players (id, coach_user_id, linked_player_id, player_name, status) VALUES
   ('22222222-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
    '11111111-0000-0000-0000-000000000002', 'Child A', 'active'),
   ('22222222-0000-0000-0000-00000000000b', '11111111-0000-0000-0000-000000000001',
-   '11111111-0000-0000-0000-000000000003', 'Child B', 'active');
+   '11111111-0000-0000-0000-000000000003', 'Child B', 'released');
 
 INSERT INTO public.coach_assessments (id, squad_player_id, coach_user_id, work_rate) VALUES
   ('33333333-0000-0000-0000-00000000000a', '22222222-0000-0000-0000-00000000000a',
@@ -64,6 +75,10 @@ INSERT INTO public.coach_assessments (id, squad_player_id, coach_user_id, work_r
 INSERT INTO public.coach_assessment_notes (assessment_id, coach_user_id, note) VALUES
   ('33333333-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001',
    'PRIVATE-COACH-NOTE-CANARY');
+
+INSERT INTO public.recognition_awards(id,coach_user_id,squad_player_id,award_type,note) VALUES
+ ('55555555-0000-0000-0000-000000000001','11111111-0000-0000-0000-000000000001',
+  '22222222-0000-0000-0000-00000000000a','player_of_week','FORMER-ACADEMY-AWARD');
 
 -- One match each, so "only mine" is distinguishable from "none".
 --
@@ -170,6 +185,9 @@ SELECT pg_temp.assert_true(
   jsonb_array_length((SELECT doc->'squad_players' FROM export_c)) = 2,
   'the coach''s export contains both roster rows — that is the coach''s record');
 
+SELECT pg_temp.assert_true(jsonb_array_length((SELECT doc->'recognition_awards' FROM export_c))=1,
+ 'positive control: current coach exports own authorized award');
+
 -- But not the children's own logs. Those are the children's.
 SELECT pg_temp.assert_true(
   (SELECT doc::text FROM export_c) NOT LIKE '%CHILD-A-OPPONENT%'
@@ -179,6 +197,69 @@ SELECT pg_temp.assert_true(
 RESET ROLE;
 SELECT set_config('request.jwt.claims', NULL, true);
 
+
+-- U8: an export must not reopen the former academy after real removal.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims','{"sub":"11111111-0000-0000-0000-000000000005","role":"authenticated"}',true);
+SELECT public.remove_coach_from_org('11111111-0000-0000-0000-000000000001');
+SELECT set_config('request.jwt.claims','{"sub":"11111111-0000-0000-0000-000000000001","role":"authenticated"}',true);
+SELECT pg_temp.assert_true(NOT EXISTS(SELECT 1 FROM public.squad_players WHERE id IN
+ ('22222222-0000-0000-0000-00000000000a','22222222-0000-0000-0000-00000000000b')),
+ 'departure control: former roster is inaccessible through ordinary RLS');
+CREATE TEMP TABLE export_departed AS SELECT public.export_my_account() AS doc;
+SELECT pg_temp.assert_true((SELECT doc->'profile'->>'full_name' FROM export_departed)='Export Coach',
+ 'departure control: own profile remains exportable');
+SELECT pg_temp.assert_true((SELECT jsonb_array_length(doc->'squad_players') FROM export_departed)=0,
+ 'removed coach export excludes former academy roster');
+SELECT pg_temp.assert_true((SELECT jsonb_array_length(doc->'coach_assessments') FROM export_departed)=0,
+ 'removed coach export excludes former academy assessments');
+SELECT pg_temp.assert_true((SELECT jsonb_array_length(doc->'coach_assessment_notes') FROM export_departed)=0,
+ 'removed coach export excludes former academy private notes');
+SELECT pg_temp.assert_true((SELECT jsonb_array_length(doc->'recognition_awards') FROM export_departed)=0,
+ 'removed coach export excludes former academy awards');
+RESET ROLE;
+SELECT set_config('request.jwt.claims',NULL,true);
+SELECT pg_temp.assert_true((SELECT count(*) FROM public.squad_players WHERE organization_id='44444444-0000-0000-0000-000000000001')=2,
+ 'history remains retained at original academy');
+
+-- Transfer to a new academy must not recover the old pinned rows, including
+-- a released row whose status the removal RPC deliberately leaves unchanged.
+INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
+ ('11111111-0000-0000-0000-000000000006','admin2@export.test',now());
+INSERT INTO public.profiles(user_id,role,full_name) VALUES
+ ('11111111-0000-0000-0000-000000000006','club','Second Export Admin');
+INSERT INTO public.organizations(id,admin_user_id,name,join_code) VALUES
+ ('44444444-0000-0000-0000-000000000002','11111111-0000-0000-0000-000000000006','Second Export Academy','EXPORT-SECOND');
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims','{"sub":"11111111-0000-0000-0000-000000000001","role":"authenticated"}',true);
+SELECT public.join_organization('EXPORT-SECOND');
+RESET ROLE;
+SELECT set_config('request.jwt.claims',NULL,true);
+INSERT INTO public.squad_players(id,coach_user_id,player_name,status) VALUES
+ ('22222222-0000-0000-0000-00000000000c','11111111-0000-0000-0000-000000000001','New Academy Adult','active');
+INSERT INTO public.coach_assessments(id,squad_player_id,coach_user_id,work_rate) VALUES
+ ('33333333-0000-0000-0000-00000000000c','22222222-0000-0000-0000-00000000000c','11111111-0000-0000-0000-000000000001',7);
+INSERT INTO public.coach_assessment_notes(assessment_id,coach_user_id,note) VALUES
+ ('33333333-0000-0000-0000-00000000000c','11111111-0000-0000-0000-000000000001','CURRENT-ACADEMY-NOTE');
+INSERT INTO public.recognition_awards(id,coach_user_id,squad_player_id,award_type,note) VALUES
+ ('55555555-0000-0000-0000-000000000002','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000c','player_of_week','CURRENT-ACADEMY-AWARD');
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims','{"sub":"11111111-0000-0000-0000-000000000001","role":"authenticated"}',true);
+CREATE TEMP TABLE export_transferred AS SELECT public.export_my_account() AS doc;
+SELECT pg_temp.assert_true((SELECT jsonb_array_length(doc->'squad_players')=1
+ AND doc->'squad_players'->0->>'id'='22222222-0000-0000-0000-00000000000c' FROM export_transferred),
+ 'transfer exports only current academy roster, not released old rows');
+SELECT pg_temp.assert_true((SELECT jsonb_array_length(doc->'coach_assessments')=1
+ AND doc->'coach_assessments'->0->>'id'='33333333-0000-0000-0000-00000000000c' FROM export_transferred),
+ 'transfer exports only current academy assessments');
+SELECT pg_temp.assert_true((SELECT jsonb_array_length(doc->'coach_assessment_notes')=1
+ AND doc->'coach_assessment_notes'->0->>'note'='CURRENT-ACADEMY-NOTE' FROM export_transferred),
+ 'transfer preserves current private note without former private note');
+SELECT pg_temp.assert_true((SELECT jsonb_array_length(doc->'recognition_awards')=1
+ AND doc->'recognition_awards'->0->>'note'='CURRENT-ACADEMY-AWARD' FROM export_transferred),
+ 'transfer preserves current award without former award');
+RESET ROLE;
+SELECT set_config('request.jwt.claims',NULL,true);
 
 -- ── 3. An unauthenticated caller gets nothing ───────────────────────────
 SET LOCAL ROLE authenticated;

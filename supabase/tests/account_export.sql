@@ -232,7 +232,26 @@ INSERT INTO public.organizations(id,admin_user_id,name,join_code) VALUES
  ('44444444-0000-0000-0000-000000000002','11111111-0000-0000-0000-000000000006','Second Export Academy','EXPORT-SECOND');
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims','{"sub":"11111111-0000-0000-0000-000000000001","role":"authenticated"}',true);
-SELECT public.join_organization('EXPORT-SECOND');
+-- Current main uses a join code; the staff-admission candidate requires a
+-- verified invitation. Exercise the real supported entry point on each tree
+-- instead of bypassing the membership guard with a privileged fixture update.
+DO $test$
+DECLARE invitation jsonb;
+BEGIN
+  IF to_regprocedure('public.issue_staff_invite(uuid,text,text,uuid,text)') IS NULL THEN
+    PERFORM public.join_organization('EXPORT-SECOND');
+  ELSE
+    PERFORM set_config('request.jwt.claims',
+      '{"sub":"11111111-0000-0000-0000-000000000006","role":"authenticated"}',true);
+    invitation := public.issue_staff_invite(
+      '66666666-0000-0000-0000-000000000001','coach','coach@export.test',
+      '44444444-0000-0000-0000-000000000002',NULL);
+    PERFORM set_config('request.jwt.claims',
+      '{"sub":"11111111-0000-0000-0000-000000000001","role":"authenticated"}',true);
+    PERFORM public.accept_staff_invite(invitation->>'token','Export Coach');
+  END IF;
+END;
+$test$;
 RESET ROLE;
 SELECT set_config('request.jwt.claims',NULL,true);
 INSERT INTO public.squad_players(id,coach_user_id,player_name,status) VALUES

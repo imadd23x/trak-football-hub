@@ -1,6 +1,7 @@
--- @trak-suite mode=--avatar-access-review in-all=false
--- Acceptance test for the avatars bucket policies. RED on main by design;
--- whichever avatar-policy migration lands flips this to in-all=true.
+-- @trak-suite mode=--avatar-access-review in-all=true
+-- Acceptance test for the avatars bucket policies. 3 of 6 red on main; turned
+-- green by 20260922143046_restrict_avatar_reads_to_owner.sql, which is when
+-- this joined --all.
 --
 -- Measured on production on 22 Sep as anon with only the public key: LIST the
 -- bucket returned every object name (object name = user_id), SIGN an object

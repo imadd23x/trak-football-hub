@@ -81,26 +81,27 @@ const EmailConfirmationScreen = ({ email }: { email: string }) => {
 
 /**
  * Shown instead of the plain confirmation screen to players below the
- * digital-consent age. Their account exists and is theirs — they are waiting
- * on a parent to finish, not to start. Saying that plainly matters: the whole
- * point of letting them sign up themselves is that it stays their account.
+ * consent threshold. It must say only what is true at this moment: signUp has
+ * returned, but for a duplicate email nothing was created, and even for a new
+ * account the parent invite is created and mailed only on the player's first
+ * sign-in after confirming (AuthContext → provision_my_profile →
+ * send-parent-invite). So it tells the child the steps that trigger the parent
+ * request instead of claiming it has already happened.
  */
-const AwaitingParentScreen = ({ email, parentEmail }: { email: string; parentEmail: string }) => (
+export const AwaitingParentScreen = ({ email, parentEmail }: { email: string; parentEmail: string }) => (
   <div className="flex flex-col items-center text-center py-6">
     <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center mb-6">
       <Mail className="w-10 h-10 text-primary" />
     </div>
     <h2 className="text-2xl text-foreground mb-2">Almost there</h2>
     <p className="text-sm text-muted-foreground mb-2">
-      Your account is created. We've asked your parent or guardian at
+      Confirm your email at {email}. As soon as you're signed in, we'll ask
+      your parent or guardian at
     </p>
     <p className="text-sm font-medium text-foreground mb-6">{parentEmail}</p>
-    <p className="text-xs text-muted-foreground mb-2">
-      to approve it. As soon as they do, your coach can start recording your
-      progress and you'll see it here.
-    </p>
     <p className="text-xs text-muted-foreground mb-8">
-      Confirm your own email at {email} in the meantime.
+      to approve your account. As soon as they do, your coach can start
+      recording your progress and you'll see it here.
     </p>
     <a href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
       ← Back to home

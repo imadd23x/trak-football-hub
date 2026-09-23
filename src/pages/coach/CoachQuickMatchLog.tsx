@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell } from '@/components/trak'
 import { computeMatchScore } from '@/lib/rating-engine'
+import { localTodayISO } from '@/lib/event-time'
 
 /**
  * Quick Match Log — 1-minute capture at full-time.
@@ -29,7 +30,7 @@ export default function CoachQuickMatchLog() {
   /* Match coverage is measured against the fixture list by date, so the day the
      match was PLAYED has to be recorded — a Sunday match logged on Monday would
      otherwise miss its fixture entirely and read as uncovered. */
-  const [matchDate, setMatchDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [matchDate, setMatchDate] = useState(localTodayISO)
 
   useEffect(() => {
     if (!user) return
@@ -202,7 +203,7 @@ export default function CoachQuickMatchLog() {
           <input
             type="date"
             value={matchDate}
-            max={new Date().toISOString().slice(0, 10)}
+            max={localTodayISO()}
             onChange={e => setMatchDate(e.target.value)}
             className="w-full bg-transparent text-[20px] text-white/88 outline-none"
             style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.02em' }}

@@ -1,7 +1,7 @@
 # Strategy and the CEO pitch
 
 *Session: 12 September 2026. Evidence baseline: repository docs as of that date —
-[Strategy.md](../../Strategy.md), [REQUIREMENTS.md](../../REQUIREMENTS.md),
+[Strategy.md](../../Strategy.md), [REQUIREMENTS.md](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/9114f4c/REQUIREMENTS.md),
 [docs/business-model-matrix.md](../../docs/business-model-matrix.md),
 [docs/character-education-strategy.md](../../docs/character-education-strategy.md).
 Several facts have since been superseded — see the [README](../README.md#what-has-changed-since).*

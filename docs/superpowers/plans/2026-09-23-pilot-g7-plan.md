@@ -33,7 +33,7 @@ No frontend feature flag can reopen a server capability.
   AI draft/publication reads and writes as needed for G7. Run source/harness,
   typecheck, lint, build/bundle, use cases, database and browser checks. Request
   independent spec and code reviews; resolve actionable findings.
-- [ ] Delivery: record exact checks, known existing consent failures, signed-URL
+- [x] Delivery: record exact checks, known existing consent failures, signed-URL
   expiry and deployment limitations. Commit through the existing hook, push to
   the approved fork, and open a draft canonical PR naming G7. No production
   deployment; deployed pilot index remains unverified.

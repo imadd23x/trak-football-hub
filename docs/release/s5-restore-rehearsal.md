@@ -3,6 +3,12 @@
 Owner: Kostas. Status: **not yet executed.** This document is the procedure and the evidence
 template. It is not evidence that a restore works.
 
+> **Update, 23 Sep (TRAK-23).** Scope changed after this was written. Real children join only
+> after the launch gate in `MVP Requirements` passes and a founder majority says go; there is no
+> "Monday" admission. Child photos are parked (G7), so the avatar-bucket gap below applies only if
+> photos return. Gate 6 accepts a backup plus this written runbook with the restore **not**
+> rehearsed, provided the go decision records that risk. The PITR decision is TRAK-46.
+
 `docs/pilot-readiness-2026-09-25.md` lists, among the gates that must pass before a real child
 signs up: *"Restore rehearsal evidence and duration (Kostas S5), not merely an available backup."*
 Eight completed physical backups exist (Imad, read-only in the production dashboard, 22 Sep, latest
@@ -60,7 +66,7 @@ not exist yet, so #99 is not deployed. And the live storage policy is still
 This is the part S5 exists to establish, and the part that a "we have backups" answer hides.
 
 1. **Storage objects are excluded from the physical backup.** Avatars are not recovered. Today
-   that is 2 synthetic objects. From Monday it is real children's photographs, and a restore would
+   that is synthetic objects only. If child photos return after the pilot, a restore would
    silently produce profiles whose `avatar_url` points at objects that no longer exist — the
    dangling case `scripts/ops/purge-avatar-object.mjs` reports. **There is currently no backup of
    the `avatars` bucket at all.** That is a separate gap from S5 and it is not closed by this
@@ -79,7 +85,7 @@ This is the part S5 exists to establish, and the part that a "we have backups" a
    signed out, and `VITE_SUPABASE_PUBLISHABLE_KEY` changes.
 6. **PITR is not enabled**, so the recovery point is the last daily physical backup, not the moment
    before the incident. Any writes since then are lost. Decide whether that is acceptable for a
-   live pilot *before* Monday, not during an incident.
+   live pilot *before* the go decision (TRAK-46), not during an incident.
 
 ## Where the project ref is hard-coded
 

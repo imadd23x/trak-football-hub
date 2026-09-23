@@ -28,6 +28,7 @@ Quick orientation for AI agents and new contributors.
 | Error boundary | `src/components/trak/ErrorBoundary.tsx` |
 | Database migrations | `supabase/migrations/` (apply in filename order) |
 | Coach AI edge function | `supabase/functions/coach-assistant/` |
+| Pilot scope: P0 journeys, coming soon, launch gate | `MVP Requirements` (progress: `docs/use-cases/PILOT-INDEX.md`) |
 | Strategic review — workshop outputs and prototype bet | `StrategicReview/` (start at `README.md`) |
 
 ## Common Patterns

@@ -20,11 +20,14 @@ use case** and `src/pages/parent/ParentGoals.tsx` is therefore untested and
 unenforced, despite the route existing.
 
 PO decision needed — one of:
-  [ ] IN list stands -> parent goals are out of pilot scope; remove the route
+  [x] IN list stands -> parent goals are out of pilot scope; remove the route
   [ ] Inventory stands -> add UC-P04 to the registry and build it properly
   [ ] Ambiguous -> restate what a parent should see, and the registry follows
 
-Status: OPEN
+Done: `ParentGoals.tsx` and its route are gone from `src/`. Parent goals are
+cut in `MVP Requirements`.
+
+Status: RESOLVED 2026-09-23
 
 ---
 
@@ -45,9 +48,14 @@ load is distinguishable from an empty history") forbids the same thing for
 therefore both stay `pending`.
 
 PO decision needed — one of:
-  [ ] Spec stands -> fix the four screens to show a retryable error
+  [x] Spec stands -> fix the four screens to show a retryable error
   [ ] Spec changes -> bump spec_version and state what a failed load may show
-Status: OPEN
+
+Done: UC-C03, UC-A04 and UC-X02 are `enforced` and pass. A clear error with a
+retry button is the pilot contract (`MVP Requirements`, J6); automatic retry
+is cut.
+
+Status: RESOLVED 2026-09-23
 
 ---
 
@@ -84,9 +92,41 @@ both UC-A02 and UC-A03.
 PO decision needed — one of:
   [ ] Spec stands -> restore a player-reachable match-logging screen and route,
       and a result screen for the band feedback that follows it
-  [ ] Spec changes -> logging is coach-driven now; rewrite REQ-001, UC-A02 and
+  [x] Spec changes -> logging is coach-driven now; rewrite REQ-001, UC-A02 and
       UC-A03 (and any other player-first use cases that assume them) to match
   [ ] Ambiguous -> clarify whether the pilot's player-first thesis still holds
       before the registry is changed either way
+
+Done: coach-only match logging was confirmed for the pilot on 20 Sep in
+Slack (#coding-agent-reviews). UC-A02/A03 are `parked`. REQ-001 is retired
+in `MVP Requirements` (J4 replaces it). The other player-first use cases are
+raised in Q-2026-09-23-01.
+
+Status: RESOLVED 2026-09-23
+
+---
+
+## Q-2026-09-23-01 · UC-C02, UC-A08, UC-A10, UC-C07, UC-P01, UC-P07, UC-A06, UC-A07, UC-C08 · Registry vs academy admission
+Raised: 2026-09-23 · found while writing MVP Requirements · REQ-003
+
+`MVP Requirements` J1 admits pilot children only through the academy roster
+and an invitation. Coaches do not add players, and nobody links by name or
+code. The registry still describes the April code-linking flow:
+
+- UC-C02 (coach adds a player manually) is `enforced`, so it blocks commits if
+  that screen is removed. The route is `/coach/squad/add`.
+- UC-A08, UC-A10, UC-C07 and UC-P01 (TRK-/PAR- codes) are `pending`. UC-A08's
+  test passes, and `uc:check` prints "flip them to enforced", which would
+  enforce a flow J1 forbids.
+- UC-P07 covers consent for ages 13–14. The threshold is now 18.
+- UC-A06 (goals), UC-A07 (medals) and UC-C08 (player-logged matches) are
+  outside the pilot.
+
+Owner: @kostasanastasioubusiness-lang (registry). Do not weaken a test to settle this.
+
+PO decision needed — one of:
+  [ ] Spec changes -> park the code-linking, goals and medals cases, rewrite
+      UC-C02 and UC-P07 to match J1/J2, and add use cases for J1–J4
+  [ ] Spec stands -> keep code linking in the pilot, and change J1 instead
 
 Status: OPEN

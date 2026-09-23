@@ -250,8 +250,10 @@ jobs:
 
       # Deploys all four functions. Values come from supabase/config.toml, so
       # that file is the source of truth for verify_jwt \u2014 not the dashboard.
+      # --use-api bundles on Supabase's side: no ghcr.io edge-runtime image pull,
+      # which ghcr.io rate-limited on 23 Sep and failed two production runs.
       - name: Deploy edge functions
-        run: supabase functions deploy --project-ref "$PROJECT_ID"
+        run: supabase functions deploy --project-ref "$PROJECT_ID" --use-api
 
       - name: Summary
         run: |

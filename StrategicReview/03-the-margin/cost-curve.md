@@ -171,7 +171,7 @@ Test by academy, not by family — families in one squad talk to each other.
 **Why it was replaced:**
 
 - **Willingness to pay.** $550 over a 10-month season is more than the ~€500 a year parents pay the
-  academy ([REQUIREMENTS.md](../../REQUIREMENTS.md)); the season pass is 20% of it.
+  academy ([REQUIREMENTS.md](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/9114f4c/REQUIREMENTS.md)); the season pass is 20% of it.
 - **The meter billed parents for the coach's activity,** and a cap would have stopped a child's record
   mid-month.
 - **Labour test:** at one record per session, $55 was about twice the value of the work.

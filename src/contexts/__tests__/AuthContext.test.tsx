@@ -122,9 +122,28 @@ beforeEach(() => {
     return new Response('{}', { status: 200 })
   }))
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/') })
 
 describe('account-bound onboarding and auth lifecycle', () => {
+  it('hydrates a recovery session on the reset route and tracks a later account change', async () => {
+    window.history.replaceState(null, '', '/reset-password')
+    mount()
+    await emit('PASSWORD_RECOVERY', session('a'))
+    await waitFor(() => expect(screen.getByTestId('identity')).toHaveTextContent('a:a'))
+    await emit('SIGNED_IN', session('b'))
+    await waitFor(() => expect(screen.getByTestId('identity')).toHaveTextContent('b:b'))
+  })
+
+  it('hydrates an already-consumed recovery callback and clears reset-route sign-out', async () => {
+    window.history.replaceState(null, '', '/reset-password')
+    api.session = session('a')
+    mount()
+    await waitFor(() => expect(screen.getByTestId('identity')).toHaveTextContent('a:a'))
+    await emit('SIGNED_OUT', null)
+    expect(screen.getByTestId('identity')).toHaveTextContent('-:-')
+    expect(window.location.pathname).toBe('/reset-password')
+  })
+
   it('provisions B only from B metadata, never A’s abandoned shared-phone payload', async () => {
     localStorage.setItem('trak_pending_profile', JSON.stringify(pending('A')))
     api.session = session('b', pending('B'))

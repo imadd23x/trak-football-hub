@@ -4,11 +4,11 @@ Quick orientation for AI agents and new contributors.
 
 ## Current work and coordination
 
-Read [the September 25 pilot plan](docs/pilot-readiness-2026-09-25.md) and [the release gate](docs/release/merge-gate.md) first. `docs/pm/STATE.md` and `docs/features-outstanding.md` are historical, not current readiness evidence. Read the actual route and callers before fixing a component; `CoachQuickMatchLog` is currently unrouted.
+Read [MVP Requirements](MVP%20Requirements) first. It defines what the first pilot must do, what shows "coming soon" and the launch gate. Every PR names the journey (J1–J7) or guarantee (G1–G7) it serves; a PR that serves none waits. Track progress in [the pilot journey index](docs/use-cases/PILOT-INDEX.md), and follow [the release gate](docs/release/merge-gate.md). [The September 25 readiness plan](docs/pilot-readiness-2026-09-25.md) is the 18 September task matrix. `docs/features-outstanding.md` is historical, not current readiness evidence. Read the actual route and callers before fixing a component; `CoachQuickMatchLog` is currently unrouted.
 
 Use task branches (`parent/`, `coach/`, `player/`, `shared/`), never main. Announce migrations and shared-file changes in #coding-agent-reviews before editing. Imad coordinates merges. A PR is approved by a verified review with a verdict (MERGE / MERGE AFTER / DO NOT MERGE) from someone who did not author it — see *What approval means* in the release gate. Commit only green; never bypass the pre-commit hook. Never apply development SQL to the shared live Supabase project. Use a disposable local database and new migrations; production deployment follows reviewed merges.
 
-Friday 25 September is the **pilot**, measured against the pilot readiness plan. The demo is completed on the way to it; no other checklist is a gate.
+Friday 25 September is a **synthetic demo**. Real children join only when the launch gate in MVP Requirements passes and a founder majority agrees. A date never admits anyone, including `pilot_config.starts_on`.
 
 ## Tech Stack
 

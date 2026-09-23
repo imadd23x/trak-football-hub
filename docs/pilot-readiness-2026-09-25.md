@@ -1,6 +1,8 @@
 # Pilot readiness — September 25, 2026
 
-This is the current delivery scope. Source code and recorded deployment/runtime evidence determine completion; this document is not proof that a task works.
+> **23 September 2026:** Pilot scope and the real-child launch gate now live in [MVP Requirements](../MVP%20Requirements). Where this 18 September task matrix disagrees with it (for example, a restore rehearsal versus a backup plus a written runbook), MVP Requirements wins. September 25 is a synthetic demo.
+
+This was the delivery scope on 18 September. Source code and recorded deployment/runtime evidence determine completion; this document is not proof that a task works.
 
 Source: [Imad's September 18 Slack plan](https://trakfootball.slack.com/archives/C0BLW846732/p1789675494856059). Correct repository: `kostasanastasioubusiness-lang/trak-football-hub`; initial implementation baseline `1fcb9238`. `t-bones29/trak-football-hub` is an outdated copy. Deployment: `trakfootball.com`, Supabase project `xbykbqolvqyqmipikuae`.
 

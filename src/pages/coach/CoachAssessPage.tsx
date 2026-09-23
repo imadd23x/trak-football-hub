@@ -94,6 +94,10 @@ function CoachAssessmentForm() {
   const [shared,          setShared]          = useState('')
   const [sharedPublished, setSharedPublished] = useState(false)
   const [sharedExists,    setSharedExists]    = useState(false)
+  // The text the family can read right now, or null. J5: nothing reaches the
+  // family until the coach presses Publish, so an edit to published text is a
+  // new draft until it is published again.
+  const [publishedBody,   setPublishedBody]   = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [noteExists, setNoteExists] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
@@ -131,7 +135,7 @@ function CoachAssessmentForm() {
     setTechnical(5); setPhysical(5); setCoachability(5)
     setAppearance('started'); setSessionId('')
     setNote(''); setNoteExists(false)
-    setShared(''); setSharedPublished(false); setSharedExists(false)
+    setShared(''); setSharedPublished(false); setSharedExists(false); setPublishedBody(null)
     setSaving(false)
     setLoadState({ scope, status: 'loading' })
     if (userId && playerId) {
@@ -170,6 +174,7 @@ function CoachAssessmentForm() {
             setShared(sf?.body ?? '')
             setSharedPublished(sf?.published_at != null)
             setSharedExists(sf != null)
+            setPublishedBody(sf?.published_at != null ? sf.body : null)
           }
           setLoadState({ scope, status: 'ready' })
         } catch (error) {
@@ -226,6 +231,10 @@ function CoachAssessmentForm() {
     () => players.find(p => p.id === playerId),
     [players, playerId],
   )
+  const firstName: string = selectedPlayer?.player_name?.trim().split(/\s+/)[0] || 'the player'
+  const message = shared.trim()
+  // True only while the box holds exactly what the family can already read.
+  const liveUnchanged = sharedPublished && publishedBody !== null && message === publishedBody.trim()
 
   /* Parental consent. Since #80 every player under 18 needs a parent's
      approval before a coach can assess them, and the database refuses the
@@ -243,9 +252,21 @@ function CoachAssessmentForm() {
     return () => { cancelled = true }
   }, [playerId])
 
-  /* --- save --- */
-  const handleSave = async () => {
+  /* --- save ---
+     J5: "Nothing reaches the family until the coach presses publish."
+       save      — sliders, note and message as a draft. A published message
+                   stays published only if its text is unchanged; edited text
+                   is withdrawn until it is published again.
+       publish   — the same, and the message goes to the player and parents.
+       unpublish — the family stops seeing the message at once. */
+  const handleSave = async (action: 'save' | 'publish' | 'unpublish' = 'save') => {
     if (!user || !playerId || saving || !formReady || consentWait || saveRequest.current) return
+    if (action === 'publish' && !message) return
+    const sharedPublishedNext =
+      action === 'publish' ? true : action === 'unpublish' ? false : liveUnchanged
+    // Rewriting an unchanged, still-published message would re-stamp it and
+    // mark it "new" for the family again. Leave it alone.
+    const writeShared = (message.length > 0 || sharedExists) && !(action === 'save' && liveUnchanged)
     const controller = new AbortController()
     saveRequest.current = controller
     const isCurrent = () => !controller.signal.aborted && currentScope.current === scope
@@ -325,7 +346,12 @@ function CoachAssessmentForm() {
         if (!isCurrent()) return
         if (noteError) {
           console.error('Note save failed:', noteError)
-          toast.error(`Assessment saved, note failed: ${noteError.message}. Your text is still here — press save to try again.`)
+          const alsoMessage = writeShared ? ` and the message to ${firstName}` : ''
+          toast.error(
+            `The scores are saved. Not saved: your private note${alsoMessage} (${noteError.message}). ` +
+              `Your text is still here — try again.`,
+            { duration: 12000 },
+          )
           return
         }
         setNoteExists(true)
@@ -334,14 +360,14 @@ function CoachAssessmentForm() {
       // Shared feedback, written separately and published deliberately (K9).
       // Never derived from `note`. Saved whenever there is text OR a row already
       // exists, so clearing the box and unpublishing both take effect.
-      if (saved?.id && (shared.trim() || sharedExists)) {
+      if (saved?.id && writeShared) {
         // Cast for the same reason as the read above.
         const { error: sharedError } = await supabase.from('coach_shared_feedback' as any).upsert({
           assessment_id: saved.id,
           coach_user_id: user.id,
-          body:          shared.trim(),
-          // NULL retracts: the child stops seeing it immediately.
-          published_at:  sharedPublished && shared.trim() ? new Date().toISOString() : null,
+          body:          message,
+          // NULL retracts: the child and their parents stop seeing it immediately.
+          published_at:  sharedPublishedNext && message ? new Date().toISOString() : null,
         }, { onConflict: 'assessment_id' }).abortSignal(controller.signal)
         if (!isCurrent()) return
         if (sharedError) {
@@ -352,8 +378,9 @@ function CoachAssessmentForm() {
           // again updates that row rather than creating a second one.
           console.error('Shared feedback save failed:', sharedError)
           toast.error(
-            `Assessment saved, but the feedback for the player did not: ${sharedError.message}. ` +
-              `Your text is still here — press save to try again.`,
+            `The scores${note.trim() ? ' and private note' : ''} are saved. Not saved: the message to ` +
+              `${firstName} (${sharedError.message}), so ${action === 'unpublish' ? 'the family can still see the old one' : 'nothing new reached the family'}. ` +
+              `Your text is still here — try again.`,
             { duration: 12000 },
           )
           setExistingId(saved.id)
@@ -361,6 +388,17 @@ function CoachAssessmentForm() {
           return
         }
         setSharedExists(true)
+        setSharedPublished(sharedPublishedNext && message.length > 0)
+        setPublishedBody(sharedPublishedNext && message ? message : null)
+      }
+      if (action === 'publish') {
+        toast.success(`Published. ${firstName} and their parents can read your message now.`)
+      } else if (action === 'unpublish') {
+        toast.success(`Unpublished. ${firstName} and their parents can no longer see the message.`)
+      } else if (message && !sharedPublishedNext) {
+        toast.success(`Assessment saved. Your message to ${firstName} has not been sent.`)
+      } else {
+        toast.success('Assessment saved.')
       }
       trackEvent('assessment_submitted', {
         mode: 'full',
@@ -434,7 +472,7 @@ function CoachAssessmentForm() {
             <p className="text-[13px] font-medium text-white/85">Waiting for a parent</p>
             <p className="text-[12px] text-white/55 leading-relaxed mt-0.5">
               You can assess {selectedPlayer.player_name} once a parent has approved their account.
-              If no parent is linked yet, the player can send the invite from their profile.
+              The form stays locked until then, and nothing about them is recorded.
             </p>
           </div>
         ) : null}
@@ -471,7 +509,10 @@ function CoachAssessmentForm() {
             </div>
           ) : <p role="status" className="text-sm text-white/50">Loading assessment…</p>
         )}
-        <fieldset disabled={!formReady || saving} className="contents">
+        {/* J5: a player waiting for a parent cannot be opened. If consent is
+            withdrawn mid-edit, the refused save sets consentWait: the form
+            locks, and everything the coach entered stays in state. */}
+        <fieldset disabled={!formReady || saving || consentWait} className="contents">
         {/* ---- 3. session selector ---- */}
         <div className="space-y-1.5">
           <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
@@ -544,25 +585,63 @@ function CoachAssessmentForm() {
           </span>
         </div>
 
-        {/* ---- 7. improvement areas (AI-powered player feedback) ---- */}
+        {/* ---- 7. message to the player (K9, J5) ----
+            Two boxes rather than one, because the schema has two tables and the
+            coach needs to see which words the family will read. Nothing copies
+            the private note into here. Parents read published messages too
+            (20260919150000), so the label says so. */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
             <div>
-              <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
-                IMPROVEMENT AREAS
-              </span>
-              {/* This used to read "AI will expand these into personalised
-                  feedback for the player". K9 made that false: the note is
-                  private and the player's feedback screen can no longer read
-                  it. A label promising a coach their words reach the child,
-                  when they do not, is worse than no label. */}
-              <p className="text-[9px] text-white/25 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Private to you. The player never sees this.
+              <label htmlFor="assess-message" className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
+                Message to {firstName}
+              </label>
+              <p className="text-[10px] text-white/45 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                They and their parents will see this.
+              </p>
+            </div>
+            <span className="text-[10px] text-white/25">{shared.length}/300</span>
+          </div>
+          <textarea
+            id="assess-message"
+            value={shared}
+            onChange={e => {
+              if (e.target.value.length <= 300) setShared(e.target.value)
+            }}
+            maxLength={300}
+            rows={3}
+            placeholder="e.g. Great week. Keep working on your first touch — try the cone drill before training."
+            className="w-full px-4 py-3 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none resize-none placeholder:text-white/20"
+          />
+          <p role="status" className="text-[10px] text-white/40" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            {liveUnchanged
+              ? 'Published. They can read it now.'
+              : sharedPublished
+                ? 'Edited since you published it. Publish again to send the new version.'
+                : message
+                  ? 'Not sent. Nothing reaches them until you press Publish.'
+                  : 'Optional. Nothing reaches them until you press Publish.'}
+          </p>
+        </div>
+
+        {/* ---- 8. private note ----
+            The label used to read "AI will expand these into personalised
+            feedback for the player". K9 made that false: the note is private
+            and no family role can read it. */}
+        <div className="space-y-1.5">
+          <div className="flex justify-between items-center">
+            <div>
+              <label htmlFor="assess-note" className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
+                Private note <span className="text-white/25">— optional</span>
+              </label>
+              <p className="text-[10px] text-white/45 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                Only you can see this.
               </p>
             </div>
             <span className="text-[10px] text-white/25">{note.length}/300</span>
           </div>
           <textarea
+            id="assess-note"
             value={note}
             onChange={e => {
               if (e.target.value.length <= 300) setNote(e.target.value)
@@ -574,57 +653,39 @@ function CoachAssessmentForm() {
           />
         </div>
 
-        {/* ---- 8b. shared feedback (K9) ---- */}
-        {/* Two boxes rather than one, because the schema has two tables and the
-            coach needs to see which words the child will read. Nothing copies
-            the note into here. */}
-        <div className="px-5 pb-5 space-y-2">
-          <div className="flex justify-between items-center">
-            <div>
-              <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
-                FEEDBACK FOR THE PLAYER
-              </span>
-              <p className="text-[9px] text-white/25 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                {sharedPublished && shared.trim()
-                  ? 'The player can read this'
-                  : 'Only the player sees this, and only once you publish it'}
-              </p>
-            </div>
-            <span className="text-[10px] text-white/25">{shared.length}/300</span>
-          </div>
-          <textarea
-            value={shared}
-            onChange={e => {
-              if (e.target.value.length <= 300) setShared(e.target.value)
-            }}
-            maxLength={300}
-            rows={3}
-            placeholder="e.g. Great week. Keep working on your first touch — try the cone drill before training."
-            className="w-full px-4 py-3 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none resize-none placeholder:text-white/20"
-          />
+        {/* ---- 9. actions ---- */}
+        <div className="space-y-2">
+          {message && !liveUnchanged ? (
+            <button
+              type="button"
+              onClick={() => handleSave('publish')}
+              disabled={!playerId || saving || !formReady || consentWait}
+              className="w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity"
+            >
+              {saving ? 'Saving...' : `Publish to ${firstName}`}
+            </button>
+          ) : null}
           <button
             type="button"
-            onClick={() => setSharedPublished(v => !v)}
-            disabled={!shared.trim()}
-            className="w-full py-2.5 rounded-[10px] text-[11px] font-semibold transition-colors disabled:opacity-30"
-            style={{
-              background: sharedPublished ? 'rgba(200,242,90,0.12)' : 'rgba(255,255,255,0.04)',
-              color:      sharedPublished ? '#C8F25A' : 'rgba(255,255,255,0.4)',
-              border:     `1px solid ${sharedPublished ? 'rgba(200,242,90,0.3)' : 'rgba(255,255,255,0.07)'}`,
-            }}
+            onClick={() => handleSave('save')}
+            disabled={!playerId || saving || !formReady || consentWait}
+            className={message && !liveUnchanged
+              ? 'w-full py-3 rounded-[10px] bg-white/[0.04] border border-white/[0.09] text-white/70 font-semibold text-sm disabled:opacity-40 transition-opacity'
+              : 'w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity'}
           >
-            {sharedPublished ? 'Published — tap to unpublish' : 'Publish to the player'}
+            {saving ? 'Saving...' : message && !liveUnchanged ? 'Save Assessment (message not sent)' : 'Save Assessment \u2192'}
           </button>
+          {sharedPublished ? (
+            <button
+              type="button"
+              onClick={() => handleSave('unpublish')}
+              disabled={!playerId || saving || !formReady || consentWait}
+              className="w-full py-2.5 rounded-[10px] text-[11px] font-semibold text-white/50 border border-white/[0.07] disabled:opacity-30"
+            >
+              Unpublish message
+            </button>
+          ) : null}
         </div>
-
-        {/* ---- 9. save button ---- */}
-        <button
-          onClick={handleSave}
-          disabled={!playerId || saving || !formReady || consentWait}
-          className="w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity"
-        >
-          {saving ? 'Saving...' : 'Save Assessment \u2192'}
-        </button>
         </fieldset>
       </div>
 

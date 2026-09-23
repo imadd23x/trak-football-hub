@@ -80,13 +80,15 @@ use_cases:
       - A failed load is distinguishable from an empty history
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # PARKED 2026-09-23 (Q-2026-09-23-01, TRAK-19). Goals are cut from the pilot (MVP Requirements, "Cut from the pilot"; TRAK-32).
+  # The PO's original words are kept so the decision stays auditable.
   - id: UC-A06
     actor: athlete
     title: Create and track a goal
     requirement: REQ-001
-    status: pending
+    status: parked
     tier: [1]
-    spec_version: 1
+    spec_version: 2
     given: A signed-in athlete
     when: They create a goal from the goals screen
     then:
@@ -94,13 +96,15 @@ use_cases:
       - The goals screen is reachable from the athlete navigation
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # PARKED 2026-09-23 (Q-2026-09-23-01, TRAK-19). Medals, recognition and awards are cut from the pilot (TRAK-31).
+  # The PO's original words are kept so the decision stays auditable.
   - id: UC-A07
     actor: athlete
     title: Earn and see medals
     requirement: REQ-001
-    status: pending
+    status: parked
     tier: [1]
-    spec_version: 1
+    spec_version: 2
     given: An athlete whose logged matches satisfy a medal rule
     when: They open the medals screen
     then:
@@ -108,13 +112,15 @@ use_cases:
       - Medal eligibility is evaluated from their real match history
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # PARKED 2026-09-23 (Q-2026-09-23-01, TRAK-19). J1: children do not join by typing a name or a coach code; the academy roster and the invitation decide who is in (TRAK-36).
+  # The PO's original words are kept so the decision stays auditable.
   - id: UC-A08
     actor: athlete
     title: Enter a TRK-XXXX code and claim the squad row
     requirement: REQ-003
-    status: pending
+    status: parked
     tier: [2]
-    spec_version: 1
+    spec_version: 2
     given: An athlete holding a coach's TRK-XXXX code
     when: They submit the code
     then:
@@ -138,13 +144,15 @@ use_cases:
       - The coach's private note is never shown to the athlete
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # PARKED 2026-09-23 (Q-2026-09-23-01, TRAK-19). J1/J2: the academy supplies every guardian email; a child does not generate a parent code (TRAK-36, TRAK-38).
+  # The PO's original words are kept so the decision stays auditable.
   - id: UC-A10
     actor: athlete
     title: Generate a PAR-XXXX code for a parent
     requirement: REQ-003
-    status: pending
+    status: parked
     tier: [2]
-    spec_version: 1
+    spec_version: 2
     given: A signed-in athlete
     when: They request a parent invite code
     then:
@@ -152,20 +160,25 @@ use_cases:
       - The same code is shown to them until it is redeemed
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # REWRITTEN 2026-09-23 (Q-2026-09-23-01, TRAK-19). J1: "coaches do not add
+  # players" — the academy roster is loaded by Trak (concierge). The old
+  # spec asserted the opposite, so this is a spec change, not a weakened test.
+  # Pending until TRAK-47 removes /coach/squad/add; TRAK-48 covers the backend
+  # refusal under real roles.
   - id: UC-C02
     actor: coach
-    title: Add a player to the squad manually
-    requirement: REQ-002
-    status: enforced
+    title: Coaches do not add players; the academy roster decides the squad
+    requirement: J1
+    status: pending
     tier: [1, 2]
-    spec_version: 1
-    given: A signed-in coach on the add-player screen
-    when: They enter a player name and save
+    spec_version: 2
+    given: A signed-in coach
+    when: They open their squad, or go to /coach/squad/add directly
     then:
-      - A squad_players row is persisted against that coach
-      - They are returned to the squad screen
-      - Saving is refused while the name is empty
-    source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
+      - The squad screen offers no way to add a player
+      - /coach/squad/add shows no add-player form and sends the coach to their squad
+      - A squad_players insert by a coach is refused by the backend
+    source: MVP Requirements
 
   # ENFORCED 2026-09-21. Its test passed on every uc:check run since the
   # 2026-09-21 merges; Imad approved promoting it (Tarek's offer, #77 thread).
@@ -199,13 +212,15 @@ use_cases:
       - Submitting is refused until a player is selected
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # PARKED 2026-09-23 (Q-2026-09-23-01, TRAK-19). J1: coach TRK- codes are not an admission path in the pilot (TRAK-36).
+  # The PO's original words are kept so the decision stays auditable.
   - id: UC-C07
     actor: coach
     title: Receive a real, stored, unique TRK-XXXX code
     requirement: REQ-003
-    status: pending
+    status: parked
     tier: [2]
-    spec_version: 1
+    spec_version: 2
     given: A signed-in coach
     when: They view their invite code
     then:
@@ -214,13 +229,15 @@ use_cases:
       - No two coaches hold the same code
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # PARKED 2026-09-23 (Q-2026-09-23-01, TRAK-19). Player-entered match logging is parked with UC-A02/A03; the coach logs matches (J4, TRAK-37).
+  # The PO's original words are kept so the decision stays auditable.
   - id: UC-C08
     actor: coach
     title: See linked athletes' logged matches, bands only
     requirement: REQ-003
-    status: pending
+    status: parked
     tier: [2]
-    spec_version: 1
+    spec_version: 2
     given: A coach linked to an athlete who has logged matches
     when: They open that athlete's profile
     then:
@@ -229,13 +246,15 @@ use_cases:
       - The athlete's body-condition input is never shown to the coach
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # PARKED 2026-09-23 (Q-2026-09-23-01, TRAK-19). J2: guardians join through the academy-supplied invitation, not a PAR- code (TRAK-36).
+  # The PO's original words are kept so the decision stays auditable.
   - id: UC-P01
     actor: parent
     title: Redeem PAR-XXXX, create an account and link to the child
     requirement: REQ-003
-    status: pending
+    status: parked
     tier: [2]
-    spec_version: 1
+    spec_version: 2
     given: A parent holding a PAR-XXXX code
     when: They redeem it and complete sign-up
     then:
@@ -286,19 +305,23 @@ use_cases:
       - The coach's private note is never shown to the parent
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # REWRITTEN 2026-09-23 (Q-2026-09-23-01, TRAK-19). The consent threshold is
+  # 18, not 13–14, and consent is given by an academy-supplied guardian (J2).
   - id: UC-P07
     actor: parent
-    title: Give verifiable consent for a 13-14 year old
-    requirement: REQ-004
+    title: A guardian gives recorded consent for a child under 18
+    requirement: J2
     status: pending
-    tier: [2]
-    spec_version: 1
-    given: A parent linking to a child aged 13 or 14
-    when: They complete the link flow
+    tier: [1, 2]
+    spec_version: 2
+    given: A guardian invited by the academy for a child under 18, or with no date of birth
+    when: They complete the consent screen
     then:
       - The flow cannot complete without a recorded consent
-      - The consent record is retrievable and timestamped
-    source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
+      - The consent record stores the guardian's name, relationship and the notice version, and is timestamped
+      - No development record about the child can be written before consent exists
+      - One guardian can consent for siblings without a second account
+    source: MVP Requirements
 
   - id: UC-T01
     actor: system
@@ -342,3 +365,108 @@ use_cases:
       - A retryable error is shown
       - The error is visibly different from the genuine empty state
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
+
+  # ADDED 2026-09-23 (Q-2026-09-23-01, TRAK-19): use cases for the P0 journeys
+  # J1–J4 in MVP Requirements. Pending until a test exists and passes.
+  - id: UC-X03
+    actor: system
+    title: Only rostered children and academy-supplied guardians get a profile
+    requirement: J1
+    status: pending
+    tier: [2]
+    spec_version: 1
+    given: A person with no valid academy invitation
+    when: They sign up as a player or a parent, or try to link to a child by name or code
+    then:
+      - The backend refuses the player or parent profile
+      - No squad row or parent link is created
+      - An invited child and guardian can complete signup (positive control)
+    source: MVP Requirements
+
+  - id: UC-X04
+    actor: system
+    title: A player cannot change their own date of birth
+    requirement: J1
+    status: pending
+    tier: [2]
+    spec_version: 1
+    given: A signed-in player
+    when: They try to change their date of birth through the app or the API
+    then:
+      - The change is refused by the backend
+      - A player with no date of birth is treated as under 18
+    source: MVP Requirements
+
+  - id: UC-P08
+    actor: parent
+    title: Guardian invitation is sent at admission to the academy-supplied address
+    requirement: J2
+    status: pending
+    tier: [2]
+    spec_version: 1
+    given: A child admitted from the academy roster with one or more guardian emails
+    when: Admission completes
+    then:
+      - Each academy-supplied guardian email receives an invitation
+      - The invitation names the child, the academy and the purpose
+      - No invitation goes to an address the academy did not supply, or to the child's own address
+    source: MVP Requirements
+
+  - id: UC-P09
+    actor: parent
+    title: Withdraw consent in one tap, effective immediately
+    requirement: J2
+    status: pending
+    tier: [1, 2]
+    spec_version: 1
+    given: A signed-in guardian whose consent for a child is active
+    when: They withdraw consent from their profile
+    then:
+      - Withdrawal is one action from the parent profile, with the child named
+      - New development writes about the child are refused at once, including from sessions already open
+      - Published content about the child is hidden from the family at once
+    source: MVP Requirements
+
+  - id: UC-A11
+    actor: athlete
+    title: Activate an account only after a guardian consents
+    requirement: J3
+    status: pending
+    tier: [1, 2]
+    spec_version: 1
+    given: A child admitted from the academy roster
+    when: Their guardian consents and they open the one-use invitation sent to the academy-supplied email
+    then:
+      - No activation invitation is sent before consent exists
+      - The account activates linked to the child's roster row
+      - A reused or expired invitation is refused, and a resend works
+    source: MVP Requirements
+
+  - id: UC-C09
+    actor: coach
+    title: Log a match for the squad with no invented defaults
+    requirement: J4
+    status: pending
+    tier: [1, 2]
+    spec_version: 1
+    given: A signed-in coach with a squad
+    when: They log a match with date, opponent and result, and each child's position, minutes, goals and assists
+    then:
+      - Nothing about a child's minutes, goals or assists is pre-filled
+      - A child whose guardian has not consented cannot be logged
+      - A retry never creates a duplicate match, and a partial failure says what was and was not saved
+    source: MVP Requirements
+
+  - id: UC-C10
+    actor: coach
+    title: Log a training session
+    requirement: J4
+    status: pending
+    tier: [1]
+    spec_version: 1
+    given: A signed-in coach
+    when: They log a training session with date, type and notes
+    then:
+      - A coach_sessions row is persisted with that date, type and notes
+      - A failed save says so and keeps what the coach typed
+    source: MVP Requirements

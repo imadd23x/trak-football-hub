@@ -1,5 +1,7 @@
 # Deck reconciliation — `Trak_Overview_Light.pptx`
 
+> **23 September 2026:** This is an 18 September snapshot. Coach-only match logging and the pilot's success measures are now settled in [MVP Requirements](../MVP%20Requirements), so the "Open" metric section below is resolved.
+
 **For Chris.** Every claim on slides 3, 4 and 6 checked against what the code
 actually does, at `upstream/main` commit `1fcb923`, on 18 Sept 2026.
 

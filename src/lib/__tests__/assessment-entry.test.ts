@@ -93,7 +93,8 @@ describe('the screen actually applies the rule', () => {
   })
 
   it('disables the save control while input is still needed', () => {
-    expect(src).toMatch(/disabled=\{\s*saving\s*\|\|\s*needsInput\s*\}/)
+    // Further conditions may follow (e.g. consentWait); saving and needsInput must lead.
+    expect(src).toMatch(/disabled=\{\s*saving\s*\|\|\s*needsInput\b[^}]*\}/)
   })
 
   it('tracks that the coach moved a slider', () => {

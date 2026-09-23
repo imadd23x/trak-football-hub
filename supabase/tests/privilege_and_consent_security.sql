@@ -1,7 +1,8 @@
 -- @trak-suite mode=--privilege-consent-review in-all=true
 -- Synthetic fixtures only. Run after real migrations in a disposable database.
 -- Covers 20260919120001 (table privileges), 20260919120002 (consent purpose)
--- and 20260919120003 (stale-consent report). Every denial assertion has a
+-- 20260919120003 (stale-consent report), and internal helper/RLS isolation.
+-- Every denial assertion has a
 -- positive control beside it, so "refused" is distinguishable from "didn't run".
 BEGIN;
 SET LOCAL TIME ZONE 'UTC';
@@ -265,13 +266,18 @@ SELECT pg_temp.pc_reset();
 
 -- B0. Positive control: a full grant through the RPC is accepted and satisfies the gate.
 SELECT pg_temp.pc_as('authenticated', 5);
-SELECT pg_temp.pc_assert(public.player_consent_required(pg_temp.pc_id(3)), 'B0: minor 3 requires consent before any grant');
+SELECT pg_temp.pc_assert(EXISTS (SELECT 1 FROM public.get_children_awaiting_consent() WHERE player_user_id = pg_temp.pc_id(3)),
+  'B0: minor 3 requires consent before any grant');
 SELECT pg_temp.pc_expect_ok(format(
   'SELECT public.record_parental_consent(%L, %L, %L::jsonb, %L, %L)',
   pg_temp.pc_id(3), 'parent', '{"coaching_records": true, "recognition": false, "parent_visibility": false}', 'v1', 'fixture wording'),
   'B0: positive control — RPC accepts a grant with coaching_records true');
+SELECT pg_temp.pc_assert(NOT EXISTS (SELECT 1 FROM public.get_children_awaiting_consent() WHERE player_user_id = pg_temp.pc_id(3)),
+  'B0: the linked child leaves the pending list after a real grant');
+SELECT pg_temp.pc_reset();
 SELECT pg_temp.pc_assert(public.player_has_parental_consent(pg_temp.pc_id(3)), 'B0: predicate is true after a real grant');
 SELECT pg_temp.pc_assert(NOT public.player_consent_required(pg_temp.pc_id(3)), 'B0: gate opens after a real grant');
+SELECT pg_temp.pc_as('authenticated', 5);
 
 -- B1. The RPC refuses a grant that declines coaching_records, or grants nothing.
 SELECT pg_temp.pc_expect_sqlstate(format(
@@ -286,9 +292,9 @@ SELECT pg_temp.pc_expect_sqlstate(format(
   'SELECT public.record_parental_consent(%L, %L, %L::jsonb, %L, %L)',
   pg_temp.pc_id(4), 'parent', '{"coaching_records": "yes"}', 'v1', 'x'),
   'P0001', 'B1: RPC rejects a non-boolean coaching_records');
+SELECT pg_temp.pc_reset();
 SELECT pg_temp.pc_assert(NOT public.player_has_parental_consent(pg_temp.pc_id(4)), 'B1: minor 4 remains unconsented after every rejected grant');
 SELECT pg_temp.pc_assert(public.player_consent_required(pg_temp.pc_id(4)), 'B1: gate stays closed for minor 4');
-SELECT pg_temp.pc_reset();
 
 -- B2. The CHECK constraint refuses the row even when the RPC is bypassed.
 SELECT pg_temp.pc_expect_sqlstate(format(
@@ -365,6 +371,177 @@ SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
 SELECT pg_temp.pc_expect_ok('SELECT 1 FROM public.stale_pending_consent', 'C6 service_role: report readable');
 SELECT pg_temp.pc_reset();
 
+
+-- D. Internal age/consent helpers are not public RPCs. Exercise real roles,
+-- known and missing IDs: an ACL assertion alone would not prove denial.
+DO $test$
+DECLARE helper text; role_name text; target integer;
+BEGIN
+  FOREACH helper IN ARRAY ARRAY['player_age_years', 'player_has_parental_consent',
+    'player_consent_required', 'squad_player_consent_required'] LOOP
+    FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+      -- Player 8 is unrelated to the target child/roster, with their own profile.
+      PERFORM pg_temp.pc_as(role_name, 8);
+      IF role_name = 'anon' THEN
+        PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+      END IF;
+      FOREACH target IN ARRAY ARRAY[
+        CASE WHEN helper = 'squad_player_consent_required' THEN 201 ELSE 2 END, 999
+      ] LOOP
+        PERFORM pg_temp.pc_expect_denied(format('SELECT public.%I(%L::uuid)', helper, pg_temp.pc_id(target)),
+          format('D1 %s: %s denies target %s', role_name, helper, target));
+      END LOOP;
+      PERFORM pg_temp.pc_reset();
+    END LOOP;
+    PERFORM pg_temp.pc_as('service_role', 8);
+    PERFORM pg_temp.pc_expect_ok(format('SELECT public.%I(%L::uuid)', helper,
+      pg_temp.pc_id(CASE WHEN helper = 'squad_player_consent_required' THEN 201 ELSE 2 END)),
+      'D1 service_role: internal helper remains callable: ' || helper);
+    PERFORM pg_temp.pc_reset();
+  END LOOP;
+END;
+$test$;
+
+-- Scoped application RPCs still execute their internal helpers as owner.
+SELECT pg_temp.pc_as('authenticated', 2);
+SELECT pg_temp.pc_assert(public.my_consent_status()->>'age' = '10'
+  AND public.my_consent_status()->>'granted' = 'true', 'D2 player: own age and consent remain available');
+SELECT pg_temp.pc_as('authenticated', 5);
+SELECT pg_temp.pc_assert((SELECT count(*) = 2 AND bool_and(player_user_id IN (pg_temp.pc_id(3), pg_temp.pc_id(4)))
+  FROM public.get_children_awaiting_consent()), 'D2 parent: only their linked unconsented children are returned');
+SELECT pg_temp.pc_as('authenticated', 8);
+SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.get_children_awaiting_consent()),
+  'D2 unrelated player: cannot obtain another family through the scoped endpoint');
+SELECT pg_temp.pc_assert((public.my_consent_status()->>'age')::integer > 18,
+  'D2 unrelated player: scoped status describes the caller, not the target minor');
+SELECT pg_temp.pc_reset();
+
+-- Positive controls cover all five RLS policies that call the private bridge.
+SELECT pg_temp.pc_as('authenticated', 1);
+INSERT INTO public.coach_assessments (id, coach_user_id, squad_player_id, organization_id)
+VALUES (pg_temp.pc_id(401), pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101));
+INSERT INTO public.recognition_awards (id, coach_user_id, squad_player_id, organization_id, award_type)
+VALUES (pg_temp.pc_id(402), pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101), 'player_of_the_week');
+INSERT INTO public.coach_shared_feedback (assessment_id, coach_user_id, body, published_at)
+VALUES (pg_temp.pc_id(401), pg_temp.pc_id(1), 'PRIVATE-BRIDGE-SHARED-CANARY', now());
+SELECT public.publish_player_feedback(pg_temp.pc_id(201), 'PRIVATE-BRIDGE-PLAYER-CANARY');
+SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_assessments WHERE id = pg_temp.pc_id(401))
+  AND (SELECT count(*) = 1 FROM public.recognition_awards WHERE id = pg_temp.pc_id(402)),
+  'D3 coach: consented assessment and award inserts actually landed');
+SELECT pg_temp.pc_as('authenticated', 2);
+SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY')
+  AND (SELECT count(*) = 1 FROM public.player_feedback WHERE published_text = 'PRIVATE-BRIDGE-PLAYER-CANARY'),
+  'D3 player: both published feedback policies remain usable');
+SELECT pg_temp.pc_as('authenticated', 5);
+SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
+  'D3 parent: published shared feedback remains readable');
+SELECT pg_temp.pc_as('authenticated', 8);
+SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY')
+  AND (SELECT count(*) = 0 FROM public.player_feedback WHERE published_text = 'PRIVATE-BRIDGE-PLAYER-CANARY'),
+  'D3 unrelated player: neither feedback table discloses the target');
+
+SELECT pg_temp.pc_as('authenticated', 5);
+SELECT public.withdraw_parental_consent(pg_temp.pc_id(2));
+SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
+  'D4 parent: withdrawal hides shared feedback');
+SELECT pg_temp.pc_as('authenticated', 2);
+SELECT pg_temp.pc_assert(public.my_consent_status()->>'required' = 'true',
+  'D4 player: scoped status reflects withdrawal');
+SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY')
+  AND (SELECT count(*) = 0 FROM public.player_feedback WHERE published_text = 'PRIVATE-BRIDGE-PLAYER-CANARY'),
+  'D4 player: withdrawal hides both published feedback kinds');
+SELECT pg_temp.pc_as('authenticated', 1);
+SELECT pg_temp.pc_expect_denied(format(
+  'INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, organization_id) VALUES (%L,%L,%L)',
+  pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101)), 'D4 coach: withdrawal blocks assessment insert');
+SELECT pg_temp.pc_expect_denied(format(
+  'INSERT INTO public.recognition_awards (coach_user_id, squad_player_id, organization_id, award_type) VALUES (%L,%L,%L,%L)',
+  pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101), 'player_of_the_week'), 'D4 coach: withdrawal blocks award insert');
+SELECT pg_temp.pc_reset();
+
+-- E. The coach UI gets a scoped boolean, never an arbitrary-ID predicate.
+-- Put scope checks before delegation: foreign, departed, missing and null IDs
+-- must produce the same error without revealing which of those cases exists.
+INSERT INTO auth.users (id, email, email_confirmed_at)
+VALUES (pg_temp.pc_id(9), 'pc-9@test.invalid', now());
+INSERT INTO public.profiles (user_id, role, full_name)
+VALUES (pg_temp.pc_id(9), 'coach', 'Other Fixture Coach');
+INSERT INTO public.coach_details (user_id, organization_id)
+VALUES (pg_temp.pc_id(9), pg_temp.pc_id(101));
+INSERT INTO public.squad_players (id, coach_user_id, player_name, status)
+VALUES (pg_temp.pc_id(207), pg_temp.pc_id(1), 'Unlinked Fixture', 'active'),
+       (pg_temp.pc_id(208), pg_temp.pc_id(1), 'Departed Fixture', 'coach_departed');
+
+CREATE FUNCTION pg_temp.pc_expect_scope_denied(target uuid, description text) RETURNS void
+LANGUAGE plpgsql AS $test$
+DECLARE denied boolean := false; failure text;
+BEGIN
+  BEGIN
+    PERFORM public.coach_squad_player_consent_required(target);
+    failure := 'unexpectedly allowed';
+  EXCEPTION WHEN OTHERS THEN
+    denied := SQLSTATE = '42501' AND SQLERRM = 'Not authorized for this squad player';
+    failure := SQLSTATE || ': ' || SQLERRM;
+  END;
+  INSERT INTO pg_temp.pc_results VALUES (description, denied, CASE WHEN denied THEN NULL ELSE failure END);
+END;
+$test$;
+
+DO $test$
+DECLARE caller integer; target integer; role_name text;
+BEGIN
+  FOREACH caller IN ARRAY ARRAY[2, 5, 8, 9] LOOP
+    PERFORM pg_temp.pc_as('authenticated', caller);
+    FOREACH target IN ARRAY ARRAY[201, 999, NULL::integer] LOOP
+      PERFORM pg_temp.pc_expect_scope_denied(CASE WHEN target IS NULL THEN NULL ELSE pg_temp.pc_id(target) END,
+        format('E1 caller %s: scoped coach check denies target %s identically', caller, target));
+    END LOOP;
+    PERFORM pg_temp.pc_reset();
+  END LOOP;
+  FOREACH role_name IN ARRAY ARRAY['anon', 'service_role'] LOOP
+    PERFORM pg_temp.pc_as(role_name, 1);
+    FOREACH target IN ARRAY ARRAY[201, 999, NULL::integer] LOOP
+      PERFORM pg_temp.pc_expect_denied(format('SELECT public.coach_squad_player_consent_required(%L::uuid)',
+        CASE WHEN target IS NULL THEN NULL ELSE pg_temp.pc_id(target) END),
+        format('E1 %s: scoped coach endpoint denies target %s', role_name, target));
+    END LOOP;
+    PERFORM pg_temp.pc_reset();
+  END LOOP;
+END;
+$test$;
+SELECT pg_temp.pc_as('authenticated', 1);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated"}', true);
+SELECT pg_temp.pc_expect_scope_denied(pg_temp.pc_id(201), 'E1 authenticated without a subject: denied');
+SELECT pg_temp.pc_as('authenticated', 1);
+SELECT pg_temp.pc_expect_scope_denied(pg_temp.pc_id(999), 'E1 owning coach: missing row denied identically');
+SELECT pg_temp.pc_expect_scope_denied(NULL, 'E1 owning coach: null row denied identically');
+SELECT pg_temp.pc_expect_scope_denied(pg_temp.pc_id(208), 'E1 owning coach: departed row denied identically');
+SELECT pg_temp.pc_assert(public.coach_squad_player_consent_required(pg_temp.pc_id(201)) IS TRUE,
+  'E2 owning coach: withdrawal requires consent');
+SELECT pg_temp.pc_assert(public.coach_squad_player_consent_required(pg_temp.pc_id(207)) IS FALSE,
+  'E2 owning coach: unlinked roster preserves the current gate');
+SELECT pg_temp.pc_reset();
+
+-- Re-grant through the actual parent RPC, then re-check through the new UI RPC.
+SELECT pg_temp.pc_as('authenticated', 5);
+SELECT public.record_parental_consent(pg_temp.pc_id(2), 'parent',
+  '{"coaching_records": true, "recognition": false, "parent_visibility": true}'::jsonb, 'v1', 'fixture wording');
+SELECT pg_temp.pc_as('authenticated', 1);
+SELECT pg_temp.pc_assert(public.coach_squad_player_consent_required(pg_temp.pc_id(201)) IS FALSE,
+  'E2 owning coach: real parental approval opens the scoped check');
+SELECT pg_temp.pc_reset();
+
+-- Ownership is academy-aware, not just the coach UUID stored on the roster.
+UPDATE public.coach_details SET organization_id = NULL WHERE user_id = pg_temp.pc_id(1);
+SELECT pg_temp.pc_as('authenticated', 1);
+SELECT pg_temp.pc_expect_scope_denied(pg_temp.pc_id(201), 'E3 coach removed from academy: old roster denied');
+SELECT pg_temp.pc_reset();
+UPDATE public.coach_details SET organization_id = pg_temp.pc_id(101) WHERE user_id = pg_temp.pc_id(1);
+-- Role loss must also close the endpoint even when ownership still matches.
+UPDATE public.profiles SET role = 'player' WHERE user_id = pg_temp.pc_id(1);
+SELECT pg_temp.pc_as('authenticated', 1);
+SELECT pg_temp.pc_expect_scope_denied(pg_temp.pc_id(201), 'E3 former coach: owned roster denied after role loss');
+SELECT pg_temp.pc_reset();
 
 -- ── Verdict ─────────────────────────────────────────────────
 DO $test$

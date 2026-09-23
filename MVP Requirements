@@ -1,251 +1,241 @@
-# Requirements: Trak Football — Pilot Wedge
-Generated: 2026-04-08
-Source: /office-hours interview
+# Trak — MVP Requirements (first pilot)
 
-## Context
+Status: proposed by Imad, 23 September 2026. Becomes the agreed pilot scope
+when it merges to main with a non-author approval (docs/release/merge-gate.md).
+Replaces the April 2026 "pilot wedge" requirements (REQ-001 to REQ-005 and
+the 60% player-logging hypothesis). Those, and the April PRD, architecture,
+roadmap and milestone plans, are in git history at commit 9114f4c.
 
-Trak is a player-first football career tracking app for 13–18 year old
-academy/semi-pro players in Greece, Cyprus, and the Netherlands. A v4
-prototype and partial Lovable codebase already exist, and the founder
-arrived with a fully-specced MVP (37 screens, 3 roles, 6 medals, a hidden
-rating algorithm, invite codes, goals, assessments, parent views).
+Progress against this scope is tracked in docs/use-cases/PILOT-INDEX.md.
 
-This office-hours interview pressure-tested that MVP against demand,
-status quo cost, wedge scope, a falsifiable metric, anti-requirements,
-and kill criteria. The outcome is **not** a rejection of the MVP spec —
-it is a narrower **pilot wedge** the founder will run *first* to decide
-whether the full MVP scope is justified. Everything below governs the
-pilot, not the eventual product.
 
-The intended outcome: an 8-week closed pilot with 1 academy club
-(~15 players, ~2 coaches, ~15 parents) that either validates the
-player-first logging thesis or kills it.
+## The idea
 
----
+Build a few essential journeys to a high standard and ship them sooner. Every
+other feature shows "coming soon". A PR that serves none of the journeys or
+guarantees below waits until the pilot has started.
 
-## Interview Summary
+The loop:
 
-### Q1 — Demand Reality
-Demand signal is triangulated from three sources:
-- **(B)** Coaches have explicitly asked the founder for a lightweight
-  assessment tool.
-- **(C)** The founder lives the pain personally (player/parent/coach context).
-- **(D)** Indirect evidence: players currently use Notes apps, spreadsheets,
-  and Instagram highlight reels as makeshift development records.
+  Academy registers the child -> parent consents -> child activates their
+  account -> coach logs the match or training -> coach assesses and writes a
+  message -> player and parent see it.
 
-**Validation risk flagged:** no named 13–18 year old *player* has
-described this pain in their own words. The strongest signal is
-coach-side and founder-side. The product positions as player-first but
-the demand evidence is not.
+Cohort: one whole squad at one UAE academy, chosen by the academy, for eight
+weeks. The academy and the player count are not agreed yet. Rehearse for 25.
 
-### Q2 — Status Quo Cost
-- Parents pay **~€500/year per child** in academy fees across GR/CY/NL
-  and receive zero persistent written progress record in return.
-- Across the 500–800 player TAM this represents
-  **~€250K–€400K/year** of parental spend producing no development data.
-- Academy players change clubs or coaches **~2× per year**, meaning
-  over a 5-year (13→18) window each player experiences ~10 transitions
-  that fully reset their track record under the status quo.
-- Capability gap: no tool today captures player-side performance
-  self-monitoring or parent-side improvement visibility.
 
-**Sharpest pain:** the rolling, structural loss of career history every
-time a player changes coach or club — directly addressed by Trak's
-"the player owns their career" positioning.
+## P0 journeys (the non-negotiables)
 
-### Q3 — Narrowest Wedge
-**(E) Full triangle, single pilot club.** Scope stays wide (all three
-roles, match log, band, coach assessment, parent view), audience stays
-narrow (one academy club, ~15 players, ~2 coaches, ~15 parents).
+J1. Academy admission (concierge)
+  - The academy gives Trak its roster: child name, date of birth, age group,
+    assigned coach, child email and every guardian email. Trak loads it by
+    hand. The academy console shows "coming soon".
+  - Only rostered children get in. The backend refuses player and parent
+    profiles that have no valid invitation. Hiding the signup screen is not
+    enough.
+  - Children do not join by typing a name or a coach code, and coaches do not
+    add players.
+  - A player cannot change their own date of birth. A missing date of birth
+    counts as a minor.
 
-**Open risk:** the founder has not yet named the specific pilot club.
-Without a named club, this wedge degrades into "build everything and
-hope."
+J2. Parent consent
+  - The invitation goes to the guardian emails the academy supplied, is sent
+    when the child is admitted, and arrives in under 60 seconds at Gmail and
+    Outlook, not in spam. It names the child, the academy and the purpose, and
+    carries Trak branding and a safe-sender line.
+  - One required consent covers coach records, assessments, the published
+    message, and viewing by the child and their linked parents. It is stored
+    with the guardian's name, relationship and the notice version. The screen
+    promises nothing the system does not enforce.
+  - Each guardian has their own sign-in, linked to the child. One guardian
+    can consent for siblings without a second account.
+  - Withdrawal is one tap from the parent profile while signed in. It takes
+    effect immediately, including for sessions that are already open.
 
-### Q4 — Falsifiable Hypothesis
-**(A) Player logging retention.**
+J3. Child activation
+  - Only after consent, the child gets a one-use invitation at the email the
+    academy supplied. First send, resend, expiry, wrong account and existing
+    account all behave safely.
+  - A forgotten password uses the standard reset to the child's email. If an
+    address is wrong, Trak corrects it by hand and records who changed it and
+    when.
 
-> ≥60% of pilot players log ≥1 match per week for 8 consecutive weeks,
-> unprompted after week 2.
+J4. Coach logs
+  - Match: date, opponent, result, and each child's position, minutes, goals
+    and assists, with no invented defaults. This uses the existing `matches`
+    table and `log_match_for_player`, which still needs a consent check.
+  - Training: date, type and session notes, using the existing
+    `coach_sessions` table.
+  - Every write checks consent and the coach's academy assignment. A retry
+    never creates a duplicate and never silently loses data.
 
-Measurement window: 8 weeks from pilot launch.
-Unprompted = no founder nudge, no coach reminder, no push campaign
-after the first 2 weeks of onboarding support.
+J5. Coach assessment and message
+  - The coach's squad marks each player "Ready to assess" or "Waiting for
+    parent". A waiting player cannot be opened, and the reason is shown in
+    plain words. If consent is withdrawn while the form is open, the save
+    fails with a plain message and the values the coach entered are kept.
+  - Everything is on one screen: six sliders produce the band, then two boxes.
+    "Message to [first name]: they and their parents will see this." and an
+    optional "Private note: only you can see this."
+  - Nothing reaches the family until the coach presses publish. If only part
+    of a save works, the screen says what was saved and what was not.
+  - Linking an assessment to a session is optional in the pilot
+    (`coach_assessments.session_id` already exists).
+  - Quick Assess either meets the same contract or is hidden.
 
-This metric is deliberately chosen to test the player-first thesis
-directly — the one thesis none of the Q1 demand signals actually
-validated.
+J6. Player and parent see it
+  - Player home shows the latest band, the six bars and the coach's message,
+    marked "new" until opened. Before the first assessment it says the player
+    is waiting for their coach, not "Your card is ready".
+  - Player and parent see the match and training history the coach logged.
+  - A parent sees the same for the selected child. With siblings, it shows
+    the right child every time.
+  - A failed load shows a clear error and a retry button. It never shows an
+    empty state that looks like "no data" (UC-X02).
 
-### Q5 — Anti-Requirements (Pilot Discipline)
-The founder committed to **all** of the following for the 8-week
-pilot window:
-- **(A)** No second pilot club onboarded until the first hits the Q4 metric.
-- **(B)** No marketing site, no ASO, no social content, no public landing.
-  Pilot is invite-only; product is the marketing.
-- **(C)** No algorithm tuning beyond v1 band mapping.
-- **(D)** No new features requested by pilot users built during the window.
-  Feedback captured, not shipped.
-- **(E)** No payment, pricing, or paywall surface. WTP tested via exit survey only.
-- **(F)** No additional parent engagement mechanics beyond the 3 specced alerts.
-- **(G)** No native iOS/Android app. Mobile web only, max width 430px.
+J7. Measure
+  - On any pilot day, answer in under a minute: assessments per coach this
+    week, and player and parent opens this week. Count real UI events only,
+    not seeded or synthetic accounts.
+  - Opening a published message is recorded as a UI event.
 
-### Q6 — Kill Criteria
-- **(A)** If fewer than **30%** of pilot players log weekly by end of week 8,
-  **kill the player-first thesis.** Pivot to coach-first wedge or abandon.
-- **(D)** If **≥50%** of pilot coaches stop assessing after week 4,
-  **kill the triangle thesis.** The product cannot sustain on player
-  logging alone.
-- **(E)** If **<20%** of invited pilot parents ever open the app during
-  the 8-week window, **retire the parent role from the roadmap.** The
-  €500/year parent-pain hypothesis from Q2 is considered falsified and
-  parent features are removed from MVP scope.
 
-**Gap deliberately left open by the founder (flagged, not blocking):**
-- No onboarding deadline — if a pilot club isn't secured, the project
-  may drift indefinitely. Recommendation: add "pilot must start within
-  6 weeks of product readiness or reassess."
+## Guarantees
 
----
+The database enforces these, not the UI. Each is proven by a negative test
+run under a real authenticated role.
 
-## Requirements
+G1. No development record exists about an under-18 without active consent, on
+    every write path: assessments, awards, `log_match_for_player`, shared
+    feedback.
+G2. A child cannot approve themselves, change their age or choose their
+    guardian's email.
+G3. No child sees another child's data, and no academy sees another
+    academy's data.
+G4. Nothing reaches a child that a coach did not write and publish. Private
+    notes stay private.
+G5. No message about a child goes to the wrong adult.
+G6. Withdrawal stops processing and hides published content immediately.
+G7. No AI processing, passport or export, and no child photos, in either the
+    UI or the backend.
 
-All requirements below scope the **pilot build**, not the full MVP.
-Each must be live before pilot week 1.
+Bypass attempts that must fail against the API: self-signup without an
+invitation, changing a date of birth, linking by name or code, a coach
+writing for a waiting player, reading private notes, and reading another
+child's records.
 
-### REQ-001: Player match log with hidden-score banding
-- **Description:** A player can log a completed match via a single form
-  capturing position, competition, venue, score, minutes, card, body
-  condition, self-rating, and position-specific inputs. The rating
-  algorithm computes a hidden score in the database and maps to one of
-  7 band words (Exceptional → Difficult). The player sees only the
-  band word and its colour.
-- **Falsifiable Hypothesis:** If the log form is too long or the band
-  feedback is not motivating, Q4 logging retention will fall below 60%.
-- **Test-for-Truth:** Instrument form-start and form-submit events;
-  measure completion rate and median time-to-complete per submission.
-- **Acceptance:** GIVEN a signed-in pilot player on mobile web
-  WHEN they complete the match log form and tap save
-  THEN a `matches` row is persisted with `computed_score` and `band`,
-  AND the result screen shows the band word with correct band colour,
-  AND no decimal number is rendered anywhere in the UI.
 
-### REQ-002: Coach assessment across 6 categories with band output
-- **Description:** A coach connected to a pilot player can submit an
-  assessment scoring the player 1–10 across work rate, tactical,
-  attitude, technical, physical, and coachability. The average maps to
-  an `overall_band`. Coach sees only the band word; underlying scores
-  live in the database.
-- **Falsifiable Hypothesis:** If coaches will not assess weekly, the
-  Q6(D) kill criterion triggers and the triangle thesis dies.
-- **Test-for-Truth:** Weekly count of assessments per active pilot
-  coach; tracked in a simple ops dashboard.
-- **Acceptance:** GIVEN a coach connected to a player via invite code
-  WHEN they submit all 6 sliders and tap save
-  THEN an `assessments` row is persisted with `overall_band`,
-  AND the connected player sees the new assessment on their profile,
-  AND the connected parent (if any) sees the 6 category band bars.
+## Success
 
-### REQ-003: Invite-code connection (coach → player, player → parent)
-- **Description:** Coaches are issued a unique `TRK-XXXX` code on
-  signup. Players generate a `PAR-XXXX` code for their parent. All
-  connections in the pilot happen via code entry only — no search,
-  no email-based invites required for pilot launch.
-- **Falsifiable Hypothesis:** If invite-code onboarding is high-friction,
-  pilot activation will fall below the triangle threshold.
-- **Test-for-Truth:** Funnel measurement from code entry to successful
-  connection; target ≥90% completion for pilot cohort.
-- **Acceptance:** GIVEN a player on onboarding step 3
-  WHEN they enter a valid `TRK-XXXX` code
-  THEN a `player_coach` row is created instantly with no approval step,
-  AND the coach's squad view shows the new player within the same session.
+Quality bar: no P0 journey fails during the eight weeks. A manual workaround
+keeps other work moving, but it does not count as a pass. The journey must be
+repaired and retested.
 
-### REQ-004: Parent read-only view of child band history
-- **Description:** A parent connected via `PAR-XXXX` sees their child's
-  match feed (bands only, no private inputs), the latest coach
-  assessment (6 band bars), and goals (read-only). Parent cannot write
-  to any table.
-- **Falsifiable Hypothesis:** If parents do not open the app, the
-  €500/year parent-pain hypothesis from Q2 is wrong.
-- **Test-for-Truth:** Weekly active parent count vs. invited parent count.
-- **Acceptance:** GIVEN a parent account connected to a child
-  WHEN they open the parent home screen
-  THEN they see the child's season band distribution and latest matches,
-  AND every mutation attempt is rejected by RLS policy.
+Value (proposed; founders set the targets before launch):
+  - Share of published coach messages that the player or a parent opens
+    within 7 days.
+  - Share of players who receive at least one published message every 14
+    days.
 
-### REQ-005: Pilot telemetry for the Q4 metric
-- **Description:** The pilot must instrument, at minimum: match logs
-  per player per week, assessments per coach per week, parent app
-  opens per week. Data available to the founder in a simple read-only
-  dashboard or SQL view — not a user-facing feature.
-- **Falsifiable Hypothesis:** Without telemetry, the pilot cannot be
-  adjudicated and the Q6 kill criteria are unenforceable.
-- **Test-for-Truth:** On day 1 of the pilot, the founder can answer
-  "how many players logged this week?" in under 1 minute.
-- **Acceptance:** GIVEN the pilot is live
-  WHEN the founder queries the telemetry view for week N
-  THEN weekly active loggers, weekly assessments, and weekly parent
-  opens are returned per pilot user.
 
----
+## Coming soon (by route, from src/App.tsx)
 
-## Anti-Requirements (Pilot Window)
-The pilot build will **not** include:
-- A second pilot club or parallel pilots.
-- Public marketing, landing page, or App Store/Play Store presence.
-- Algorithm tuning beyond v1 band mapping.
-- Any feature requested by a pilot user during the 8-week window.
-- Payment, pricing, or paywall surface.
-- Parent engagement mechanics beyond the 3 specced alert types.
-- A native iOS or Android app — mobile web only, max width 430px.
-- Any feature explicitly excluded from MVP in the brief (training log,
-  standalone wellness, highlights, CV export, 1-on-1 requests,
-  attendance, coach progress dashboard, child switcher UI).
-- Decimal rating numbers anywhere in the UI for any role.
+"Coming soon" means the route shows a static placeholder AND its backend
+writes are closed. Hiding a button is not enough.
 
-## Kill Criteria
-- **Player-first thesis killed:** <30% of pilot players log weekly by
-  end of week 8 → pivot to coach-first wedge or abandon Trak.
-- **Triangle thesis killed:** ≥50% of pilot coaches stop assessing after
-  week 4 → the product cannot sustain on player logging alone.
-- **Parent role retired:** <20% of invited pilot parents ever open the
-  app during the 8-week window → remove parent role from MVP scope and
-  retire the €500/year parent-pain hypothesis.
+P0, must work:
+  /, /auth/confirm, /reset-password, /onboarding/:role (invitation only),
+  /parent-invite, /parent-info, /parent/home, /parent/matches,
+  /parent/consent, /parent/profile, /coach/home, /coach/squad,
+  /coach/player/:id, /coach/assess, /coach/sessions, /coach/sessions/add,
+  /coach/sessions/list, /coach/profile, /coach/manual, /player/home,
+  /player/feedback/:assessmentId, /player/matches, /player/match/:id,
+  /player/profile, /profile, /settings, /dashboard
 
-## Open Risks (Flagged, Not Blocking)
-1. **No named pilot club.** Wedge (E) is unsafe until a specific
-   academy is committed. Recommend blocking pilot launch on this.
-2. **No onboarding deadline.** Without a "pilot must start by date X"
-   guardrail, the project can drift. Recommend 6 weeks from product
-   readiness.
-3. **Demand signal is coach- and founder-sided, not player-sided.**
-   The Q4 metric is specifically designed to test the missing signal,
-   but the founder should expect a higher-than-comfortable risk of
-   the metric missing.
-4. **Status quo cost is quantified on the parent side (€500/year) but
-   not on the player or coach side.** Plan first 30 days of post-launch
-   interviews to close this.
+Coming soon:
+  /player/passport, /player/evolution, /coach/feedback/:assessmentId (AI
+  draft review), /coach/assistant, /coach/schedule, /coach/recognition,
+  /coach/award, /parent/alerts, /club/radar
 
----
+Remove for the pilot:
+  /coach/squad/add (the academy registers players). Remove avatar upload
+  from every profile page.
 
-## Verification
-How to verify the pilot build before launch:
-1. End-to-end manual walkthrough on mobile web (≤430px) as each of the
-   three roles, using three real devices or three browser profiles.
-2. Confirm no decimal number renders in any screen for any role
-   (spot-check match result, coach assessment result, parent home,
-   player profile).
-3. Seed one test player, one test coach, one test parent; verify RLS
-   policies reject cross-tenant reads (test player B cannot read test
-   player A's matches; parent cannot write anywhere).
-4. Query the REQ-005 telemetry view and confirm the founder can answer
-   the three pilot questions (loggers/week, assessments/week, parent
-   opens/week) from a single SQL statement or dashboard.
-5. Dry-run the onboarding flow for coach → player → parent using real
-   `TRK-XXXX` and `PAR-XXXX` codes end to end; measure total time from
-   first app open to fully-connected triangle. Target: under 10 minutes
-   for all three roles combined.
+Decide (owner in brackets):
+  /club/home, /club/squads, /club/coaches, /club/profile: recommend coming
+  soon, because concierge replaces the console (Kostas).
+  /coach/quick-assess: same contract as J5, or hidden (Kostas).
+  /coach/sessions/quick (Kostas).
 
-## Next Step
-After founder approval of these requirements, run `/plan-ceo-review` to
-evaluate the strategic merit of this pilot wedge and assign an
-execution mode.
+
+## Cut from the pilot
+
+  - AI feedback, the assistant and schedule parsing. Child data would go to a
+    third party without processor paperwork.
+  - Passport, export and sharing.
+  - Child photos and avatars, until storage access and backup are fixed.
+  - Recognition and awards.
+  - Parent goals.
+  - Player-entered match logging (UC-A02/A03 are parked).
+  - Lead guardian inviting another adult. The academy supplies every guardian.
+  - A separate "household" entity. Guardians who each link to the child
+    already get the same result.
+  - Per-child training notes. The published message is the child-specific
+    text.
+  - Transfers between academies. One academy, one squad: founders handle any
+    change by hand.
+  - Automatic retry. A clear error with a retry button is enough.
+
+
+## First after the pilot starts
+
+Events: the coach schedules training and matches, the family sees a calendar
+with Google and Apple sync, and the coach marks attendance. RSVP is not
+agreed. Then the home screen for each role (design work in the pilot-demo
+channels). Other coming-soon items have no agreed order.
+
+
+## Launch gate for real children
+
+Real children join only when all of these pass and a majority of founders
+says go. A date on its own never admits anyone.
+
+  1. Every P0 journey passes on the deployed build, on two real phones,
+     with synthetic identities and approved inboxes. Use three children: two
+     siblings, and one whose guardian withholds consent. Then withdraw
+     consent for one child.
+  2. Every guarantee's negative test passes against the deployed backend.
+  3. A synthetic 25-player squad runs with no errors.
+  4. A signed academy pilot agreement, and terms accepted.
+  5. Counsel signs off on data roles, the notice, withdrawal and deletion,
+     and retention. The proposed retention is the pilot plus 90 days.
+  6. A backup and a written recovery runbook exist. The restore has not been
+     rehearsed, and the go decision records that risk.
+  7. A named support inbox. The founders jointly own support and escalation.
+  8. `pilot_config` points at the real academy. Today it points at
+     "Rehearsal FC", starting 28 September.
+
+Friday 25 September is a synthetic demo, not admission.
+
+Incidents: for a wrong recipient, a consent bypass or a cross-child read,
+pause the affected scope and new admissions at once. A founder majority
+decides the restart, subject to legal duties.
+
+
+## Open
+
+  1. The academy, the squad, the player count and named contacts.
+  2. The targets for the value measures.
+  3. The counsel items in gate 5.
+  4. Use-case registry entries that contradict J1
+     (docs/use-cases/OPEN-QUESTIONS.md, Q-2026-09-23-01).
+
+
+## Where the April requirement IDs went
+
+REQ-001 (player match log): retired. The coach logs matches (J4).
+REQ-002 (coach assessment): J5.
+REQ-003 (invite codes): replaced by academy admission (J1 to J3).
+REQ-004 (parent view and consent): J2 and J6.
+REQ-005 (telemetry): J7.

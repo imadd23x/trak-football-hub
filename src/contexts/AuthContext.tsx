@@ -276,8 +276,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // On the reset password page, suppress all auth redirects so the
       // form stays visible. ResetPassword.tsx handles its own auth events.
       if (window.location.pathname === '/reset-password') {
-        if (event === 'PASSWORD_RECOVERY') return;
-        if (event === 'SIGNED_IN') return;
+        acceptSession(session);
+        if (event === 'SIGNED_OUT') {
+          queryClient.clear();
+          discardLegacyPendingProfile();
+        }
+        return;
       }
 
       // Same on the confirmation page. It verifies, then signs out on purpose,
@@ -305,12 +309,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (disposed || receivedAuthEvent || generation.current !== initialGeneration) return;
-      // If we're on the reset password page, don't auto-redirect — let
-      // the ResetPassword component handle the PASSWORD_RECOVERY event.
-      if (window.location.pathname === '/reset-password') {
-        setLoading(false);
-        return;
-      }
       if (window.location.pathname === '/auth/confirm') {
         setLoading(false);
         return;

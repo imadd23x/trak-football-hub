@@ -1,6 +1,6 @@
 # Trak Football — Developer Strategy & MVP Brief
 
-> **This document is the single source of truth.**  
+> **April 2026 brief, no longer the source of truth.** Pilot scope lives in [MVP Requirements](MVP%20Requirements). Where the two disagree, MVP Requirements wins.  
 > Do not make assumptions. If something is unclear, ask before building.  
 > A working prototype (v4) exists and is the visual reference for every screen — request access if you do not have it.
 

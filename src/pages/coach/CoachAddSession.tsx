@@ -114,6 +114,7 @@ export default function CoachAddSession() {
 
   // Squad
   const [squad,       setSquad]       = useState<SquadPlayer[]>([])
+  const [notReady,    setNotReady]    = useState<string[]>([])
   const [details,     setDetails]     = useState<Record<string, PlayerDetail>>({})
   const [expanded,    setExpanded]    = useState<Set<string>>(new Set())
 
@@ -144,14 +145,30 @@ export default function CoachAddSession() {
       .select('id, player_name, linked_player_id, position, age_group, age')
       .eq('coach_user_id', user.id)
       .order('player_name')
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         const players = data || []
-        setSquad(players)
+        // J4 + G1: the database refuses any record about a child whose consent
+        // is not confirmed, and one refused row fails the whole attendance
+        // insert. Offer confirmed players only; name the rest. Same check as
+        // the assess screen; a failed check counts as not confirmed.
+        const required = await Promise.all(players.map(p =>
+          supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: p.id } as never)
+            .then(({ data: r, error }) => (error || typeof r !== 'boolean' ? null : r))))
+        const ready = players.filter((_, i) => required[i] === false)
+        setNotReady(players.flatMap((p, i) => required[i] === false ? []
+          : [`${p.player_name} (${required[i] ? 'waiting for a parent' : "consent couldn't be checked"})`]))
+        setSquad(ready)
         const init: Record<string, PlayerDetail> = {}
-        players.forEach(p => { init[p.id] = { ...DEFAULT_DETAIL, position: p.position } })
+        ready.forEach(p => { init[p.id] = { ...DEFAULT_DETAIL, position: p.position } })
         setDetails(init)
       })
   }, [user])
+
+  const notReadyNote = notReady.length > 0 && (
+    <p className="text-[11px] text-white/40 px-4 py-3" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      Not recorded until a parent approves: {notReady.join(', ')}
+    </p>
+  )
 
   const isMatch = type === 'match'
 
@@ -568,7 +585,7 @@ export default function CoachAddSession() {
                 </div>
               </div>
 
-              {squad.length === 0 ? (
+              {squad.length === 0 && notReady.length === 0 ? (
                 <p className="px-4 pb-4 text-[12px] text-white/40">
                   No squad yet. Add players from the Squad tab first.
                 </p>
@@ -785,6 +802,7 @@ export default function CoachAddSession() {
                   })}
                 </div>
               )}
+              {notReadyNote}
             </div>
 
             {/* Match notes */}
@@ -917,7 +935,7 @@ export default function CoachAddSession() {
                     style={{ fontFamily: "'DM Mono', monospace" }}>NONE</button>
                 </div>
               </div>
-              {squad.length === 0 ? (
+              {squad.length === 0 && notReady.length === 0 ? (
                 <p className="text-[12px] text-white/40 py-2">No squad yet. Add players from the Squad tab first.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -939,6 +957,7 @@ export default function CoachAddSession() {
                   })}
                 </div>
               )}
+              {notReadyNote}
             </div>
 
             {/* Notes */}
@@ -983,7 +1002,7 @@ export default function CoachAddSession() {
                     style={{ fontFamily: "'DM Mono', monospace" }}>NONE</button>
                 </div>
               </div>
-              {squad.length === 0 ? (
+              {squad.length === 0 && notReady.length === 0 ? (
                 <p className="text-[12px] text-white/40 py-2">No squad yet. Add players from the Squad tab first.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -1005,6 +1024,7 @@ export default function CoachAddSession() {
                   })}
                 </div>
               )}
+              {notReadyNote}
             </div>
 
             <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]">

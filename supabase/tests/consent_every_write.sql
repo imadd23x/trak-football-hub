@@ -67,6 +67,28 @@ BEGIN
 END;
 $test$;
 
+
+-- Independent review probes roll back an unexpectedly allowed write so later
+-- controls run against the same fixture. Zero affected rows also deny access.
+CREATE FUNCTION pg_temp.ce_review_refused(statement text, description text) RETURNS void
+LANGUAGE plpgsql AS $test$
+DECLARE n integer; denied boolean := false; failure text;
+BEGIN
+  BEGIN
+    EXECUTE statement;
+    GET DIAGNOSTICS n = ROW_COUNT;
+    denied := n = 0;
+    IF NOT denied THEN failure := 'unexpectedly allowed: ' || n || ' row(s)'; END IF;
+    RAISE EXCEPTION USING ERRCODE = 'P9001', MESSAGE = 'rollback review probe';
+  EXCEPTION
+    WHEN SQLSTATE 'P9001' THEN NULL;
+    WHEN insufficient_privilege THEN denied := true;
+    WHEN OTHERS THEN failure := SQLSTATE || ': ' || SQLERRM;
+  END;
+  INSERT INTO pg_temp.ce_results VALUES (description, denied, failure);
+END;
+$test$;
+
 CREATE FUNCTION pg_temp.ce_as(p_uid uuid, p_email text) RETURNS void LANGUAGE plpgsql AS $test$
 BEGIN
   PERFORM set_config('request.jwt.claims',
@@ -244,6 +266,50 @@ SELECT set_config('trak.ce_adult_sp',
 SELECT pg_temp.ce_allowed(format('INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, work_rate, tactical, attitude, technical, physical, coachability) VALUES (%L, %L, 7,7,7,7,7,7)',
   pg_temp.ce(10), current_setting('trak.ce_adult_sp')), 1,
   '3b CONTROL a linked 19-year-old is assessed without a guardian');
+
+-- G6 must check the original subject as well as the proposed replacement.
+SELECT set_config('trak.ce_adult_a',
+  (SELECT id::text FROM public.coach_assessments WHERE squad_player_id = current_setting('trak.ce_adult_sp')::uuid LIMIT 1), true);
+SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_shared_feedback SET assessment_id = %L, body = %L, published_at = now() WHERE assessment_id = %L',
+  current_setting('trak.ce_adult_a'), 'Withdrawn Ada message reassigned and republished', current_setting('trak.ce_a1')),
+  'REVIEW G6 a withdrawn message cannot be moved and republished through a consent-ready assessment');
+SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_assessments SET squad_player_id = %L, work_rate = 4 WHERE id = %L',
+  current_setting('trak.ce_adult_sp'), current_setting('trak.ce_a1')),
+  'REVIEW G6 a withdrawn assessment cannot be moved and edited through a consent-ready roster row');
+SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_assessment_notes SET assessment_id = %L, note = %L WHERE assessment_id = %L',
+  current_setting('trak.ce_adult_a'), 'Moved after withdrawal', current_setting('trak.ce_a1')),
+  'REVIEW G6 a withdrawn private note cannot be moved and edited through a consent-ready assessment');
+SELECT pg_temp.ce_review_refused(format('UPDATE public.recognition_awards SET squad_player_id = %L, awarded_for = %L WHERE id = %L',
+  current_setting('trak.ce_adult_sp'), 'Moved after withdrawal', current_setting('trak.ce_award')),
+  'REVIEW G6 a withdrawn award cannot be moved and edited through a consent-ready roster row');
+SELECT pg_temp.ce_review_refused(format('UPDATE public.session_attendance SET squad_player_id = %L, status = %L WHERE session_id = %L AND squad_player_id = %L',
+  current_setting('trak.ce_adult_sp'), 'late', current_setting('trak.ce_s1'), current_setting('trak.ce_sp')),
+  'REVIEW G6 withdrawn attendance cannot be moved and edited through a consent-ready roster row');
+
+
+-- Consequence: a reassigned published message becomes visible to another player.
+DO $test$
+DECLARE exposed boolean := false; failure text;
+BEGIN
+  BEGIN
+    UPDATE public.coach_shared_feedback
+    SET assessment_id = current_setting('trak.ce_adult_a')::uuid, published_at = now()
+    WHERE assessment_id = current_setting('trak.ce_a1')::uuid;
+    PERFORM pg_temp.ce_as(pg_temp.ce(21), 'adult@consent-every-write.test');
+    SELECT EXISTS (SELECT 1 FROM public.coach_shared_feedback
+      WHERE assessment_id = current_setting('trak.ce_adult_a')::uuid AND body = 'Great week, Ada.') INTO exposed;
+    RAISE EXCEPTION USING ERRCODE = 'P9002', MESSAGE = 'rollback disclosure probe';
+  EXCEPTION
+    WHEN SQLSTATE 'P9002' THEN NULL;
+    WHEN insufficient_privilege THEN exposed := false;
+    WHEN OTHERS THEN failure := SQLSTATE || ': ' || SQLERRM;
+  END;
+  PERFORM pg_temp.ce_assert(NOT exposed AND failure IS NULL,
+    'REVIEW G6 another player cannot read the withdrawn child message after coach reassignment',
+    CASE WHEN exposed THEN 'another player read Great week, Ada. after reassignment' ELSE failure END);
+END;
+$test$;
+
 RESET ROLE;
 UPDATE public.player_details SET date_of_birth = NULL WHERE user_id = pg_temp.ce(21);
 SET LOCAL ROLE authenticated;
@@ -275,6 +341,68 @@ SELECT pg_temp.ce_allowed(format($$SELECT public.log_match_for_player(%L, 'Rival
   pg_temp.ce(20)), 1,
   '5 CONTROL after re-approval log_match_for_player accepts the child again');
 
+
+-- Candidate safety controls: active-consent edits and app upserts remain usable;
+-- changing the subject does not. Every probe rolls back its own content changes.
+RESET ROLE;
+UPDATE public.player_details SET date_of_birth = (current_date - interval '19 years')::date
+WHERE user_id = pg_temp.ce(21);
+CREATE FUNCTION pg_temp.ce_allowed_rollback(statement text, description text) RETURNS void
+LANGUAGE plpgsql AS $test$
+DECLARE n integer; failure text;
+BEGIN
+  BEGIN
+    EXECUTE statement;
+    GET DIAGNOSTICS n = ROW_COUNT;
+    IF n <> 1 THEN failure := n || ' row(s), expected 1'; END IF;
+    RAISE EXCEPTION USING ERRCODE='P9003', MESSAGE='rollback positive control';
+  EXCEPTION
+    WHEN SQLSTATE 'P9003' THEN NULL;
+    WHEN OTHERS THEN failure := SQLSTATE || ': ' || SQLERRM;
+  END;
+  PERFORM pg_temp.ce_assert(failure IS NULL, description, failure);
+END;
+$test$;
+-- Synthetic maintenance function exists only in this transaction's pg_temp.
+CREATE FUNCTION pg_temp.ce_maintenance_probe(statement text) RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $test$
+DECLARE n integer;
+BEGIN
+  BEGIN
+    EXECUTE statement;
+    GET DIAGNOSTICS n = ROW_COUNT;
+    RAISE EXCEPTION USING ERRCODE='P9003', MESSAGE='rollback maintenance control';
+  EXCEPTION WHEN SQLSTATE 'P9003' THEN NULL;
+  END;
+  RETURN n;
+END;
+$test$;
+REVOKE ALL ON FUNCTION pg_temp.ce_maintenance_probe(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pg_temp.ce_maintenance_probe(text) TO authenticated;
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.ce_as(pg_temp.ce(10), 'coach@consent-every-write.test');
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_assessments SET work_rate=9 WHERE id=%L', current_setting('trak.ce_a1')), 'CANDIDATE active-consent assessment edit');
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_assessment_notes SET note=%L WHERE assessment_id=%L', 'ordinary edit', current_setting('trak.ce_a1')), 'CANDIDATE active-consent note edit');
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_shared_feedback SET body=%L WHERE assessment_id=%L', 'ordinary edit', current_setting('trak.ce_a1')), 'CANDIDATE active-consent feedback edit');
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.recognition_awards SET awarded_for=%L WHERE id=%L', 'ordinary edit', current_setting('trak.ce_award')), 'CANDIDATE active-consent award edit');
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.session_attendance SET status=%L WHERE session_id=%L AND squad_player_id=%L', 'late', current_setting('trak.ce_s1'), current_setting('trak.ce_sp')), 'CANDIDATE active-consent attendance edit');
+SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_shared_feedback SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_a2'), current_setting('trak.ce_a1')), 'CANDIDATE feedback cannot be attached to a different assessment of the same child');
+SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_assessment_notes SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_a2'), current_setting('trak.ce_a1')), 'CANDIDATE note cannot be attached to a different assessment of the same child');
+SELECT pg_temp.ce_review_refused(format('INSERT INTO public.coach_shared_feedback(id,assessment_id,coach_user_id,body) SELECT id,%L,coach_user_id,body FROM public.coach_shared_feedback WHERE assessment_id=%L ON CONFLICT(id) DO UPDATE SET assessment_id=excluded.assessment_id', current_setting('trak.ce_adult_a'), current_setting('trak.ce_a1')), 'CANDIDATE upsert cannot reassign feedback to another player');
+SELECT pg_temp.ce_allowed_rollback(format('INSERT INTO public.coach_shared_feedback(assessment_id,coach_user_id,body) VALUES (%L,%L,%L) ON CONFLICT(assessment_id) DO UPDATE SET body=excluded.body', current_setting('trak.ce_a1'), pg_temp.ce(10), 'ordinary upsert'), 'CANDIDATE same-assessment feedback upsert still works');
+-- The guard trusts the effective database role, not a client/JWT role string.
+SELECT set_config('request.jwt.claims', jsonb_build_object('role','service_role','sub',pg_temp.ce(10)::text,'email','coach@consent-every-write.test')::text,true);
+SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_shared_feedback SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_adult_a'), current_setting('trak.ce_a1')), 'CANDIDATE a forged privileged JWT role cannot bypass the subject guard');
+SELECT pg_temp.ce_as(pg_temp.ce(10), 'coach@consent-every-write.test');
+SELECT pg_temp.ce_assert(pg_temp.ce_maintenance_probe(format('UPDATE public.coach_shared_feedback SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_adult_a'), current_setting('trak.ce_a1'))) = 1, 'CANDIDATE authorized definer maintenance works with an authenticated JWT');
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_assessments SET squad_player_id=%L WHERE id=%L', current_setting('trak.ce_adult_sp'), current_setting('trak.ce_a1')), 'CANDIDATE privileged assessment maintenance');
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_assessment_notes SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_adult_a'), current_setting('trak.ce_a1')), 'CANDIDATE privileged note maintenance');
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_shared_feedback SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_adult_a'), current_setting('trak.ce_a1')), 'CANDIDATE privileged feedback maintenance');
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.recognition_awards SET squad_player_id=%L WHERE id=%L', current_setting('trak.ce_adult_sp'), current_setting('trak.ce_award')), 'CANDIDATE privileged award maintenance');
+SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.session_attendance SET squad_player_id=%L WHERE session_id=%L AND squad_player_id=%L', current_setting('trak.ce_adult_sp'), current_setting('trak.ce_s1'), current_setting('trak.ce_sp')), 'CANDIDATE privileged attendance maintenance');
+
 RESET ROLE;
 SELECT set_config('request.jwt.claims', '', true);
 
@@ -296,8 +424,8 @@ DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.ce_results;
-  IF total <> 27 THEN
-    RAISE EXCEPTION 'Consent on every write: % assertions ran; expected exactly 27', total;
+  IF total <> 49 THEN
+    RAISE EXCEPTION 'Consent on every write: % assertions ran; expected exactly 49', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'Consent on every write: % of % failed: %', failed, total,

@@ -10,9 +10,11 @@
 --
 -- Each policy below is recreated with its existing clauses plus the consent
 -- predicate, through the RLS bridge trak_private.squad_player_consent_required
--- (20260921182442). Policies, not triggers: account deletion and coach
--- departure run as SECURITY DEFINER maintenance and must still be able to
--- update these rows for a child whose guardian has withdrawn.
+-- (20260921182442). Consent is enforced by policies, so account deletion and
+-- coach departure, which run as SECURITY DEFINER maintenance, can still update
+-- these rows for a child whose guardian has withdrawn. One invoker trigger per
+-- table stops an app client moving a record to another child (see the end);
+-- maintenance passes it the same way.
 --
 -- The coach can still retract a published message after withdrawal (G6,
 -- 20260921110000), and only retract: the text, assessment and owner stay as
@@ -281,6 +283,51 @@ BEGIN
   );
 END;
 $$;
+
+-- ── A record keeps its subject (Tarek's #123 review) ─────────────────────────
+-- WITH CHECK sees only the new subject, so moving a withdrawn child's record to
+-- a consented player passed every policy above. An app client cannot change
+-- which child an existing record describes. Invoker rights: SECURITY DEFINER
+-- maintenance (deletion, departure) runs as the owner, even with a user's JWT
+-- present. AFTER, with no UPDATE OF filter, so it sees the final row whatever
+-- other triggers did; raising rolls back the whole statement.
+CREATE OR REPLACE FUNCTION trak_private.reject_development_subject_reassignment()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER
+SET search_path = ''
+AS $fn$
+BEGIN
+  IF current_user IN ('anon', 'authenticated')
+     AND (pg_catalog.to_jsonb(NEW) -> TG_ARGV[0])
+         IS DISTINCT FROM (pg_catalog.to_jsonb(OLD) -> TG_ARGV[0]) THEN
+    RAISE EXCEPTION 'An existing development record cannot be moved to another player'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NULL;
+END;
+$fn$;
+REVOKE ALL ON FUNCTION trak_private.reject_development_subject_reassignment()
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DROP TRIGGER IF EXISTS trg_keep_development_subject ON public.coach_assessments;
+CREATE TRIGGER trg_keep_development_subject AFTER UPDATE ON public.coach_assessments
+  FOR EACH ROW EXECUTE FUNCTION trak_private.reject_development_subject_reassignment('squad_player_id');
+
+DROP TRIGGER IF EXISTS trg_keep_development_subject ON public.coach_assessment_notes;
+CREATE TRIGGER trg_keep_development_subject AFTER UPDATE ON public.coach_assessment_notes
+  FOR EACH ROW EXECUTE FUNCTION trak_private.reject_development_subject_reassignment('assessment_id');
+
+DROP TRIGGER IF EXISTS trg_keep_development_subject ON public.coach_shared_feedback;
+CREATE TRIGGER trg_keep_development_subject AFTER UPDATE ON public.coach_shared_feedback
+  FOR EACH ROW EXECUTE FUNCTION trak_private.reject_development_subject_reassignment('assessment_id');
+
+DROP TRIGGER IF EXISTS trg_keep_development_subject ON public.recognition_awards;
+CREATE TRIGGER trg_keep_development_subject AFTER UPDATE ON public.recognition_awards
+  FOR EACH ROW EXECUTE FUNCTION trak_private.reject_development_subject_reassignment('squad_player_id');
+
+DROP TRIGGER IF EXISTS trg_keep_development_subject ON public.session_attendance;
+CREATE TRIGGER trg_keep_development_subject AFTER UPDATE ON public.session_attendance
+  FOR EACH ROW EXECUTE FUNCTION trak_private.reject_development_subject_reassignment('squad_player_id');
 
 -- ── Post-conditions ──────────────────────────────────────────────────────────
 DO $migration$

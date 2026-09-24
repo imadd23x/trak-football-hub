@@ -1,0 +1,60 @@
+--- a/src/pages/coach/CoachAssessPage.tsx
++++ b/src/pages/coach/CoachAssessPage.tsx
+@@ -238,7 +238,7 @@
+     setConsentWait(false)
+     if (!playerId) return
+     let cancelled = false
+-    void supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
++    void supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
+       .then(({ data, error }) => { if (!cancelled && !error) setConsentWait(data === true) })
+     return () => { cancelled = true }
+   }, [playerId])
+@@ -283,7 +283,7 @@
+         // 42501 is an RLS refusal. The likeliest cause is consent withdrawn or
+         // never given; re-ask the policy's own predicate rather than guess.
+         if (saveError.code === '42501') {
+-          const { data: waiting, error: waitingError } = await supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
++          const { data: waiting, error: waitingError } = await supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: playerId } as never)
+           if (!isCurrent()) return
+           // If the re-check itself fails we cannot say why; do not claim a reason.
+           if (waitingError) {
+--- a/src/pages/coach/CoachQuickAssess.tsx
++++ b/src/pages/coach/CoachQuickAssess.tsx
+@@ -143,7 +143,7 @@
+     setConsentWait(false)
+     if (!currentPlayerId) return
+     let cancelled = false
+-    void supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: currentPlayerId } as never)
++    void supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: currentPlayerId } as never)
+       .then(({ data, error }) => { if (!cancelled && !error) setConsentWait(data === true) })
+     return () => { cancelled = true }
+   }, [currentPlayerId])
+@@ -218,7 +218,7 @@
+       console.error('Save failed:', insertError)
+       // 42501 is an RLS refusal; re-ask the policy's predicate, never "try again".
+       if (insertError.code === '42501') {
+-        const { data: waiting, error: waitingError } = await supabase.rpc('squad_player_consent_required' as never, { p_squad_player_id: currentPlayer.id } as never)
++        const { data: waiting, error: waitingError } = await supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: currentPlayer.id } as never)
+         // If the re-check itself fails we cannot say why; do not claim a reason.
+         if (waitingError) {
+           toast.error('Not saved, and the reason could not be confirmed. Check your connection and try again.')
+--- a/src/pages/coach/__tests__/assess-consent-notice.test.tsx
++++ b/src/pages/coach/__tests__/assess-consent-notice.test.tsx
+@@ -1,7 +1,7 @@
+ /**
+  * Consent is 18 since #80, so on Monday every academy player is under the
+  * threshold and a coach cannot assess them until a parent approves. The
+- * database refuses (RLS WITH CHECK on squad_player_consent_required), and this
++ * database refuses (RLS WITH CHECK on the internal consent predicate), and this
+  * screen used to show that refusal verbatim, after the coach had set six sliders:
+  *
+  *   Could not save assessment: new row violates row-level security policy
+@@ -30,7 +30,7 @@
+     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach', nationality: 'AE', invite_code: 'ABCD' }]),
+     table('squad_players', [{ id: 'squad-1', coach_user_id: COACH.id, player_name: 'Omar Synthetic', position: 'Midfielder', linked_player_id: 'player-1' }]),
+     table('coach_sessions', []), table('coach_details', []), table('coach_assessments', []),
+-    http.post(`${SUPABASE_URL}/rest/v1/rpc/squad_player_consent_required`, async ({ request }) => {
++    http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_player_consent_required`, async ({ request }) => {
+       calls.consentChecks.push(await request.json())
+       if (consentRequired === 'error') return HttpResponse.json({ message: 'synthetic failure' }, { status: 500 })
+       // After a refused save the screen re-asks; by then consent has been withdrawn.

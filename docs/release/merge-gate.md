@@ -2,7 +2,7 @@
 
 Imad coordinates releases. Every PR needs one approval from someone who did not author it (see *What approval means*); Imad merges after approval, in the agreed order, one at a time. Every task has its own branch. No direct pushes to main.
 
-Friday 25 September is measured against `docs/pilot-readiness-2026-09-25.md` — the pilot, not a demo. The demo is completed on the way to the pilot. No other checklist is a gate.
+Friday 25 September is a synthetic demo. Real children join only when the launch gate in [MVP Requirements](../../MVP%20Requirements) passes and a founder majority agrees. No configured date waives it.
 
 ## What approval means
 
@@ -50,7 +50,8 @@ Verify both deployment jobs and the routed journey on trakfootball.com using des
 
 Stop the merge queue. Identify which migrations/functions actually applied; do not assume a red job rolled back prior steps. Use reviewed forward migrations to repair schema/permissions. A previous compatible frontend may be restored while retaining security fixes. Never erase migration history or restore an older access-control vulnerability as a rollback shortcut.
 
-The second academy provides isolation test fixtures; it is not a staging environment or backup. Real-child admission additionally requires all gates in the current pilot-readiness document.
+The second academy provides isolation test fixtures; it is not a staging environment or backup. Real-child admission additionally requires the launch gate in [MVP Requirements](../../MVP%20Requirements).
+
 # Fork-first development
 
 All Imad/Codex changes are committed and tested in `imadd23x/trak-football-hub`.

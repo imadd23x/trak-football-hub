@@ -30,3 +30,10 @@
 - The built app passes seven local Chromium checks at 390×844: denied match Retry, recovery, hiding a previous route's match, current-match completion, unavailable record, Home error ordering and Home Retry recovery. Every backend call is intercepted; no unexpected external calls or page errors occurred. Error, unavailable and recovered screens were visually inspected.
 - Scope review has no outstanding findings. Optional reveal storage errors are caught without suppressing backend read errors. Empty assessments clear coach content while retaining calendar data when the accessible squad still supplies coach IDs.
 - Main remained `93e7037` during verification. These are local synthetic results, not deployed evidence, human non-author approval or closure of TRAK-6/TRAK-13.
+
+## Current-main integration (24 September 2026)
+
+- Integrated canonical main `e7e40bdcf3bea7ecbb524d5422e0e4f41066ba78` (#121, parent sees the published coach message) without conflicts. The player implementation remains unchanged.
+- Fresh required checks: 742 source tests passed, nine baseline skips; 18 harness tests; typecheck, build, lint (zero errors, 131 warnings), use-case gate, and bundle scan all pass.
+- The rebuilt app passes the seven player mobile checks again. All ten parent invitation/family/consent browser tests also pass with synthetic intercepted HTTP. These browser runs are at 390×844, not hosted or real-phone evidence.
+- Reviewer acceptance agreement is still pending in the existing Slack thread. TRAK-6 and TRAK-13 remain open; no release approval, merge or production deployment is implied.

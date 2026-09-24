@@ -115,6 +115,8 @@ export default function CoachAddSession() {
   // Squad
   const [squad,       setSquad]       = useState<SquadPlayer[]>([])
   const [notReady,    setNotReady]    = useState<string[]>([])
+  const [rosterFailed,  setRosterFailed]  = useState(false)
+  const [rosterAttempt, setRosterAttempt] = useState(0)
   const [details,     setDetails]     = useState<Record<string, PlayerDetail>>({})
   const [expanded,    setExpanded]    = useState<Set<string>>(new Set())
 
@@ -145,8 +147,11 @@ export default function CoachAddSession() {
       .select('id, player_name, linked_player_id, position, age_group, age')
       .eq('coach_user_id', user.id)
       .order('player_name')
-      .then(async ({ data }) => {
-        const players = data || []
+      .then(async ({ data, error }) => {
+        // A failed load is not an empty squad: say so and offer a retry.
+        setRosterFailed(!!error)
+        if (error) return
+        const players = data ?? []
         // J4 + G1: the database refuses any record about a child whose consent
         // is not confirmed, and one refused row fails the whole attendance
         // insert. Offer confirmed players only; name the rest. Same check as
@@ -162,9 +167,15 @@ export default function CoachAddSession() {
         ready.forEach(p => { init[p.id] = { ...DEFAULT_DETAIL, position: p.position } })
         setDetails(init)
       })
-  }, [user])
+  }, [user, rosterAttempt])
 
-  const notReadyNote = notReady.length > 0 && (
+  // Under each player list: why nobody is offered, or who is left out and why.
+  const rosterNote = rosterFailed ? (
+    <p role="alert" className="text-[12px] text-white/55 px-4 py-3" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      Couldn't load your squad.{' '}
+      <button type="button" onClick={() => setRosterAttempt(n => n + 1)} className="underline text-[#C8F25A]">Retry</button>
+    </p>
+  ) : notReady.length > 0 && (
     <p className="text-[11px] text-white/40 px-4 py-3" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       Not recorded until a parent approves: {notReady.join(', ')}
     </p>
@@ -585,7 +596,7 @@ export default function CoachAddSession() {
                 </div>
               </div>
 
-              {squad.length === 0 && notReady.length === 0 ? (
+              {squad.length === 0 && notReady.length === 0 && !rosterFailed ? (
                 <p className="px-4 pb-4 text-[12px] text-white/40">
                   No squad yet. Add players from the Squad tab first.
                 </p>
@@ -802,7 +813,7 @@ export default function CoachAddSession() {
                   })}
                 </div>
               )}
-              {notReadyNote}
+              {rosterNote}
             </div>
 
             {/* Match notes */}
@@ -935,7 +946,7 @@ export default function CoachAddSession() {
                     style={{ fontFamily: "'DM Mono', monospace" }}>NONE</button>
                 </div>
               </div>
-              {squad.length === 0 && notReady.length === 0 ? (
+              {squad.length === 0 && notReady.length === 0 && !rosterFailed ? (
                 <p className="text-[12px] text-white/40 py-2">No squad yet. Add players from the Squad tab first.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -957,7 +968,7 @@ export default function CoachAddSession() {
                   })}
                 </div>
               )}
-              {notReadyNote}
+              {rosterNote}
             </div>
 
             {/* Notes */}
@@ -1002,7 +1013,7 @@ export default function CoachAddSession() {
                     style={{ fontFamily: "'DM Mono', monospace" }}>NONE</button>
                 </div>
               </div>
-              {squad.length === 0 && notReady.length === 0 ? (
+              {squad.length === 0 && notReady.length === 0 && !rosterFailed ? (
                 <p className="text-[12px] text-white/40 py-2">No squad yet. Add players from the Squad tab first.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -1024,7 +1035,7 @@ export default function CoachAddSession() {
                   })}
                 </div>
               )}
-              {notReadyNote}
+              {rosterNote}
             </div>
 
             <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]">

@@ -62,6 +62,27 @@ describe('J4 attendance offers only consent-confirmed players', () => {
     expect(inserted[0]).toMatchObject({ squad_player_id: 'ready' })
   })
 
+  it('a failed roster load says so and can be retried; it is never "No squad yet"', async () => {
+    roster([])
+    let calls = 0
+    server.use(http.get(`${SUPABASE_URL}/rest/v1/squad_players`, () => {
+      calls++
+      return calls === 1
+        ? HttpResponse.json({ message: 'roster unavailable', code: 'XX000' }, { status: 400 })
+        : HttpResponse.json([READY])
+    }))
+    const user = userEvent.setup()
+    renderApp('/coach/sessions/add')
+
+    expect(await screen.findByText(/Couldn't load your squad/)).toBeInTheDocument()
+    expect(screen.queryByText(/No squad yet/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /Rea Ready/ })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('button', { name: /Rea Ready/ })).toBeInTheDocument()
+    expect(screen.queryByText(/Couldn't load your squad/)).toBeNull()
+  })
+
   it('match: only the confirmed player can be marked as played', async () => {
     roster([])
     renderApp('/coach/sessions/quick')

@@ -403,12 +403,14 @@ use_cases:
     requirement: J2
     status: pending
     tier: [2]
-    spec_version: 1
+    spec_version: 2
     given: A child admitted from the academy roster with one or more guardian emails
     when: Admission completes
     then:
-      - Each academy-supplied guardian email receives an invitation
+      - Each academy-supplied guardian email receives an invitation within 60 seconds of admission
+      - It arrives in the inbox, not in spam, at both a Gmail and an Outlook address
       - The invitation names the child, the academy and the purpose
+      - It carries Trak branding and a safe-sender line
       - No invitation goes to an address the academy did not supply, or to the child's own address
     source: MVP Requirements
 

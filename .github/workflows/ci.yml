@@ -113,9 +113,8 @@ jobs:
         run: npm run test:harness
 
       # Runs the use-case suite through the registry ratchet: enforced use
-      # cases block, pending ones report without blocking. UC-C02 and UC-C04
-      # are enforced; everything else is pending and reports coverage debt
-      # without blocking.
+      # cases block, pending ones report without blocking, parked ones never
+      # run. docs/use-cases/README.md lists which is which.
       - name: Use cases
         run: npm run uc:check
 

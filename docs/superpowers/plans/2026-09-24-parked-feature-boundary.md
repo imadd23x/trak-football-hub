@@ -54,7 +54,8 @@ The first run had a text-selector mismatch in a positive control; the confirmed 
 - [x] Full UI checks: **783 source tests pass**, 9 baseline skips; harness/typecheck/build/lint/bundle scan pass. Lint has 125 warnings and no errors. UC-C03 initially failed only because it asserted the old Add Player copy; update both empty and failed-load absence selectors, retain response-settle and add explicit error assertion. Registry/lock/UC-C02 untouched.
 - [x] SQL: 88 migrations replayed; new boundary suite and all 19 registered SQL suites pass on PGlite 18.3 and native PostgreSQL 17.11. The 157 boundary checks also pass after reapplying the forward migration. Existing policy/grant parity, 78 account-deletion assertions and trusted departure/history checks pass. Expected closure suite was observed red on both engines before migration.
 - [x] Separate internal spec and code-quality reviews of UI and SQL have no actionable findings. These are internal checks, not independent team approval.
-- [ ] Commit green with mandatory hooks, push Tarek's fork, prepare exact review evidence. Open PR only after named reviewer agrees criteria. Never merge or deploy in this work.
+- [x] Commit the bounded implementation as `3040bed` with mandatory use-case and credential hooks passing. Prepare current-main integration and the tested handoff.
+- [ ] Push the final integration to Tarek's fork and obtain named reviewer agreement before opening a PR. External review and deployed proof remain release steps, not claims made by local tests.
 
 ## Commands and evidence
 
@@ -62,4 +63,6 @@ Use the installed Node22 binary in PATH; no production credentials. UI commands:
 
 New DB mode: `node scripts/test-db.mjs --parked-feature-boundary`. The native runner on this dependency stack predates #131's registry-driven discovery; use the recorded disposable native replay rather than duplicating that reviewed runner change. All evidence remains local until approved team handoff. UC-C02 stays pending because UI success does not supply TRAK-48's backend roster INSERT proof; 14 other use cases still lack tests.
 
-Canonical main advanced to `e7e40bd` (#121 parent coach messages) during final verification. Integrate it after the green implementation commit, preserve both parent browser edits, and rerun all UI gates and mobile journeys before the branch is pushed. No database files changed on that main advance.
+Canonical main advanced to `e7e40bd` (#121 parent coach messages) during final verification and was integrated after `3040bed`, preserving both parent browser edits. The final integrated tree passes **786 source tests** (9 baseline skips), **18 harness tests**, all required checks, and **13 mobile journeys**. No database files changed on that main advance. The combined source run caught four static policy checks that incorrectly assumed every write policy permits a write; their role/ownership/org requirements now explicitly accept an exact terminal `WITH CHECK (false)`, while every allowing policy retains its original guards. Both internal reviewers checked this adjustment. Broader expressions such as `(false OR true)` are not exempted.
+
+Final local evidence: `/private/tmp/trak47-final-checks/`, `/private/tmp/trak47-browser.log`, `/private/tmp/trak47-db-all-pglite.log`, `/private/tmp/trak47-db-all-native.log`, `/private/tmp/trak47-db-idempotence-native.log`. Native replay uses a stopped, socket-only disposable PostgreSQL 17.11 cluster. No hosted data or deployment was changed.

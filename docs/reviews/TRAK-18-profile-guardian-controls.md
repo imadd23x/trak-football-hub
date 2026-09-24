@@ -30,4 +30,6 @@ The separate config reuses the pilot browser configuration without changing its 
 
 Run the required source/harness/typecheck/build/lint/use-case checks and the dedicated browser suite. Confirm no guardian-email entry or add action is exposed by Profile across the tested states, retry remains usable, and resend cannot change the invitation recipient. Preserve the prior invitation controls and review the explicit G2 backend limitations. The reservation is in [the G2 coordination thread](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1790191626493799).
 
-Reviewer agreement, independent review, CI on the proposed PR head, release recovery (#125), merge and deployed synthetic verification remain outstanding. No independent verdict or full G2 closure is claimed.
+Reviewer agreement, independent review, CI on the proposed PR head, merge and deployed synthetic verification remain outstanding. No independent verdict or full G2 closure is claimed.
+
+Main integration on 24 September: merged `93e70374d9e6ff902abc1ecc9d66fa546838a05c` (#125). The only added main change is the CI API-bundling flag; the Profile implementation and test files are byte-identical to tested commit `ba510ee`. Recovery workflow [35977029799](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/actions/runs/35977029799) completed successfully, including Supabase and frontend deployment. This is workflow evidence, not our own hosted G2 journey proof. Pre-commit checks run again for this integration.

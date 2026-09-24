@@ -26,10 +26,16 @@ npx playwright test --config playwright.g2-profile.config.ts
 
 The separate config reuses the pilot browser configuration without changing its shared test list. It must be run explicitly; neither the default pilot browser command nor CI currently selects this new browser file. Component regressions run in the normal source test suite. No SQL suite was rerun for this UI-only change; this provides no new backend G2 proof.
 
-## Proposed review acceptance
+## Review acceptance
 
 Run the required source/harness/typecheck/build/lint/use-case checks and the dedicated browser suite. Confirm no guardian-email entry or add action is exposed by Profile across the tested states, retry remains usable, and resend cannot change the invitation recipient. Preserve the prior invitation controls and review the explicit G2 backend limitations. The reservation is in [the G2 coordination thread](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1790191626493799).
 
-Reviewer agreement, independent review, CI on the proposed PR head, merge and deployed synthetic verification remain outstanding. No independent verdict or full G2 closure is claimed.
+At the time of the initial implementation, reviewer agreement, independent review, CI, merge and deployed synthetic verification were outstanding. The agreement is now recorded below; independent review, CI on the final PR head, merge and deployed verification remain required. No independent verdict or full G2 closure is claimed.
 
 Main integration on 24 September: merged `93e70374d9e6ff902abc1ecc9d66fa546838a05c` (#125). The only added main change is the CI API-bundling flag; the Profile implementation and test files are byte-identical to tested commit `ba510ee`. Recovery workflow [35977029799](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/actions/runs/35977029799) completed successfully, including Supabase and frontend deployment. This is workflow evidence, not our own hosted G2 journey proof. Pre-commit checks run again for this integration.
+
+## Reviewer agreement and resend check
+
+[Kostas accepted the criteria and volunteered as reviewer on 24 September](https://trakfootball.slack.com/archives/C0C2N0D1C06/p1790243268327949), adding that resend must never accept a new address. The existing Profile test asserts the exact request body `{ invite_id, resend: true }`, with no recipient field. The built browser test rejects any other shape. The delivery handler rejects a request combining `parent_email` with either an invitation ID or resend flag, and uses only a stored recipient. Its separate onboarding address selector does not introduce a new destination.
+
+The 24 invitation tests were rerun after the agreement and passed. The existing send-parent-invite handler suite also passed; no delivery function or application code changed for this clarification. No emails were sent. The first attempted focused command could not find npm on a restricted PATH; rerunning with the pinned Node 22 executable succeeded.

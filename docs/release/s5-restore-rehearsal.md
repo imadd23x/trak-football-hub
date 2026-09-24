@@ -20,7 +20,7 @@ and what does not come back.
 
 A physical backup restores **one Postgres database into a new Supabase project**. It does not
 restore a service. The restored project has a **new project ref**, and that ref is hard-coded in
-**nine files** outside documentation, plus the platform configuration. So the recovery clock is
+**eight files** outside documentation, plus the platform configuration. So the recovery clock is
 dominated by a code change and a CI deploy, not by the restore.
 
 Measure the whole thing or the number is meaningless. `T0` is the decision to restore; `T_done` is
@@ -61,6 +61,9 @@ Two things in that snapshot are worth naming rather than leaving in a table. `tr
 not exist yet, so #99 is not deployed. And the live storage policy is still
 `"Avatars are publicly readable" FOR SELECT` — the Monday exposure, open at the time of writing.
 
+**Superseded, 23 Sep:** #99 is deployed (`trak_private` exists) and #113 closed the public avatar
+read on production (TRAK-42). Both are why step 0 re-measures instead of trusting this table.
+
 ## What a restore does NOT bring back
 
 This is the part S5 exists to establish, and the part that a "we have backups" answer hides.
@@ -80,7 +83,9 @@ This is the part S5 exists to establish, and the part that a "we have backups" a
    the exact `https://www.trakfootball.com/reset-password` entry that #102's recovery flow depends
    on — Tarek probed that allow-list on 22 Sep and a fallback-to-root link does not work, so a
    missing entry locks every parent out of password recovery. Email templates are set by hand and
-   are not deployed by CI.
+   are not deployed by CI. The same goes for **custom SMTP settings**, which TRAK-51 is likely to
+   configure for J2's under-60-second invitation delivery: without them, the restored project falls
+   back to the default sender and J2's delivery requirement no longer holds.
 5. **A new project has new JWT keys.** Every session issued by the old project is dead: everyone is
    signed out, and `VITE_SUPABASE_PUBLISHABLE_KEY` changes.
 6. **PITR is not enabled**, so the recovery point is the last daily physical backup, not the moment
@@ -89,7 +94,8 @@ This is the part S5 exists to establish, and the part that a "we have backups" a
 
 ## Where the project ref is hard-coded
 
-`grep -rl xbykbqolvqyqmipikuae` finds nine files outside documentation, on 22 Sep. A restored
+`git grep -l xbykbqolvqyqmipikuae` finds eight files outside documentation on `main`, 23 Sep.
+Re-grep before executing; the count changes as branches merge. A restored
 project has a different ref. Until these change, the app does not work — and the first one fails in
 a way that looks like a network problem rather than a configuration one.
 
@@ -102,7 +108,7 @@ a way that looks like a network problem rather than a configuration one.
 | `supabase/config.toml` `project_id` | Local CLI only. CI passes `--project-ref "$PROJECT_ID"` explicitly and deliberately does not `supabase link`, so CI is repointed by the two GitHub secrets above, **not** by this file. |
 | `e2e/parent-consent.spec.ts`, `e2e/parent-family.spec.ts`, `e2e/parent-invitation.spec.ts` | Specs abort requests to any other origin, so they fail closed |
 | `seed-admin-data.mjs` | Seeds against whatever it names; check before running it anywhere |
-| `src/lib/__tests__/avatar-url.test.ts`, `src/lib/__tests__/avatar-object-path-mirror.test.ts` | Fixtures only; harmless |
+| `src/lib/__tests__/avatar-url.test.ts` | Fixtures only; harmless |
 
 ## Decision point — this costs money
 
@@ -116,8 +122,23 @@ rehearsal fixtures and is in active use.
 
 ## Procedure
 
+There are two procedures, and they must not be mixed up.
+
+- **Rehearsal** proves the restore works and measures how long it takes. It never touches
+  production: not the GitHub secrets main's CI uses, not Vercel's Production environment, not
+  `main`. `trakfootball.com` keeps serving the real project the whole time.
+- **Real recovery** is for an actual incident. It repoints production on purpose.
+
+Why they are separate: on `main`, CI pushes migrations and functions with the `SUPABASE_PROJECT_ID`
+and `SUPABASE_DB_URL` secrets, and deploys the frontend with `vercel deploy --prebuilt --prod`
+(`.github/workflows/ci.yml`). Changing either during a rehearsal would point `trakfootball.com` at
+a throwaway project that the last step deletes. That is an outage, and anything written in between
+is lost.
+
 Record wall-clock at every marker. Estimates are deliberately absent: producing the real numbers is
 the deliverable.
+
+### Rehearsal (production untouched)
 
 | # | Step | Marker |
 |---|---|---|
@@ -125,11 +146,25 @@ the deliverable.
 | 1 | Dashboard → Database → Backups → restore the latest physical backup **to a new project**. Note the chosen backup's timestamp. | `T_restore_start` |
 | 2 | Wait for the new project to reach `ACTIVE_HEALTHY`. Note its ref and Postgres patch version. | `T_db_ready` |
 | 3 | Run the verification queries below against the restored project. | `T_db_verified` |
-| 4 | Set `LOVABLE_API_KEY` and `SITE_URL` on the restored project; re-create the auth redirect allow-list including `/reset-password`. | |
-| 5 | Point CI at it: `SUPABASE_PROJECT_ID`, `SUPABASE_DB_URL`. Deploy the four edge functions. | `T_functions_ready` |
-| 6 | Change the ref in `vercel.json` (both CSP directives) and `src/integrations/supabase/client.ts`; set the two `VITE_` variables in Vercel as **Config**; deploy. | `T_frontend_deployed` |
-| 7 | Sign in as a designated synthetic account and complete one real journey — coach logs an assessment, player reads it. | **`T_done`** |
-| 8 | Delete the restored project. Confirm the charge does not recur. Restore the repository changes from step 6. | |
+| 4 | Set `LOVABLE_API_KEY` and `SITE_URL` on the restored project; re-create the auth redirect allow-list including `/reset-password` (use the Preview URL from step 6 for the rehearsal, and note the production entries a real recovery would need). Custom SMTP settings too, once TRAK-51 sets them. | |
+| 5 | Deploy the four edge functions **by hand**: `supabase functions deploy <name> --project-ref <restored-ref> --use-api`. **Do not** change the GitHub secrets `SUPABASE_PROJECT_ID` or `SUPABASE_DB_URL`. | `T_functions_ready` |
+| 6 | On a **throwaway branch** that is never merged, change the ref in `vercel.json` (both CSP directives) and `src/integrations/supabase/client.ts`. In Vercel, set the two `VITE_` variables as **Config** scoped to **Preview** only, for that branch. Push the branch and wait for its **Preview** deployment. **Do not** touch Production env and **do not** merge. | `T_frontend_deployed` |
+| 7 | On the **Preview URL**, sign in as a designated synthetic account and complete one real journey: a coach logs an assessment and the player reads it. | **`T_done`** |
+| 8 | Revert everything the rehearsal changed: delete the restored project and confirm the charge does not recur; delete the throwaway branch and its Preview deployment; remove the Preview-scoped `VITE_` variables; remove any redirect or SMTP entries added only for the rehearsal. Confirm `trakfootball.com` still serves the production project (its CSP and bundle still name `xbykbqolvqyqmipikuae`). | |
+
+The rehearsal's `T0 → T_done` is shorter than a real recovery's, because a real recovery also waits
+for a production CI run. Record both numbers: the rehearsal number, and the duration of the last
+green production run on `main` as the estimate for that extra step.
+
+### Real recovery (an incident only)
+
+Same steps 0–4 and 7, except:
+
+| # | Step | Marker |
+|---|---|---|
+| 5 | Point CI at the restored project: change the GitHub secrets `SUPABASE_PROJECT_ID` and `SUPABASE_DB_URL`. Deploy the four edge functions. | `T_functions_ready` |
+| 6 | On `main` through a reviewed PR, change the ref in `vercel.json` (both CSP directives) and `src/integrations/supabase/client.ts`. Set the two `VITE_` variables in Vercel **Production** as **Config**. The merge deploys `trakfootball.com` with `--prod`. | `T_frontend_deployed` |
+| 8 | Do **not** delete the restored project: it is production now. Keep the old project paused, not deleted, until the founders agree nothing more needs recovering from it. | |
 
 ### Step 3 verification
 

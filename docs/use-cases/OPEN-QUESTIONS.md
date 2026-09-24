@@ -138,3 +138,26 @@ every child under 18. UC-X03, UC-X04, UC-P08, UC-P09, UC-A11, UC-C09 and
 UC-C10 are added as `pending` for J1–J4.
 
 Status: RESOLVED 2026-09-23
+
+## Q-2026-09-24-UC-C03 · UC-C03 · View the squad
+Raised: 2026-09-24 · commit blocked · REQ-002
+Observed: UC-C03: enforced use-case test failed
+Spec (v2) says:
+  THEN Every player in their squad is listed
+  THEN A coach with an empty squad sees an explicit empty message
+  THEN A failed load is distinguishable from an empty squad
+
+PO decision needed — one of:
+  [ ] Spec stands -> code bug, fix the code, no registry change
+  [ ] Spec changes -> bump spec_version, add changelog entry, dev updates test
+  [ ] Spec ambiguous -> rewrite given/when/then, bump spec_version
+Status: OPEN
+
+Resolution: the UC-C03 specification stands unchanged. TRAK-47 follows the
+approved academy-admission decision and removes Add Player, so its explicit
+empty-state copy now says "Your squad is being prepared". Updated both the
+presence and failed-load absence selectors; retained the response-settle
+check and added an explicit error assertion. No registry or lock change.
+UC-C02 v2 tests remain unchanged and pending backend proof from TRAK-48.
+
+Status: RESOLVED 2026-09-24

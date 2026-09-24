@@ -12,10 +12,15 @@
  * withdrawn mid-form) is translated rather than shown raw.
  */
 import { it, expect, describe } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { Toaster } from '@/components/ui/sonner'
+import CoachQuickAssess from '../CoachQuickAssess'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
 import { table, SUPABASE_URL } from '../../../../tests/msw/supabase'
@@ -112,12 +117,12 @@ describe('CoachAssessPage and parental consent', () => {
   })
 })
 
-// Quick assess walks the whole squad one player at a time and is linked from
-// Coach Home and the post-match prompt. Before this, an unconsented player
-// answered "Could not save assessment. Please try again." every time.
+// TRAK-47 retires Quick Assess from the router. Keep these consent regressions
+// for its retained, unrouted component; the real-App boundary suite asserts
+// that its old URL redirects to the full assessment and cannot mount it.
 describe('CoachQuickAssess and parental consent', () => {
   async function openQuick() {
-    renderApp('/coach/quick-assess')
+    render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><AuthProvider><Toaster /><CoachQuickAssess /></AuthProvider></MemoryRouter></QueryClientProvider>)
     const user = userEvent.setup()
     await screen.findByText('Omar Synthetic')
     return user

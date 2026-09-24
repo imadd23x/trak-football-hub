@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-for (const role of ['player', 'coach'] as const) {
+for (const role of ['player', 'coach', 'club'] as const) {
   test(`G7 ${role} routes, photos and manual feedback`, async ({ page, context }, testInfo) => {
     const id = '97000000-0000-4000-8000-000000000001'
     const user = { id, email: `${role}@example.test`, email_confirmed_at: '2026-09-01T00:00:00Z', app_metadata: {}, user_metadata: {}, aud: 'authenticated', role: 'authenticated', created_at: '2026-09-01T00:00:00Z' }
@@ -32,23 +32,39 @@ for (const role of ['player', 'coach'] as const) {
         return failFeedback ? json({ message: 'Synthetic failure' }, 503) : json({ body: 'Look up before receiving. Your coach wrote this.' })
       }
       if (url.pathname === `/rest/v1/${role}_details`) return json({})
-      if (['/rest/v1/squad_players', '/rest/v1/player_parent_links'].includes(url.pathname)) return json([])
+      if (['/rest/v1/squad_players', '/rest/v1/player_parent_links', '/rest/v1/coach_sessions', '/rest/v1/coach_assessments'].includes(url.pathname)) return json([])
       unexpected.push(request.method() + ' ' + url.pathname)
       return json({ message: 'Unmocked request blocked' }, 500)
     })
 
-    const paths = role === 'player' ? ['/player/passport', '/player/evolution'] : ['/coach/assistant', '/coach/feedback/synthetic-assessment', '/coach/schedule']
+    const paths = role === 'player' ? ['/player/passport', '/player/evolution']
+      : role === 'club' ? ['/club/home', '/club/squads', '/club/coaches', '/club/profile', '/club/radar']
+        : ['/coach/assistant', '/coach/feedback/synthetic-assessment', '/coach/schedule', '/coach/recognition', '/coach/award']
     for (const path of paths) {
       await page.goto(path)
       await expect(page.getByRole('heading', { name: 'Coming soon' })).toBeVisible()
-      await expect(page.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', `/${role}/home`)
+      await expect(page.getByRole('link', { name: role === 'club' ? 'Account settings' : 'Back to home' }))
+        .toHaveAttribute('href', role === 'club' ? '/settings' : `/${role}/home`)
     }
     await page.screenshot({ path: testInfo.outputPath('coming-soon-mobile.png'), fullPage: true })
-    await page.goto('/settings')
+    if (role === 'club') await page.getByRole('link', { name: 'Account settings' }).click()
+    else await page.goto('/settings')
     await expect(page.getByRole('button', { name: 'Synthetic Pilot', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Delete my account' })).toBeVisible()
     await expect(page.locator('input[type=file], img')).toHaveCount(0)
     await expect(page.getByText('Profile photos are coming soon.')).toBeVisible()
+
+    if (role === 'coach') {
+      await page.goto('/coach/squad/add')
+      await expect(page).toHaveURL(/\/coach\/squad$/)
+      await expect(page.getByRole('heading', { name: 'Squad' })).toBeVisible()
+      await expect(page.getByRole('button', { name: /add player/i })).toHaveCount(0)
+      await page.goto('/coach/quick-assess')
+      await expect(page).toHaveURL(/\/coach\/assess$/)
+      await expect(page.getByRole('heading', { name: 'Assessment' })).toBeVisible()
+      await page.goto('/coach/sessions/quick')
+      await expect(page.getByText(/No squad yet\./)).toBeVisible()
+    }
 
     if (role === 'player') {
       await page.goto('/player/feedback/synthetic-assessment')

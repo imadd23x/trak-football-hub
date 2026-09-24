@@ -481,24 +481,23 @@ export default function CoachHomePage() {
 
         {/* Empty squad callout */}
         {playerCount === 0 && (
-          <button
-            onClick={() => navigate('/coach/squad/add')}
-            className="w-full mt-3 rounded-[14px] border p-4 text-left active:scale-[0.98] transition-transform"
+          <div
+            className="w-full mt-3 rounded-[14px] border p-4 text-left"
             style={{ background: '#101012', borderColor: 'rgba(255,255,255,0.07)' }}
           >
             <p className="text-[13px] font-medium text-white/70" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-              Add players to your squad
+              Your squad is being prepared
             </p>
             <p className="text-[10px] mt-0.5 text-white/35" style={{ fontFamily: "'DM Mono', monospace" }}>
-              Once you've added players you can assess them, log matches, and track progress →
+              Your academy will add players to this squad.
             </p>
-          </button>
+          </div>
         )}
 
-        {/* Quick Assess CTA */}
+        {/* Full assessment entry */}
         {playerCount > 0 && (
           <button
-            onClick={() => navigate('/coach/quick-assess')}
+            onClick={() => navigate('/coach/assess')}
             className="w-full mt-3 relative overflow-hidden rounded-[14px] border p-4 text-left active:scale-[0.98] transition-transform"
             style={{
               background: 'rgba(200,242,90,0.06)',
@@ -517,14 +516,14 @@ export default function CoachHomePage() {
                   className="text-[14px] font-semibold"
                   style={{ color: '#C8F25A', fontFamily: "'DM Sans', sans-serif" }}
                 >
-                  Quick Assess
+                  Assess players
                 </span>
               </div>
               <p
                 className="text-[11px] mt-1"
                 style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.3)' }}
               >
-                Swipe through your squad and rate each player fast
+                Choose a player and record their assessment
               </p>
             </div>
           </button>

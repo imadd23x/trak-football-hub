@@ -47,6 +47,11 @@ INSERT INTO public.profiles (user_id, role, full_name) VALUES
   ('a0000000-0000-0000-0000-000000000002', 'coach',  'Coach B'),
   ('b0000000-0000-0000-0000-000000000001', 'player', 'Child One');
 
+-- 18 or over, so no guardian consent is involved: this suite tests note
+-- privacy. A missing DOB counts as a minor (consent_every_write.sql).
+INSERT INTO public.player_details (user_id, date_of_birth) VALUES
+  ('b0000000-0000-0000-0000-000000000001', (current_date - interval '19 years')::date);
+
 -- Coach A's roster row, linked to the child's own account.
 INSERT INTO public.squad_players (id, coach_user_id, linked_player_id, player_name, status) VALUES
   ('c0000000-0000-0000-0000-000000000001',

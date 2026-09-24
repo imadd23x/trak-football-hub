@@ -15,10 +15,38 @@
 -- update these rows for a child whose guardian has withdrawn.
 --
 -- The coach can still retract a published message after withdrawal (G6,
--- 20260921110000): an update that leaves the message unpublished is allowed.
--- ponytail: that also lets the coach edit an unpublished draft's text after
--- withdrawal. Only the coach can read it. Add a trigger comparing OLD.body if
--- counsel treats draft edits as processing.
+-- 20260921110000), and only retract: the text, assessment and owner stay as
+-- they were.
+--
+-- Unknown age fails closed (MVP J1: a missing date of birth counts as a
+-- minor). 20260912000001 let writes through for a roster row with no account
+-- and for a player with no date of birth. Neither can hold consent
+-- (record_parental_consent refuses a missing DOB), so both now wait.
+
+-- ── Consent helpers: unknown age means consent is required ─────────────────
+-- CREATE OR REPLACE keeps the grants set in 20260921182442.
+CREATE OR REPLACE FUNCTION public.player_consent_required(p_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $fn$
+  SELECT NOT COALESCE(
+    public.player_age_years(p_user_id) >= public.consent_threshold_age()
+      OR public.player_has_parental_consent(p_user_id),
+    false
+  );
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.squad_player_consent_required(p_squad_player_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $fn$
+  SELECT sp.linked_player_id IS NULL
+      OR public.player_consent_required(sp.linked_player_id)
+  FROM public.squad_players sp
+  WHERE sp.id = p_squad_player_id;
+$fn$;
 
 -- ── coach_assessments: editing needs consent, as creating already does ──────
 DROP POLICY IF EXISTS "Coaches can update own assessments" ON public.coach_assessments;
@@ -78,6 +106,23 @@ CREATE POLICY "Coaches insert own shared feedback"
     )
   );
 
+-- The row as it was before the UPDATE. WITH CHECK sees only the new row, and a
+-- policy cannot read its own table (42P17), so a definer function reads it
+-- under the statement's snapshot. RLS-only, like the consent bridge.
+CREATE OR REPLACE FUNCTION trak_private.shared_feedback_unchanged(
+  p_id uuid, p_assessment_id uuid, p_coach_user_id uuid, p_body text)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = ''
+AS $fn$
+  SELECT EXISTS (
+    SELECT 1 FROM public.coach_shared_feedback
+    WHERE id = p_id AND assessment_id = p_assessment_id
+      AND coach_user_id = p_coach_user_id AND body = p_body);
+$fn$;
+REVOKE ALL ON FUNCTION trak_private.shared_feedback_unchanged(uuid, uuid, uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION trak_private.shared_feedback_unchanged(uuid, uuid, uuid, text) TO authenticated;
+
 DROP POLICY IF EXISTS "Coaches update own shared feedback" ON public.coach_shared_feedback;
 CREATE POLICY "Coaches update own shared feedback"
   ON public.coach_shared_feedback FOR UPDATE TO authenticated
@@ -93,8 +138,12 @@ CREATE POLICY "Coaches update own shared feedback"
       WHERE ca.id = coach_shared_feedback.assessment_id
         AND ca.coach_user_id = auth.uid()
         AND public.squad_player_is_mine(ca.squad_player_id)
-        AND (coach_shared_feedback.published_at IS NULL
-             OR NOT trak_private.squad_player_consent_required(ca.squad_player_id))
+        AND (NOT trak_private.squad_player_consent_required(ca.squad_player_id)
+             -- Without consent, only a retraction: nothing else changes.
+             OR (coach_shared_feedback.published_at IS NULL
+                 AND trak_private.shared_feedback_unchanged(coach_shared_feedback.id,
+                       coach_shared_feedback.assessment_id, coach_shared_feedback.coach_user_id,
+                       coach_shared_feedback.body)))
     )
   );
 

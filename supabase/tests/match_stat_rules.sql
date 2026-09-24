@@ -121,6 +121,12 @@ INSERT INTO public.coach_details (user_id, organization_id)
 VALUES (pg_temp.ms_id(1), NULL)
 ON CONFLICT DO NOTHING;
 
+-- 18 or over, so no guardian consent is involved: this suite tests the stat
+-- rules. A missing DOB counts as a minor (consent_every_write.sql).
+INSERT INTO public.player_details (user_id, date_of_birth)
+VALUES (pg_temp.ms_id(2), (current_date - interval '19 years')::date)
+ON CONFLICT DO NOTHING;
+
 INSERT INTO public.squad_players (id, coach_user_id, player_name, linked_player_id, status)
 VALUES (pg_temp.ms_id(10), pg_temp.ms_id(1), 'MS Player', pg_temp.ms_id(2), 'active')
 ON CONFLICT DO NOTHING;

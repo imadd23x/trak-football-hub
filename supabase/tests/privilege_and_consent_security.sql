@@ -518,8 +518,9 @@ SELECT pg_temp.pc_expect_scope_denied(NULL, 'E1 owning coach: null row denied id
 SELECT pg_temp.pc_expect_scope_denied(pg_temp.pc_id(208), 'E1 owning coach: departed row denied identically');
 SELECT pg_temp.pc_assert(public.coach_squad_player_consent_required(pg_temp.pc_id(201)) IS TRUE,
   'E2 owning coach: withdrawal requires consent');
-SELECT pg_temp.pc_assert(public.coach_squad_player_consent_required(pg_temp.pc_id(207)) IS FALSE,
-  'E2 owning coach: unlinked roster preserves the current gate');
+-- MVP J1: unknown age counts as a minor (20260923190000).
+SELECT pg_temp.pc_assert(public.coach_squad_player_consent_required(pg_temp.pc_id(207)) IS TRUE,
+  'E2 owning coach: an unlinked roster row waits for consent');
 SELECT pg_temp.pc_reset();
 
 -- Re-grant through the actual parent RPC, then re-check through the new UI RPC.

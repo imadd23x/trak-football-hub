@@ -87,6 +87,7 @@ INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
   (pg_temp.ce(1),  'admin@consent-every-write.test',  now()),
   (pg_temp.ce(10), 'coach@consent-every-write.test',  now()),
   (pg_temp.ce(20), 'player@consent-every-write.test', now()),
+  (pg_temp.ce(21), 'adult@consent-every-write.test',  now()),
   (pg_temp.ce(30), 'parent@consent-every-write.test', now());
 
 INSERT INTO public.organizations (id, admin_user_id, name, join_code)
@@ -200,6 +201,55 @@ SELECT pg_temp.ce_refused(format($$SELECT public.log_match_for_player(%L, 'Rival
 -- G6: the coach must still be able to take back what the family could see.
 SELECT pg_temp.ce_allowed(format('UPDATE public.coach_shared_feedback SET published_at = NULL WHERE assessment_id = %L', current_setting('trak.ce_a1')), 1,
   '3 G6 CONTROL after withdrawal the coach can still retract the published message');
+-- Retraction must not carry new text (Tarek's #123 review).
+SELECT pg_temp.ce_refused(format('UPDATE public.coach_shared_feedback SET body = %L WHERE assessment_id = %L',
+  'Changed after withdrawal', current_setting('trak.ce_a1')),
+  '3 G6 changing an unpublished draft after withdrawal is refused');
+SELECT pg_temp.ce_refused(format('UPDATE public.coach_shared_feedback SET body = %L, published_at = NULL WHERE assessment_id = %L',
+  'Changed while retracting', current_setting('trak.ce_a1')),
+  '3 G6 mixing body changes with retraction after withdrawal is refused');
+
+-- ── 3b. Unknown age fails closed (MVP J1: a missing DOB counts as a minor) ──
+
+-- A roster row with no account behind it cannot hold consent.
+DO $test$
+DECLARE v_sp uuid;
+BEGIN
+  INSERT INTO public.squad_players (coach_user_id, player_name, status)
+  VALUES (pg_temp.ce(10), 'Unknown Age Synthetic', 'active') RETURNING id INTO v_sp;
+  PERFORM set_config('trak.ce_unknown', v_sp::text, true);
+END;
+$test$;
+SELECT pg_temp.ce_refused(format('INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, work_rate, tactical, attitude, technical, physical, coachability) VALUES (%L, %L, 7,7,7,7,7,7)',
+  pg_temp.ce(10), current_setting('trak.ce_unknown')),
+  '3b G1 an unlinked, unknown-age child cannot be assessed without consent');
+SELECT pg_temp.ce_refused(format('INSERT INTO public.session_attendance (session_id, squad_player_id, status) VALUES (%L, %L, %L)',
+  current_setting('trak.ce_s1'), current_setting('trak.ce_unknown'), 'present'),
+  '3b G1 an unlinked, unknown-age child cannot get attendance without consent');
+
+-- A linked 19-year-old needs no guardian; the same player with the DOB gone does.
+SELECT pg_temp.ce_as(pg_temp.ce(21), 'adult@consent-every-write.test');
+DO $test$
+BEGIN
+  PERFORM public.provision_my_profile(jsonb_build_object(
+    'role', 'player', 'full_name', 'Adult Synthetic',
+    'player_details', jsonb_build_object('date_of_birth', (current_date - interval '19 years')::date::text,
+                                         'position', 'Forward')));
+  PERFORM public.link_player_to_coach(current_setting('trak.ce_code'));
+END;
+$test$;
+SELECT pg_temp.ce_as(pg_temp.ce(10), 'coach@consent-every-write.test');
+SELECT set_config('trak.ce_adult_sp',
+  (SELECT id::text FROM public.squad_players WHERE linked_player_id = pg_temp.ce(21)), true);
+SELECT pg_temp.ce_allowed(format('INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, work_rate, tactical, attitude, technical, physical, coachability) VALUES (%L, %L, 7,7,7,7,7,7)',
+  pg_temp.ce(10), current_setting('trak.ce_adult_sp')), 1,
+  '3b CONTROL a linked 19-year-old is assessed without a guardian');
+RESET ROLE;
+UPDATE public.player_details SET date_of_birth = NULL WHERE user_id = pg_temp.ce(21);
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.ce_refused(format('INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, work_rate, tactical, attitude, technical, physical, coachability) VALUES (%L, %L, 6,6,6,6,6,6)',
+  pg_temp.ce(10), current_setting('trak.ce_adult_sp')),
+  '3b G1 a linked player with no date of birth is treated as a minor');
 
 -- ── 4. The child cannot write match records about themselves ──────────────
 
@@ -246,8 +296,8 @@ DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.ce_results;
-  IF total <> 21 THEN
-    RAISE EXCEPTION 'Consent on every write: % assertions ran; expected exactly 21', total;
+  IF total <> 27 THEN
+    RAISE EXCEPTION 'Consent on every write: % assertions ran; expected exactly 27', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'Consent on every write: % of % failed: %', failed, total,

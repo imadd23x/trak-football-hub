@@ -91,6 +91,13 @@ export default function PlayerHome() {
   const [mayHaveMissedHistory, setMayHaveMissedHistory] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
+  // J7 counts published messages the player opens. The message is read here now
+  // (TRAK-71), not behind a tap, so showing it is opening it.
+  const shownAssessmentId = coachAssessmentNote && !feedbackLoadFailed ? coachAssessment?.id : undefined
+  useEffect(() => {
+    if (shownAssessmentId) trackEvent('feedback_opened', { assessment_id: shownAssessmentId })
+  }, [shownAssessmentId])
+
   useEffect(() => {
     if (!user) return
     // This effect re-runs on an Auth refresh for the same account. Without a
@@ -359,7 +366,7 @@ export default function PlayerHome() {
           </div>
         )}
 
-        {user && <PlayerParentInviteCard playerUserId={user.id} />}
+        {user && <PlayerParentInviteCard playerUserId={user.id} hideWhenLinked />}
 
         {/* Identity */}
         <div className="py-2.5 pb-4">
@@ -661,47 +668,21 @@ export default function PlayerHome() {
                     </div>
                   ))}
                 </div>
+
+                {/* TRAK-71: the coach's message in full, here, with no tap-through. */}
+                {feedbackLoadFailed ? (
+                  <p role="alert" className="mt-4 text-[12px] text-white/55">
+                    Couldn't load your coach's message. Pull down to refresh and try again.
+                  </p>
+                ) : coachAssessmentNote ? (
+                  <div className="mt-4 pt-4 border-t border-white/[0.06]">
+                    <MetadataLabel text="MESSAGE FROM YOUR COACH" />
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-white/80 whitespace-pre-line">{coachAssessmentNote}</p>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
-        )}
-
-        {/* Feedback card. Shown for ANY assessment, not only ones carrying a
-            written note: gating on the note made the whole feedback screen
-            unreachable whenever a coach assessed without typing anything, and
-            the note is optional for them. Without a note the screen works from
-            the six category scores instead. */}
-        {coachAssessment && (
-          <button
-            onClick={() => navigate(`/player/feedback/${coachAssessment.id}`)}
-            className="w-full mt-3 text-left rounded-[18px] p-4 active:scale-[0.98] transition-transform"
-            style={{ background: 'rgba(200,242,90,0.07)', border: '1px solid rgba(200,242,90,0.18)' }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-[11px] flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(200,242,90,0.14)' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C8F25A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
-                  <path d="M19 3v4"/><path d="M21 5h-4"/>
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-white/88">
-                  {feedbackLoadFailed
-                    ? "Couldn't load your feedback"
-                    : coachAssessmentNote ? 'Your coach left feedback' : 'What to work on'}
-                </p>
-                <p className="text-[11px] text-white/40 mt-0.5 truncate">
-                  {feedbackLoadFailed
-                    ? 'Pull down to refresh and try again'
-                    : coachAssessmentNote
-                      ? `"${coachAssessmentNote}"`
-                      : 'Based on your latest assessment'}
-                </p>
-              </div>
-              <span className="text-[#C8F25A] text-[13px] flex-shrink-0">→</span>
-            </div>
-          </button>
         )}
 
         {/* Recent Matches */}

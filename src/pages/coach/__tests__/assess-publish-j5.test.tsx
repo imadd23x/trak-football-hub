@@ -1,6 +1,6 @@
 /**
  * J5 (MVP Requirements): everything on one screen. Six sliders produce the
- * band, then "Message to [first name]: they and their parents will see this."
+ * band, then "Message to [first name]: only [first name] sees this." (TRAK-63)
  * and an optional "Private note: only you can see this." Nothing reaches the
  * family until the coach presses Publish. A waiting-for-parent player cannot be
  * opened, and a consent withdrawal mid-edit fails the save and keeps the values.
@@ -98,17 +98,17 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('J5: one screen, message to the player, private note, publish', () => {
-  it('labels the message for the player and parents, and the note as private, message first', async () => {
+  it('labels the message for the player only, and the note as private, message first', async () => {
     showForm()
     await choose('player-b')
     await waitFor(() => expect(messageBox()).toBeEnabled())
-    expect(screen.getByText('They and their parents will see this.')).toBeInTheDocument()
+    // TRAK-63 (25 Sep): parents see bands only, never the coach's message.
+    expect(screen.getByText('Only Bella sees this.')).toBeInTheDocument()
+    expect(screen.queryByText(/parents/i)).toBeNull()
     expect(screen.getByText('Only you can see this.')).toBeInTheDocument()
     expect(screen.getByText(/Message to Bella/)).toBeInTheDocument()
     // Message box comes before the private note.
     expect(messageBox().compareDocumentPosition(noteBox()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    // The old label promised the player alone; parents read published messages too.
-    expect(screen.queryByText(/only the player sees this/i)).toBeNull()
   })
 
   it('Save keeps a new message as an unpublished draft', async () => {

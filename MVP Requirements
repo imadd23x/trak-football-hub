@@ -19,7 +19,7 @@ The loop:
 
   Academy registers the child -> parent consents -> child activates their
   account -> coach logs the match or training -> coach assesses and writes a
-  message -> player and parent see it.
+  message -> the player sees the message; the parent sees the bands.
 
 Cohort: one whole squad at one UAE academy, chosen by the academy, for eight
 weeks. The academy and the player count are not agreed yet. Rehearse for 25.
@@ -76,8 +76,12 @@ J5. Coach assessment and message
     plain words. If consent is withdrawn while the form is open, the save
     fails with a plain message and the values the coach entered are kept.
   - Everything is on one screen: six sliders produce the band, then two boxes.
-    "Message to [first name]: they and their parents will see this." and an
+    "Message to [first name]: only [first name] sees this." and an
     optional "Private note: only you can see this."
+  - Parents never see the coach's message; they see the bands. Decided by
+    Imad on 25 September 2026 after the second use-case test: a message
+    parents also read doubles the coach's workload and invites parent-coach
+    friction. Revisit with pilot feedback (TRAK-63).
   - Nothing reaches the family until the coach presses publish. If only part
     of a save works, the screen says what was saved and what was not.
   - An assessment belongs to a session that already happened: the session is
@@ -90,8 +94,9 @@ J6. Player and parent see it
     marked "new" until opened. Before the first assessment it says the player
     is waiting for their coach, not "Your card is ready".
   - Player and parent see the match and training history the coach logged.
-  - A parent sees the same for the selected child. With siblings, it shows
-    the right child every time.
+  - A parent sees the same bands and history for the selected child, but
+    not the coach's message (J5). With siblings, it shows the right child
+    every time.
   - A failed load shows a clear error and a retry button. It never shows an
     empty state that looks like "no data" (UC-X02).
 
@@ -134,7 +139,7 @@ keeps other work moving, but it does not count as a pass. The journey must be
 repaired and retested.
 
 Value (proposed; founders set the targets before launch):
-  - Share of published coach messages that the player or a parent opens
+  - Share of published coach messages that the player opens
     within 7 days.
   - Share of players who receive at least one published message every 14
     days.

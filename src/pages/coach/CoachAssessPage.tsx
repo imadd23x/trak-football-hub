@@ -258,12 +258,11 @@ function CoachAssessmentForm() {
                    stays published only if its text is unchanged; edited text
                    is withdrawn until it is published again.
        publish   — the same, and the message goes to the player and parents.
-       unpublish — the family stops seeing the message at once. */
-  const handleSave = async (action: 'save' | 'publish' | 'unpublish' = 'save') => {
+     Unpublish is not a save: see handleUnpublish below. */
+  const handleSave = async (action: 'save' | 'publish' = 'save') => {
     if (!user || !playerId || saving || !formReady || consentWait || saveRequest.current) return
     if (action === 'publish' && !message) return
-    const sharedPublishedNext =
-      action === 'publish' ? true : action === 'unpublish' ? false : liveUnchanged
+    const sharedPublishedNext = action === 'publish' ? true : liveUnchanged
     // Rewriting an unchanged, still-published message would re-stamp it and
     // mark it "new" for the family again. Leave it alone.
     const writeShared = (message.length > 0 || sharedExists) && !(action === 'save' && liveUnchanged)
@@ -379,7 +378,7 @@ function CoachAssessmentForm() {
           console.error('Shared feedback save failed:', sharedError)
           toast.error(
             `The scores${note.trim() ? ' and private note' : ''} are saved. Not saved: the message to ` +
-              `${firstName} (${sharedError.message}), so ${action === 'unpublish' ? 'the family can still see the old one' : 'nothing new reached the family'}. ` +
+              `${firstName} (${sharedError.message}), so nothing new reached the family. ` +
               `Your text is still here — try again.`,
             { duration: 12000 },
           )
@@ -393,8 +392,6 @@ function CoachAssessmentForm() {
       }
       if (action === 'publish') {
         toast.success(`Published. ${firstName} and their parents can read your message now.`)
-      } else if (action === 'unpublish') {
-        toast.success(`Unpublished. ${firstName} and their parents can no longer see the message.`)
       } else if (message && !sharedPublishedNext) {
         toast.success(`Assessment saved. Your message to ${firstName} has not been sent.`)
       } else {
@@ -414,6 +411,50 @@ function CoachAssessmentForm() {
       if (isCurrent()) {
         console.error('Assessment save interrupted:', error)
         toast.error('Could not finish saving. Your text is still here — please try again.')
+      }
+    } finally {
+      if (saveRequest.current === controller) saveRequest.current = null
+      if (isCurrent()) setSaving(false)
+    }
+  }
+
+  /* --- unpublish ---
+     Retraction only: the family stops seeing the message, and nothing else is
+     written. It must not depend on the scores or the private note saving, and
+     it stays available after consent is withdrawn, because the database keeps
+     the coach's right to retract then too (20260921110000, TRAK-14). Unsaved
+     edits on the screen stay on the screen. */
+  const handleUnpublish = async () => {
+    if (!user || !existingId || !sharedPublished || saving || !formReady || saveRequest.current) return
+    const controller = new AbortController()
+    saveRequest.current = controller
+    const isCurrent = () => !controller.signal.aborted && currentScope.current === scope
+    setSaving(true)
+    try {
+      const { data, error } = await supabase.from('coach_shared_feedback' as any)
+        .update({ published_at: null })
+        .eq('assessment_id', existingId).eq('coach_user_id', user.id)
+        .select('assessment_id').abortSignal(controller.signal).maybeSingle()
+      if (!isCurrent()) return
+      if (error) {
+        console.error('Unpublish failed:', error)
+        toast.error(`Not unpublished (${error.message}). ${firstName} and their parents can still see the message. Try again.`, { duration: 12000 })
+        return
+      }
+      // No row back means nothing changed: the message may have been removed,
+      // or this coach no longer owns it. Never report a retraction that did
+      // not happen.
+      if (!data) {
+        toast.error(`Not unpublished: the message could not be found. Reload to see what ${firstName} can read.`, { duration: 12000 })
+        return
+      }
+      setSharedPublished(false)
+      setPublishedBody(null)
+      toast.success(`Unpublished. ${firstName} and their parents can no longer see the message.`)
+    } catch (error) {
+      if (isCurrent()) {
+        console.error('Unpublish interrupted:', error)
+        toast.error(`Could not confirm the message was unpublished. ${firstName} may still see it. Try again.`)
       }
     } finally {
       if (saveRequest.current === controller) saveRequest.current = null
@@ -675,18 +716,20 @@ function CoachAssessmentForm() {
           >
             {saving ? 'Saving...' : message && !liveUnchanged ? 'Save Assessment (message not sent)' : 'Save Assessment \u2192'}
           </button>
-          {sharedPublished ? (
-            <button
-              type="button"
-              onClick={() => handleSave('unpublish')}
-              disabled={!playerId || saving || !formReady || consentWait}
-              className="w-full py-2.5 rounded-[10px] text-[11px] font-semibold text-white/50 border border-white/[0.07] disabled:opacity-30"
-            >
-              Unpublish message
-            </button>
-          ) : null}
         </div>
         </fieldset>
+        {/* Outside the consent-locked fieldset: retracting what the family can
+            already read is always allowed, even while the form is locked. */}
+        {sharedPublished && existingId ? (
+          <button
+            type="button"
+            onClick={() => void handleUnpublish()}
+            disabled={saving || !formReady}
+            className="w-full py-2.5 rounded-[10px] text-[11px] font-semibold text-white/50 border border-white/[0.07] disabled:opacity-30"
+          >
+            Unpublish message
+          </button>
+        ) : null}
       </div>
 
       {/* ---- 10. bottom nav ---- */}

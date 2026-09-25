@@ -23,8 +23,11 @@ const RLS_REFUSAL = { code: '42501', details: null, hint: null, message: 'new ro
 const existing = { id: 'assessment-a', work_rate: 8, tactical: 8, attitude: 8,
   technical: 8, physical: 8, coachability: 8, appearance: 'sub', session_id: null }
 
-interface Write { table: string; body: Record<string, unknown> }
+interface Write { table: string; method: 'post' | 'patch'; body: Record<string, unknown> }
 let writes: Write[]
+// refuseNote: the private-note write is refused. sharedGone: an update to the
+// shared message matches no row (removed, or no longer this coach's).
+let faults: { refuseNote: boolean; sharedGone: boolean }
 let consent: { required: boolean; afterRefusal: boolean; refuseInsert: boolean; refused: boolean }
 
 function showForm() {
@@ -46,6 +49,7 @@ const shared = () => writes.filter(w => w.table === 'coach_shared_feedback').map
 beforeEach(() => {
   writes = []
   consent = { required: false, afterRefusal: false, refuseInsert: false, refused: false }
+  faults = { refuseNote: false, sharedGone: false }
   server.use(
     http.get(endpoint('squad_players'), () => HttpResponse.json([
       { id: 'player-a', player_name: 'Alex Synthetic' },
@@ -68,9 +72,17 @@ beforeEach(() => {
           consent.refused = true
           return HttpResponse.json(RLS_REFUSAL, { status: 403 })
         }
-        writes.push({ table, body: await request.json() as Record<string, unknown> })
-        const id = new URL(request.url).searchParams.get('id')?.replace('eq.', '')
-        return HttpResponse.json(table === 'coach_assessments' ? [{ id: method === 'post' ? 'assessment-b' : id }] : [])
+        if (table === 'coach_assessment_notes' && faults.refuseNote) {
+          return HttpResponse.json(RLS_REFUSAL, { status: 403 })
+        }
+        writes.push({ table, method, body: await request.json() as Record<string, unknown> })
+        const params = new URL(request.url).searchParams
+        const id = params.get('id')?.replace('eq.', '')
+        if (table === 'coach_assessments') return HttpResponse.json([{ id: method === 'post' ? 'assessment-b' : id }])
+        if (table === 'coach_shared_feedback' && method === 'patch' && !faults.sharedGone) {
+          return HttpResponse.json([{ assessment_id: params.get('assessment_id')?.replace('eq.', '') }])
+        }
+        return HttpResponse.json([])
       }))),
   )
 })
@@ -126,14 +138,16 @@ describe('J5: one screen, message to the player, private note, publish', () => {
     expect(shared()).toEqual([expect.objectContaining({ body: 'Published feedback for Alex and more', published_at: null })])
   })
 
-  it('Unpublish retracts a published message at once', async () => {
+  it('Unpublish retracts a published message at once, and writes nothing else', async () => {
     showForm()
     await choose('player-a')
     await screen.findByDisplayValue('Published feedback for Alex')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Unpublish message' })).toBeEnabled())
     await userEvent.click(screen.getByRole('button', { name: 'Unpublish message' }))
-    await screen.findByText('Coach home')
-    expect(shared()).toEqual([expect.objectContaining({ body: 'Published feedback for Alex', published_at: null })])
+    await screen.findByText(/Not sent\. Nothing reaches them/)
+    expect(writes).toEqual([{ table: 'coach_shared_feedback', method: 'patch', body: { published_at: null } }])
+    expect(screen.queryByRole('button', { name: 'Unpublish message' })).toBeNull()
+    expect(messageBox()).toHaveValue('Published feedback for Alex')
   })
 
   it('offers no Publish when there is no message', async () => {
@@ -182,5 +196,61 @@ describe('J5: consent', () => {
     expect(noteBox()).toHaveValue('Watch the left foot')
     expect(screen.getAllByRole('slider')[0]).toHaveValue('9')
     expect(messageBox()).toBeDisabled()
+  })
+})
+
+// Tarek's #117 review: Unpublish used to run the whole save first, so a
+// retraction depended on unrelated writes succeeding.
+describe('J5: Unpublish is a retraction and nothing else', () => {
+  it('does not save edited scores or a private draft', async () => {
+    showForm()
+    await choose('player-a')
+    await screen.findByDisplayValue('Published feedback for Alex')
+    await waitFor(() => expect(noteBox()).toBeEnabled())
+    fireEvent.change(screen.getAllByRole('slider')[0], { target: { value: '3' } })
+    await userEvent.type(noteBox(), 'Private draft')
+    await userEvent.click(screen.getByRole('button', { name: 'Unpublish message' }))
+    await screen.findByText(/Not sent\. Nothing reaches them/)
+    expect(writes.map(w => w.table)).toEqual(['coach_shared_feedback'])
+    // The unsaved edits are still on screen, still unsaved.
+    expect(screen.getAllByRole('slider')[0]).toHaveValue('3')
+    expect(noteBox()).toHaveValue('Private draft')
+  })
+
+  it('still retracts when the private note would have been refused', async () => {
+    faults.refuseNote = true
+    showForm()
+    await choose('player-a')
+    await screen.findByDisplayValue('Published feedback for Alex')
+    await waitFor(() => expect(noteBox()).toBeEnabled())
+    await userEvent.type(noteBox(), 'Private draft')
+    await userEvent.click(screen.getByRole('button', { name: 'Unpublish message' }))
+    await screen.findByText(/Not sent\. Nothing reaches them/)
+    expect(shared()).toEqual([{ published_at: null }])
+  })
+
+  it('stays available after consent is withdrawn, while everything else is locked', async () => {
+    consent.required = true
+    showForm()
+    await choose('player-a')
+    await screen.findByDisplayValue('Published feedback for Alex')
+    expect(await screen.findByText(/waiting for a parent/i)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Unpublish message' })).toBeEnabled())
+    expect(messageBox()).toBeDisabled()
+    expect(screen.getByRole('button', { name: /save assessment/i })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Unpublish message' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Unpublish message' })).toBeNull())
+    expect(writes).toEqual([{ table: 'coach_shared_feedback', method: 'patch', body: { published_at: null } }])
+  })
+
+  it('says so when the retraction matched no row, and keeps offering it', async () => {
+    faults.sharedGone = true
+    showForm()
+    await choose('player-a')
+    await screen.findByDisplayValue('Published feedback for Alex')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Unpublish message' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Unpublish message' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Unpublish message' })).toBeEnabled())
+    expect(screen.getByText(/Published\. They can read it now/)).toBeInTheDocument()
   })
 })

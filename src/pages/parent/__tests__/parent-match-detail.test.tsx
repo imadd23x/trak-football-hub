@@ -5,7 +5,7 @@
  * before (score, opponent, competition, venue, band), and so does a failed
  * approval read: it fails closed.
  */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
@@ -38,9 +38,11 @@ const fullMatch = (child: string) => ({
   position: 'Midfielder', age_group: 'U15', minutes_played: 64, goals: 2, assists: 1,
 })
 let awaiting: 'fail' | Array<Record<string, unknown>> = []
+let approvalReads = 0
 
 beforeEach(() => {
   awaiting = []
+  approvalReads = 0
   server.use(
     http.get(endpoint('player_parent_links'), () => HttpResponse.json([ALEX, ZARA].map(player_user_id => ({ player_user_id })))),
     http.get(endpoint('profiles'), () => HttpResponse.json([ALEX, ZARA].map(user_id => ({ user_id, full_name: NAMES[user_id] })))),
@@ -57,8 +59,10 @@ beforeEach(() => {
     http.get(endpoint('squad_players'), () => HttpResponse.json([])),
     http.get(endpoint('coach_assessments'), () => HttpResponse.json([])),
     http.get(endpoint('recognition_awards'), () => HttpResponse.json([])),
-    http.post(endpoint('rpc/get_children_awaiting_consent'), () =>
-      awaiting === 'fail' ? HttpResponse.json({ message: 'unavailable' }, { status: 503 }) : HttpResponse.json(awaiting)),
+    http.post(endpoint('rpc/get_children_awaiting_consent'), () => {
+      approvalReads += 1
+      return awaiting === 'fail' ? HttpResponse.json({ message: 'unavailable' }, { status: 503 }) : HttpResponse.json(awaiting)
+    }),
   )
 })
 afterEach(cleanup)
@@ -106,6 +110,9 @@ describe('parent match detail (TRAK-73)', () => {
     awaiting = [{ player_user_id: ALEX, full_name: 'Alex', age_years: 14 }]
     renderParent('/parent/match/match-Alex')
     expect(await screen.findByText('3–1')).toBeInTheDocument()
+    // Limited because Alex is waiting, not because the list is still loading.
+    await waitFor(() => expect(approvalReads).toBe(1))
+    await new Promise(resolve => setTimeout(resolve, 50))
     expect(screen.getByText('League')).toBeInTheDocument()
     expect(screen.queryByText("64'")).not.toBeInTheDocument()
     expect(screen.queryByText('Midfielder')).not.toBeInTheDocument()

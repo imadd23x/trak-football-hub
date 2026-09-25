@@ -1,6 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { inferTimeKnown, fillTimeKnown } from '../../supabase/functions/parse-schedule/time-known'
 
 /**
@@ -19,10 +17,9 @@ import { inferTimeKnown, fillTimeKnown } from '../../supabase/functions/parse-sc
  * The parser is the last point that still knows, because it saw the text.
  */
 
-const INDEX = readFileSync(
-  join(process.cwd(), 'supabase', 'functions', 'parse-schedule', 'index.ts'),
-  'utf8',
-)
+// G7 disables the parsing endpoint. Its former prompt/schema integration checks
+// are replaced by real-handler refusal tests in pilot-ai-disabled.test.ts.
+// Retain the pure helper contract below for any future approved parser work.
 
 describe('inferTimeKnown — the fallback, used only when the model omits the field', () => {
   it('reads a stated time as known', () => {
@@ -90,32 +87,5 @@ describe('fillTimeKnown — every event carries a boolean', () => {
       events: [null, 'nonsense', { title: 'ok', starts_at: '2026-03-01T18:00:00' }] as any[],
     })
     expect(parsed.events[2].time_known).toBe(true)
-  })
-})
-
-describe('the function actually applies the contract', () => {
-  it('declares time_known as required in the tool schema', () => {
-    // A field the model may silently drop is not a contract callers can use.
-    expect(
-      /required:\s*\[[^\]]*"time_known"/.test(INDEX),
-      'time_known is not in the tool schema\'s required list, so the model may omit it.',
-    ).toBe(true)
-  })
-
-  it('calls fillTimeKnown before returning', () => {
-    expect(
-      INDEX.includes('fillTimeKnown(parsed)'),
-      'parse-schedule returns the parsed payload without guaranteeing time_known, so callers ' +
-        'get undefined some of the time and go back to guessing from midnight.',
-    ).toBe(true)
-  })
-
-  it('tells the model that an explicit midnight is a known time', () => {
-    // The prompt is the only thing that can get the one ambiguous case right.
-    expect(
-      /midnight/i.test(INDEX) && /time_known/.test(INDEX),
-      'the system prompt does not tell the model how to treat an explicit midnight kick-off, ' +
-        'which is the single case the midnight heuristic cannot get right.',
-    ).toBe(true)
   })
 })

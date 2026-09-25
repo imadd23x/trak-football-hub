@@ -257,7 +257,9 @@ export default function CoachAddSession() {
       teamScore: scoreUs === '' ? undefined : Number(scoreUs),
     }).length > 0)
 
-  const canSave = !saving && !rosterLoading && incompleteRecords.length === 0 && impossibleRecords.length === 0 && (
+  // A failed roster is not an empty one: saving now would drop the players
+  // the coach took (Tarek's #126 re-review).
+  const canSave = !saving && !rosterLoading && !rosterFailed && incompleteRecords.length === 0 && impossibleRecords.length === 0 && (
     isMatch    ? opponent.trim().length > 0 && scoreUs !== '' && scoreThem !== ''
     : type === 'training' ? trainingFocus.size > 0
     : title.trim().length > 0

@@ -9,6 +9,7 @@ import { computeMatchScore } from '@/lib/rating-engine'
 import { goalsKey, assistsKey } from '@/lib/match-input-keys'
 import { trackEvent } from '@/lib/telemetry'
 import { validateMatchInput, MATCH_LIMITS } from '@/lib/match-input-rules'
+import { localTodayISO } from '@/lib/event-time'
 
 type SquadPlayer = {
   id: string
@@ -87,7 +88,7 @@ export default function CoachAddSession() {
     () => (window.location.pathname.endsWith('/sessions/quick') ? 'match' : 'training'),
   )
   const [title, setTitle] = useState('')
-  const [date,  setDate]  = useState(new Date().toISOString().split('T')[0])
+  const [date,  setDate]  = useState(localTodayISO)
   const [notes, setNotes] = useState('')
 
   // Training-specific

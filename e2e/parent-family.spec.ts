@@ -34,6 +34,7 @@ await context.route('**/*',async route=>{
  if(u.pathname==='/rest/v1/squad_players') return json([{id:u.searchParams.get('linked_player_id')?.slice(3)}]);
  if(u.pathname==='/rest/v1/coach_assessments') return json([{id:'assessment',created_at:'2026-09-01T12:00:00Z',coach_user_id:coach,coach_rating:0,work_rate:0,tactical:0,attitude:0,technical:0,physical:0,coachability:0}]);
  if(u.pathname==='/rest/v1/recognition_awards') return json([]);
+ if(u.pathname==='/rest/v1/coach_shared_feedback') return json([]);
  if(u.pathname==='/rest/v1/matches') {
    if(failMatches) return json({message:'Synthetic network error'},503);
    return json([{id:'match-'+u.searchParams.get('user_id'),match_date:'2026-09-01',created_at:'2026-09-18T12:00:00Z',opponent:u.searchParams.get('user_id')===`eq.${zara}`?'Zara Opposition':'Alex Opposition',team_score:0,opponent_score:0,computed_rating:0,competition:'Synthetic League',venue:'Test Pitch'}]);

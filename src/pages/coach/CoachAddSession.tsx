@@ -220,7 +220,10 @@ export default function CoachAddSession() {
     scoreUs === '' ? undefined : Number(scoreUs),
   )
 
-  const canSave = !saving && incompleteRecords.length === 0 && impossibleRecords.length === 0 && !teamGoalsError && (
+  // J4 records what happened; planning ahead is the parked calendar (TRAK-67, TRAK-25).
+  const futureDate = date > localTodayISO()
+
+  const canSave = !saving && !futureDate && incompleteRecords.length === 0 && impossibleRecords.length === 0 && !teamGoalsError && (
     isMatch    ? opponent.trim().length > 0 && scoreUs !== '' && scoreThem !== ''
     : type === 'training' ? trainingFocus.size > 0
     : title.trim().length > 0
@@ -548,7 +551,7 @@ export default function CoachAddSession() {
             {/* Date */}
             <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]">
               <MetadataLabel text="DATE" />
-              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              <input type="date" aria-label="Session date" max={localTodayISO()} value={date} onChange={e => setDate(e.target.value)}
                 className="w-full bg-transparent text-[15px] text-white/88 outline-none mt-2"
                 style={{ fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark' }} />
             </div>
@@ -903,7 +906,7 @@ export default function CoachAddSession() {
             {/* Date */}
             <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]">
               <MetadataLabel text="DATE" />
-              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              <input type="date" aria-label="Session date" max={localTodayISO()} value={date} onChange={e => setDate(e.target.value)}
                 className="w-full bg-transparent text-[15px] text-white/88 outline-none mt-2"
                 style={{ fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark' }} />
             </div>
@@ -970,7 +973,7 @@ export default function CoachAddSession() {
 
             <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]">
               <MetadataLabel text="DATE" />
-              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              <input type="date" aria-label="Session date" max={localTodayISO()} value={date} onChange={e => setDate(e.target.value)}
                 className="w-full bg-transparent text-[15px] text-white/88 outline-none mt-2"
                 style={{ fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark' }} />
             </div>
@@ -1028,6 +1031,12 @@ export default function CoachAddSession() {
       {/* Sticky save */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-5 pb-5 pt-3"
         style={{ background: 'linear-gradient(180deg,rgba(10,10,11,0) 0%,#0A0A0B 35%)' }}>
+        {futureDate && (
+          <p role="alert" className="text-[11px] text-center text-[rgb(251,191,36)] mb-2"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            A session can't be dated in the future. Log it once it has happened.
+          </p>
+        )}
         {teamGoalsError && (
           <p role="alert" className="text-[11px] text-center text-[rgb(251,191,36)] mb-2"
             style={{ fontFamily: "'DM Sans', sans-serif" }}>

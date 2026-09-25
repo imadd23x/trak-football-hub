@@ -259,6 +259,26 @@ SELECT pg_temp.assert_true(
   (SELECT count(*) = 1 FROM public.roster_children WHERE id = 'a9300000-0000-0000-0000-000000000002'),
   'the refused coach delete left the admission in place');
 
+-- Tarek's #128 re-review: a coach may relink their own squad row to
+-- themselves (the self-link rule allows linking to the caller). That must not
+-- turn into authority to erase the admission. Only the admission's own
+-- player_user_id, which no app role can write, counts as the child.
+SAVEPOINT coach_self_link;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
+UPDATE public.squad_players SET linked_player_id = auth.uid()
+  WHERE id = 'a9200000-0000-0000-0000-000000000002';
+SELECT pg_temp.assert_true(pg_temp.outcome($$
+  DELETE FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000002'
+$$) = '42501', 'a coach who links a rostered row to themselves still cannot delete it');
+RESET ROLE;
+SELECT pg_temp.assert_true(
+  (SELECT count(*) = 1 FROM public.roster_children WHERE id = 'a9300000-0000-0000-0000-000000000002')
+  AND EXISTS (SELECT 1 FROM public.roster_guardians WHERE roster_child_id = 'a9300000-0000-0000-0000-000000000002'),
+  'the relinked admission and its guardians survive');
+ROLLBACK TO SAVEPOINT coach_self_link;
+SELECT set_config('request.jwt.claims', '', true);
+
 -- ── Account deletion through the real RPC (Tarek's #128 review) ─
 -- Each call runs delete_my_account() as the signed-in user, checks the
 -- outcome, then rolls itself back so the next call sees the same fixtures.

@@ -165,14 +165,25 @@ REVOKE ALL ON FUNCTION public.roster_child_matches_squad_academy() FROM PUBLIC, 
 -- account erasure (delete_my_account(), signed in as that child). Any other
 -- signed-in request is refused, whether it comes straight from the app or
 -- through a SECURITY DEFINER function the coach calls.
+--
+-- "That child" is the admission's own player_user_id, never the squad row's
+-- linked_player_id: a coach can relink their own squad row to themselves, so
+-- trusting that field let a coach manufacture the erasure exception (Tarek,
+-- #128 re-review). No app role can write roster_children, so player_user_id
+-- is only ever set by the admission path. Until TRAK-48 slice 3 sets it at
+-- claim time, a rostered child's own erasure is refused here rather than
+-- taking the admission with it.
 CREATE OR REPLACE FUNCTION public.refuse_app_delete_of_rostered_squad_row()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
 AS $fn$
 BEGIN
   IF auth.uid() IS NOT NULL
-     AND auth.uid() IS DISTINCT FROM OLD.linked_player_id
-     AND EXISTS (SELECT 1 FROM public.roster_children rc WHERE rc.squad_player_id = OLD.id) THEN
+     AND EXISTS (
+       SELECT 1 FROM public.roster_children rc
+       WHERE rc.squad_player_id = OLD.id
+         AND rc.player_user_id IS DISTINCT FROM auth.uid()
+     ) THEN
     RAISE EXCEPTION 'This player was admitted by the academy. Ask Trak to remove them from the roster.'
       USING ERRCODE = '42501';
   END IF;

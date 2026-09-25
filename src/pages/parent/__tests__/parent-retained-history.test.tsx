@@ -42,7 +42,6 @@ let hiddenNames: boolean
 let failNames: boolean
 let messages: Record<string, string>
 let messageFilters: string[]
-let failMessages: boolean
 let client: QueryClient
 const table = (name: string) => `${url}/rest/v1/${name}`
 const childFrom = (request: Request, field: string) => new URL(request.url).searchParams.get(field)?.includes(zara) ? zara : alex
@@ -53,7 +52,7 @@ beforeEach(async () => {
   await supabase.auth.initialize()
   localStorage.setItem('sb-test-auth-token', JSON.stringify(session()))
   nameFilters = []; hiddenNames = false; failNames = false
-  messages = {}; messageFilters = []; failMessages = false
+  messages = {}; messageFilters = []
   client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
   assessments = Object.fromEntries([alex, zara].map((child, index) => [child, [0, 1].map(order => ({
     id: id(100 + index * 10 + order), coach_user_id: index ? coachB : coachA,
@@ -89,11 +88,10 @@ beforeEach(async () => {
     http.get(table('recognition_awards'), ({ request }) => HttpResponse.json(awards[childFrom(request, 'squad_player_id')])),
     http.get(table('matches'), ({ request }) => HttpResponse.json([{ id: id(300), created_at: '2026-09-18T11:00:00Z', match_date: '2026-09-18', opponent: `${label(childFrom(request, 'user_id'))} opposition`,
       competition: 'League', venue: null, computed_rating: 0, team_score: 0, opponent_score: 0 }])),
-    // Only published rows are readable (RLS); the client asks for them explicitly.
+    // Records any request: parents must never ask for the coach's message (TRAK-63).
     http.get(table('coach_shared_feedback'), ({ request }) => {
       const params = new URL(request.url).searchParams
       messageFilters.push(`${params.get('assessment_id')} ${params.get('published_at')}`)
-      if (failMessages) return HttpResponse.json({ code: '42501', message: 'Synthetic denied message query' }, { status: 403 })
       const body = messages[params.get('assessment_id')?.slice(3) ?? '']
       return HttpResponse.json(body ? [{ body }] : [])
     }),
@@ -170,35 +168,20 @@ describe('parent retained coach history through the real AuthProvider and SDK', 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it("shows the selected child's published coach message and never the sibling's (J6)", async () => {
+  // TRAK-63 (Imad, 25 Sep): parents see the bands, never the coach's message.
+  // A published message exists for both children; the parent app must neither
+  // show it nor ask for it.
+  it("shows the bands but never the coach's published message, for either child", async () => {
     messages[assessments[alex][0].id] = 'Alex: keep working on your first touch.'
     messages[assessments[zara][0].id] = 'Zara: great pressing this week.'
     mount(); await screen.findByText('Alex opposition')
-    const region = await screen.findByRole('region', { name: 'Message from the coach' })
-    expect(within(region).getByText(/Alex: keep working on your first touch\./)).toBeInTheDocument()
-    expect(screen.queryByText(/Zara: great pressing/)).not.toBeInTheDocument()
-    expect(messageFilters).toContain(`eq.${assessments[alex][0].id} not.is.null`)
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: zara } })
-    await screen.findByText(/Zara: great pressing this week\./)
-    expect(screen.queryByText(/Alex: keep working/)).not.toBeInTheDocument()
-  })
-
-  it('shows no message section when the latest assessment has no published message', async () => {
-    messages[assessments[alex][1].id] = 'An older message the coach wrote.'
-    mount(); await screen.findByText('Alex opposition')
+    expect(screen.getByRole('region', { name: 'Latest coach assessment' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Message from the coach' })).not.toBeInTheDocument()
-    expect(screen.queryByText(/An older message/)).not.toBeInTheDocument()
-  })
-
-  it('treats a failed message read as a retryable error, not as no message', async () => {
-    messages[assessments[alex][0].id] = 'Alex: keep working on your first touch.'
-    failMessages = true
-    mount(); await screen.findByRole('alert')
-    expect(screen.queryByText('No coach assessments yet.')).not.toBeInTheDocument()
-    failMessages = false
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    await screen.findByText(/Alex: keep working on your first touch\./)
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(/keep working on your first touch/)).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: zara } })
+    await screen.findByText('Zara opposition')
+    expect(screen.queryByText(/great pressing this week/)).not.toBeInTheDocument()
+    expect(messageFilters).toEqual([])
   })
 
   it('does not apply a late Alex coach-name response after switching to Zara', async () => {

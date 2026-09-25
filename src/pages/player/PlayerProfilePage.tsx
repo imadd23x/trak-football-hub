@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { useAvatarUrl } from '@/hooks/use-avatar-url'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
-import { IconMatch, IconPassport, IconHowItWorks } from '@/components/icons/TrakIcons'
+import { IconPassport, IconHowItWorks } from '@/components/icons/TrakIcons'
 import { ChevronRight, Settings as SettingsIcon } from 'lucide-react'
 import { trackEvent } from '@/lib/telemetry'
 import { bandForScore } from '@/lib/rating-engine'
@@ -16,8 +15,6 @@ type TrendFilter = 'last5' | 'last10' | 'all'
 
 export default function PlayerProfilePage() {
   const { user, profile } = useAuth()
-  // Signed, never the stored value: the avatars bucket is private (F-3).
-  const avatarSrc = useAvatarUrl(profile?.avatar_url)
   const navigate = useNavigate()
   const location = useLocation()
   const [details, setDetails] = useState<any>(null)
@@ -89,10 +86,9 @@ export default function PlayerProfilePage() {
         {/* Avatar + Identity */}
         <div className="text-center mb-6">
           <div className="w-[72px] h-[72px] rounded-[22px] overflow-hidden bg-[#202024] border border-[rgba(200,242,90,0.18)] mx-auto mb-3 flex items-center justify-center">
-            {avatarSrc
-              ? <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" />
-              : <IconMatch size={32} color="#C8F25A" />
-            }
+            <span className="text-2xl font-semibold text-primary" aria-hidden="true">
+              {(profile?.full_name || '?').charAt(0).toUpperCase()}
+            </span>
           </div>
           <p className="text-[20px] font-semibold text-white/88 tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.02em' }}>
             {profile?.full_name}
@@ -126,7 +122,7 @@ export default function PlayerProfilePage() {
             <div>
               <MetadataLabel text="MY PASSPORT" />
               <p className="text-[12px] text-white/55 mt-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Career history, seasons & verified stats
+                Coming soon
               </p>
             </div>
           </div>

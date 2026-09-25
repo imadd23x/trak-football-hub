@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCsv, validateRoster } from '../../scripts/load-roster.mjs'
+import { parseCsv, planLoad, validateRoster } from '../../scripts/load-roster.mjs'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
 // written. Synthetic addresses only.
@@ -71,5 +71,21 @@ describe('load-roster validation', () => {
 
   it('parses quoted fields, doubled quotes and CRLF', () => {
     expect(parseCsv('a,"b ""x"", c"\r\nd,e\r\n')).toEqual([['a', 'b "x", c'], ['d', 'e']])
+  })
+
+  it('resumes a stopped load: skips children already in this academy, refuses ones in another', () => {
+    const { rows } = validateRoster(file(
+      'A,2011-01-01,U15,a@roster.test,g@roster.test,c@roster.test',
+      'B,2011-01-01,U15,b@roster.test,g@roster.test,c@roster.test',
+      'C,2011-01-01,U15,c1@roster.test,g@roster.test,c@roster.test',
+    ), TODAY)
+    const org = 'org-a'
+    expect(planLoad(rows, [{ child_email: 'A@Roster.test', organization_id: org }], org)).toMatchObject({
+      skipped: [2], conflicts: [], toLoad: [{ line: 3 }, { line: 4 }],
+    })
+    expect(planLoad(rows, [{ child_email: 'b@roster.test', organization_id: 'org-b' }], org)).toMatchObject({
+      skipped: [], conflicts: [3],
+    })
+    expect(planLoad(rows, [], org).toLoad).toHaveLength(3)
   })
 })

@@ -22,6 +22,12 @@
 // call to admit_roster_child(), which admits the child, the squad row and
 // every guardian together or not at all. The database repeats every check
 // made here; this file exists to catch a bad file before anything is written.
+//
+// A validation problem loads nothing. A refusal from the database stops the
+// load at that line, with every earlier child already admitted, each whole.
+// Fix the line and run the same file again: children already admitted to
+// this academy are skipped by child_email and the rest load. A re-run never
+// changes a child who is already admitted.
 
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -113,6 +119,23 @@ export function validateRoster(text, { today = new Date().toISOString().slice(0,
   return { rows, errors };
 }
 
+// Splits validated rows into those still to load and those already admitted.
+// admitted is [{ child_email, organization_id }] for the file's addresses. An
+// address admitted to this academy is skipped, so a stopped load can resume.
+// One admitted to another academy is a conflict: nothing loads.
+export function planLoad(rows, admitted, org) {
+  const academyOf = new Map(admitted.map(a => [normalizeEmail(a.child_email), a.organization_id]));
+  const toLoad = [];
+  const skipped = [];
+  const conflicts = [];
+  for (const r of rows) {
+    if (!academyOf.has(r.child_email)) toLoad.push(r);
+    else if (academyOf.get(r.child_email) === org) skipped.push(r.line);
+    else conflicts.push(r.line);
+  }
+  return { toLoad, skipped, conflicts };
+}
+
 function parseArgs(argv) {
   const out = { apply: false };
   for (let i = 0; i < argv.length; i++) {
@@ -149,7 +172,7 @@ async function main() {
   console.log(`[load-roster] ${rows.length} valid row(s), ${guardians} guardian address(es), ${errors.length} problem(s).`);
   for (const e of errors) console.log(`[load-roster] ${e}`);
   if (errors.length) {
-    console.log('[load-roster] Nothing loaded. Fix the file and run again; a partial roster is never loaded.');
+    console.log('[load-roster] Nothing loaded. Fix the file and run again; a file with a problem loads nothing.');
     process.exitCode = 1;
     return;
   }
@@ -176,8 +199,23 @@ async function main() {
     return;
   }
 
+  const { data: admitted, error: admittedError } = await admin
+    .from('roster_children')
+    .select('child_email, organization_id')
+    .in('child_email', rows.map(r => r.child_email));
+  if (admittedError) throw new Error(`Could not check existing admissions: ${admittedError.message}`);
+  const { toLoad, skipped, conflicts } = planLoad(rows, admitted, args.org);
+  if (conflicts.length) {
+    console.log(`[load-roster] The child on line(s) ${conflicts.join(', ')} is already admitted to another academy. Nothing loaded.`);
+    process.exitCode = 1;
+    return;
+  }
+  if (skipped.length) {
+    console.log(`[load-roster] Line(s) ${skipped.join(', ')} already admitted to this academy; skipped, not changed.`);
+  }
+
   let loaded = 0;
-  for (const r of rows) {
+  for (const r of toLoad) {
     const { error } = await admin.rpc('admit_roster_child', {
       p_organization_id: args.org,
       p_coach_user_id: coaches.get(r.coach_email),
@@ -190,16 +228,15 @@ async function main() {
       p_source_file: args.file.split('/').pop(),
     });
     if (error) {
-      // Rows before this one are admitted; each is whole. Re-running the file
-      // refuses them as already admitted, so fix this line and load the rest.
+      // Rows before this one are admitted, each whole. A re-run skips them.
       console.log(`[load-roster] Line ${r.line} refused (${error.code ?? 'error'}): ${error.message}`);
-      console.log(`[load-roster] Stopped. ${loaded} child(ren) admitted before line ${r.line}.`);
+      console.log(`[load-roster] Stopped. ${loaded} child(ren) admitted before line ${r.line}. Fix that line and run the same file again; admitted children are skipped.`);
       process.exitCode = 1;
       return;
     }
     loaded++;
   }
-  console.log(`[load-roster] Admitted ${loaded} child(ren) into ${args.org}.`);
+  console.log(`[load-roster] Admitted ${loaded} child(ren) into ${args.org}; ${skipped.length} already admitted.`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

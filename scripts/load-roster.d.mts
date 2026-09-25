@@ -15,3 +15,8 @@ export declare function validateRoster(
   text: string,
   options?: { today?: string },
 ): { rows: RosterRow[]; errors: string[] }
+export declare function planLoad(
+  rows: RosterRow[],
+  admitted: { child_email: string; organization_id: string }[],
+  org: string,
+): { toLoad: RosterRow[]; skipped: number[]; conflicts: number[] }

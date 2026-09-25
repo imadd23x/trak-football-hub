@@ -28,8 +28,14 @@
 
 CREATE TABLE public.roster_children (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id uuid NOT NULL REFERENCES public.organizations(id),
-  squad_player_id uuid NOT NULL UNIQUE REFERENCES public.squad_players(id),
+  -- Both cascade, like every other reference to squad_players, so account
+  -- deletion keeps working once a child is admitted: delete_my_account()
+  -- removes a player's linked squad row and an academy admin's organization.
+  -- A child who erases their account therefore erases their admission too;
+  -- the academy re-loads them if they come back. A coach cannot trigger the
+  -- cascade: see refuse_app_delete_of_rostered_squad_row() below.
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  squad_player_id uuid NOT NULL UNIQUE REFERENCES public.squad_players(id) ON DELETE CASCADE,
   date_of_birth   date NOT NULL,
   child_email     text NOT NULL,
   player_user_id  uuid UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -149,6 +155,36 @@ CREATE TRIGGER roster_children_matches_squad_academy
 -- Trigger functions are not callable as RPCs.
 REVOKE ALL ON FUNCTION public.roster_email_roles_disjoint() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.roster_child_matches_squad_academy() FROM PUBLIC, anon, authenticated;
+
+-- ── A coach cannot un-admit a child (J1, TRAK-62) ───────────
+-- Coaches hold DELETE on their own squad rows ("Coaches can delete own squad
+-- players"). With the cascade above, deleting a rostered child's squad row
+-- would silently delete the academy's admission. J1: only the concierge
+-- roster adds or removes children. So a rostered row can be deleted only by
+-- the operator (service_role, no signed-in user) or by the child's own
+-- account erasure (delete_my_account(), signed in as that child). Any other
+-- signed-in request is refused, whether it comes straight from the app or
+-- through a SECURITY DEFINER function the coach calls.
+CREATE OR REPLACE FUNCTION public.refuse_app_delete_of_rostered_squad_row()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $fn$
+BEGIN
+  IF auth.uid() IS NOT NULL
+     AND auth.uid() IS DISTINCT FROM OLD.linked_player_id
+     AND EXISTS (SELECT 1 FROM public.roster_children rc WHERE rc.squad_player_id = OLD.id) THEN
+    RAISE EXCEPTION 'This player was admitted by the academy. Ask Trak to remove them from the roster.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN OLD;
+END;
+$fn$;
+
+CREATE TRIGGER squad_players_refuse_app_delete_of_rostered
+  BEFORE DELETE ON public.squad_players
+  FOR EACH ROW EXECUTE FUNCTION public.refuse_app_delete_of_rostered_squad_row();
+
+REVOKE ALL ON FUNCTION public.refuse_app_delete_of_rostered_squad_row() FROM PUBLIC, anon, authenticated;
 
 -- ── The operator's load, one child at a time ────────────────
 -- Creates the coach-facing squad row, the roster row and every guardian row

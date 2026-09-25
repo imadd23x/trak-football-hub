@@ -42,13 +42,17 @@ INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
   ('a9000000-0000-0000-0000-000000000003', 'coach-a@roster.test', now()),
   ('a9000000-0000-0000-0000-000000000004', 'child-a@roster.test', now()),
   ('a9000000-0000-0000-0000-000000000005', 'guardian-a@roster.test', now()),
-  ('a9000000-0000-0000-0000-000000000006', 'coach-b@roster.test', now());
+  ('a9000000-0000-0000-0000-000000000006', 'coach-b@roster.test', now()),
+  ('a9000000-0000-0000-0000-000000000007', 'unrostered-child@roster.test', now());
 
 INSERT INTO public.profiles (user_id, role, full_name) VALUES
   ('a9000000-0000-0000-0000-000000000003', 'coach', 'Roster Coach'),
   ('a9000000-0000-0000-0000-000000000004', 'player', 'Roster Child'),
   ('a9000000-0000-0000-0000-000000000005', 'parent', 'Roster Guardian'),
-  ('a9000000-0000-0000-0000-000000000006', 'coach', 'Other Academy Coach');
+  ('a9000000-0000-0000-0000-000000000006', 'coach', 'Other Academy Coach'),
+  ('a9000000-0000-0000-0000-000000000001', 'club', 'Roster Academy Admin'),
+  ('a9000000-0000-0000-0000-000000000002', 'club', 'Unrostered Academy Admin'),
+  ('a9000000-0000-0000-0000-000000000007', 'player', 'Unrostered Control');
 
 INSERT INTO public.organizations (id, admin_user_id, name, join_code) VALUES
   ('a9100000-0000-0000-0000-000000000001', 'a9000000-0000-0000-0000-000000000001', 'Roster Academy A', 'ROSTER-A'),
@@ -62,9 +66,11 @@ INSERT INTO public.coach_details (user_id, organization_id) VALUES
 INSERT INTO public.squad_players (id, coach_user_id, player_name, age_group, linked_player_id) VALUES
   ('a9200000-0000-0000-0000-000000000001', 'a9000000-0000-0000-0000-000000000003', 'Sibling One', 'U15', 'a9000000-0000-0000-0000-000000000004'),
   ('a9200000-0000-0000-0000-000000000002', 'a9000000-0000-0000-0000-000000000003', 'Sibling Two', 'U13', NULL),
-  ('a9200000-0000-0000-0000-000000000003', 'a9000000-0000-0000-0000-000000000006', 'Other Academy', 'U15', NULL);
+  ('a9200000-0000-0000-0000-000000000003', 'a9000000-0000-0000-0000-000000000006', 'Other Academy', 'U15', NULL),
+  ('a9200000-0000-0000-0000-000000000004', 'a9000000-0000-0000-0000-000000000003', 'Unrostered Control', 'U15', 'a9000000-0000-0000-0000-000000000007'),
+  ('a9200000-0000-0000-0000-000000000005', 'a9000000-0000-0000-0000-000000000003', 'Coach Removable', 'U15', NULL);
 SELECT pg_temp.assert_true(
-  (SELECT count(*) = 3 FROM public.squad_players sp
+  (SELECT count(*) = 5 FROM public.squad_players sp
    JOIN public.coach_details cd ON cd.user_id = sp.coach_user_id
    WHERE sp.id::text LIKE 'a92%' AND sp.organization_id = cd.organization_id),
   'fixture: each squad row sits in its coach''s academy');
@@ -221,7 +227,129 @@ SELECT pg_temp.assert_true(
   AND NOT has_function_privilege('authenticated', 'public.roster_child_matches_squad_academy()', 'EXECUTE'),
   'the roster trigger functions cannot be called by app roles');
 
--- ── Deleting a child's account keeps the admission, unclaimed ─
+-- ── A coach cannot un-admit a child (J1, TRAK-62) ───────────
+-- roster_children cascades from squad_players, so a coach's DELETE of a
+-- rostered squad row would otherwise delete the academy's admission.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000003","email":"coach-a@roster.test","role":"authenticated"}', true);
+SELECT pg_temp.assert_true(pg_temp.outcome($$
+  DELETE FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000002'
+$$) = '42501', 'a coach cannot delete a rostered child''s squad row');
+SELECT pg_temp.assert_true(
+  (SELECT count(*) = 1 FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000002'),
+  'the refused squad row is still there');
+SELECT pg_temp.assert_true(pg_temp.outcome($$
+  DELETE FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000005'
+$$) = 'allowed', 'CONTROL a coach can still delete their own unrostered squad row');
+SELECT pg_temp.assert_true(
+  (SELECT count(*) = 0 FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000005'),
+  'CONTROL the unrostered squad row is gone');
+RESET ROLE;
+-- A trusted function called while the coach is signed in is refused too.
+SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
+SELECT pg_temp.assert_true(pg_temp.outcome($$
+  DELETE FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000002'
+$$) = '42501', 'a privileged delete on the coach''s behalf cannot un-admit a child either');
+SELECT set_config('request.jwt.claims', '', true);
+SELECT pg_temp.assert_true(
+  NOT has_function_privilege('authenticated', 'public.refuse_app_delete_of_rostered_squad_row()', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.refuse_app_delete_of_rostered_squad_row()', 'EXECUTE'),
+  'the trigger function is not an RPC');
+SELECT pg_temp.assert_true(
+  (SELECT count(*) = 1 FROM public.roster_children WHERE id = 'a9300000-0000-0000-0000-000000000002'),
+  'the refused coach delete left the admission in place');
+
+-- ── Account deletion through the real RPC (Tarek's #128 review) ─
+-- Each call runs delete_my_account() as the signed-in user, checks the
+-- outcome, then rolls itself back so the next call sees the same fixtures.
+-- A direct DELETE FROM auth.users would skip the RPC's earlier squad and
+-- academy steps, which is where the foreign keys bite.
+CREATE TEMP TABLE roster_deletion_review(description text, passed boolean, detail text);
+GRANT INSERT ON roster_deletion_review TO authenticated;
+CREATE FUNCTION pg_temp.roster_user_exists(p_uid uuid) RETURNS boolean
+LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $test$
+  SELECT EXISTS (SELECT 1 FROM auth.users WHERE id = p_uid);
+$test$;
+CREATE FUNCTION pg_temp.roster_rows(p_org uuid) RETURNS bigint
+LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $test$
+  SELECT count(*) FROM public.roster_children WHERE organization_id = p_org;
+$test$;
+CREATE FUNCTION pg_temp.roster_row_exists(p_id uuid) RETURNS boolean
+LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $test$
+  SELECT EXISTS (SELECT 1 FROM public.roster_children WHERE id = p_id);
+$test$;
+REVOKE ALL ON FUNCTION pg_temp.roster_user_exists(uuid), pg_temp.roster_rows(uuid), pg_temp.roster_row_exists(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pg_temp.roster_user_exists(uuid), pg_temp.roster_rows(uuid), pg_temp.roster_row_exists(uuid) TO authenticated;
+CREATE FUNCTION pg_temp.review_account_deletion(description text, expect_after text)
+RETURNS void LANGUAGE plpgsql AS $test$
+DECLARE ok boolean := false; expected boolean; failure text; constraint_name text;
+BEGIN
+  BEGIN
+    PERFORM public.delete_my_account();
+    EXECUTE 'SELECT (' || expect_after || ')' INTO expected;
+    ok := NOT pg_temp.roster_user_exists(auth.uid()) AND expected IS TRUE;
+    IF NOT ok THEN failure := 'account still exists, or roster not as expected: ' || expect_after; END IF;
+    RAISE EXCEPTION USING ERRCODE = 'P9222', MESSAGE = 'rollback deletion probe';
+  EXCEPTION
+    WHEN SQLSTATE 'P9222' THEN NULL;
+    WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS constraint_name = CONSTRAINT_NAME;
+      failure := SQLSTATE || ': ' || SQLERRM || ' constraint=' || coalesce(constraint_name, '');
+  END;
+  INSERT INTO pg_temp.roster_deletion_review VALUES (description, ok, failure);
+END;
+$test$;
+GRANT EXECUTE ON FUNCTION pg_temp.review_account_deletion(text, text) TO authenticated;
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000007","role":"authenticated","email":"unrostered-child@roster.test"}', true);
+SELECT pg_temp.review_account_deletion('CONTROL a child without a roster admission deletes their account',
+  $$pg_temp.roster_rows('a9100000-0000-0000-0000-000000000001') = 3$$);
+SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000004","role":"authenticated","email":"child-a@roster.test"}', true);
+SELECT pg_temp.review_account_deletion('a rostered child deletes their account, and erasure removes their admission',
+  $$NOT pg_temp.roster_row_exists('a9300000-0000-0000-0000-000000000001') AND pg_temp.roster_rows('a9100000-0000-0000-0000-000000000001') = 2$$);
+SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000002","role":"authenticated","email":"admin-b@roster.test"}', true);
+SELECT pg_temp.review_account_deletion('CONTROL an admin without roster admissions deletes their account',
+  $$pg_temp.roster_rows('a9100000-0000-0000-0000-000000000001') = 3$$);
+SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000001","role":"authenticated","email":"admin-a@roster.test"}', true);
+SELECT pg_temp.review_account_deletion('an admin with roster admissions deletes their account, and the academy''s roster goes with it',
+  $$pg_temp.roster_rows('a9100000-0000-0000-0000-000000000001') = 0$$);
+SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000003","role":"authenticated","email":"coach-a@roster.test"}', true);
+SELECT pg_temp.review_account_deletion('CONTROL a rostered child''s coach deletes their account and the roster stays',
+  $$pg_temp.roster_rows('a9100000-0000-0000-0000-000000000001') = 3$$);
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '', true);
+DO $test$
+DECLARE failed integer; total integer;
+BEGIN
+  SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.roster_deletion_review;
+  IF total <> 5 OR failed <> 0 THEN
+    RAISE EXCEPTION 'Roster account deletion: % of % failed: %', failed, total,
+      (SELECT string_agg(description || ' [' || coalesce(detail, '') || ']', ' || ') FROM pg_temp.roster_deletion_review WHERE NOT passed);
+  END IF;
+END;
+$test$;
+
+-- ── The operator can still remove a child from the roster ───
+-- Give the row a linked account first, so this exercises the operator's
+-- exemption (no signed-in user), not the child's own-erasure one.
+UPDATE public.squad_players SET linked_player_id = 'a9000000-0000-0000-0000-000000000007'
+WHERE id = 'a9200000-0000-0000-0000-000000000002';
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+SELECT pg_temp.assert_true(pg_temp.outcome($$
+  DELETE FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000002'
+$$) = 'allowed', 'the operator (service_role) can remove a rostered child');
+SELECT pg_temp.assert_true(
+  (SELECT count(*) = 0 FROM public.roster_children WHERE id = 'a9300000-0000-0000-0000-000000000002')
+  AND (SELECT count(*) = 1 FROM public.roster_guardians g JOIN public.roster_children rc ON rc.id = g.roster_child_id
+       WHERE g.email = 'guardian-a@roster.test' AND rc.id = 'a9300000-0000-0000-0000-000000000001'),
+  'removing the squad row removes that admission and its guardian rows, and leaves the sibling''s');
+RESET ROLE;
+
+-- ── Deleting a child's auth user directly keeps the admission, unclaimed ─
+-- The operator's path (dashboard or admin API), not the child's own erasure
+-- above: the squad row survives, so the admission does too, ready to reclaim.
 DELETE FROM auth.users WHERE id = 'a9000000-0000-0000-0000-000000000004';
 SELECT pg_temp.assert_true(
   (SELECT player_user_id IS NULL FROM public.roster_children WHERE id = 'a9300000-0000-0000-0000-000000000001'),

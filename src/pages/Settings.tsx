@@ -1,12 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
-import { ArrowLeft, Pencil, Check, X, Camera } from 'lucide-react'
+import { ArrowLeft, Pencil, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
-import { resolveAvatarUrl } from '@/lib/avatar-url'
 import { ParentConnections } from '@/components/parent/ParentConnections'
 import { supabase } from '@/integrations/supabase/client'
 import { POSITIONS, COACH_ROLES, AGE_GROUPS } from '@/lib/constants'
@@ -24,7 +23,7 @@ export default function Settings() {
   </RouteGuard>
 }
 
-type Operation = 'name' | 'coach' | 'player' | 'avatar' | 'delete' | 'password' | 'signout'
+type Operation = 'name' | 'coach' | 'player' | 'delete' | 'password' | 'signout'
 
 function AccountSettings({ userId }: { userId: string }) {
   const navigate = useNavigate()
@@ -48,17 +47,12 @@ function AccountSettings({ userId }: { userId: string }) {
     if (isCurrent()) { operation.current = null; setPending(null) }
   }
   const saving = pending === 'name'
-  const uploadingAvatar = pending === 'avatar'
   const savingCoach = pending === 'coach'
   const savingPlayer = pending === 'player'
 
   const [editingName, setEditingName] = useState(false)
   const [displayName, setDisplayName] = useState(profile?.full_name ?? '')
   const [nameDraft, setNameDraft] = useState(profile?.full_name ?? '')
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  // Never the raw `profiles.avatar_url` value — it is a storage key or a
-  // legacy URL, not something an <img> can load. The effect below signs it.
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [coachClub, setCoachClub] = useState('')
   const [coachTeam, setCoachTeam] = useState('')
   const [coachRoleVal, setCoachRoleVal] = useState('')
@@ -72,28 +66,6 @@ function AccountSettings({ userId }: { userId: string }) {
   const [loadAttempt, setLoadAttempt] = useState(0)
 
   useEffect(() => { setDisplayName(profile?.full_name ?? '') }, [profile?.full_name])
-  // F-3: `profiles.avatar_url` holds a bare storage key going forward (a
-  // legacy public URL for anyone who uploaded before this fix), never
-  // something renderable as-is — the `avatars` bucket has been private since
-  // 26 May. Sign it into a URL that actually loads; null (no avatar, or a
-  // signing failure) falls through to the initials placeholder rather than a
-  // broken image.
-  useEffect(() => {
-    let cancelled = false
-    const current = () => mounted.current && !cancelled
-    if (!profile?.avatar_url) { setAvatarUrl(null); return }
-    void (async () => {
-      const { client } = await getSettingsAccount(userId, current)
-      const signed = await resolveAvatarUrl(
-        profile.avatar_url,
-        (path, expiresIn) => client.storage.from('avatars').createSignedUrl(path, expiresIn),
-        message => console.error('[avatar] could not sign stored avatar:', message),
-      )
-      if (current()) setAvatarUrl(signed)
-    })()
-    return () => { cancelled = true }
-  }, [userId, profile?.avatar_url])
-
   // Stable identity/role dependencies preserve unfinished drafts on token refresh.
   useEffect(() => {
     if (role !== 'coach' && role !== 'player') return
@@ -237,43 +209,6 @@ function AccountSettings({ userId }: { userId: string }) {
     finally { finish() }
   }
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return }
-    if (!begin('avatar')) return
-    try {
-      const { client } = await getSettingsAccount(userId, isCurrent)
-      const { error: uploadError } = await client.storage.from('avatars')
-        .upload(userId, file, { upsert: true, contentType: file.type })
-      if (uploadError) throw uploadError
-      await assertSettingsAccount(userId, isCurrent)
-      // F-3: store the bare object key, not getPublicUrl()'s output — the
-      // `avatars` bucket is private, so a "public" URL 404s everywhere it is
-      // rendered even though the upload and this save both report success.
-      // No cache-buster: a signed URL is minted fresh per render below and
-      // per read at every other call site, so there is nothing to bust.
-      const { data, error } = await client.from('profiles').update({ avatar_url: userId })
-        .eq('user_id', userId).select('user_id').maybeSingle()
-      if (error) throw error
-      if (data?.user_id !== userId) throw new Error('Profile photo save was not confirmed')
-      await assertSettingsAccount(userId, isCurrent)
-      const signed = await resolveAvatarUrl(
-        userId,
-        (path, expiresIn) => client.storage.from('avatars').createSignedUrl(path, expiresIn),
-        message => console.error('[avatar] could not sign the upload for preview:', message),
-      )
-      if (isCurrent()) setAvatarUrl(signed)
-      await refreshProfile()
-      if (isCurrent()) toast.success('Profile photo updated')
-    } catch (error) {
-      if (isCurrent()) toast.error(error instanceof Error ? error.message : 'Upload failed')
-    } finally {
-      finish()
-      if (isCurrent() && fileInputRef.current) fileInputRef.current.value = ''
-    }
-  }
-
   const signOutAccount = async () => {
     if (!begin('signout')) return
     try {
@@ -305,42 +240,13 @@ function AccountSettings({ userId }: { userId: string }) {
           </h1>
         </div>
 
-        {/* Avatar */}
         <div className="flex flex-col items-center mb-7">
-          <div className="relative">
-            <div
-              className="w-[72px] h-[72px] rounded-[22px] overflow-hidden flex items-center justify-center"
-              style={{ background: '#202024', border: '1px solid rgba(200,242,90,0.18)' }}
-            >
-              {avatarUrl
-                ? <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-                : <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 26, fontWeight: 600, color: '#C8F25A' }}>
-                    {(displayName || '?').charAt(0).toUpperCase()}
-                  </span>
-              }
-            </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!!pending}
-              className="absolute -bottom-1.5 -right-1.5 w-[26px] h-[26px] rounded-full flex items-center justify-center"
-              style={{ background: '#C8F25A', border: '2px solid #0A0A0B' }}
-              aria-label="Change profile photo"
-            >
-              <Camera size={13} color="#000" />
-            </button>
-          </div>
-          {uploadingAvatar && (
-            <span className="mt-3" style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>
-              Uploading…
+          <div className="w-[72px] h-[72px] rounded-[22px] bg-card border border-border flex items-center justify-center">
+            <span className="font-mono text-2xl font-semibold text-primary" aria-hidden="true">
+              {(displayName || '?').charAt(0).toUpperCase()}
             </span>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            className="hidden"
-            onChange={handleAvatarChange}
-          />
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Profile photos are coming soon.</p>
         </div>
 
         {/* Account */}

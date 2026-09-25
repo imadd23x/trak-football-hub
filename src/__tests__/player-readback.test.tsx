@@ -461,4 +461,49 @@ describe('player readback through authenticated routes', () => {
     },
   )
 
+  // Kostas's #133 review (P2): AuthContext hands out a new user object on every
+  // same-account token refresh (hourly, and on returning to the tab), so this
+  // load re-runs. A re-run must refresh what is on screen, not blank it.
+  it('keeps the home card and the coach message on screen while a same-account refresh reloads', async () => {
+    renderApp('/player/home')
+    await screen.findByText(WORDS, { exact: false })
+    const pending = deferred()
+    server.use(http.get(endpoint('matches'), async () => { await pending.promise; return HttpResponse.json([match('recent')]) }))
+    try {
+      await refresh()
+      const cardShown = screen.queryAllByText(/recent opposition/).length > 0
+      const messageShown = screen.queryByText(WORDS, { exact: false }) !== null
+      await releaseResponse(pending, 'matches')
+      expect(cardShown, 'match list stays visible during a same-account refresh').toBe(true)
+      expect(messageShown, "the coach's message stays visible during a same-account refresh").toBe(true)
+    } finally { pending.resolve() }
+  })
+
+  // Kostas and Imad (P3): if a callback throws instead of resolving with
+  // { error }, Promise.all rejected and loading never ended.
+  it('ends in a retryable error, not an endless skeleton, when a Home callback throws', async () => {
+    server.use(http.get(endpoint('matches'), () => HttpResponse.json({ unexpected: 'shape' })))
+    renderApp('/player/home')
+    expect(await screen.findByRole('button', { name: /retry/i })).toBeEnabled()
+  })
+
+  // Imad's #133 review: the squad callback's cancelled guard was unpinned.
+  it('ignores a squad failure from before a successful refresh', async () => {
+    const pending = deferred()
+    let requests = 0
+    server.use(http.get(endpoint('squad_players'), async () => {
+      if (++requests === 1) { await pending.promise; return failure() }
+      return HttpResponse.json([{ id: 'squad-a', coach_user_id: 'coach-a', linked_player_id: account }])
+    }))
+    renderApp('/player/home')
+    try {
+      await waitFor(() => expect(requests).toBe(1))
+      await refresh()
+      await screen.findByText(WORDS, { exact: false })
+      await releaseResponse(pending, 'squad_players')
+      expect(screen.queryByRole('alert')).toBeNull()
+      expect(screen.getByText(WORDS, { exact: false })).toBeInTheDocument()
+    } finally { pending.resolve() }
+  })
+
 })

@@ -31,6 +31,7 @@ export interface ParentDevelopment {
   assessments: ParentAssessment[]
   awards: ParentAward[]
   coachNames: Record<string, string>
+  // No coach message: parents see the bands only (TRAK-63, 25 Sep).
 }
 
 export { fetchAwaitingConsent, type AwaitingConsentChild } from './parent-consent'

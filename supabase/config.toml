@@ -5,23 +5,16 @@ project_id = "xbykbqolvqyqmipikuae"
 # default (verify_jwt = true) and a deploy can flip a setting that was changed in
 # the dashboard. Declaring every function keeps this file the source of truth.
 
-# Both AI functions now reject before spending anything: getUser() must return
-# a real user, that user's profile role must be 'coach', and claim_ai_call()
-# must allow the call against a per-user daily cap.
-#
-# The platform gate stays on as well, but it is NOT what protects these. The
-# publishable anon key is a validly-signed JWT and ships in the client bundle
-# of a public repo, so verify_jwt accepts it and proves nothing about who is
-# calling. Only getUser() establishes a session. Do not weaken the body checks
-# on the strength of this flag being true.
+# G7: all three AI handlers unconditionally return PILOT_FEATURE_DISABLED (403)
+# before reading bodies, credentials, database state, quotas or provider secrets.
+# OPTIONS only returns CORS headers. The platform JWT gate remains enabled as
+# an additional boundary; no caller role or configuration switch enables AI.
 [functions.parse-schedule]
 verify_jwt = true
 
 [functions.coach-assistant]
 verify_jwt = true
 
-# getUser() plus an explicit 401 in the body, with the platform gate on too.
-# This one was already doing the right thing when the other two were not.
 [functions.player-feedback]
 verify_jwt = true
 

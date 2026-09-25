@@ -82,10 +82,10 @@ beforeEach(async () => {
     http.get(`${url}/rest/v1/player_details`, ({ request }) => rowResponse(request, { position: 'Midfielder', shirt_number: 0 })),
     http.get(`${url}/rest/v1/squad_players`, () => HttpResponse.json([])),
     http.get(`${url}/rest/v1/player_parent_links`, () => HttpResponse.json([])),
-    // Settings resolves every avatar_url through createSignedUrl(); the
-    // storage-js client prefixes this relative field with its own base url.
-    http.post(`${url}/storage/v1/object/sign/avatars/:key`, ({ params }) =>
-      HttpResponse.json({ signedURL: `/object/sign/avatars/${params.key}?token=synthetic` })),
+    http.all(`${url}/storage/v1/*`, ({ request }) => {
+      requests.push({ method: request.method, path: 'storage', authorization: request.headers.get('Authorization') })
+      return HttpResponse.json({ message: 'Photos disabled during pilot' }, { status: 403 })
+    }),
   )
 })
 afterEach(() => { cleanup(); client.clear(); vi.restoreAllMocks() })
@@ -134,22 +134,15 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     await waitFor(() => expect(messages.success).toHaveBeenCalledWith('Name updated'))
   })
 
-  it('clears A photo and draft on a real SDK A-to-B transition, and clears same-account null avatars', async () => {
+  it('keeps photos absent and clears A draft on a real SDK A-to-B transition', async () => {
     mount(); await ready()
-    // Signing is an extra round-trip the raw stored value never needed, so
-    // this first appearance is awaited rather than asserted synchronously.
-    await waitFor(() => expect(screen.getByAltText('Profile')).toHaveAttribute('src', expect.stringContaining('/object/sign/avatars/a?token=synthetic')))
-    profiles.a.avatar_url = null
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh profile' }))
-    await waitFor(() => expect(screen.queryByAltText('Profile')).not.toBeInTheDocument())
-    profiles.a.avatar_url = 'a'
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh profile' }))
-    await screen.findByAltText('Profile')
+    expect(screen.queryByAltText('Profile')).not.toBeInTheDocument()
     chooseName('Unsubmitted A draft')
     await switchToB()
     expect(screen.queryByAltText('Profile')).not.toBeInTheDocument()
     expect(screen.queryByDisplayValue('Unsubmitted A draft')).not.toBeInTheDocument()
     expect(screen.getByText('b@synthetic.test.invalid')).toBeInTheDocument()
+    expect(requests.filter(r => r.path === 'storage')).toEqual([])
   })
 
   it('preserves name and coach drafts on a real same-user TOKEN_REFRESHED event', async () => {
@@ -290,34 +283,24 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     expect(messages.error).not.toHaveBeenCalled()
   })
 
-  it('F-3: persists the bare object key, not a public-bucket URL, and shows the signed preview', async () => {
-    server.use(http.post(`${url}/storage/v1/object/avatars/a`, () => HttpResponse.json({ Key: 'avatars/a' })))
+  it('G7 offers no photo input and makes no storage request or avatar write', async () => {
     const { container } = mount(); await ready()
-    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(['image'], 'avatar.png', { type: 'image/png' })] } })
-    await waitFor(() => expect(messages.success).toHaveBeenCalledWith('Profile photo updated'))
-    // The `avatars` bucket has been private since 26 May; getPublicUrl()'s
-    // output 404s everywhere it is rendered even though this save and the
-    // upload both report success. The stored value must be the bare key that
-    // resolveAvatarUrl() at every read site can actually sign.
-    expect(requests.filter(r => r.method === 'PATCH')).toEqual([
-      { method: 'PATCH', path: 'profiles', authorization: 'Bearer token-a', body: { avatar_url: 'a' } },
-    ])
-    await waitFor(() => expect(screen.getByAltText('Profile')).toHaveAttribute('src', expect.stringContaining('/object/sign/avatars/a?token=synthetic')))
+    expect(container.querySelector('input[type="file"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Change profile photo' })).not.toBeInTheDocument()
+    expect(screen.queryByAltText('Profile')).not.toBeInTheDocument()
+    expect(requests.filter(r => r.path === 'storage' || r.method === 'PATCH')).toEqual([])
   })
 
-  it('binds upload to A and does not start its profile write after B signs in', async () => {
-    const held = deferred(); let started = false
-    server.use(http.post(`${url}/storage/v1/object/avatars/a`, async ({ request }) => {
-      expect(request.headers.get('Authorization')).toBe('Bearer token-a'); started = true
-      await held.promise; return HttpResponse.json({ Key: 'avatars/a' })
-    }))
+  it('does not fetch a stored photo after refreshing the profile or changing accounts', async () => {
     const { container } = mount(); await ready()
-    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(['image'], 'avatar.png', { type: 'image/png' })] } })
-    await waitFor(() => expect(started).toBe(true)); await switchToB()
-    await act(async () => { held.resolve(); await held.promise; await new Promise(resolve => setTimeout(resolve, 20)) })
-    expect(requests.filter(r => r.method === 'PATCH')).toEqual([])
+    profiles.a.avatar_url = 'https://photos.test.invalid/retained.jpg'
+    profiles.a.full_name = 'Refreshed Synthetic A'
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh profile' }))
+    await screen.findByRole('button', { name: 'Refreshed Synthetic A' })
+    await switchToB()
+    expect(container.querySelector('input[type="file"]')).toBeNull()
     expect(screen.queryByAltText('Profile')).not.toBeInTheDocument()
-    expect(messages.success).not.toHaveBeenCalled(); expect(messages.error).not.toHaveBeenCalled()
+    expect(requests.filter(r => r.path === 'storage' || r.method === 'PATCH')).toEqual([])
   })
 
   it('binds deletion to A, prevents repeat clicks, and never logs B out on late A completion', async () => {

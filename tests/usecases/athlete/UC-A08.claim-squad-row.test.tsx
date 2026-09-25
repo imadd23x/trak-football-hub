@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useCase } from '../../support/use-case'
 import { renderApp } from '../../support/render-app'
@@ -161,8 +161,11 @@ useCase('UC-A08', () => {
 
     renderApp('/player/profile')
 
-    // The connected placeholder stands in until the name arrives.
-    expect(await screen.findByText('Connected')).toBeInTheDocument()
+    // TRAK-71: Profile names the coach under Connections, so the separate coach
+    // card stays hidden once linked. Let the link lookup settle, then check
+    // the code prompt never appeared for a player who is already connected.
+    await screen.findByText('CONNECTIONS')
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)) })
     expect(screen.queryByPlaceholderText(/TRK-/i)).toBeNull()
     expect(screen.queryByRole('button', { name: /^connect$/i })).toBeNull()
   })

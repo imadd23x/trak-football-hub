@@ -138,6 +138,20 @@ SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public.get_player_invites_f
 SELECT public.create_parent_invite('newguardian@p1.test');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public.get_player_invites_for_current_user()), 'repeating creation is idempotent');
 SELECT pg_temp.assert_true((SELECT parent_email='newguardian@p1.test' FROM public.get_player_invites_for_current_user()), 'recipient is normalized server-side');
+-- G5 / TRAK-52: a child cannot name their own address as their parent's. The
+-- invite would never reach an adult, and the screen would say a parent was
+-- asked. Provisioning reaches the same check through create_parent_invite.
+DO $test$
+DECLARE v_state text := 'allowed';
+BEGIN
+  BEGIN
+    PERFORM public.create_parent_invite('  NewChild@P1.TEST ');
+  EXCEPTION WHEN OTHERS THEN v_state := SQLSTATE;
+  END;
+  PERFORM pg_temp.assert_true(v_state = '22023', 'a child cannot name their own email as their parent''s (got ' || v_state || ')');
+END;
+$test$;
+SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public.get_player_invites_for_current_user()), 'the refused own-email invitation created no row');
 
 -- Expiry, stable creation, explicit resend rotation and ownership.
 SELECT set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000002","role":"authenticated"}', true);

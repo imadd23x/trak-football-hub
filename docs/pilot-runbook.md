@@ -1,7 +1,7 @@
 # Trak Academy Pilot — operational reference
 
-The full runbook lives in `docs/pilot-runbook.html` (published as an artifact) and the scope in
-`docs/pilot-scope.html`. This file carries only the parts you run, so the narrative lives in one
+The full runbook lives in `docs/pilot-runbook.html` (published as an artifact) and the pilot scope in
+`MVP Requirements`. This file carries only the parts you run, so the narrative lives in one
 place and cannot drift.
 
 ---

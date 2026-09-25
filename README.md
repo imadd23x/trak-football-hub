@@ -4,7 +4,7 @@ Performance tracking app for youth football players, coaches, parents, and club 
 
 ## Prerequisites
 
-- Node.js 22.x (matching CI; `.nvmrc` selects the same major)
+- Node.js 22.15 or later 22.x (matching CI; `.nvmrc` selects the latest 22.x). On 22.14 `npm test` fails with unhandled `BroadcastChannel` errors.
 - npm 11.6.0 (the version declared by `packageManager`)
 - A [Supabase](https://supabase.com) project (free tier works)
 

@@ -146,12 +146,10 @@ const PlayerOnboarding = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [position, setPosition] = useState('');
-  const [club, setClub] = useState('');
   const [ageGroup, setAgeGroup] = useState('');
   const [shirtNumber, setShirtNumber] = useState('');
 
   const [parentEmail, setParentEmail] = useState('');
-  const [coachCode, setCoachCode] = useState('');
 
   // Built once from the three selects, so the age check and the value sent to
   // the database can never disagree.
@@ -201,7 +199,7 @@ const PlayerOnboarding = () => {
   };
 
   const handleStep2 = () => {
-    if (!position || !club || !ageGroup) {
+    if (!position || !ageGroup) {
       toast.error('Please fill in all required fields'); return;
     }
     // The age group and the date of birth were independent fields, so any
@@ -239,15 +237,15 @@ const PlayerOnboarding = () => {
         role: 'player' as const,
         full_name: name,
         nationality,
+        // No club: the academy roster supplies it (TRAK-54, #144).
         player_details: {
           date_of_birth: dateOfBirth!,
           position,
-          current_club: club,
           age_group: ageGroup,
           shirt_number: shirtNumber ? parseInt(shirtNumber, 10) : null,
         },
+        // No coach code: the roster links the child's coach (TRAK-53).
         parent_email: parentEmail || null,
-        coach_invite_code: coachCode.trim() || null,
       };
 
       const { user, error } = await signUp(email, password, pendingProfile);
@@ -312,7 +310,7 @@ const PlayerOnboarding = () => {
             <option value="">Select position</option>
             {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
           </StyledSelect>
-          <Input placeholder="Current club" value={club} onChange={e => setClub(e.target.value)} className="bg-card" />
+          <p className="text-xs text-muted-foreground">Your academy adds your club and coach.</p>
           <StyledSelect value={ageGroup} onChange={e => setAgeGroup(e.target.value)}>
             <option value="">Select age group</option>
             {AGE_GROUPS.map(a => <option key={a} value={a}>{a}</option>)}
@@ -327,19 +325,9 @@ const PlayerOnboarding = () => {
 
       {step === 3 && (
         <>
-          <p className="text-sm text-muted-foreground mb-2">
-            Have a coach invite code? Enter it to link with your coach (optional).
-          </p>
-          <Input
-            placeholder="Coach code e.g. TRK-AB2K (optional)"
-            value={coachCode}
-            onChange={e => setCoachCode(e.target.value.toUpperCase())}
-            className="bg-card"
-            maxLength={8}
-          />
           {needsConsent ? (
             <>
-              <p className="text-sm text-foreground mt-3 mb-1">
+              <p className="text-sm text-foreground mb-1">
                 You're under {CONSENT_THRESHOLD_AGE}, so a parent or guardian needs to approve your account first.
               </p>
               <p className="text-xs text-muted-foreground mb-2">
@@ -356,7 +344,7 @@ const PlayerOnboarding = () => {
             </>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground mt-3 mb-2">
+              <p className="text-sm text-muted-foreground mb-2">
                 Want to invite a parent? Enter their email below (optional).
               </p>
               <Input type="email" placeholder="Parent's email (optional)" value={parentEmail} onChange={e => setParentEmail(e.target.value)} className="bg-card" />

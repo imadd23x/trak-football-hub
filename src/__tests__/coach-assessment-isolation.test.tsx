@@ -109,7 +109,8 @@ describe('full assessment player boundaries', () => {
     await selectPlayer('player-b')
     await act(async () => { pending.release(); await new Promise(resolve => setTimeout(resolve, 30)) })
     expect(feedbackBox()).toHaveValue('')
-    expect(screen.getByRole('button', { name: 'Publish to the player' })).toBeDisabled()
+    // J5: with no message there is nothing to publish, so no Publish action is offered.
+    expect(screen.queryByRole('button', { name: /^Publish/ })).toBeNull()
     await waitFor(() => expect(save()).toBeEnabled())
     await userEvent.click(save())
     await screen.findByText('Coach home')
@@ -203,8 +204,9 @@ describe('full assessment player boundaries', () => {
     await screen.findByText('Coach home')
     expect(writes.find(write => write.table === 'coach_assessment_notes')?.body)
       .toMatchObject({ assessment_id: 'assessment-a', note: '' })
-    expect(writes.find(write => write.table === 'coach_shared_feedback')?.body)
-      .toMatchObject({ body: 'Published feedback for Alex' })
+    // J5: the published message is unchanged, so it is left alone. Rewriting
+    // it would re-stamp published_at and mark it "new" for the family again.
+    expect(writes.find(write => write.table === 'coach_shared_feedback')).toBeUndefined()
   })
 
   it('clears the roster selection and draft when another coach signs in', async () => {

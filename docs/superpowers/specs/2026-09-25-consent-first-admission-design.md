@@ -85,6 +85,7 @@ phase 4 can't ship before them.
   signup.
 
 Tests (new suite, in `--all`):
+
 - A guardian consents for an account-less roster child.
 - A guardian of another child is refused, and so is an unclaimed guardian
   email.
@@ -101,6 +102,7 @@ approve first'` (42501), and `AuthContext` shows it the way slice 3 shows
 "Your academy hasn't added this email yet".
 
 Tests:
+
 - Signup is refused before consent and after withdrawal.
 - Signup is allowed after consent.
 - An 18+ roster child is allowed without consent.
@@ -127,6 +129,7 @@ Tests:
   measured with approved inboxes after this phase.
 
 Tests:
+
 - Handler unit tests for both entry points: a non-guardian is refused, and
   a guardian without active consent can't invite the child.
 - The loader calls the function once per admitted child and never for a
@@ -145,6 +148,7 @@ Tests:
   - The player's refusal copy from phase 2.
 
 Routed tests:
+
 - A parent sees and approves an account-less child.
 - The child invite is requested once.
 - A rostered child's signup has no guardian step.

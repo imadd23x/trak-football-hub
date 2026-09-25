@@ -12,6 +12,9 @@ import { supabase } from '@/integrations/supabase/client'
 const endpoint = (name: string) => `${SUPABASE_URL}/rest/v1/${name}`
 const failure = () => HttpResponse.json({ code: '42501', message: 'Synthetic denied read' }, { status: 403 })
 const WORDS = 'Keep your head up before receiving the ball.'
+// Matched as a substring: main quotes the message in a tap-through card, and
+// #141 (TRAK-71) shows it unquoted inside the assessment. These tests are about
+// whether the words are shown or cleared, not how they are framed.
 let sequence = 0
 let account: string
 let role: 'player' | 'parent'
@@ -141,7 +144,7 @@ describe('player readback through authenticated routes', () => {
 
   it('CONTROL renders player home with the current coach message', async () => {
     renderApp('/player/home')
-    expect(await screen.findByText(`"${WORDS}"`)).toBeInTheDocument()
+    expect(await screen.findByText(WORDS, { exact: false })).toBeInTheDocument()
   })
 
   it('preserves a failed details read when the independent matches read finishes later', async () => {
@@ -165,7 +168,7 @@ describe('player readback through authenticated routes', () => {
     'clears the old coach message after refreshed %s returns no accessible rows', async name => {
       server.use(table('coach_calendar_events', [event]))
       renderApp('/player/home')
-      await screen.findByText(`"${WORDS}"`)
+      await screen.findByText(WORDS, { exact: false })
       await screen.findByText('Team training')
       expect(screen.getByText('Coach Audit')).toBeInTheDocument()
       let checked = false
@@ -173,7 +176,7 @@ describe('player readback through authenticated routes', () => {
       await refresh()
       await waitFor(() => expect(checked).toBe(true))
       await screen.findByText('vs recent opposition')
-      await waitFor(() => expect(screen.queryByText(`"${WORDS}"`)).toBeNull())
+      await waitFor(() => expect(screen.queryByText(WORDS, { exact: false })).toBeNull())
       expect(screen.queryByText('LATEST COACH ASSESSMENT')).toBeNull()
       expect(screen.queryByText('Coach Audit')).toBeNull()
       if (name === 'squad_players') expect(screen.queryByText('Team training')).toBeNull()
@@ -183,11 +186,11 @@ describe('player readback through authenticated routes', () => {
 
   it('CONTROL clears the old coach message after a refreshed published-feedback query returns no rows', async () => {
     renderApp('/player/home')
-    await screen.findByText(`"${WORDS}"`)
+    await screen.findByText(WORDS, { exact: false })
     server.use(table('coach_shared_feedback', []))
     await refresh()
     await screen.findByText('vs recent opposition')
-    await waitFor(() => expect(screen.queryByText(`"${WORDS}"`)).toBeNull())
+    await waitFor(() => expect(screen.queryByText(WORDS, { exact: false })).toBeNull())
   })
 
   it('CONTROL a delayed sibling response does not replace the currently selected child', async () => {
@@ -322,7 +325,7 @@ describe('player readback through authenticated routes', () => {
     server.use(table('player_details', [{ position: 'Defender', current_club: 'Recovered Academy', age_group: 'U15' }]))
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByText('Recovered Academy U15')).toBeInTheDocument()
-    expect(await screen.findByText(`"${WORDS}"`)).toBeInTheDocument()
+    expect(await screen.findByText(WORDS, { exact: false })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
@@ -367,7 +370,7 @@ describe('player readback through authenticated routes', () => {
         expect(screen.queryByText('Stale Academy U15')).toBeNull()
         expect(screen.queryByText('Stale Coach')).toBeNull()
         expect(screen.queryByText('LATEST COACH ASSESSMENT')).toBeNull()
-        expect(screen.queryByText(`"${WORDS}"`)).toBeNull()
+        expect(screen.queryByText(WORDS, { exact: false })).toBeNull()
         expect(screen.queryByText('Team training')).toBeNull()
         expect(screen.queryByText('YOUR CARD HAS BEEN UPDATED')).toBeNull()
         expect(localStorage.getItem(`trak_last_match_count_${account}`)).toBe('1')
@@ -396,15 +399,15 @@ describe('player readback through authenticated routes', () => {
   it('keeps feedback failures visible while still loading the calendar', async () => {
     server.use(http.get(endpoint('coach_shared_feedback'), failure), table('coach_calendar_events', [event]))
     renderApp('/player/home')
-    expect(await screen.findByText("Couldn't load your feedback")).toBeInTheDocument()
+    expect(await screen.findByText(/Couldn't load your (feedback|coach's message)/)).toBeInTheDocument()
     expect(await screen.findByText('Team training')).toBeInTheDocument()
-    expect(screen.queryByText(`"${WORDS}"`)).toBeNull()
+    expect(screen.queryByText(WORDS, { exact: false })).toBeNull()
   })
 
 
   it('records the first match count silently and reveals newly logged matches after refresh', async () => {
     renderApp('/player/home')
-    await screen.findByText(`"${WORDS}"`)
+    await screen.findByText(WORDS, { exact: false })
     expect(localStorage.getItem(`trak_last_match_count_${account}`)).toBe('1')
     expect(screen.queryByText('YOUR CARD HAS BEEN UPDATED')).toBeNull()
     server.use(table('matches', [match('recent'), match('second')]))
@@ -428,7 +431,7 @@ describe('player readback through authenticated routes', () => {
       await waitFor(() => expect(requests).toBe(1))
       await refresh()
       await waitFor(() => expect(requests).toBe(2))
-      await screen.findByText(`"${WORDS}"`)
+      await screen.findByText(WORDS, { exact: false })
       await releaseResponse(pending, 'rpc/my_consent_status')
       expect(screen.queryByText('Waiting for your parent')).toBeNull()
     } finally { pending.resolve() }
@@ -451,7 +454,7 @@ describe('player readback through authenticated routes', () => {
       try {
         renderApp('/player/home')
         expect(await screen.findByText('vs recent opposition')).toBeInTheDocument()
-        expect(await screen.findByText(`"${WORDS}"`)).toBeInTheDocument()
+        expect(await screen.findByText(WORDS, { exact: false })).toBeInTheDocument()
         expect(screen.queryByRole('alert')).toBeNull()
         expect(screen.queryByText('YOUR CARD HAS BEEN UPDATED')).toBeNull()
       } finally { storage.mockRestore() }

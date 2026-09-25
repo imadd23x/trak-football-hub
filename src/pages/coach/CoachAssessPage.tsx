@@ -368,7 +368,7 @@ function CoachAssessmentForm() {
           assessment_id: saved.id,
           coach_user_id: user.id,
           body:          message,
-          // NULL retracts: the child and their parents stop seeing it immediately.
+          // NULL retracts: the child stops seeing it immediately.
           published_at:  sharedPublishedNext && message ? new Date().toISOString() : null,
         }, { onConflict: 'assessment_id' }).abortSignal(controller.signal)
         if (!isCurrent()) return
@@ -394,7 +394,7 @@ function CoachAssessmentForm() {
         setPublishedBody(sharedPublishedNext && message ? message : null)
       }
       if (action === 'publish') {
-        toast.success(`Published. ${firstName} and their parents can read your message now.`)
+        toast.success(`Published. ${firstName} can read your message now.`)
       } else if (message && !sharedPublishedNext) {
         toast.success(`Assessment saved. Your message to ${firstName} has not been sent.`)
       } else {
@@ -441,7 +441,7 @@ function CoachAssessmentForm() {
       if (!isCurrent()) return
       if (error) {
         console.error('Unpublish failed:', error)
-        toast.error(`Not unpublished (${error.message}). ${firstName} and their parents can still see the message. Try again.`, { duration: 12000 })
+        toast.error(`Not unpublished (${error.message}). ${firstName} can still see the message. Try again.`, { duration: 12000 })
         return
       }
       // No row back means nothing changed: the message may have been removed,
@@ -453,7 +453,7 @@ function CoachAssessmentForm() {
       }
       setSharedPublished(false)
       setPublishedBody(null)
-      toast.success(`Unpublished. ${firstName} and their parents can no longer see the message.`)
+      toast.success(`Unpublished. ${firstName} can no longer see the message.`)
     } catch (error) {
       if (isCurrent()) {
         console.error('Unpublish interrupted:', error)
@@ -645,9 +645,9 @@ function CoachAssessmentForm() {
 
         {/* ---- 7. message to the player (K9, J5) ----
             Two boxes rather than one, because the schema has two tables and the
-            coach needs to see which words the family will read. Nothing copies
-            the private note into here. Parents read published messages too
-            (20260919150000), so the label says so. */}
+            coach needs to see which words the player will read. Nothing copies
+            the private note into here. Parents see the bands only, never this
+            message (TRAK-63, 25 Sep), so the label names the player alone. */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
             <div>
@@ -655,7 +655,7 @@ function CoachAssessmentForm() {
                 Message to {firstName}
               </label>
               <p className="text-[10px] text-white/45 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                They and their parents will see this.
+                Only {firstName} sees this.
               </p>
             </div>
             <span className="text-[10px] text-white/25">{shared.length}/300</span>

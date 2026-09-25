@@ -98,12 +98,6 @@ export default function ParentHome() {
                     </div>
                   ) : <p className="py-4 text-sm text-muted-foreground">No coach assessments yet.</p>}
                 </section>
-                {development?.message && <section className="mt-5" aria-label="Message from the coach">
-                  <MetadataLabel text="MESSAGE FROM THE COACH" />
-                  <div className="rounded-xl p-4 mt-2 bg-card border border-border">
-                    <p className="text-sm text-foreground whitespace-pre-line">&ldquo;{development.message}&rdquo;</p>
-                  </div>
-                </section>}
                 {award && <section className="mt-5" aria-label="Recognition">
                   <MetadataLabel text="RECOGNITION" />
                   <div className="rounded-xl p-4 mt-2 bg-card border border-border">

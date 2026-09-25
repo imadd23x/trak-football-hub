@@ -8,7 +8,8 @@ import { MobileShell, MetadataLabel } from '@/components/trak'
 import { computeMatchScore } from '@/lib/rating-engine'
 import { goalsKey, assistsKey } from '@/lib/match-input-keys'
 import { trackEvent } from '@/lib/telemetry'
-import { validateMatchInput, MATCH_LIMITS } from '@/lib/match-input-rules'
+import { validateMatchInput, teamGoalsViolation, MATCH_LIMITS } from '@/lib/match-input-rules'
+import { localTodayISO } from '@/lib/event-time'
 
 type SquadPlayer = {
   id: string
@@ -87,7 +88,7 @@ export default function CoachAddSession() {
     () => (window.location.pathname.endsWith('/sessions/quick') ? 'match' : 'training'),
   )
   const [title, setTitle] = useState('')
-  const [date,  setDate]  = useState(new Date().toISOString().split('T')[0])
+  const [date,  setDate]  = useState(localTodayISO)
   const [notes, setNotes] = useState('')
 
   // Training-specific
@@ -257,9 +258,15 @@ export default function CoachAddSession() {
       teamScore: scoreUs === '' ? undefined : Number(scoreUs),
     }).length > 0)
 
+  const teamGoalsError = !isMatch ? null : teamGoalsViolation(
+    squad.filter(p => details[p.id]?.played && typeof details[p.id].goals === 'number')
+      .map(p => details[p.id].goals as number),
+    scoreUs === '' ? undefined : Number(scoreUs),
+  )
+
   // A failed roster is not an empty one: saving now would drop the players
   // the coach took (Tarek's #126 re-review).
-  const canSave = !saving && !rosterLoading && !rosterFailed && incompleteRecords.length === 0 && impossibleRecords.length === 0 && (
+  const canSave = !saving && !rosterLoading && !rosterFailed && incompleteRecords.length === 0 && impossibleRecords.length === 0 && !teamGoalsError && (
     isMatch    ? opponent.trim().length > 0 && scoreUs !== '' && scoreThem !== ''
     : type === 'training' ? trainingFocus.size > 0
     : title.trim().length > 0
@@ -1070,6 +1077,12 @@ export default function CoachAddSession() {
       {/* Sticky save */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-5 pb-5 pt-3"
         style={{ background: 'linear-gradient(180deg,rgba(10,10,11,0) 0%,#0A0A0B 35%)' }}>
+        {teamGoalsError && (
+          <p role="alert" className="text-[11px] text-center text-[rgb(251,191,36)] mb-2"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            {teamGoalsError}
+          </p>
+        )}
         {incompleteRecords.length > 0 && (
           <p role="status" className="text-[11px] text-center text-[rgb(251,191,36)] mb-2"
             style={{ fontFamily: "'DM Sans', sans-serif" }}>

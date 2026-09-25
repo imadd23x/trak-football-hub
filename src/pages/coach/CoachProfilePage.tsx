@@ -4,15 +4,10 @@ import { ChevronRight, Settings as SettingsIcon, BookOpen } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, TrakCard, MetadataLabel, InviteCodeDisplay } from '@/components/trak'
-import { IconProfile } from '@/components/icons/TrakIcons'
 import { formatCoachCode, generateCode } from '@/lib/invite-codes'
-import { useAvatarUrl } from '@/hooks/use-avatar-url'
 
 export default function CoachProfilePage() {
   const { user, profile } = useAuth()
-  // `profile.avatar_url` is not a usable src — the avatars bucket is private
-  // and the stored string is a public-route URL (F-3). Sign it at render time.
-  const avatarUrl = useAvatarUrl(profile?.avatar_url)
   const navigate = useNavigate()
   const location = useLocation()
   const [details, setDetails] = useState<any>(null)
@@ -162,10 +157,9 @@ export default function CoachProfilePage() {
         {/* Avatar + Identity */}
         <div className="text-center mb-6">
           <div className="w-[72px] h-[72px] rounded-[22px] overflow-hidden bg-[#202024] border border-[rgba(200,242,90,0.18)] mx-auto mb-3 flex items-center justify-center">
-            {avatarUrl
-              ? <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-              : <IconProfile size={32} color="#C8F25A" />
-            }
+            <span className="text-2xl font-semibold text-primary" aria-hidden="true">
+              {(profile?.full_name || '?').charAt(0).toUpperCase()}
+            </span>
           </div>
           <p className="text-[20px] font-semibold text-white/88 tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.02em' }}>
             {profile?.full_name || 'Coach'}

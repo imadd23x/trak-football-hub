@@ -31,8 +31,7 @@ export interface ParentDevelopment {
   assessments: ParentAssessment[]
   awards: ParentAward[]
   coachNames: Record<string, string>
-  // The coach's published message on the latest assessment, as the player sees it.
-  message: string | null
+  // No coach message: parents see the bands only (TRAK-63, 25 Sep).
 }
 
 export { fetchAwaitingConsent, type AwaitingConsentChild } from './parent-consent'
@@ -72,7 +71,7 @@ export async function fetchParentDevelopment(childId: string, signal: AbortSigna
   if (detailsResult.error) throw detailsResult.error
   if (squadResult.error) throw squadResult.error
   const ids = (squadResult.data ?? []).map(row => row.id)
-  if (!ids.length) return { details: detailsResult.data, assessments: [], awards: [], coachNames: {}, message: null }
+  if (!ids.length) return { details: detailsResult.data, assessments: [], awards: [], coachNames: {} }
 
   const [assessmentResult, awardResult] = await Promise.all([
     supabase.from('coach_assessments')
@@ -95,18 +94,7 @@ export async function fetchParentDevelopment(childId: string, signal: AbortSigna
     if (error) throw error
     coachNames = Object.fromEntries((data ?? []).map(profile => [profile.user_id, profile.full_name]))
   }
-  // RLS returns only published rows for a consented, linked child; the filter
-  // says so at the call site. A failed read throws: "no message" must not be
-  // shown when we could not check.
-  let message: string | null = null
-  if (assessments[0]) {
-    const { data, error } = await supabase.from('coach_shared_feedback' as never)
-      .select('body').eq('assessment_id', assessments[0].id).not('published_at', 'is', null)
-      .abortSignal(signal).retry(false).maybeSingle()
-    if (error) throw error
-    message = (data as { body?: string } | null)?.body?.trim() || null
-  }
-  return { details: detailsResult.data, assessments, awards, coachNames, message }
+  return { details: detailsResult.data, assessments, awards, coachNames }
 }
 
 export function averageRecordedRating(matches: ParentMatch[]): number | null {

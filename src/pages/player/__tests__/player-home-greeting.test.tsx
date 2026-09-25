@@ -13,7 +13,6 @@ import { table, rpc } from '../../../../tests/msw/supabase'
 const PLAYER = { id: 'player-greeting' }
 
 beforeEach(() => {
-  signInAs(PLAYER)
   server.use(
     table('profiles', [{ id: 'p', user_id: PLAYER.id, role: 'player', full_name: 'Greta Synthetic' }]),
     table('matches', []), table('player_details', []), table('squad_players', []),
@@ -34,6 +33,10 @@ describe('TRAK-70: player home greeting', () => {
     // Only the clock is faked; timers stay real so the app's requests settle.
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(`2026-09-25T${time}:00`))
+    // Sign in on the faked clock. A session minted on the real clock expires an
+    // hour after the test runs, so a faked hour later than that looked expired,
+    // the refresh failed and the app signed out (red on CI at 17:48 UTC).
+    signInAs(PLAYER)
     renderApp('/player/home')
     expect(await screen.findByText('Greta Synthetic')).toBeInTheDocument()
     expect(screen.getByText(greeting)).toBeInTheDocument()

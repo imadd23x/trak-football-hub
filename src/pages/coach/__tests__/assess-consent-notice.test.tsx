@@ -34,7 +34,7 @@ function setup({ consentRequired, insertRefused = false }: { consentRequired: bo
   server.use(
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach', nationality: 'AE', invite_code: 'ABCD' }]),
     table('squad_players', [{ id: 'squad-1', coach_user_id: COACH.id, player_name: 'Omar Synthetic', position: 'Midfielder', linked_player_id: 'player-1' }]),
-    table('coach_sessions', []), table('coach_details', []), table('coach_assessments', []),
+    table('coach_sessions', [{ id: 'session-1', title: 'vs Synthetic FC', session_date: '2026-09-20' }]), table('coach_details', []), table('coach_assessments', []),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_player_consent_required`, async ({ request }) => {
       calls.consentChecks.push(await request.json())
       if (consentRequired === 'error') return HttpResponse.json({ message: 'synthetic failure' }, { status: 500 })
@@ -56,6 +56,9 @@ async function choosePlayer() {
   const user = userEvent.setup()
   const option = await screen.findByRole('option', { name: 'Omar Synthetic' })
   await user.selectOptions(option.closest('select') as HTMLSelectElement, 'squad-1')
+  // TRAK-68: the assessment belongs to a past session.
+  await screen.findByRole('option', { name: /vs Synthetic FC/ })
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Session' }), 'session-1')
   return user
 }
 

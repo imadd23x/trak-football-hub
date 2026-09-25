@@ -53,9 +53,11 @@ function aiFunctions(): string[] {
 describe('edge functions that spend the AI key require a session', () => {
   const names = aiFunctions()
 
-  it('finds the AI functions to check', () => {
-    // If this drops to zero the suite below silently proves nothing.
-    expect(names.length, 'no function references LOVABLE_API_KEY — did the env var get renamed?').toBeGreaterThan(0)
+  it('G7 has no live AI provider functions during the pilot', () => {
+    // G7 intentionally retires the provider paths. pilot-ai-disabled.test.ts
+    // executes all three real handlers and proves their unconditional refusal.
+    // Keep the dormant auth/quota checks below as guards against reintroduction.
+    expect(names, 'AI provider functions must remain disabled for the pilot').toEqual([])
   })
 
   for (const name of names) {

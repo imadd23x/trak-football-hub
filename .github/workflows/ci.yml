@@ -222,7 +222,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       # Deliberately no `supabase link`. Linking asks the Management API for
       # project metadata AND the project's API keys, so making it work would

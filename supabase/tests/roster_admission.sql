@@ -350,6 +350,30 @@ BEGIN
 END;
 $test$;
 
+-- ── Known gap until TRAK-48 slice 3: linked but unclaimed ───
+-- Imad's #128 re-review. admit_roster_child() leaves player_user_id NULL, and
+-- nothing sets it until slice 3 claims the row at signup. A child linked to a
+-- rostered row before then (link_player_to_coach still exists) is therefore
+-- not the admitted child as far as the delete trigger knows, and their own
+-- delete_my_account() is refused. Pinned here as the CURRENT behaviour so
+-- that slice 3 has to flip it: its acceptance says a rostered child's own
+-- erasure succeeds.
+SAVEPOINT linked_unclaimed;
+UPDATE public.squad_players SET linked_player_id = 'a9000000-0000-0000-0000-000000000007'
+WHERE id = 'a9200000-0000-0000-0000-000000000002';
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000007","role":"authenticated"}', true);
+SELECT pg_temp.assert_true(
+  pg_temp.outcome($$SELECT public.delete_my_account()$$) = '42501',
+  'KNOWN GAP (slice 3 flips this): a linked but unclaimed rostered child''s own erasure is refused');
+RESET ROLE;
+SELECT pg_temp.assert_true(
+  EXISTS (SELECT 1 FROM auth.users WHERE id = 'a9000000-0000-0000-0000-000000000007')
+  AND EXISTS (SELECT 1 FROM public.roster_children WHERE id = 'a9300000-0000-0000-0000-000000000002'),
+  'the refused erasure rolled back whole: the account and the admission are both still there');
+ROLLBACK TO SAVEPOINT linked_unclaimed;
+SELECT set_config('request.jwt.claims', '', true);
+
 -- ── The operator can still remove a child from the roster ───
 -- Give the row a linked account first, so this exercises the operator's
 -- exemption (no signed-in user), not the child's own-erasure one.

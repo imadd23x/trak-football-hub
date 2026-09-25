@@ -12,6 +12,7 @@ import { parseDisplayDate } from '@/lib/calendar'
 import { trackEvent } from '@/lib/telemetry'
 import CardRevealModal from '@/components/player/CardRevealModal'
 import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
+import { timeOfDayGreeting } from '@/lib/greeting'
 
 const QUOTES = [
   { text: "The more difficult the victory, the greater the happiness in winning.", author: "Pelé" },
@@ -363,7 +364,7 @@ export default function PlayerHome() {
 
         {/* Identity */}
         <div className="py-2.5 pb-4">
-          <p className="text-xs text-white/22 mb-1">Good morning,</p>
+          <p className="text-xs text-white/22 mb-1">{timeOfDayGreeting()}</p>
           <p className="text-[28px] font-semibold text-white/88 leading-tight tracking-tight"
             style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.03em' }}>
             {profile?.full_name || 'Player'}

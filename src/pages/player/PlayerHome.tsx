@@ -672,7 +672,8 @@ export default function PlayerHome() {
                 {/* TRAK-71: the coach's message in full, here, with no tap-through. */}
                 {feedbackLoadFailed ? (
                   <p role="alert" className="mt-4 text-[12px] text-white/55">
-                    Couldn't load your coach's message. Pull down to refresh and try again.
+                    Couldn't load your coach's message.{' '}
+                    <button type="button" onClick={() => setReloadKey(k => k + 1)} className="underline text-[#C8F25A]">Retry</button>
                   </p>
                 ) : coachAssessmentNote ? (
                   <div className="mt-4 pt-4 border-t border-white/[0.06]">

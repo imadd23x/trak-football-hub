@@ -10,6 +10,7 @@ import { BANDS } from '@/lib/types'
 import { calculateSquadAnalytics, type SquadAnalytics } from '@/lib/squad-analytics'
 import { trackEvent } from '@/lib/telemetry'
 import { generateCode } from '@/lib/invite-codes'
+import { openable } from '@/lib/openable'
 
 // Derived from BANDS rather than restated. CLAUDE.md says colours never live
 // outside the BANDS config, and this file had a seventh-hand copy of them: the
@@ -565,8 +566,10 @@ export default function CoachHomePage() {
                 return (
                   <div
                     key={a.id}
-                    className="flex items-center gap-3 rounded-[14px] border border-white/[0.07] p-[13px_14px] mb-2"
+                    className="flex items-center gap-3 rounded-[14px] border border-white/[0.07] p-[13px_14px] mb-2 cursor-pointer active:scale-[0.99] transition-transform"
                     style={{ background: '#101012' }}
+                    {...openable(`Open assessment for ${playerName}, ${formattedDate}`,
+                      () => navigate(`/coach/assess?assessment=${a.id}`))}
                   >
                     {/* Initials avatar */}
                     <div

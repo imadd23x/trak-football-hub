@@ -28,7 +28,7 @@ const DIRS = [
 ]
 
 /** Components nothing imports or routes. Fixing them is editing dead code. */
-const UNREFERENCED = new Set(['CoachQuickMatchLog.tsx', 'CoachAssess.tsx', 'CoachSessionDetail.tsx'])
+const UNREFERENCED = new Set(['CoachQuickMatchLog.tsx', 'CoachSessionDetail.tsx'])
 
 function sources(): { name: string; path: string; code: string }[] {
   return DIRS.flatMap(dir =>

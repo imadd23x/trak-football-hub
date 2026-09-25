@@ -62,7 +62,8 @@ describe('settings controls reflect supported behavior', () => {
     expect(screen.queryByText('Who can see my passport')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Anyone with link' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Send reset email' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Change profile photo' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Change profile photo' })).not.toBeInTheDocument()
+    expect(document.querySelector('input[type="file"]')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Delete my account' })).toBeEnabled()
 

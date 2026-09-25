@@ -13,6 +13,7 @@ import { ErrorBoundary } from "@/components/trak/ErrorBoundary";
 import LandingPage from "./pages/LandingPage";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import ComingSoonPage from "./pages/ComingSoonPage";
 
 // Lazy-loaded routes — split bundles so navigating between sections is fast
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
@@ -36,8 +37,6 @@ const PlayerHome = lazy(() => import("./pages/player/PlayerHome"));
 const PlayerMatches = lazy(() => import("./pages/player/PlayerMatches"));
 const PlayerMatchDetail = lazy(() => import("./pages/player/PlayerMatchDetail"));
 const PlayerProfilePage = lazy(() => import("./pages/player/PlayerProfilePage"));
-const PlayerPassport = lazy(() => import("./pages/player/PlayerPassport"));
-const PlayerEvolutionCard = lazy(() => import("./pages/player/PlayerEvolutionCard"));
 const PlayerFeedback = lazy(() => import("./pages/player/PlayerFeedback"));
 const HowTrakWorks = lazy(() => import("./pages/HowTrakWorks"));
 
@@ -54,8 +53,6 @@ const CoachPlayerProfilePage = lazy(() => import("./pages/coach/CoachPlayerProfi
 const CoachRecognition = lazy(() => import("./pages/coach/CoachRecognition"));
 const CoachAwardPlayer = lazy(() => import("./pages/coach/CoachAwardPlayer"));
 const CoachQuickAssess = lazy(() => import("./pages/coach/CoachQuickAssess"));
-const CoachSchedule = lazy(() => import("./pages/coach/CoachSchedule"));
-const CoachAssistant = lazy(() => import("./pages/coach/CoachAssistant"));
 
 const ParentHome = lazy(() => import("./pages/parent/ParentHome"));
 const ParentMatches = lazy(() => import("./pages/parent/ParentMatches"));
@@ -109,8 +106,8 @@ const App = () => (
             <Route path="/player/matches" element={<RouteGuard allowedRole="player"><PlayerMatches /></RouteGuard>} />
             <Route path="/player/match/:id" element={<RouteGuard allowedRole="player"><PlayerMatchDetail /></RouteGuard>} />
             <Route path="/player/profile" element={<RouteGuard allowedRole="player"><PlayerProfilePage /></RouteGuard>} />
-            <Route path="/player/passport" element={<RouteGuard allowedRole="player"><PlayerPassport /></RouteGuard>} />
-            <Route path="/player/evolution" element={<RouteGuard allowedRole="player"><PlayerEvolutionCard /></RouteGuard>} />
+            <Route path="/player/passport" element={<RouteGuard allowedRole="player"><ComingSoonPage feature="Player passport" home="/player/home" /></RouteGuard>} />
+            <Route path="/player/evolution" element={<RouteGuard allowedRole="player"><ComingSoonPage feature="Evolution card" home="/player/home" /></RouteGuard>} />
             <Route path="/player/feedback/:assessmentId" element={<RouteGuard allowedRole="player"><PlayerFeedback /></RouteGuard>} />
             <Route path="/how-it-works" element={<HowTrakWorks />} />
 
@@ -119,7 +116,7 @@ const App = () => (
             <Route path="/coach/squad" element={<RouteGuard allowedRole="coach"><CoachSquadPage /></RouteGuard>} />
             <Route path="/coach/squad/add" element={<RouteGuard allowedRole="coach"><CoachAddPlayer /></RouteGuard>} />
             <Route path="/coach/assess" element={<RouteGuard allowedRole="coach"><CoachAssessPage /></RouteGuard>} />
-            <Route path="/coach/feedback/:assessmentId" element={<RouteGuard allowedRole="coach"><CoachReviewFeedback /></RouteGuard>} />
+            <Route path="/coach/feedback/:assessmentId" element={<RouteGuard allowedRole="coach"><ComingSoonPage feature="AI feedback" home="/coach/home" /></RouteGuard>} />
             <Route path="/coach/sessions" element={<RouteGuard allowedRole="coach"><CoachSessionsChooser /></RouteGuard>} />
             <Route path="/coach/sessions/list" element={<RouteGuard allowedRole="coach"><CoachSessionsPage /></RouteGuard>} />
             {/* Quick match log now resolves to the full session screen, preset to Match.
@@ -136,8 +133,8 @@ const App = () => (
             <Route path="/coach/player/:id" element={<RouteGuard allowedRole="coach"><CoachPlayerProfilePage /></RouteGuard>} />
             <Route path="/coach/recognition" element={<RouteGuard allowedRole="coach"><CoachRecognition /></RouteGuard>} />
             <Route path="/coach/award" element={<RouteGuard allowedRole="coach"><CoachAwardPlayer /></RouteGuard>} />
-            <Route path="/coach/schedule" element={<RouteGuard allowedRole="coach"><CoachSchedule /></RouteGuard>} />
-            <Route path="/coach/assistant" element={<RouteGuard allowedRole="coach"><CoachAssistant /></RouteGuard>} />
+            <Route path="/coach/schedule" element={<RouteGuard allowedRole="coach"><ComingSoonPage feature="Schedule" home="/coach/home" /></RouteGuard>} />
+            <Route path="/coach/assistant" element={<RouteGuard allowedRole="coach"><ComingSoonPage feature="Coach assistant" home="/coach/home" /></RouteGuard>} />
 
             {/* Parent routes */}
             <Route path="/parent/home" element={<RouteGuard allowedRole="parent"><ParentHome /></RouteGuard>} />
@@ -169,4 +166,3 @@ const App = () => (
 );
 
 export default App;
-import CoachReviewFeedback from '@/pages/coach/CoachReviewFeedback'

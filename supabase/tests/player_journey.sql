@@ -7,7 +7,9 @@
 -- players are in their account, they receive their feedback." That sentence is
 -- the pilot. Nothing had ever run it in one pass, so this does: coach signs up
 -- with an academy code, adds a player, assesses them twice, the player joins
--- with the TRK code, the coach publishes feedback, the player reads it.
+-- with the TRK code, the coach publishes manual feedback, the player reads it.
+-- G7 disables the separate AI publisher; this pilot journey uses the same
+-- coach_shared_feedback write/read path as the manual assessment interface.
 --
 -- Each step asserts what the player should be able to see afterwards, because
 -- the failure mode that matters here is not an error — it is a screen that is
@@ -157,8 +159,13 @@ SELECT pg_temp.jactor(pg_temp.jid(10));
 DO $test$
 DECLARE v_sp uuid := current_setting('trak.journey_squad_player')::uuid;
 BEGIN
-  PERFORM public.publish_player_feedback(v_sp, 'Your first touch has come on a lot. Keep going.', NULL);
-  PERFORM pg_temp.jassert(true, '5 the coach publishes approved feedback');
+  INSERT INTO public.coach_shared_feedback (assessment_id, coach_user_id, body, published_at)
+  SELECT id, auth.uid(), 'Your first touch has come on a lot. Keep going.', now()
+  FROM public.coach_assessments WHERE squad_player_id = v_sp
+  ORDER BY created_at DESC, id LIMIT 1;
+  PERFORM pg_temp.jassert(
+    (SELECT count(*) FROM public.coach_shared_feedback WHERE coach_user_id = auth.uid()) = 1,
+    '5 the coach publishes manual feedback');
 END;
 $test$;
 
@@ -167,14 +174,18 @@ SELECT pg_temp.jactor(pg_temp.jid(20));
 DO $test$
 DECLARE v_text text; v_drafts integer;
 BEGIN
-  SELECT published_text INTO v_text FROM public.player_feedback WHERE superseded_at IS NULL;
+  SELECT body INTO v_text FROM public.coach_shared_feedback WHERE published_at IS NOT NULL;
   PERFORM pg_temp.jassert(v_text LIKE 'Your first touch%',
     '5 the player reads the feedback their coach approved',
     coalesce(left(v_text, 30), 'nothing readable'));
 
-  SELECT count(*) INTO v_drafts FROM public.ai_feedback_drafts;
-  PERFORM pg_temp.jassert(v_drafts = 0,
-    '6 the player still cannot read any unapproved draft', v_drafts || ' visible');
+  BEGIN
+    SELECT count(*) INTO v_drafts FROM public.ai_feedback_drafts;
+    PERFORM pg_temp.jassert(v_drafts = 0,
+      '6 the player still cannot read any unapproved draft', v_drafts || ' visible');
+  EXCEPTION WHEN insufficient_privilege THEN
+    PERFORM pg_temp.jassert(true, '6 the player still cannot read any unapproved draft', 'privilege denied');
+  END;
 END;
 $test$;
 

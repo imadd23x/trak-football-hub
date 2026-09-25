@@ -184,19 +184,23 @@ use_cases:
       - A failed load is distinguishable from an empty squad
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
+  # SPEC v2 2026-09-25 (TRAK-68): Imad decided an assessment belongs to a
+  # session that already happened, so the session is required. v1 had it
+  # optional, and a same-day re-assessment silently moved the first one to
+  # another match (second use-case test).
   - id: UC-C04
     actor: coach
     title: Assess a player on six sliders producing a band
     requirement: REQ-002
     status: enforced
     tier: [1, 2]
-    spec_version: 1
-    given: A signed-in coach with at least one squad player
-    when: They select a player, set the six sliders and submit
+    spec_version: 2
+    given: A signed-in coach with at least one squad player and at least one past session
+    when: They select a player and a past session, set the six sliders and submit
     then:
-      - A coach_assessments row is persisted with all six category scores
+      - A coach_assessments row is persisted with all six category scores and the chosen session
       - A band derived from the six scores is shown before submitting
-      - Submitting is refused until a player is selected
+      - Submitting is refused until a player and a session are selected
     source: docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
   - id: UC-C07

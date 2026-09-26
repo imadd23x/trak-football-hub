@@ -125,8 +125,16 @@ code. The registry still describes the April code-linking flow:
 Owner: @kostasanastasioubusiness-lang (registry). Do not weaken a test to settle this.
 
 PO decision needed — one of:
-  [ ] Spec changes -> park the code-linking, goals and medals cases, rewrite
+  [x] Spec changes -> park the code-linking, goals and medals cases, rewrite
       UC-C02 and UC-P07 to match J1/J2, and add use cases for J1–J4
   [ ] Spec stands -> keep code linking in the pilot, and change J1 instead
 
-Status: OPEN
+Done (TRAK-19): UC-A06, UC-A07, UC-A08, UC-A10, UC-C07, UC-C08 and UC-P01
+are `parked`, and UC-A08's test file is deleted, following the UC-A02/A03
+precedent. UC-C02 v2 now says coaches do not add players; it is `pending`
+until TRAK-47 removes `/coach/squad/add`, and its new test is red on main
+today and green once the route and its buttons are gone. UC-P07 v2 covers
+every child under 18. UC-X03, UC-X04, UC-P08, UC-P09, UC-A11, UC-C09 and
+UC-C10 are added as `pending` for J1–J4.
+
+Status: RESOLVED 2026-09-23

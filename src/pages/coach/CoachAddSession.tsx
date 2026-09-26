@@ -116,6 +116,9 @@ export default function CoachAddSession() {
 
   // Squad
   const [squad,       setSquad]       = useState<SquadPlayer[]>([])
+  const [notReady,    setNotReady]    = useState<string[]>([])
+  const [rosterFailed,  setRosterFailed]  = useState(false)
+  const [rosterAttempt, setRosterAttempt] = useState(0)
   const [details,     setDetails]     = useState<Record<string, PlayerDetail>>({})
   const [expanded,    setExpanded]    = useState<Set<string>>(new Set())
 
@@ -139,21 +142,60 @@ export default function CoachAddSession() {
   const [attendanceSaved,  setAttendanceSaved]  = useState(false)
   const [loggedPlayerIds,  setLoggedPlayerIds]  = useState<Set<string>>(new Set())
 
+  // The roster reloads whenever the session refreshes. Until a reload confirms
+  // who is ready, Save waits (Tarek's #126 review).
+  const [rosterLoading, setRosterLoading] = useState(true)
+
   useEffect(() => {
     if (!user) return
+    // A later load supersedes this one; its late answers must not overwrite it.
+    let superseded = false
+    setRosterLoading(true)
     supabase
       .from('squad_players')
       .select('id, player_name, linked_player_id, position, age_group, age')
       .eq('coach_user_id', user.id)
       .order('player_name')
-      .then(({ data }) => {
-        const players = data || []
-        setSquad(players)
-        const init: Record<string, PlayerDetail> = {}
-        players.forEach(p => { init[p.id] = { ...DEFAULT_DETAIL, position: p.position } })
-        setDetails(init)
+      .then(async ({ data, error }) => {
+        if (superseded) return
+        // A failed load is not an empty squad: say so, offer a retry, and offer
+        // no players from an earlier load. Drafts stay for when a retry works.
+        setRosterFailed(!!error)
+        if (error) { setSquad([]); setNotReady([]); setRosterLoading(false); return }
+        const players = data ?? []
+        // J4 + G1: the database refuses any record about a child whose consent
+        // is not confirmed, and one refused row fails the whole attendance
+        // insert. Offer confirmed players only; name the rest. Same check as
+        // the assess screen; a failed check counts as not confirmed.
+        const required = await Promise.all(players.map(p =>
+          supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: p.id } as never)
+            .then(({ data: r, error }) => (error || typeof r !== 'boolean' ? null : r))))
+        if (superseded) return
+        const ready = players.filter((_, i) => required[i] === false)
+        const readyIds = new Set(ready.map(p => p.id))
+        setNotReady(players.flatMap((p, i) => required[i] === false ? []
+          : [`${p.player_name} (${required[i] ? 'waiting for a parent' : "consent couldn't be checked"})`]))
+        setSquad(ready)
+        // Keep what the coach entered for players still ready; drop the rest.
+        setDetails(prev => Object.fromEntries(ready.map(p =>
+          [p.id, prev[p.id] ?? { ...DEFAULT_DETAIL, position: p.position }])))
+        setAttended(prev => new Set([...prev].filter(id => readyIds.has(id))))
+        setRosterLoading(false)
       })
-  }, [user])
+    return () => { superseded = true }
+  }, [user, rosterAttempt])
+
+  // Under each player list: why nobody is offered, or who is left out and why.
+  const rosterNote = rosterFailed ? (
+    <p role="alert" className="text-[12px] text-white/55 px-4 py-3" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      Couldn't load your squad.{' '}
+      <button type="button" onClick={() => setRosterAttempt(n => n + 1)} className="underline text-[#C8F25A]">Retry</button>
+    </p>
+  ) : notReady.length > 0 && (
+    <p className="text-[11px] text-white/40 px-4 py-3" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      Not recorded until a parent approves: {notReady.join(', ')}
+    </p>
+  )
 
   const isMatch = type === 'match'
 
@@ -198,6 +240,8 @@ export default function CoachAddSession() {
   }
 
   const playedCount = Object.values(details).filter(d => d.played).length
+  // Attendance goes out only for players in the latest confirmed roster.
+  const present = squad.filter(p => attended.has(p.id))
 
   // ── validation ───────────────────────────────────────────────────────────────
   /* Only players marked as having played are checked, so a coach is never
@@ -224,7 +268,9 @@ export default function CoachAddSession() {
   // J4 records what happened; planning ahead is the parked calendar (TRAK-67, TRAK-25).
   const futureDate = date > localTodayISO()
 
-  const canSave = !saving && !futureDate && incompleteRecords.length === 0 && impossibleRecords.length === 0 && !teamGoalsError && (
+  // A failed roster is not an empty one: saving now would drop the players
+  // the coach took (Tarek's #126 re-review).
+  const canSave = !saving && !rosterLoading && !rosterFailed && !futureDate && incompleteRecords.length === 0 && impossibleRecords.length === 0 && !teamGoalsError && (
     isMatch    ? opponent.trim().length > 0 && scoreUs !== '' && scoreThem !== ''
     : type === 'training' ? trainingFocus.size > 0
     : title.trim().length > 0
@@ -414,16 +460,16 @@ export default function CoachAddSession() {
       trackEvent('match_logged', {
         actor: 'coach',
         source: 'add_session',
-        players: attended.size,
+        players: present.length,
         match_date: date,
         competition,
         venue,
       })
     } else {
       // Training / Other — simple attendance
-      if (attended.size > 0 && !attendanceSaved) {
+      if (present.length > 0 && !attendanceSaved) {
         const { error: attErr } = await supabase.from('session_attendance').insert(
-          [...attended].map(squad_player_id => ({
+          present.map(({ id: squad_player_id }) => ({
             session_id: sessionId,
             squad_player_id,
             status: 'present',
@@ -582,7 +628,7 @@ export default function CoachAddSession() {
                 </div>
               </div>
 
-              {squad.length === 0 ? (
+              {squad.length === 0 && notReady.length === 0 && !rosterFailed ? (
                 <p className="px-4 pb-4 text-[12px] text-white/40">
                   No squad yet. Add players from the Squad tab first.
                 </p>
@@ -799,6 +845,7 @@ export default function CoachAddSession() {
                   })}
                 </div>
               )}
+              {rosterNote}
             </div>
 
             {/* Match notes */}
@@ -911,7 +958,7 @@ export default function CoachAddSession() {
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[9px] font-medium tracking-[0.14em] uppercase text-white/45"
                   style={{ fontFamily: "'DM Mono', monospace" }}>
-                  ATTENDED · {attended.size}/{squad.length}
+                  ATTENDED · {present.length}/{squad.length}
                 </span>
                 <div className="flex gap-3">
                   <button onClick={() => setAttended(new Set(squad.map(p => p.id)))}
@@ -922,7 +969,7 @@ export default function CoachAddSession() {
                     style={{ fontFamily: "'DM Mono', monospace" }}>NONE</button>
                 </div>
               </div>
-              {squad.length === 0 ? (
+              {squad.length === 0 && notReady.length === 0 && !rosterFailed ? (
                 <p className="text-[12px] text-white/40 py-2">No squad yet. Add players from the Squad tab first.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -944,6 +991,7 @@ export default function CoachAddSession() {
                   })}
                 </div>
               )}
+              {rosterNote}
             </div>
 
             {/* Notes */}
@@ -977,7 +1025,7 @@ export default function CoachAddSession() {
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[9px] font-medium tracking-[0.14em] uppercase text-white/45"
                   style={{ fontFamily: "'DM Mono', monospace" }}>
-                  ATTENDED · {attended.size}/{squad.length}
+                  ATTENDED · {present.length}/{squad.length}
                 </span>
                 <div className="flex gap-3">
                   <button onClick={() => setAttended(new Set(squad.map(p => p.id)))}
@@ -988,7 +1036,7 @@ export default function CoachAddSession() {
                     style={{ fontFamily: "'DM Mono', monospace" }}>NONE</button>
                 </div>
               </div>
-              {squad.length === 0 ? (
+              {squad.length === 0 && notReady.length === 0 && !rosterFailed ? (
                 <p className="text-[12px] text-white/40 py-2">No squad yet. Add players from the Squad tab first.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -1010,6 +1058,7 @@ export default function CoachAddSession() {
                   })}
                 </div>
               )}
+              {rosterNote}
             </div>
 
             <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]">

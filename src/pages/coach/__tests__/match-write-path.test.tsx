@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
-import { table, insertInto, SUPABASE_URL } from '../../../../tests/msw/supabase'
+import { table, insertInto, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
 
 /**
  * What the coach's form actually sends, driven through the rendered screen and
@@ -61,6 +61,8 @@ function captureMatchRpc(): RpcBody[] {
     table('coach_sessions', []),
     insertInto('coach_sessions', body => ({ id: 'session-1', ...body })),
     insertInto('session_attendance', body => ({ id: 'att-1', ...body })),
+    // The child's consent is confirmed, so the screen offers them (G1).
+    rpc('coach_squad_player_consent_required', () => false),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/log_match_for_player`, async ({ request }) => {
       calls.push((await request.json()) as RpcBody)
       return HttpResponse.json(null)

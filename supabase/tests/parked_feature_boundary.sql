@@ -99,6 +99,12 @@ INSERT INTO public.squad_players(id,coach_user_id,player_name,linked_player_id,s
  (pg_temp.p47id(203),pg_temp.p47id(12),'Removal Archived',NULL,'archived'),
  (pg_temp.p47id(204),pg_temp.p47id(10),'Minor No Consent',pg_temp.p47id(24),'active'),
  (pg_temp.p47id(205),pg_temp.p47id(11),'Player B',pg_temp.p47id(22),'active');
+-- TRAK-48 slice 3 (#144): a new player profile needs a roster place, so the
+-- provisioning control below (actor 21) is admitted the way the pilot admits.
+INSERT INTO public.squad_players(id,coach_user_id,player_name,status) VALUES
+ (pg_temp.p47id(206),pg_temp.p47id(10),'New Audit Player','active');
+INSERT INTO public.roster_children(organization_id,squad_player_id,date_of_birth,child_email,loaded_by) VALUES
+ (pg_temp.p47id(100),pg_temp.p47id(206),'2000-01-01','synthetic-21@parked47.invalid','fixture');
 INSERT INTO public.staff_compliance(organization_id,coach_user_id,dbs_status) VALUES
  (pg_temp.p47id(100),pg_temp.p47id(12),'valid'),
  (pg_temp.p47id(101),pg_temp.p47id(11),'valid');

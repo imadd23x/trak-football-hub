@@ -93,6 +93,15 @@ INSERT INTO public.profiles (user_id, role, full_name, avatar_url) VALUES
   (pg_temp.g7id(10), 'coach', 'G7 Coach', NULL),
   (pg_temp.g7id(20), 'player', 'G7 Player', 'https://historical.invalid/avatar.png'),
   (pg_temp.g7id(30), 'parent', 'G7 Parent', 'https://historical.invalid/parent.png');
+-- TRAK-48 slice 3: an ordinary new player signs up from the academy roster.
+INSERT INTO public.organizations (id, admin_user_id, name, join_code) VALUES
+  (pg_temp.g7id(90), pg_temp.g7id(10), 'G7 Academy', 'G7-ACADEMY');
+INSERT INTO public.coach_details (user_id, organization_id) VALUES (pg_temp.g7id(10), pg_temp.g7id(90))
+  ON CONFLICT (user_id) DO UPDATE SET organization_id = EXCLUDED.organization_id;
+INSERT INTO public.squad_players (id, coach_user_id, player_name, age_group) VALUES
+  (pg_temp.g7id(91), pg_temp.g7id(10), 'New Player', 'U15');
+INSERT INTO public.roster_children (organization_id, squad_player_id, date_of_birth, child_email, loaded_by) VALUES
+  (pg_temp.g7id(90), pg_temp.g7id(91), current_date - interval '14 years', 'new-player@g7.test', 'fixture');
 INSERT INTO public.player_details (user_id, date_of_birth)
   VALUES (pg_temp.g7id(20), '2000-01-01');
 INSERT INTO public.player_parent_links (player_user_id, parent_user_id)

@@ -98,6 +98,17 @@ BEGIN
 END;
 $test$;
 
+-- TRAK-48 slice 3: a player or parent profile needs the academy's roster to
+-- name them. The operator loads the child (with the coach's roster row) and
+-- the parent the child will name.
+RESET ROLE;
+INSERT INTO public.roster_children (organization_id, squad_player_id, date_of_birth, child_email, loaded_by)
+VALUES (pg_temp.cj(100), current_setting('trak.cj_sp')::uuid, (current_date - interval '15 years 2 months')::date,
+        'player@consent-journey.test', 'fixture');
+INSERT INTO public.roster_guardians (roster_child_id, email, loaded_by)
+SELECT id, 'parent@consent-journey.test', 'fixture' FROM public.roster_children WHERE child_email = 'player@consent-journey.test';
+SET LOCAL ROLE authenticated;
+
 -- ── 2. A 15-year-old signs up, names a parent, and joins the roster ─────────
 
 SELECT pg_temp.cj_as(pg_temp.cj(20), 'player@consent-journey.test');
@@ -155,9 +166,11 @@ BEGIN
   SELECT count(*) INTO v_seen FROM public.get_my_pending_parent_invites();
   PERFORM pg_temp.cj_assert(v_seen = 0,
     '4 CONTROL an unrelated adult sees no invitation', v_seen || ' visible');
-  PERFORM public.provision_my_profile(jsonb_build_object('role', 'parent', 'full_name', 'Stranger Synthetic', 'nationality', NULL));
 END;
 $test$;
+-- Slice 3: an adult the roster does not name cannot even create a parent profile.
+SELECT pg_temp.cj_refused($$SELECT public.provision_my_profile(jsonb_build_object('role', 'parent', 'full_name', 'Stranger Synthetic', 'nationality', NULL))$$,
+  '4 J1 an unrelated adult cannot create a parent profile');
 SELECT pg_temp.cj_refused(format('SELECT public.accept_parent_invite(%L)', current_setting('trak.cj_invite')),
   '4 CONTROL an unrelated adult cannot accept the invitation');
 SELECT pg_temp.cj_refused(format(
@@ -260,8 +273,8 @@ DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.cj_results;
-  IF total <> 19 THEN
-    RAISE EXCEPTION 'Parent consent journey: % assertions ran; expected exactly 19', total;
+  IF total <> 20 THEN
+    RAISE EXCEPTION 'Parent consent journey: % assertions ran; expected exactly 20', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'Parent consent journey: % of % failed: %', failed, total,

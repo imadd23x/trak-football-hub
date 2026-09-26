@@ -226,6 +226,12 @@ const PlayerOnboarding = () => {
       toast.error("Please enter a parent or guardian's email so we can ask them to approve your account");
       return;
     }
+    // G5: the request would go to the child, not a parent. The database refuses
+    // it too, but only after the account exists, so stop it here.
+    if (parentEmail.trim() && parentEmail.trim().toLowerCase() === email.trim().toLowerCase()) {
+      toast.error("Your parent's email must be different from yours");
+      return;
+    }
 
     setLoading(true);
     try {

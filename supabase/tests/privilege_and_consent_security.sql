@@ -416,7 +416,9 @@ SELECT pg_temp.pc_assert((public.my_consent_status()->>'age')::integer > 18,
   'D2 unrelated player: scoped status describes the caller, not the target minor');
 SELECT pg_temp.pc_reset();
 
--- Positive controls cover all five RLS policies that call the private bridge.
+-- Positive controls cover the active assessment/award/manual-feedback policies.
+-- G7 deliberately removes the deferred player_feedback policies and publisher;
+-- retained rows must be inaccessible even while consent is active.
 SELECT pg_temp.pc_as('authenticated', 1);
 INSERT INTO public.coach_assessments (id, coach_user_id, squad_player_id, organization_id)
 VALUES (pg_temp.pc_id(401), pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101));
@@ -424,21 +426,35 @@ INSERT INTO public.recognition_awards (id, coach_user_id, squad_player_id, organ
 VALUES (pg_temp.pc_id(402), pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101), 'player_of_the_week');
 INSERT INTO public.coach_shared_feedback (assessment_id, coach_user_id, body, published_at)
 VALUES (pg_temp.pc_id(401), pg_temp.pc_id(1), 'PRIVATE-BRIDGE-SHARED-CANARY', now());
-SELECT public.publish_player_feedback(pg_temp.pc_id(201), 'PRIVATE-BRIDGE-PLAYER-CANARY');
+SELECT pg_temp.pc_expect_denied(format('SELECT public.publish_player_feedback(%L, %L)',
+  pg_temp.pc_id(201), 'PRIVATE-BRIDGE-PLAYER-CANARY'),
+  'D3 coach: consent cannot reopen the deferred publication RPC');
+SELECT pg_temp.pc_reset();
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+INSERT INTO public.player_feedback (squad_player_id, author_user_id, published_text)
+VALUES (pg_temp.pc_id(201), pg_temp.pc_id(1), 'PRIVATE-BRIDGE-PLAYER-CANARY');
+SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.player_feedback
+  WHERE published_text = 'PRIVATE-BRIDGE-PLAYER-CANARY'),
+  'D3 control: a retained deferred publication exists before read denials');
+SELECT pg_temp.pc_reset();
+SELECT pg_temp.pc_as('authenticated', 1);
 SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_assessments WHERE id = pg_temp.pc_id(401))
   AND (SELECT count(*) = 1 FROM public.recognition_awards WHERE id = pg_temp.pc_id(402)),
   'D3 coach: consented assessment and award inserts actually landed');
 SELECT pg_temp.pc_as('authenticated', 2);
-SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY')
-  AND (SELECT count(*) = 1 FROM public.player_feedback WHERE published_text = 'PRIVATE-BRIDGE-PLAYER-CANARY'),
-  'D3 player: both published feedback policies remain usable');
+SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
+  'D3 player: published manual feedback remains usable');
+SELECT pg_temp.pc_expect_denied('SELECT published_text FROM public.player_feedback',
+  'D3 player: active consent does not expose retained deferred feedback');
 SELECT pg_temp.pc_as('authenticated', 5);
 SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
   'D3 parent: published shared feedback remains readable');
 SELECT pg_temp.pc_as('authenticated', 8);
-SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY')
-  AND (SELECT count(*) = 0 FROM public.player_feedback WHERE published_text = 'PRIVATE-BRIDGE-PLAYER-CANARY'),
-  'D3 unrelated player: neither feedback table discloses the target');
+SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
+  'D3 unrelated player: manual feedback does not disclose the target');
+SELECT pg_temp.pc_expect_denied('SELECT published_text FROM public.player_feedback',
+  'D3 unrelated player: retained deferred feedback stays inaccessible');
 
 SELECT pg_temp.pc_as('authenticated', 5);
 SELECT public.withdraw_parental_consent(pg_temp.pc_id(2));
@@ -447,9 +463,10 @@ SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback 
 SELECT pg_temp.pc_as('authenticated', 2);
 SELECT pg_temp.pc_assert(public.my_consent_status()->>'required' = 'true',
   'D4 player: scoped status reflects withdrawal');
-SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY')
-  AND (SELECT count(*) = 0 FROM public.player_feedback WHERE published_text = 'PRIVATE-BRIDGE-PLAYER-CANARY'),
-  'D4 player: withdrawal hides both published feedback kinds');
+SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
+  'D4 player: withdrawal hides previously visible manual feedback');
+SELECT pg_temp.pc_expect_denied('SELECT published_text FROM public.player_feedback',
+  'D4 player: retained deferred feedback stays inaccessible after withdrawal');
 SELECT pg_temp.pc_as('authenticated', 1);
 SELECT pg_temp.pc_expect_denied(format(
   'INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, organization_id) VALUES (%L,%L,%L)',

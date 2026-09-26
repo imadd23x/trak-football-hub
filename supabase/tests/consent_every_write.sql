@@ -119,19 +119,12 @@ SET LOCAL ROLE authenticated;
 
 -- ── Setup: coach, 15-year-old player, parent linked and approving ───────────
 
-SELECT pg_temp.ce_as(pg_temp.ce(10), 'coach@consent-every-write.test');
-DO $test$
-BEGIN
-  PERFORM public.provision_my_profile(jsonb_build_object(
-    'role', 'coach', 'full_name', 'Every Write Coach',
-    'coach_details', jsonb_build_object('academy_code', 'CEVW01', 'current_club', 'Every Write FC')));
-END;
-$test$;
-
--- Since TRAK-48 slice 3 (#144) a player or parent signs up only with a roster
--- place, so the operator admits both players first, as in the pilot.
+-- Since TRAK-12 (#151) staff are set up by Trak, and since TRAK-48 slice 3
+-- (#144) a player or parent signs up only with a roster place, so the
+-- operator admits the coach and both players first, as in the pilot.
 RESET ROLE;
 SET LOCAL ROLE service_role;
+SELECT public.admit_staff_member(pg_temp.ce(10), 'coach', 'Every Write Coach', pg_temp.ce(100));
 SELECT set_config('trak.ce_roster_ada', public.admit_roster_child(pg_temp.ce(100), pg_temp.ce(10), 'Ada Synthetic', 'U16',
     (current_date - interval '15 years 2 months')::date, 'player@consent-every-write.test',
     ARRAY['parent@consent-every-write.test'], 'consent_every_write')::text, true);

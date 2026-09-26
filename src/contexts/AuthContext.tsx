@@ -19,7 +19,7 @@ interface PendingProfileData {
   player_details?: {
     date_of_birth: string;
     position: string;
-    current_club: string;
+    current_club?: string; // a rostered player's comes from the academy (TRAK-54)
     age_group: string;
     shirt_number: number | null;
   };

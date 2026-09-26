@@ -77,6 +77,10 @@ INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
 INSERT INTO public.organizations (id, admin_user_id, name, join_code)
 VALUES (pg_temp.cj(100), pg_temp.cj(1), 'Consent Journey FC', 'CJRN01');
 
+-- TRAK-12: Trak sets up staff. The operator admits the coach to the academy;
+-- the coach's own signup below then completes an existing profile.
+SELECT public.admit_staff_member(pg_temp.cj(10), 'coach', 'Journey Coach', pg_temp.cj(100));
+
 SET LOCAL ROLE authenticated;
 
 -- ── 1. The coach joins the academy and adds the player to the roster ────────

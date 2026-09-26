@@ -125,6 +125,30 @@ describe('J5: one screen, message to the player, private note, publish', () => {
     expect(typeof shared()[0].published_at).toBe('string')
   })
 
+  // J7 (TRAK-10): the pilot count is distinct assessments per coach, so the
+  // event must name the row the database returned, new or edited.
+  it('the save event names the saved assessment, for a new one and an edit', async () => {
+    const { trackEvent } = await import('@/lib/telemetry')
+    const saves = () => vi.mocked(trackEvent).mock.calls.filter(([type]) => type === 'assessment_submitted')
+    vi.mocked(trackEvent).mockClear()
+    showForm()
+    await choose('player-b')
+    await waitFor(() => expect(messageBox()).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: /save assessment/i }))
+    await screen.findByText('Coach home')
+    expect(saves()).toHaveLength(1)
+    expect(saves()[0][1]).toMatchObject({ assessment_id: 'assessment-b', updated: false })
+
+    cleanup()
+    showForm()
+    await choose('player-a')
+    await screen.findByDisplayValue('Published feedback for Alex')
+    await userEvent.click(screen.getByRole('button', { name: /save assessment/i }))
+    await screen.findByText('Coach home')
+    expect(saves()).toHaveLength(2)
+    expect(saves()[1][1]).toMatchObject({ assessment_id: 'assessment-a', updated: true })
+  })
+
   it('an edited published message is sent again on Save', async () => {
     showForm()
     await choose('player-a')

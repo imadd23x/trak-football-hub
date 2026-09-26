@@ -121,18 +121,27 @@ SET LOCAL ROLE authenticated;
 
 SELECT pg_temp.ce_as(pg_temp.ce(10), 'coach@consent-every-write.test');
 DO $test$
-DECLARE v_sp uuid; v_code text;
 BEGIN
   PERFORM public.provision_my_profile(jsonb_build_object(
     'role', 'coach', 'full_name', 'Every Write Coach',
     'coach_details', jsonb_build_object('academy_code', 'CEVW01', 'current_club', 'Every Write FC')));
-  SELECT invite_code INTO v_code FROM public.profiles WHERE user_id = pg_temp.ce(10);
-  PERFORM set_config('trak.ce_code', v_code, true);
-  INSERT INTO public.squad_players (coach_user_id, player_name, status)
-  VALUES (pg_temp.ce(10), 'Ada Synthetic', 'active') RETURNING id INTO v_sp;
-  PERFORM set_config('trak.ce_sp', v_sp::text, true);
 END;
 $test$;
+
+-- Since TRAK-48 slice 3 (#144) a player or parent signs up only with a roster
+-- place, so the operator admits both players first, as in the pilot.
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('trak.ce_roster_ada', public.admit_roster_child(pg_temp.ce(100), pg_temp.ce(10), 'Ada Synthetic', 'U16',
+    (current_date - interval '15 years 2 months')::date, 'player@consent-every-write.test',
+    ARRAY['parent@consent-every-write.test'], 'consent_every_write')::text, true);
+SELECT set_config('trak.ce_roster_adult', public.admit_roster_child(pg_temp.ce(100), pg_temp.ce(10), 'Adult Synthetic', 'U19',
+    (current_date - interval '19 years')::date, 'adult@consent-every-write.test',
+    ARRAY['adult.guardian@consent-every-write.test'], 'consent_every_write')::text, true);
+RESET ROLE;
+SELECT set_config('trak.ce_sp', (SELECT squad_player_id::text FROM public.roster_children
+  WHERE id = current_setting('trak.ce_roster_ada')::uuid), true);
+SET LOCAL ROLE authenticated;
 
 SELECT pg_temp.ce_as(pg_temp.ce(20), 'player@consent-every-write.test');
 DO $test$
@@ -142,17 +151,13 @@ BEGIN
     'parent_email', 'parent@consent-every-write.test',
     'player_details', jsonb_build_object('date_of_birth', (current_date - interval '15 years 2 months')::date::text,
                                          'position', 'Defender')));
-  PERFORM public.link_player_to_coach(current_setting('trak.ce_code'));
 END;
 $test$;
 
 SELECT pg_temp.ce_as(pg_temp.ce(30), 'parent@consent-every-write.test');
 DO $test$
-DECLARE v_invite uuid;
 BEGIN
-  SELECT invite_id INTO v_invite FROM public.get_my_pending_parent_invites() LIMIT 1;
   PERFORM public.provision_my_profile(jsonb_build_object('role', 'parent', 'full_name', 'Parent Synthetic', 'nationality', NULL));
-  PERFORM public.accept_parent_invite(v_invite);
   PERFORM pg_temp.ce_consent();
 END;
 $test$;
@@ -252,7 +257,6 @@ BEGIN
     'role', 'player', 'full_name', 'Adult Synthetic',
     'player_details', jsonb_build_object('date_of_birth', (current_date - interval '19 years')::date::text,
                                          'position', 'Forward')));
-  PERFORM public.link_player_to_coach(current_setting('trak.ce_code'));
 END;
 $test$;
 SELECT pg_temp.ce_as(pg_temp.ce(10), 'coach@consent-every-write.test');

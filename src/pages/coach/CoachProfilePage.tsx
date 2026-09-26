@@ -18,14 +18,10 @@ export default function CoachProfilePage() {
   const [inviteStatus, setInviteStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
 
   // Academy membership. `orgName` is null while unknown; `orgStatus` separates
-  // "not in an academy" from "we could not find out", because the join form
-  // below is shown for the first and must not be shown for the second — a coach
-  // who is already in an academy should never be invited to join one.
+  // "not in an academy" from "we could not find out", so a failed read is never
+  // shown as "no academy". Trak sets a coach's academy (TRAK-12, #151).
   const [orgName, setOrgName] = useState<string | null>(null)
   const [orgStatus, setOrgStatus] = useState<'loading' | 'none' | 'joined' | 'failed'>('loading')
-  const [joinCode, setJoinCode] = useState('')
-  const [joining, setJoining] = useState(false)
-  const [joinError, setJoinError] = useState<string | null>(null)
 
   const loadOrg = async (uid: string) => {
     const { data, error } = await supabase
@@ -99,54 +95,6 @@ export default function CoachProfilePage() {
       })
   }, [user])
 
-  const handleJoinAcademy = async () => {
-    if (!user || joining) return
-    const code = joinCode.trim()
-    if (!code) return
-    setJoining(true)
-    setJoinError(null)
-
-    const { data: returnedOrgId, error } = await supabase
-      .rpc('join_organization' as any, { p_code: code.replace(/^TRK-/i, '') })
-
-    if (error) {
-      // The RPC raises 'Invalid academy code' for an unknown code. Anything
-      // else is a genuine failure and should not be reported as a typo.
-      setJoinError(
-        /invalid academy code/i.test(error.message)
-          ? "That academy code wasn't recognised. Check it with your academy."
-          : 'Could not join just now. Nothing has changed — try again.',
-      )
-      setJoining(false)
-      return
-    }
-
-    // Read back, because the RPC cannot tell you it did nothing.
-    //
-    //   UPDATE public.coach_details SET organization_id = v_org_id
-    //   WHERE user_id = auth.uid();
-    //   RETURN v_org_id;
-    //
-    // A coach with no coach_details row updates zero rows and still gets the
-    // organisation's id back. Trusting the return value would show "joined"
-    // over a database that never recorded it — the same shape as everything
-    // else fixed on this branch, this time in a function I did not write.
-    const { data: check, error: checkError } = await supabase
-      .from('coach_details').select('organization_id').eq('user_id', user.id).maybeSingle()
-    const storedOrgId = (check as { organization_id?: string | null } | null)?.organization_id
-
-    if (checkError || !storedOrgId || storedOrgId !== returnedOrgId) {
-      console.error('join_organization returned an id but stored nothing', { returnedOrgId, storedOrgId, checkError })
-      setJoinError('The academy did not save. Nothing has changed — please tell your academy admin.')
-      setJoining(false)
-      return
-    }
-
-    setJoinCode('')
-    setJoining(false)
-    await loadOrg(user.id)
-  }
-
   return (
     <MobileShell>
       <div className="flex items-center justify-between pt-3 pb-2 border-b border-white/[0.07]">
@@ -202,15 +150,8 @@ export default function CoachProfilePage() {
           </p>
         </TrakCard>
 
-        {/* Academy.
-            Signup already tells a coach "you can join your academy later from
-            your profile" when their code is unrecognised — and when they give
-            no code at all, nothing is said and nothing is offered. Until now
-            that promise had no implementation anywhere in the app:
-            join_organization() has existed since 20260608000001 and was granted
-            to authenticated, and no screen called it.
-            A coach outside an academy is invisible to the academy dashboard,
-            and so is every player they add. */}
+        {/* Academy. Trak sets it (TRAK-12): the database refuses a code-join
+            (#151), so a coach outside an academy is told who to ask. */}
         <TrakCard>
           <MetadataLabel text="ACADEMY" />
           {orgStatus === 'loading' ? (
@@ -227,38 +168,10 @@ export default function CoachProfilePage() {
               {orgName ?? 'Linked to your academy'}
             </p>
           ) : (
-            <div className="mt-2">
-              <p className="text-[12px] text-white/45 mb-3 leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                You aren't linked to an academy. Your squad is yours alone — an
-                academy can't see your players, and you won't appear on its
-                dashboard. Enter your academy's code to join.
-              </p>
-              <div className="flex gap-2">
-                <input
-                  value={joinCode}
-                  onChange={e => { setJoinCode(e.target.value); setJoinError(null) }}
-                  placeholder="TRK-XXXX"
-                  autoCapitalize="characters"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  className="flex-1 min-w-0 h-10 px-3 rounded-[10px] bg-white/[0.04] border border-white/[0.09] text-[13px] text-white/[0.88] placeholder:text-white/25 outline-none focus:border-[rgba(200,242,90,0.35)]"
-                  style={{ fontFamily: "'DM Mono', monospace" }}
-                />
-                <button
-                  onClick={handleJoinAcademy}
-                  disabled={joining || !joinCode.trim()}
-                  className="h-10 px-4 rounded-[10px] text-[13px] font-medium text-black disabled:opacity-40 flex-shrink-0"
-                  style={{ background: '#C8F25A', fontFamily: "'DM Sans', sans-serif" }}
-                >
-                  {joining ? 'Joining…' : 'Join'}
-                </button>
-              </div>
-              {joinError && (
-                <p className="text-[11px] mt-2" style={{ color: 'rgb(251,191,36)', fontFamily: "'DM Sans', sans-serif" }}>
-                  {joinError}
-                </p>
-              )}
-            </div>
+            <p className="text-[12px] text-white/45 mt-2 leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+              You aren't linked to an academy yet. Your academy is set by Trak: ask
+              your academy to add you.
+            </p>
           )}
         </TrakCard>
 

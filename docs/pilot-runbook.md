@@ -146,11 +146,12 @@ TRAK_REHEARSAL_PASSWORD='<set a fresh one, do not commit it>' node seed-pilot-re
 Two squads, ~30 players, six weeks of fixtures, matches, assessments and awards under
 `@rehearsal.trak.dev` / "Rehearsal FC". Reset with `--purge`.
 
-The seed signs its staff in with the app key. Re-running it over the existing rehearsal
-accounts works. **After `--purge`**, it would re-create the academy but be refused
-moving the coaches into it. Their logins survive the purge, so run only step 2 above
-first: `director@` as `club` with academy name "Rehearsal FC", then `coach.u15@`,
-`coach.u17@` and `coach.gk@` into it. Then run the seed.
+The seed signs its staff in with the app key, so it can only use staff who already
+exist. Re-running it over the rehearsal academy works, including after `--purge`: the
+academy and its coaches survive a purge. A rebuild in an empty project needs the staff
+admitted first, with the steps above: `director@` as `club` with academy name
+"Rehearsal FC", then `coach.u15@`, `coach.u17@` and `coach.gk@` into it. Then run
+the seed.
 
 `telemetry_events` stays **empty** after seeding — it is written by the app, not the script. That
 is deliberate: metrics 4, 6 and 7 stay blank until you click through the smoke test below.

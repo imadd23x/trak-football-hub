@@ -285,6 +285,73 @@ SELECT pg_temp.sassert(
   'activity is in week ' || public.pilot_week(now())::text);
 
 
+-- ── F. Telemetry-based metrics count the pilot academy only ─
+-- 20260901000005 scoped the roster/match views through pilot_coach_ids() and
+-- never redefined the four that read telemetry_events: pilot_time_to_assess,
+-- pilot_rating_agreement, pilot_weekly_active, and pilot_retention on top of
+-- it. pilot_scorecard reads three of them, so median time-to-assess, blind
+-- rating agreement and player/parent return would include every academy, dev
+-- account and rehearsal user alongside the real cohort. Imad measured it read-
+-- only on 21 Sep: 7 of 12 timing rows came from outside the configured academy.
+--
+-- Every user below acts in the pilot week. Only sid(1) (pilot coach) and
+-- sid(4) (pilot player) belong to the configured academy. The other coach,
+-- the unattached coach and the other academy's player are the ones that must
+-- not count; each F assertion has a control showing the pilot user IS counted,
+-- so an empty view cannot pass.
+UPDATE public.pilot_config SET org_id = pg_temp.sid(101), starts_on = CURRENT_DATE WHERE id;
+
+INSERT INTO public.telemetry_events (user_id, role, event_type, metadata, created_at) VALUES
+  (pg_temp.sid(1), 'coach',  'assessment_submitted', '{"duration_ms": 10000, "players": 1}',   now()),
+  (pg_temp.sid(2), 'coach',  'assessment_submitted', '{"duration_ms": 900000, "players": 1}',  now()),
+  (pg_temp.sid(3), 'coach',  'assessment_submitted', '{"duration_ms": 900000, "players": 1}',  now()),
+  (pg_temp.sid(1), 'coach',  'blind_rating_captured', '{"gut_band": "good", "computed_band": "good"}',    now()),
+  (pg_temp.sid(2), 'coach',  'blind_rating_captured', '{"gut_band": "elite", "computed_band": "developing"}', now()),
+  (pg_temp.sid(3), 'coach',  'blind_rating_captured', '{"gut_band": "elite", "computed_band": "developing"}', now()),
+  (pg_temp.sid(4), 'player', 'session_open', '{}', now()),
+  (pg_temp.sid(6), 'player', 'session_open', '{}', now());
+
+SELECT pg_temp.sassert(
+  EXISTS (SELECT 1 FROM public.pilot_time_to_assess WHERE coach_user_id = pg_temp.sid(1)),
+  'F1-control pilot_time_to_assess counts the pilot coach');
+SELECT pg_temp.sassert(
+  NOT EXISTS (SELECT 1 FROM public.pilot_time_to_assess WHERE coach_user_id IN (pg_temp.sid(2), pg_temp.sid(3))),
+  'F1 pilot_time_to_assess excludes coaches outside the pilot academy',
+  (SELECT count(*)::text || ' outside rows' FROM public.pilot_time_to_assess WHERE coach_user_id IN (pg_temp.sid(2), pg_temp.sid(3))));
+
+SELECT pg_temp.sassert(
+  EXISTS (SELECT 1 FROM public.pilot_rating_agreement WHERE coach_user_id = pg_temp.sid(1)),
+  'F2-control pilot_rating_agreement counts the pilot coach');
+SELECT pg_temp.sassert(
+  NOT EXISTS (SELECT 1 FROM public.pilot_rating_agreement WHERE coach_user_id IN (pg_temp.sid(2), pg_temp.sid(3))),
+  'F2 pilot_rating_agreement excludes coaches outside the pilot academy',
+  (SELECT count(*)::text || ' outside rows' FROM public.pilot_rating_agreement WHERE coach_user_id IN (pg_temp.sid(2), pg_temp.sid(3))));
+
+SELECT pg_temp.sassert(
+  (SELECT count(DISTINCT user_id) FROM public.pilot_weekly_active WHERE user_id IN (pg_temp.sid(1), pg_temp.sid(4))) = 2,
+  'F3-control pilot_weekly_active counts the pilot coach and the pilot player');
+SELECT pg_temp.sassert(
+  NOT EXISTS (SELECT 1 FROM public.pilot_weekly_active WHERE user_id IN (pg_temp.sid(2), pg_temp.sid(3), pg_temp.sid(6))),
+  'F3 pilot_weekly_active excludes users outside the pilot academy',
+  (SELECT string_agg(DISTINCT role, ',') FROM public.pilot_weekly_active WHERE user_id IN (pg_temp.sid(2), pg_temp.sid(3), pg_temp.sid(6))));
+
+SELECT pg_temp.sassert(
+  (SELECT max(week1_cohort) FROM public.pilot_retention WHERE role = 'player') = 1,
+  'F4 pilot_retention''s week-1 player cohort is the pilot academy''s players only',
+  (SELECT max(week1_cohort)::text || ' players in cohort' FROM public.pilot_retention WHERE role = 'player'));
+
+-- The number the pilot is judged by. With only the pilot coach, the median is
+-- 10s; the outside coaches' 900s runs would drag it to 900.
+SELECT pg_temp.sassert(
+  (SELECT median_assess_seconds FROM public.pilot_scorecard WHERE week = public.pilot_week(now())) = 10.0,
+  'F5 the scorecard''s median time-to-assess reflects the pilot academy only',
+  (SELECT median_assess_seconds::text || 's' FROM public.pilot_scorecard WHERE week = public.pilot_week(now())));
+SELECT pg_temp.sassert(
+  (SELECT rating_agreement_blind_pct FROM public.pilot_scorecard WHERE week = public.pilot_week(now())) = 100.0,
+  'F6 the scorecard''s blind rating agreement reflects the pilot academy only',
+  (SELECT rating_agreement_blind_pct::text || '%' FROM public.pilot_scorecard WHERE week = public.pilot_week(now())));
+
+
 -- ── Report ──────────────────────────────────────────────────
 DO $test$
 DECLARE failures text; n_passed int; total int;

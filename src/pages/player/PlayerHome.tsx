@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -12,6 +12,7 @@ import { parseDisplayDate } from '@/lib/calendar'
 import { trackEvent } from '@/lib/telemetry'
 import CardRevealModal from '@/components/player/CardRevealModal'
 import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
+import { timeOfDayGreeting } from '@/lib/greeting'
 
 const QUOTES = [
   { text: "The more difficult the victory, the greater the happiness in winning.", author: "Pelé" },
@@ -72,10 +73,13 @@ export default function PlayerHome() {
   // state the parent screens suffer from.
   useEffect(() => {
     if (!user) return
+    let cancelled = false
     // `as any`: generated types predate the consent migration.
     ;(supabase.rpc as any)('my_consent_status').then(({ data }: { data: unknown }) => {
+      if (cancelled) return
       setConsent(data as { required: boolean; invited_parent: string | null } | null)
     })
+    return () => { cancelled = true }
   }, [user])
 
   const [showReveal, setShowReveal] = useState(false)
@@ -90,6 +94,9 @@ export default function PlayerHome() {
   // actually happened rather than guessing which row was theirs.
   const [mayHaveMissedHistory, setMayHaveMissedHistory] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  // The account and Retry count of the last load that finished. A run for the
+  // same pair is a background refresh (see below), not a first load.
+  const loadedFor = useRef<{ userId: string; reloadKey: number } | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -98,46 +105,74 @@ export default function PlayerHome() {
     // and reinstate what it read — which is how retracted feedback stayed on
     // screen. Only the newest run may write to state.
     let cancelled = false
+    // AuthContext hands out a new user object on every token refresh (hourly,
+    // and on returning to the tab), so a same-account re-run is a background
+    // refresh: it keeps the card on screen and replaces each value from its own
+    // result, instead of blanking the card behind the skeleton (Kostas, #133).
+    // A first load, a Retry and a different account still start from nothing.
+    const background = loadedFor.current?.userId === user.id && loadedFor.current.reloadKey === reloadKey
+    let failed = false
+    const fail = () => { failed = true; setLoadFailed(true) }
+    // These belong to this load's accessible roster and latest assessment.
+    // A successful empty read must not retain values from the previous load.
+    const clearCoach = () => {
+      setCoachAssessment(null)
+      setCoachName('')
+      setCoachAssessmentNote(null)
+      setFeedbackLoadFailed(false)
+    }
+    if (!background) {
+      setLoading(true)
+      setLoadFailed(false)
+      clearCoach()
+      setUpcomingEvents([])
+    }
 
-    supabase.from('matches').select('*').eq('user_id', user.id)
+    const matchesRequest = supabase.from('matches').select('*').eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
-        setLoading(false)
+        if (cancelled) return
         // A failed read is not an empty season — without this the home screen
         // showed a player with a full record the same blank card as a new one.
-        if (error) { setLoadFailed(true); return }
-        setLoadFailed(false)
+        if (error) { fail(); return }
 
         const deduped = dedupeMatches(data)
         setMatches(deduped)
 
         // Card reveal — show once when new matches have been logged since last visit
-        const storageKey = `trak_last_match_count_${user.id}`
-        const stored = localStorage.getItem(storageKey)
-        if (stored === null) {
-          // First ever open — record count silently, no reveal
-          localStorage.setItem(storageKey, String(deduped.length))
-        } else {
-          const lastSeen = parseInt(stored, 10)
-          if (deduped.length > lastSeen) {
-            setNewMatchCount(deduped.length - lastSeen)
-            setShowReveal(true)
+        try {
+          const storageKey = `trak_last_match_count_${user.id}`
+          const stored = localStorage.getItem(storageKey)
+          if (stored === null) {
+            // First ever open — record count silently, no reveal
+            localStorage.setItem(storageKey, String(deduped.length))
+          } else {
+            const lastSeen = parseInt(stored, 10)
+            if (deduped.length > lastSeen) {
+              setNewMatchCount(deduped.length - lastSeen)
+              setShowReveal(true)
+            }
           }
+        } catch {
+          // Reveal bookkeeping is optional when browser storage is unavailable.
+          // It must not prevent the successful card reads from finishing.
         }
       })
-    supabase.from('player_details').select('position, current_club, age_group').eq('user_id', user.id).maybeSingle()
+    const detailsRequest = supabase.from('player_details').select('position, current_club, age_group').eq('user_id', user.id).maybeSingle()
       .then(({ data, error }) => {
+        if (cancelled) return
         // These sibling reads used to destructure only `data`, so a failure
         // rendered as "nothing recorded yet" — the same false empty state this
         // screen's main query was fixed for, arriving one query along.
-        if (error) { setLoadFailed(true); return }
+        if (error) { fail(); return }
         setDetails(data)
       })
     // Fetch squad link → coach assessments + published calendar events
-    supabase.from('squad_players').select('id, coach_user_id').eq('linked_player_id', user.id)
+    const squadRequest = supabase.from('squad_players').select('id, coach_user_id').eq('linked_player_id', user.id)
       .then(async ({ data: squadRows, error: squadError }) => {
-        if (squadError) { setLoadFailed(true); return }
-        if (!squadRows?.length) return
+        if (cancelled) return
+        if (squadError) { fail(); return }
+        if (!squadRows?.length) { clearCoach(); setUpcomingEvents([]); return }
         const ids = squadRows.map((r: any) => r.id)
         const coachIds = squadRows.map((r: any) => r.coach_user_id).filter(Boolean)
 
@@ -147,12 +182,13 @@ export default function PlayerHome() {
           .in('squad_player_id', ids)
           .order('created_at', { ascending: false })
           .limit(1)
-        if (assessError) { setLoadFailed(true); return }
-        if (assessments?.length) {
+        if (cancelled) return
+        if (assessError) { fail(); return }
+        if (!assessments?.length) clearCoach()
+        else {
           const latest = assessments[0]
-          setCoachAssessment(latest)
           const { data: cp } = await supabase.from('profiles').select('full_name').eq('user_id', latest.coach_user_id).maybeSingle()
-          if (cp) setCoachName(cp.full_name)
+          if (cancelled) return
           // Published feedback the coach wrote FOR this player — not the
           // coach's private note, which K9 (20260918135500) made unreadable
           // here and which was never meant for the child in the first place.
@@ -169,6 +205,10 @@ export default function PlayerHome() {
             .not('published_at', 'is', null)
             .maybeSingle()
           if (cancelled) return
+          // The assessment, its coach and its message change together, so a
+          // background refresh never pairs a new assessment with an old message.
+          setCoachAssessment(latest)
+          setCoachName(cp?.full_name || '')
           // Assign unconditionally, including null. The previous version only
           // assigned a truthy body, so once feedback had been displayed it
           // could never be taken away: a coach retracting a publication left
@@ -189,15 +229,16 @@ export default function PlayerHome() {
             console.error('[Trak] shared feedback fetch failed', sharedError.message)
             setFeedbackLoadFailed(true)
             setCoachAssessmentNote(null)
-            return
+          } else {
+            setFeedbackLoadFailed(false)
+            const body = (sharedRow as { body?: string } | null)?.body?.trim()
+            setCoachAssessmentNote(body || null)
           }
-          setFeedbackLoadFailed(false)
-          const body = (sharedRow as { body?: string } | null)?.body?.trim()
-          setCoachAssessmentNote(body || null)
         }
 
         // Published upcoming calendar events from coach
-        if (coachIds.length) {
+        if (!coachIds.length) setUpcomingEvents([])
+        else {
           const { data: evs, error: evsError } = await supabase
             .from('coach_calendar_events')
             .select('*')
@@ -213,13 +254,32 @@ export default function PlayerHome() {
             .order('event_date', { ascending: true, nullsFirst: false })
             .order('starts_at', { ascending: true })
             .limit(5)
+          if (cancelled) return
           // A failed calendar read is not an empty calendar. Without this the
           // player is told they have no sessions coming up, which is a
           // statement about their week, not about the network.
-          if (evsError) { setLoadFailed(true); return }
+          if (evsError) { fail(); return }
           setUpcomingEvents(evs || [])
         }
       })
+
+    // A sibling success cannot erase a failure. Keep loading until all of
+    // this run's required reads finish; only a run that finishes cleanly
+    // clears loadFailed. A callback that throws, instead of resolving with
+    // { error }, ends in the same retryable error rather than an endless
+    // skeleton (Kostas and Imad, #133).
+    Promise.all([matchesRequest, detailsRequest, squadRequest]).then(() => {
+      if (cancelled) return
+      if (!failed) setLoadFailed(false)
+      setLoading(false)
+      loadedFor.current = { userId: user.id, reloadKey }
+    }, error => {
+      if (cancelled) return
+      console.error('[Trak] player home load failed', error)
+      setLoadFailed(true)
+      setLoading(false)
+      loadedFor.current = { userId: user.id, reloadKey }
+    })
 
     return () => { cancelled = true }
   }, [user, reloadKey])
@@ -318,7 +378,7 @@ export default function PlayerHome() {
       <div className="pt-12 pb-4">
         <LoadError
           what="your card"
-          onRetry={() => { setLoading(true); setLoadFailed(false); setReloadKey(k => k + 1) }}
+          onRetry={() => setReloadKey(k => k + 1)}
         />
       </div>
       <NavBar role="player" activeTab={location.pathname} onNavigate={navigate} />
@@ -363,7 +423,7 @@ export default function PlayerHome() {
 
         {/* Identity */}
         <div className="py-2.5 pb-4">
-          <p className="text-xs text-white/22 mb-1">Good morning,</p>
+          <p className="text-xs text-white/22 mb-1">{timeOfDayGreeting()}</p>
           <p className="text-[28px] font-semibold text-white/88 leading-tight tracking-tight"
             style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.03em' }}>
             {profile?.full_name || 'Player'}

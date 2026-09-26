@@ -4,9 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PlayerParentInviteCard } from '../PlayerParentInviteCard'
 import { ParentInviteCard } from '../ParentInviteCard'
 
-const calls = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn(), session: vi.fn(), copy: vi.fn(), create: vi.fn(), boundSession: vi.fn(), userId: 'player-a' }))
+const calls = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn(), session: vi.fn(), copy: vi.fn(), userId: 'player-a' }))
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: calls.userId } }) }))
-vi.mock('@/lib/onboarding-session', () => ({ createOnboardingSession: calls.boundSession }))
+vi.mock('@/lib/onboarding-session', () => ({ createOnboardingSession: vi.fn() }))
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {
   rpc: (name: string) => ({ abortSignal: () => calls.rpc(name) }),
   functions: { invoke: calls.invoke },
@@ -41,8 +41,6 @@ beforeEach(() => {
   calls.invoke.mockResolvedValue({ data: { sent: true }, error: null })
   calls.session.mockResolvedValue({ data: { session: { user: { id: 'player-a' }, access_token: 'player-a-token' } }, error: null })
   calls.copy.mockResolvedValue(undefined)
-  calls.create.mockResolvedValue({ data: [], error: null })
-  calls.boundSession.mockResolvedValue({ client: { rpc: calls.create } })
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: calls.copy } })
   Object.defineProperty(navigator, 'share', { configurable: true, value: undefined })
 })
@@ -255,56 +253,64 @@ describe('player parent invitation recovery', () => {
     expect(screen.getByRole('button', { name: 'Resend email' })).toBeEnabled()
   })
 
-  it('preserves profile invitation creation using the initiating account token', async () => {
-    let rows: ReturnType<typeof invite>[] = []
-    calls.rpc.mockImplementation(async () => ({ data: rows, error: null }))
-    calls.create.mockImplementation(async () => { rows = [invite()]; return { data: [], error: null } })
+  it.each(['empty', 'pending', 'expired', 'accepted'])('Profile directs guardian changes to the academy with %s invitations', async state => {
+    calls.rpc.mockResolvedValue({ data: state === 'empty' ? [] : [invite('first', state === 'accepted' ? 'accepted' : 'pending', state === 'expired')], error: null })
     mount('player-a', true)
-    fireEvent.change(await screen.findByRole('textbox', { name: 'Parent’s email' }), { target: { value: 'first@example.test' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Invite' }))
-    expect(await screen.findByRole('button', { name: 'Share link' })).toBeEnabled()
-    expect(calls.boundSession).toHaveBeenCalledWith({ user: { id: 'player-a' }, access_token: 'player-a-token' })
-    expect(calls.create).toHaveBeenCalledWith('create_parent_invite', { p_email: 'first@example.test' })
+    await waitFor(() => expect(screen.queryByText('Loading invitations…')).not.toBeInTheDocument())
+    const card = screen.getByRole('region', { name: 'Parent invitations' })
+    expect(within(card).queryByRole('textbox')).not.toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: 'Invite' })).not.toBeInTheDocument()
+    expect(within(card).getByText('Contact your academy to add a guardian or correct their email.')).toBeInTheDocument()
+    if (state !== 'empty') expect(within(card).getByText('first@example.test')).toBeInTheDocument()
     expect(calls.invoke).not.toHaveBeenCalled()
   })
 
-  it('reports invitation creation failure without announcing a saved invite', async () => {
-    calls.rpc.mockResolvedValue({ data: [], error: null })
-    calls.create.mockResolvedValue({ data: null, error: { message: 'Could not save invitation' } })
+  it('keeps Profile retry actionable without offering guardian creation after a failed lookup', async () => {
+    calls.rpc.mockResolvedValueOnce({ data: null, error: new Error('offline') })
+      .mockResolvedValue({ data: [], error: null })
     mount('player-a', true)
-    fireEvent.change(await screen.findByRole('textbox', { name: 'Parent’s email' }), { target: { value: 'first@example.test' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Invite' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't create the invitation")
-    expect(screen.queryByText(/Invitation saved/)).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Share link' })).not.toBeInTheDocument()
-  })
-
-  it('recovers a saved invitation after its first reload fails without creating it again', async () => {
-    calls.rpc.mockResolvedValueOnce({ data: [], error: null })
-      .mockResolvedValueOnce({ data: null, error: new Error('offline') })
-      .mockResolvedValue({ data: [invite()], error: null })
-    mount('player-a', true)
-    fireEvent.change(await screen.findByRole('textbox', { name: 'Parent’s email' }), { target: { value: 'first@example.test' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Invite' }))
-    expect(await screen.findByText(/Invitation saved, but couldn't reload/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Share link' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load current invitations")
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Invite' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Retry loading' }))
-    expect(await screen.findByRole('button', { name: 'Share link' })).toBeEnabled()
-    expect(screen.queryByText(/Invitation saved, but couldn't reload/)).not.toBeInTheDocument()
-    expect(calls.create).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(screen.getByText('Contact your academy to add a guardian or correct their email.')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(calls.rpc).toHaveBeenCalledTimes(2)
+    expect(calls.invoke).not.toHaveBeenCalled()
   })
 
-  it('does not create an invitation after leaving the initiating account during session verification', async () => {
-    let finish!: (value: unknown) => void
-    calls.rpc.mockResolvedValue({ data: [], error: null })
-    calls.boundSession.mockReturnValue(new Promise(resolve => { finish = resolve }))
+  it('resends the existing Profile invitation without changing its recipient', async () => {
+    calls.rpc.mockResolvedValueOnce({ data: [invite('first', 'pending', true)], error: null })
+      .mockResolvedValue({ data: [fresh()], error: null })
+    mount('player-a', true)
+    fireEvent.click(await screen.findByRole('button', { name: 'Resend email' }))
+    expect(await screen.findByText(/Email sent/)).toBeInTheDocument()
+    expect(calls.invoke).toHaveBeenCalledExactlyOnceWith('send-parent-invite', {
+      body: { invite_id: 'first', resend: true }, headers: { Authorization: 'Bearer player-a-token' },
+    })
+    expect(screen.getByText('first@example.test')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Share link' }))
+    await waitFor(() => expect(calls.copy).toHaveBeenCalledWith(`${window.location.origin}/parent-invite?token=new-token`))
+  })
+
+  it('removes the prior Profile recipient on account change without adding an editor for the new account', async () => {
     const view = mount('player-a', true)
-    fireEvent.change(await screen.findByRole('textbox', { name: 'Parent’s email' }), { target: { value: 'first@example.test' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Invite' }))
-    await waitFor(() => expect(calls.boundSession).toHaveBeenCalledTimes(1))
+    await screen.findByText('first@example.test')
+    calls.rpc.mockResolvedValue({ data: [], error: null })
     view.changePlayer('player-b')
-    await act(async () => finish({ client: { rpc: calls.create } }))
-    expect(calls.create).not.toHaveBeenCalled()
-    expect(screen.queryByText(/Invitation saved/)).not.toBeInTheDocument()
+    expect(screen.queryByText('first@example.test')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Loading invitations…')).not.toBeInTheDocument())
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Share link' })).not.toBeInTheDocument()
+    expect(screen.getByText('Contact your academy to add a guardian or correct their email.')).toBeInTheDocument()
+  })
+
+  it('keeps the Home invitation card hidden when the player has no invitations', async () => {
+    calls.rpc.mockResolvedValue({ data: [], error: null })
+    mount()
+    await waitFor(() => expect(screen.queryByText('Loading invitations…')).not.toBeInTheDocument())
+    expect(screen.queryByRole('region', { name: 'Parent invitations' })).not.toBeInTheDocument()
   })
 })

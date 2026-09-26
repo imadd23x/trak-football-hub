@@ -13,7 +13,7 @@ vi.mock('@/lib/telemetry', () => ({ trackEvent: vi.fn(), startTimer: () => () =>
 
 const endpoint = (table: string) => `${SUPABASE_URL}/rest/v1/${table}`
 const assessmentA = { id: 'assessment-a', work_rate: 8, tactical: 8, attitude: 8,
-  technical: 8, physical: 8, coachability: 8, appearance: 'sub', session_id: null }
+  technical: 8, physical: 8, coachability: 8, appearance: 'sub', session_id: 'session-1' }
 interface Write { table: string; method: string; id: string | null; body: Record<string, unknown> }
 let writes: Write[]
 let reads: string[]
@@ -38,9 +38,17 @@ const noteBox = () => screen.getByPlaceholderText(/First touch under pressure/)
 const feedbackBox = () => screen.getByPlaceholderText(/Great week/)
 const save = () => screen.getByRole('button', { name: /Save Assessment/ })
 
+// TRAK-68: an assessment needs a past session. It stays chosen across players.
+async function chooseSessionIfNone() {
+  await screen.findByRole('option', { name: /vs Synthetic FC/ })
+  const session = screen.getByRole('combobox', { name: 'Session' }) as HTMLSelectElement
+  if (session.value === '') await userEvent.selectOptions(session, 'session-1')
+}
+
 async function selectPlayer(player: string) {
   await screen.findByRole('option', { name: 'Alex Synthetic' })
   await userEvent.selectOptions(selector(), player)
+  await chooseSessionIfNone()
   await waitFor(() => expect(reads).toContain(player))
 }
 
@@ -52,7 +60,7 @@ beforeEach(() => {
       { id: 'player-a', player_name: 'Alex Synthetic' },
       { id: 'player-b', player_name: 'Bella Synthetic' },
     ])),
-    http.get(endpoint('coach_sessions'), () => HttpResponse.json([])),
+    http.get(endpoint('coach_sessions'), () => HttpResponse.json([{ id: 'session-1', title: 'vs Synthetic FC', session_date: '2026-09-20' }])),
     http.get(endpoint('coach_assessments'), ({ request }) => {
       const player = new URL(request.url).searchParams.get('squad_player_id')?.replace('eq.', '') ?? ''
       reads.push(player)

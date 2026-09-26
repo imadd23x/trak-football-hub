@@ -8,7 +8,7 @@ import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
 import { ParentConnections } from '@/components/parent/ParentConnections'
 import { supabase } from '@/integrations/supabase/client'
-import { POSITIONS, COACH_ROLES, AGE_GROUPS } from '@/lib/constants'
+import { COACH_ROLES, AGE_GROUPS } from '@/lib/constants'
 
 const nameSchema = z
   .string()
@@ -48,7 +48,6 @@ function AccountSettings({ userId }: { userId: string }) {
   }
   const saving = pending === 'name'
   const savingCoach = pending === 'coach'
-  const savingPlayer = pending === 'player'
 
   const [editingName, setEditingName] = useState(false)
   const [displayName, setDisplayName] = useState(profile?.full_name ?? '')
@@ -56,78 +55,32 @@ function AccountSettings({ userId }: { userId: string }) {
   const [coachClub, setCoachClub] = useState('')
   const [coachTeam, setCoachTeam] = useState('')
   const [coachRoleVal, setCoachRoleVal] = useState('')
-  const [playerPos, setPlayerPos] = useState('')
-  const [playerShirt, setPlayerShirt] = useState('')
-  const [linkedCoachNames, setLinkedCoachNames] = useState<string[]>([])
-  const [linkedParentNames, setLinkedParentNames] = useState<string[]>([])
-  const [connections, setConnections] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [connectionAttempt, setConnectionAttempt] = useState(0)
-  const [roleData, setRoleData] = useState<'loading' | 'ready' | 'error'>(role === 'coach' || role === 'player' ? 'loading' : 'ready')
+  // Players have nothing to edit here (TRAK-71): position and shirt number are
+  // coach-owned, and their connections are on the Profile tab.
+  const [roleData, setRoleData] = useState<'loading' | 'ready' | 'error'>(role === 'coach' ? 'loading' : 'ready')
   const [loadAttempt, setLoadAttempt] = useState(0)
 
   useEffect(() => { setDisplayName(profile?.full_name ?? '') }, [profile?.full_name])
   // Stable identity/role dependencies preserve unfinished drafts on token refresh.
   useEffect(() => {
-    if (role !== 'coach' && role !== 'player') return
+    if (role !== 'coach') return
     let cancelled = false
     const controller = new AbortController()
     const current = () => mounted.current && !cancelled
     setRoleData('loading')
     void (async () => {
       const { client } = await getSettingsAccount(userId, current)
-      if (role === 'coach') {
-        const { data, error } = await client.from('coach_details').select('current_club, team, coach_role')
-          .eq('user_id', userId).abortSignal(controller.signal).maybeSingle()
-        if (error) throw error
-        if (!current()) return
-        setCoachClub(data?.current_club ?? '')
-        setCoachTeam(data?.team ?? '')
-        setCoachRoleVal(data?.coach_role ?? '')
-      } else {
-        const { data, error } = await client.from('player_details').select('position, shirt_number')
-          .eq('user_id', userId).abortSignal(controller.signal).maybeSingle()
-        if (error) throw error
-        if (!current()) return
-        setPlayerPos(data?.position ?? '')
-        setPlayerShirt(data?.shirt_number == null ? '' : String(data.shirt_number))
-      }
+      const { data, error } = await client.from('coach_details').select('current_club, team, coach_role')
+        .eq('user_id', userId).abortSignal(controller.signal).maybeSingle()
+      if (error) throw error
+      if (!current()) return
+      setCoachClub(data?.current_club ?? '')
+      setCoachTeam(data?.team ?? '')
+      setCoachRoleVal(data?.coach_role ?? '')
       if (current()) setRoleData('ready')
     })().catch(() => { if (current()) setRoleData('error') })
     return () => { cancelled = true; controller.abort() }
   }, [userId, role, loadAttempt])
-
-  // Ancillary connections cannot block editing the player's own details.
-  useEffect(() => {
-    if (role !== 'player') return
-    let cancelled = false
-    const controller = new AbortController()
-    const current = () => mounted.current && !cancelled
-    setConnections('loading')
-    void (async () => {
-      const { client } = await getSettingsAccount(userId, current)
-      const [squad, parents] = await Promise.all([
-        client.from('squad_players').select('coach_user_id').eq('linked_player_id', userId).eq('status', 'active').abortSignal(controller.signal),
-        client.from('player_parent_links').select('parent_user_id').eq('player_user_id', userId).abortSignal(controller.signal),
-      ])
-      if (squad.error) throw squad.error
-      if (parents.error) throw parents.error
-      const coachIds = [...new Set((squad.data ?? []).flatMap(row => row.coach_user_id ? [row.coach_user_id] : []))]
-      const parentIds = [...new Set((parents.data ?? []).map(row => row.parent_user_id))]
-      const ids = [...new Set([...coachIds, ...parentIds])]
-      const names = new Map<string, string>()
-      if (ids.length) {
-        const { data, error } = await client.from('profiles').select('user_id, full_name').in('user_id', ids).abortSignal(controller.signal)
-        if (error) throw error
-        for (const row of data ?? []) names.set(row.user_id, row.full_name)
-      }
-      if (!current()) return
-      // A profile name may be hidden by RLS without invalidating the link.
-      setLinkedCoachNames(coachIds.map(id => names.get(id) || 'Linked coach'))
-      setLinkedParentNames(parentIds.map(id => names.get(id) || 'Linked parent'))
-      setConnections('ready')
-    })().catch(() => { if (current()) setConnections('error') })
-    return () => { cancelled = true; controller.abort() }
-  }, [userId, role, connectionAttempt])
 
   const saveName = async () => {
     const parsed = nameSchema.safeParse(nameDraft)
@@ -170,22 +123,6 @@ function AccountSettings({ userId }: { userId: string }) {
       const { client } = await getSettingsAccount(userId, isCurrent)
       const { data, error } = await client.from('coach_details')
         .upsert({ user_id: userId, current_club: coachClub, team: coachTeam, coach_role: coachRoleVal }, { onConflict: 'user_id' })
-        .select('user_id').maybeSingle()
-      if (error) throw error
-      if (data?.user_id !== userId) throw new Error('Profile save was not confirmed')
-      if (isCurrent()) toast.success('Profile updated')
-    } catch { if (isCurrent()) toast.error('Could not save profile') }
-    finally { finish() }
-  }
-
-  const savePlayerProfile = async () => {
-    if (roleData !== 'ready') return
-    if (!playerPos) { toast.error('Please select a position'); return }
-    if (!begin('player')) return
-    try {
-      const { client } = await getSettingsAccount(userId, isCurrent)
-      const { data, error } = await client.from('player_details')
-        .upsert({ user_id: userId, position: playerPos, shirt_number: playerShirt ? Number(playerShirt) : null }, { onConflict: 'user_id' })
         .select('user_id').maybeSingle()
       if (error) throw error
       if (data?.user_id !== userId) throw new Error('Profile save was not confirmed')
@@ -339,52 +276,6 @@ function AccountSettings({ userId }: { userId: string }) {
           </Section>
         )}
 
-        {/* Player profile */}
-        {role === 'player' && (
-          <Section label="My Profile">
-            <Row label="Position" right={
-              <select value={playerPos} disabled={!!pending || roleData !== 'ready'} onChange={e => setPlayerPos(e.target.value)}
-                style={{ background: '#101012', border: 'none', outline: 'none', fontSize: 13, color: 'rgba(255,255,255,0.88)', textAlign: 'right' }}>
-                <option value="">Select…</option>
-                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            } />
-            <Row label="Shirt number" right={
-              <input value={playerShirt} disabled={!!pending || roleData !== 'ready'} onChange={e => setPlayerShirt(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                inputMode="numeric" placeholder="—"
-                style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'rgba(255,255,255,0.88)', textAlign: 'right', width: 48 }} />
-            } />
-            <div className="py-3">
-              <button onClick={savePlayerProfile} disabled={!!pending || roleData !== 'ready'}
-                style={{ fontSize: 13, color: '#C8F25A' }}>
-                {savingPlayer ? 'Saving…' : 'Save changes'}
-              </button>
-            </div>
-          </Section>
-        )}
-
-        {/* Connections — player */}
-        {role === 'player' && (
-          <Section label="Connections">
-            {connections === 'loading' && <p role="status" className="py-3 text-sm text-white/50">Loading connections…</p>}
-            {connections === 'error' && <div role="alert" className="py-3 text-sm text-white/50">
-              Connections could not be loaded. <button onClick={() => setConnectionAttempt(value => value + 1)}>Retry connections</button>
-            </div>}
-            {connections === 'ready' && <>
-              <ConnectionRow label={linkedCoachNames.length > 1 ? 'Coaches' : 'Coach'}
-                status={linkedCoachNames.length ? 'connected' : 'none'} name={linkedCoachNames.join(', ') || undefined} />
-              <ConnectionRow label={linkedParentNames.length > 1 ? 'Parents' : 'Parent'}
-                status={linkedParentNames.length ? 'connected' : 'none'} name={linkedParentNames.join(', ') || undefined} />
-              {(!linkedCoachNames.length || !linkedParentNames.length) && (
-                <div className="py-3" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                  {!linkedCoachNames.length && 'Ask your coach for their TRK- code and enter it on your Profile to connect. '}
-                  {!linkedParentNames.length && 'To add a parent, send them an invite from your Profile.'}
-                </div>
-              )}
-            </>}
-          </Section>
-        )}
-
         {/* Connections — parent */}
         {role === 'parent' && (
           <Section label="Linked children">
@@ -496,69 +387,3 @@ function Value({ children }: { children: React.ReactNode }) {
   return <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>{children}</span>
 }
 
-function ConnectionRow({
-  label,
-  status,
-  name,
-  onRemove,
-}: {
-  label: string
-  status: 'connected' | 'none'
-  name?: string
-  onRemove?: () => void
-}) {
-  const connected = status === 'connected'
-  return (
-    <div
-      className="py-3.5 flex items-center justify-between gap-3"
-      style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: 999,
-            background: connected ? '#C8F25A' : 'rgba(255,255,255,0.15)',
-            flexShrink: 0,
-          }}
-        />
-        <div className="min-w-0">
-          <div
-            style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: 9,
-              fontWeight: 500,
-              textTransform: 'uppercase',
-              letterSpacing: '0.12em',
-              color: 'rgba(255,255,255,0.45)',
-            }}
-          >
-            {label}
-          </div>
-          <div
-            className="truncate"
-            style={{ fontSize: 13, color: connected ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.4)' }}
-          >
-            {connected ? name : 'Not connected'}
-          </div>
-        </div>
-      </div>
-      {connected && onRemove && (
-        <button
-          onClick={onRemove}
-          style={{
-            fontFamily: "'DM Mono', monospace",
-            fontSize: 9,
-            textTransform: 'uppercase',
-            letterSpacing: '0.12em',
-            color: 'rgba(255,255,255,0.4)',
-            flexShrink: 0,
-          }}
-        >
-          Remove
-        </button>
-      )}
-    </div>
-  )
-}

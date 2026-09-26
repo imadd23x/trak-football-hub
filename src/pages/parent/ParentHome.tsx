@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
@@ -6,6 +7,7 @@ import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches } fr
 import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
 import { BANDS } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
+import { trackEvent } from '@/lib/telemetry'
 
 export default function ParentHome() {
   const navigate = useNavigate()
@@ -21,6 +23,14 @@ export default function ParentHome() {
   const details = development?.details
   const hasError = matchQuery.isError || developmentQuery.isError
   const loading = matchQuery.isPending || developmentQuery.isPending
+
+  // J7 (TRAK-10): parents never see the coach's message (TRAK-63), so a parent
+  // open is the child's latest assessment reaching this screen. The pilot view
+  // counts each parent and assessment once and checks the parent's link.
+  const shownAssessmentId = selectedChild && !loading && !hasError ? assessment?.id : undefined
+  useEffect(() => {
+    if (shownAssessmentId) void trackEvent('assessment_viewed', { assessment_id: shownAssessmentId })
+  }, [shownAssessmentId])
 
   return (
     <MobileShell>

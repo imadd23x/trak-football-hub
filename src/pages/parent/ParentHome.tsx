@@ -1,4 +1,5 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
@@ -6,6 +7,7 @@ import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches } fr
 import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
 import { BANDS } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
+import { trackEvent } from '@/lib/telemetry'
 
 export default function ParentHome() {
   const navigate = useNavigate()
@@ -21,6 +23,14 @@ export default function ParentHome() {
   const details = development?.details
   const hasError = matchQuery.isError || developmentQuery.isError
   const loading = matchQuery.isPending || developmentQuery.isPending
+
+  // J7 (TRAK-10): parents never see the coach's message (TRAK-63), so a parent
+  // open is the child's latest assessment reaching this screen. The pilot view
+  // counts each parent and assessment once and checks the parent's link.
+  const shownAssessmentId = selectedChild && !loading && !hasError ? assessment?.id : undefined
+  useEffect(() => {
+    if (shownAssessmentId) void trackEvent('assessment_viewed', { assessment_id: shownAssessmentId })
+  }, [shownAssessmentId])
 
   return (
     <MobileShell>
@@ -110,7 +120,7 @@ export default function ParentHome() {
                 <section className="mt-5" aria-label="Recent matches">
                   <MetadataLabel text="RECENT MATCHES" />
                   {matches.length ? <div className="rounded-xl mt-2 bg-card border border-border divide-y divide-border">
-                    {matches.slice(0, 5).map(match => <div key={match.id} className="flex items-center gap-3 p-4">
+                    {matches.slice(0, 5).map(match => <Link key={match.id} to={`/parent/match/${match.id}`} className="flex items-center gap-3 p-4">
                       <span className="w-5 text-xs text-muted-foreground">{matchResult(match) ?? '—'}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground truncate">{match.opponent || match.competition || 'Match'}</p>
@@ -119,7 +129,7 @@ export default function ParentHome() {
                         </p>
                       </div>
                       <ParentRating rating={match.computed_rating} />
-                    </div>)}
+                    </Link>)}
                   </div> : <p className="py-4 text-sm text-muted-foreground">No matches yet. Matches recorded by the coach will appear here.</p>}
                 </section>
               </>

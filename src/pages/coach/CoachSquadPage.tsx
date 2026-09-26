@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, BandPill } from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
-import { Plus, WifiOff } from 'lucide-react'
+import { Users, WifiOff } from 'lucide-react'
 
 const POSITIONS = ['All', 'Goalkeeper', 'Defender', 'Midfielder', 'Attacker'] as const
 
@@ -30,6 +30,9 @@ export default function CoachSquadPage() {
   const [ageFilter, setAgeFilter] = useState<string>('All')
   const [loadFailed, setLoadFailed] = useState(false)
   const [retry, setRetry] = useState(0)
+  // The account and Retry count of the last squad read that finished. A run
+  // for the same pair is a background refresh (see the load below).
+  const loadedFor = useRef<{ userId: string; retry: number } | null>(null)
 
   // Age group label: prefer the age_group text column ('U12'), fall back to legacy integer age
   const ageLabel = (p: any): string | null => p.age_group ?? (p.age != null ? String(p.age) : null)
@@ -42,13 +45,21 @@ export default function CoachSquadPage() {
   useEffect(() => {
     if (!user) return
     let cancelled = false
-    setLoadFailed(false)
-    setConsent({})
+    // AuthContext hands out a new user object on every same-account token
+    // refresh (hourly, and on returning to the tab), which re-runs this load.
+    // That re-run keeps the chips on screen and replaces them from its own
+    // checks, instead of blinking them all off (TRAK-79). A first load, a
+    // Retry and a different account still start from nothing.
+    const background = loadedFor.current?.userId === user.id && loadedFor.current.retry === retry
+    // A background run also keeps a failure on screen until its own read
+    // succeeds, so a refresh never shows an empty squad in its place (UC-X02;
+    // Tarek, #149 review).
+    if (!background) { setConsent({}); setLoadFailed(false) }
 
     // Fetch squad players.
     // The error must be checked: falling through to `data || []` renders a
     // failed read as an empty squad, so a coach offline with a full roster is
-    // told to "Add your first player".
+    // shown "Your squad is being prepared".
     supabase
       .from('squad_players')
       .select('*')
@@ -56,10 +67,12 @@ export default function CoachSquadPage() {
       .order('player_name')
       .then(({ data, error }) => {
         if (cancelled) return
+        loadedFor.current = { userId: user.id, retry }
         if (error) {
           setLoadFailed(true)
           return
         }
+        setLoadFailed(false)
         setPlayers(data || [])
         // One check per player, the same predicate the RLS policy evaluates. A
         // pilot squad is about 25 players, so this stays a handful of requests.
@@ -119,12 +132,6 @@ export default function CoachSquadPage() {
       {/* Topbar */}
       <div className="flex items-center justify-between px-5 py-[10px] border-b border-white/[0.07] shrink-0">
         <h1 className="text-[15px] font-semibold text-white/90">Squad</h1>
-        <button
-          onClick={() => navigate('/coach/squad/add')}
-          className="flex items-center justify-center w-8 h-8 rounded-[9px] bg-[#C8F25A] active:scale-95 transition-transform"
-        >
-          <Plus size={16} className="text-black" strokeWidth={2.5} />
-        </button>
       </div>
 
       {/* Filters */}
@@ -204,19 +211,12 @@ export default function CoachSquadPage() {
                 className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
                 style={{ background: 'rgba(200,242,90,0.08)', border: '1px solid rgba(200,242,90,0.15)' }}
               >
-                <Plus size={22} className="text-[#C8F25A]" strokeWidth={1.5} />
+                <Users size={22} className="text-[#C8F25A]" strokeWidth={1.5} />
               </div>
-              <p className="text-[15px] text-white/70 font-medium mb-1">Add your first player</p>
+              <p className="text-[15px] text-white/70 font-medium mb-1">Your squad is being prepared</p>
               <p className="text-[12px] text-white/35 leading-relaxed mb-5">
-                Build your squad to start logging sessions, assessments and match ratings.
+                Your academy will add players to this squad.
               </p>
-              <button
-                onClick={() => navigate('/coach/squad/add')}
-                className="px-5 py-2.5 rounded-[10px] text-[13px] font-medium text-black"
-                style={{ background: '#C8F25A' }}
-              >
-                Add player
-              </button>
             </div>
           ) : (
             <div className="pt-8 text-center">

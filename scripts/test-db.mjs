@@ -169,8 +169,17 @@ try {
     : ordered(inAll);
   // Printed so that a suite silently dropping out of the run is visible.
   console.log(`Suites (${mode}): ${suites.join(', ') || 'none'}`);
+  // WARNINGs are how several suites name each failed assertion before raising
+  // a summary ("2 of 13 failed"). PGlite only delivers them to onNotice, so
+  // without this a suite can fail and say how many but never which. NOTICEs
+  // stay quiet: suites use them for routine counts.
+  const printWarnings = suite => notice => {
+    if (['WARNING', 'ERROR', 'FATAL', 'PANIC'].includes(notice.severity)) {
+      console.error(`${notice.severity} (${suite}): ${notice.message}`);
+    }
+  };
   for (const suite of suites) {
-    const result = await db.exec(await read(suite));
+    const result = await db.exec(await read(suite), { onNotice: printWarnings(suite) });
     console.log(`Passed: ${suite}`);
     for (const query of result) {
       if (query.rows?.[0]?.player_age_timezone_assertions) console.log(`Player age timezone assertions: ${query.rows[0].player_age_timezone_assertions}`);

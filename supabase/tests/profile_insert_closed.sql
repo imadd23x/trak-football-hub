@@ -50,6 +50,10 @@ INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
 INSERT INTO public.organizations (id, admin_user_id, name, join_code)
 VALUES (pg_temp.pi(100), pg_temp.pi(1), 'Profile Insert FC', 'PINS01');
 
+-- TRAK-12: Trak sets up staff. The operator admits the coach first; their
+-- signup below then completes that profile (self-made staff: g3_staff_admission).
+SELECT public.admit_staff_member(pg_temp.pi(10), 'coach', 'Admitted Coach', pg_temp.pi(100));
+
 SET LOCAL ROLE authenticated;
 
 -- ── Direct inserts are refused for every role ───────────────────────────────
@@ -77,7 +81,7 @@ SELECT pg_temp.pi_as(10);
 SELECT pg_temp.pi_run($$SELECT public.provision_my_profile(jsonb_build_object(
   'role', 'coach', 'full_name', 'Provisioned Coach',
   'coach_details', jsonb_build_object('academy_code', 'PINS01')))$$,
-  false, 'CONTROL a coach signs up through provision_my_profile');
+  false, 'CONTROL a coach Trak admitted completes signup through provision_my_profile');
 SELECT pg_temp.pi_run(format($$UPDATE public.profiles SET full_name = 'Renamed Coach' WHERE user_id = %L$$, pg_temp.pi(10)),
   false, 'CONTROL a user can still edit their own profile');
 RESET ROLE;

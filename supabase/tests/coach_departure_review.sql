@@ -148,7 +148,16 @@ SELECT pg_temp.departure_check(
 -- F1: after transfer, B must not inherit A's player-profile/DOB access.
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{"sub":"90000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
-SELECT public.join_organization('REVIEW-B');
+-- TRAK-12: putting a coach into an academy is an operator step now (Trak
+-- moves the coach); this is the same coach_details update join_organization made.
+SELECT set_config('trak.saved_claims', current_setting('request.jwt.claims', true), true);
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '', true);
+UPDATE public.coach_details
+SET organization_id = (SELECT id FROM public.organizations WHERE upper(join_code) = upper('REVIEW-B'))
+WHERE user_id = (current_setting('trak.saved_claims')::jsonb->>'sub')::uuid;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', current_setting('trak.saved_claims'), true);
 SELECT set_config('request.jwt.claims', '{"sub":"90000000-0000-0000-0000-000000000004","role":"authenticated"}', true);
 SELECT pg_temp.departure_check(
   (SELECT count(*) = 0 FROM public.profiles WHERE user_id IN ('90000000-0000-0000-0000-000000000005', '90000000-0000-0000-0000-000000000006')),

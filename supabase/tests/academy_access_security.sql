@@ -113,7 +113,16 @@ SELECT pg_temp.academy_assert((SELECT count(*) = 0 FROM public.profiles WHERE us
 SELECT pg_temp.academy_assert(NOT public.player_in_my_org(pg_temp.academy_id(7)), 'helper rejects a non-player legacy target');
 SELECT public.remove_coach_from_org(pg_temp.academy_id(3));
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(3), 'role', 'authenticated')::text, true);
-SELECT public.join_organization('ACCESS-B');
+-- TRAK-12: putting a coach into an academy is an operator step now (Trak
+-- moves the coach); this is the same coach_details update join_organization made.
+SELECT set_config('trak.saved_claims', current_setting('request.jwt.claims', true), true);
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '', true);
+UPDATE public.coach_details
+SET organization_id = (SELECT id FROM public.organizations WHERE upper(join_code) = upper('ACCESS-B'))
+WHERE user_id = (current_setting('trak.saved_claims')::jsonb->>'sub')::uuid;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', current_setting('trak.saved_claims'), true);
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(1), 'role', 'authenticated')::text, true);
 SELECT pg_temp.academy_assert((SELECT count(*) = 1 FROM public.profiles WHERE user_id = pg_temp.academy_id(5)), 'original academy keeps profile access after removal and transfer');
 SELECT pg_temp.academy_assert((SELECT count(*) = 1 FROM public.player_details WHERE user_id = pg_temp.academy_id(5)), 'original academy keeps DOB access after removal and transfer');
@@ -135,7 +144,16 @@ SELECT pg_temp.academy_assert(NOT public.player_in_my_org(pg_temp.academy_id(5))
 -- joins A; the player then uses the code to claim the uniquely named stub.
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(8), 'role', 'authenticated')::text, true);
 SELECT pg_temp.academy_assert((SELECT organization_id IS NULL FROM public.squad_players WHERE id = pg_temp.academy_id(22)), 'independent roster starts without academy');
-SELECT public.join_organization('ACCESS-A');
+-- TRAK-12: putting a coach into an academy is an operator step now (Trak
+-- moves the coach); this is the same coach_details update join_organization made.
+SELECT set_config('trak.saved_claims', current_setting('request.jwt.claims', true), true);
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '', true);
+UPDATE public.coach_details
+SET organization_id = (SELECT id FROM public.organizations WHERE upper(join_code) = upper('ACCESS-A'))
+WHERE user_id = (current_setting('trak.saved_claims')::jsonb->>'sub')::uuid;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', current_setting('trak.saved_claims'), true);
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(9), 'role', 'authenticated')::text, true);
 SELECT pg_temp.academy_assert(public.link_player_to_coach('TRK-ACCA08') = pg_temp.academy_id(22), 'player adopts existing independent roster row');
 SELECT pg_temp.academy_assert(public.link_player_to_coach('TRK-ACCA08') = pg_temp.academy_id(22), 'repeated adoption is idempotent');
@@ -174,7 +192,16 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(51), 'role', 'authenticated')::text, true);
 SELECT public.delete_my_account();
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(52), 'role', 'authenticated')::text, true);
-SELECT public.join_organization('ACCESS-B');
+-- TRAK-12: putting a coach into an academy is an operator step now (Trak
+-- moves the coach); this is the same coach_details update join_organization made.
+SELECT set_config('trak.saved_claims', current_setting('request.jwt.claims', true), true);
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '', true);
+UPDATE public.coach_details
+SET organization_id = (SELECT id FROM public.organizations WHERE upper(join_code) = upper('ACCESS-B'))
+WHERE user_id = (current_setting('trak.saved_claims')::jsonb->>'sub')::uuid;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', current_setting('trak.saved_claims'), true);
 SELECT pg_temp.academy_assert((SELECT count(*) = 0 FROM public.coach_assessments WHERE id IN (pg_temp.academy_id(70), pg_temp.academy_id(71))), 'coach cannot read closed history after joining another academy');
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(53), 'role', 'authenticated')::text, true);
 SELECT pg_temp.academy_assert(public.link_player_to_coach('TRK-ACCA52') <> pg_temp.academy_id(60), 'same-name player gets a fresh row instead of adopting closed academy history');

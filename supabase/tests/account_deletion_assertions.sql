@@ -123,7 +123,16 @@ SELECT pg_temp.account_check(EXISTS (SELECT 1 FROM public.player_details WHERE u
 SELECT public.remove_coach_from_org(pg_temp.account_id(4));
 SELECT public.remove_coach_from_org(pg_temp.account_id(5));
 SELECT set_config('request.jwt.claims', jsonb_build_object('sub', pg_temp.account_id(4), 'role', 'authenticated')::text, true);
-SELECT public.join_organization('DELETE-B');
+-- TRAK-12: putting a coach into an academy is an operator step now (Trak
+-- moves the coach); this is the same coach_details update join_organization made.
+SELECT set_config('trak.saved_claims', current_setting('request.jwt.claims', true), true);
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '', true);
+UPDATE public.coach_details
+SET organization_id = (SELECT id FROM public.organizations WHERE upper(join_code) = upper('DELETE-B'))
+WHERE user_id = (current_setting('trak.saved_claims')::jsonb->>'sub')::uuid;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', current_setting('trak.saved_claims'), true);
 SELECT pg_temp.account_check(NOT EXISTS (SELECT 1 FROM public.squad_players WHERE id = pg_temp.account_id(203)), 'transferred coach cannot read released academy A row before deletion');
 SELECT set_config('request.jwt.claims', jsonb_build_object('sub', pg_temp.account_id(5), 'role', 'authenticated')::text, true);
 SELECT pg_temp.account_check(NOT EXISTS (SELECT 1 FROM public.squad_players WHERE id = pg_temp.account_id(204)), 'removed coach cannot read released academy A row before deletion');

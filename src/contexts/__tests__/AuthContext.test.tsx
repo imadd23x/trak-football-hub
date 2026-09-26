@@ -153,6 +153,17 @@ describe('account-bound onboarding and auth lifecycle', () => {
     expect(localStorage.getItem('trak_pending_profile')).toBeNull()
   })
 
+  // TRAK-48 slice 3: a child or parent the roster does not name is refused by
+  // the database. Retrying cannot help, so the message says what will.
+  it('tells an unrostered account to ask the academy, not to retry', async () => {
+    api.session = session('b', pending('B'))
+    api.lookup.mockResolvedValue({ data: null, error: null })
+    api.provision.mockResolvedValueOnce({ data: null, error: { code: '42501', message: "Your academy hasn't added this email yet" } })
+    mount()
+    await waitFor(() => expect(api.error).toHaveBeenCalledWith("Your academy hasn't added this email yet. Ask your academy to add it, then sign in again."))
+    expect(api.error).not.toHaveBeenCalledWith(expect.stringMatching(/Pull to refresh/))
+  })
+
   it('does not provision an account without its own onboarding metadata', async () => {
     localStorage.setItem('trak_pending_profile', JSON.stringify(pending('A')))
     api.session = session('b')

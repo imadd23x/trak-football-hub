@@ -72,11 +72,28 @@ CREATE FUNCTION pg_temp.ab_dob(p_uid uuid) RETURNS date LANGUAGE sql AS $test$
 $test$;
 
 INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
+  (pg_temp.ab(1),  'admin@admission-boundary.test', now()),
+  (pg_temp.ab(2),  'coach@admission-boundary.test', now()),
   (pg_temp.ab(20), 'child@admission-boundary.test', now()),
   (pg_temp.ab(21), 'nodob@admission-boundary.test', now());
 
 SELECT set_config('trak.ab_child_dob', (current_date - interval '14 years')::date::text, true);
 SELECT set_config('trak.ab_adult_dob', (current_date - interval '19 years')::date::text, true);
+
+-- Slice 3 (TRAK-48): a new player must be on the academy roster, which also
+-- supplies their date of birth. The first child is rostered. The second is an
+-- account made before slice 3 without a date of birth - the case the DOB lock
+-- still has to protect, since a new child can no longer sign up without one.
+INSERT INTO public.profiles (user_id, role, full_name) VALUES
+  (pg_temp.ab(1), 'club', 'Admission Admin'), (pg_temp.ab(2), 'coach', 'Admission Coach'),
+  (pg_temp.ab(21), 'player', 'No DOB Synthetic');
+INSERT INTO public.organizations (id, admin_user_id, name, join_code) VALUES
+  (pg_temp.ab(30), pg_temp.ab(1), 'Admission Academy', 'AB-ACADEMY');
+INSERT INTO public.coach_details (user_id, organization_id) VALUES (pg_temp.ab(2), pg_temp.ab(30));
+INSERT INTO public.squad_players (id, coach_user_id, player_name, age_group) VALUES
+  (pg_temp.ab(40), pg_temp.ab(2), 'Child Synthetic', 'U15');
+INSERT INTO public.roster_children (organization_id, squad_player_id, date_of_birth, child_email, loaded_by) VALUES
+  (pg_temp.ab(30), pg_temp.ab(40), current_setting('trak.ab_child_dob')::date, 'child@admission-boundary.test', 'fixture');
 
 -- ── 1. Signup: the request that creates the profile sets the DOB ────────────
 SET LOCAL ROLE authenticated;
@@ -87,11 +104,11 @@ SELECT pg_temp.ab_allowed(format($$SELECT public.provision_my_profile(jsonb_buil
   current_setting('trak.ab_child_dob')),
   '1 CONTROL signup sets the date of birth');
 
--- The second player signs up without one.
+-- The second, pre-slice-3 player repeats signup without one.
 SELECT pg_temp.ab_as(pg_temp.ab(21), 'nodob@admission-boundary.test');
 SELECT pg_temp.ab_allowed($$SELECT public.provision_my_profile(jsonb_build_object(
   'role', 'player', 'full_name', 'No DOB Synthetic'))$$,
-  '1 CONTROL signup without a date of birth');
+  '1 CONTROL an existing player without a date of birth repeats signup');
 
 RESET ROLE;
 SELECT pg_temp.ab_later(pg_temp.ab(20));

@@ -77,7 +77,8 @@ INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
   (pg_temp.g3(6),  'player@g3-staff.test',    now()),
   (pg_temp.g3(10), 'new-coach@g3-staff.test', now()),  -- no profile yet
   (pg_temp.g3(11), 'new-admin@g3-staff.test', now()),  -- no profile yet
-  (pg_temp.g3(12), 'hired@g3-staff.test',     now());  -- the operator admits this coach
+  (pg_temp.g3(12), 'hired@g3-staff.test',     now()),  -- the operator admits this coach
+  (pg_temp.g3(13), 'no-code@g3-staff.test',   now());  -- no profile yet, and no academy code
 INSERT INTO public.profiles (user_id, role, full_name) VALUES
   (pg_temp.g3(1), 'club',   'Admin A'), (pg_temp.g3(2), 'coach', 'Coach A'),
   (pg_temp.g3(3), 'club',   'Admin B'), (pg_temp.g3(4), 'coach', 'Coach B'),
@@ -98,6 +99,9 @@ SET LOCAL ROLE authenticated;
 SELECT pg_temp.g3_as(pg_temp.g3(10));
 SELECT pg_temp.g3_refused($$SELECT public.provision_my_profile('{"role":"coach","full_name":"Self-made Coach","coach_details":{"academy_code":"TRK-G3ACADA"}}'::jsonb)$$,
   '1 G3 a new account cannot make itself a coach with an academy code');
+SELECT pg_temp.g3_as(pg_temp.g3(13));
+SELECT pg_temp.g3_refused($$SELECT public.provision_my_profile('{"role":"coach","full_name":"Codeless Coach"}'::jsonb)$$,
+  '1 G3 a new account cannot make itself a coach without an academy code either');
 SELECT pg_temp.g3_check(pg_temp.g3_sees_a() = 0, '1 G3 the refused would-be coach reads none of academy A''s assessments');
 SELECT pg_temp.g3_as(pg_temp.g3(11));
 SELECT pg_temp.g3_refused($$SELECT public.provision_my_profile('{"role":"club","full_name":"Self-made Admin","club_details":{"academy_name":"Shadow Academy"}}'::jsonb)$$,
@@ -107,7 +111,7 @@ SELECT pg_temp.g3_refused($$UPDATE public.profiles SET role = 'coach' WHERE user
   '1 G3 a player cannot make themselves a coach');
 RESET ROLE;
 SELECT pg_temp.g3_check(
-  NOT EXISTS (SELECT 1 FROM public.profiles WHERE user_id IN (pg_temp.g3(10), pg_temp.g3(11)))
+  NOT EXISTS (SELECT 1 FROM public.profiles WHERE user_id IN (pg_temp.g3(10), pg_temp.g3(11), pg_temp.g3(13)))
   AND NOT EXISTS (SELECT 1 FROM public.organizations WHERE admin_user_id = pg_temp.g3(11))
   AND (SELECT role::text FROM public.profiles WHERE user_id = pg_temp.g3(6)) = 'player',
   '1 G3 nothing refused above left a profile, an academy or a changed role');
@@ -177,8 +181,8 @@ DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.g3_results;
-  IF total <> 22 THEN
-    RAISE EXCEPTION 'G3 staff admission: % assertions ran; expected exactly 22', total;
+  IF total <> 23 THEN
+    RAISE EXCEPTION 'G3 staff admission: % assertions ran; expected exactly 23', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'G3 staff admission: % of % failed: %', failed, total,

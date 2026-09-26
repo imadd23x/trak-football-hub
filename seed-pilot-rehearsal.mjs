@@ -191,28 +191,23 @@ async function preflight() {
 
 async function purge() {
   console.log(`\nPurging the rehearsal academy.\n`)
-  const admin = await signInOrUp(`director@${DOMAIN}`)
-  if (!admin) { console.error('Could not sign in as the rehearsal director.'); return }
 
-  const { data: org } = await supabase
-    .from('organizations').select('id').eq('admin_user_id', admin.id).maybeSingle()
-
+  // Only the squads can be cleared with the app key. Since #134 (TRAK-47) an
+  // app role cannot delete calendar events, awards or an academy, and the
+  // old calls here failed without saying so while this printed that they had
+  // worked. Awards go with their squad rows (ON DELETE CASCADE).
   for (const s of SQUADS) {
     const coach = await signInOrUp(s.coachEmail)
     if (!coach) continue
-    await supabase.from('coach_calendar_events').delete().eq('coach_user_id', coach.id)
-    await supabase.from('recognition_awards').delete().eq('coach_user_id', coach.id)
-    await supabase.from('squad_players').delete().eq('coach_user_id', coach.id)
-    log(`cleared ${s.coachName}'s squad, fixtures and awards`)
+    const { error } = await supabase.from('squad_players').delete().eq('coach_user_id', coach.id)
+    if (error) log(`${s.coachName}'s squad: ${error.message}`)
+    else log(`cleared ${s.coachName}'s squad, with its assessments, attendance and awards`)
   }
 
-  if (org) {
-    await signInOrUp(`director@${DOMAIN}`)
-    await supabase.from('organizations').delete().eq('id', org.id)
-    log('removed the organisation')
-  }
-
-  console.log('\nDone. Auth users remain — delete them from the Supabase dashboard')
+  // Keeping the academy is also what a reset needs: pilot_config.org_id
+  // points at it, and its coaches stay in it, so the next seed run reuses it.
+  console.log(`\n${ORG_NAME} and its fixture list are kept: the app key cannot remove them.`)
+  console.log('Auth users remain too — delete them from the Supabase dashboard')
   console.log(`if you want the ${DOMAIN} accounts gone entirely.\n`)
 }
 

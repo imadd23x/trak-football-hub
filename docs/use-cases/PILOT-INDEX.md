@@ -1,8 +1,8 @@
 # First pilot: journey index
 
-Tracks the P0 journeys and guarantees in [MVP Requirements](../../MVP%20Requirements) and what has been proven for each one. That file defines the scope. This file only records progress. Owners are proposed until confirmed in review.
+Tracks the P0 journeys and guarantees in [MVP Requirements](../../MVP%20Requirements) and what has been proven for each one. That file defines the scope. This file only records progress. Current assignments, dependencies and delivery status live in the [Linear pilot project](https://linear.app/trak-football/project/trak-first-real-child-pilot-38b7cba7d7ff). This index records deployed journey evidence; it is not a second task board.
 
-A row passes only on the **deployed** build, under real roles. Record evidence as `commit · deployment · device · identity · date` (see the [merge gate](../release/merge-gate.md)). An open PR, a green branch or a passing local test is not evidence.
+A row passes only on the **deployed** build, under real roles. Record evidence as `commit · deployment · device · identity · date` (see the [merge gate](../release/merge-gate.md)). An open PR, a green branch or a passing local test is not evidence. In Linear, merge/deploy moves work into Verifying; only Makis's FINAL OK moves it to Done.
 
 | Journey | Owner | Registry use cases | Deployed evidence |
 |---|---|---|---|

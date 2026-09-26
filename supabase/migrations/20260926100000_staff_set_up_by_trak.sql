@@ -70,7 +70,9 @@ REVOKE ALL ON FUNCTION public.refuse_self_chosen_academy() FROM PUBLIC, anon, au
 
 -- join_organization existed only to join by code. Guard 2 already refuses it;
 -- app roles lose EXECUTE too, so the code-join path is closed at the door.
+-- get_org_id_by_join_code was its lookup; no screen or function calls it.
 REVOKE ALL ON FUNCTION public.join_organization(text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.get_org_id_by_join_code(text) FROM PUBLIC, anon, authenticated;
 
 -- ── The operator's call ────────────────────────────────────────────────────
 -- Creates or completes a staff profile for an existing auth account (made

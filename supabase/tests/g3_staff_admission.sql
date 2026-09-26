@@ -125,6 +125,8 @@ SELECT pg_temp.g3_refused(format($$UPDATE public.coach_details SET organization_
 SELECT pg_temp.g3_as(pg_temp.g3(5));
 SELECT pg_temp.g3_refused($$SELECT public.join_organization('G3ACADA')$$,
   '2 G3 a coach in no academy cannot join one with its code');
+SELECT pg_temp.g3_refused($$SELECT public.get_org_id_by_join_code('G3ACADA')$$,
+  '2 G3 an app user cannot look an academy up by its code');
 SELECT pg_temp.g3_check(pg_temp.g3_sees_a() = 0, '2 G3 the academy-less coach reads none of academy A''s assessments');
 RESET ROLE;
 SELECT pg_temp.g3_check(
@@ -165,14 +167,18 @@ SELECT pg_temp.g3_check(
   NOT has_function_privilege('authenticated', 'public.join_organization(text)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.join_organization(text)', 'EXECUTE'),
   '4 G3 app roles cannot execute join_organization');
+SELECT pg_temp.g3_check(
+  NOT has_function_privilege('authenticated', 'public.get_org_id_by_join_code(text)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.get_org_id_by_join_code(text)', 'EXECUTE'),
+  '4 G3 app roles cannot execute get_org_id_by_join_code');
 
 -- ── Report ─────────────────────────────────────────────────────────────────
 DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.g3_results;
-  IF total <> 20 THEN
-    RAISE EXCEPTION 'G3 staff admission: % assertions ran; expected exactly 20', total;
+  IF total <> 22 THEN
+    RAISE EXCEPTION 'G3 staff admission: % assertions ran; expected exactly 22', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'G3 staff admission: % of % failed: %', failed, total,

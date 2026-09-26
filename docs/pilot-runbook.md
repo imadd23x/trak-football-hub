@@ -88,6 +88,53 @@ ORDER BY avg_bias;
 Negative `avg_bias` means the engine bands **lower** than the coach. A consistent negative for
 `gk`/`def` beside a positive for `att` is the systematic bias the scope predicts.
 
+## Staff accounts — Trak sets them up
+
+Nobody signs up as a coach or academy admin, and a coach cannot choose or change
+their academy (TRAK-12, `20260926100000_staff_set_up_by_trak.sql`). The app
+refuses all of it. The operator creates staff, one person at a time:
+
+1. **Create the login.** Supabase dashboard → Authentication → Users: create the
+   user directly (not an email invitation) with their email, a long random password
+   that you neither keep nor send, and the email auto-confirmed. The app's handling
+   of Supabase invitation links has no tests; the password reset in step 4 does.
+2. **Admit them** in the dashboard SQL editor, which runs as `postgres`. Don't switch
+   to an app role: the call refuses `authenticated` and `anon`. Do the admin first,
+   because it creates the academy, then each coach into it:
+
+   ```sql
+   -- Academy admin: returns the academy id, creating the academy if they have none.
+   SELECT public.admit_staff_member(
+     (SELECT id FROM auth.users WHERE email = lower('<admin email>')),
+     'club', '<Full Name>', NULL, '<Academy name>');
+   -- Coach: into an existing academy.
+   SELECT public.admit_staff_member(
+     (SELECT id FROM auth.users WHERE email = lower('<coach email>')),
+     'coach', '<Full Name>', (SELECT id FROM public.organizations WHERE name = '<Academy name>'));
+   ```
+
+   It refuses a missing account, an empty name, a coach with no existing academy,
+   and an account that already has a different role.
+3. **Check** before telling them:
+
+   ```sql
+   SELECT p.role, p.full_name, p.invite_code, o.name AS academy
+   FROM public.profiles p
+   LEFT JOIN public.coach_details cd ON cd.user_id = p.user_id
+   LEFT JOIN public.organizations o
+     ON o.id = cd.organization_id OR o.admin_user_id = p.user_id
+   WHERE p.user_id = (SELECT id FROM auth.users WHERE email = lower('<email>'));
+   ```
+
+4. **Tell them** to open trakfootball.com, tap *Forgot password?* with that email,
+   and set their own password from the email. Their profile is already there when
+   they first sign in. A coach's `invite_code` is what their players type to link.
+
+**Moving a coach** to another academy: run the coach call again with the new
+academy. **Removing** one: the academy admin does it from *Coaches*, or run
+`UPDATE public.coach_details SET organization_id = NULL WHERE user_id = …` as the
+operator. Never hand out service credentials to do any of this from a client.
+
 ## Rehearsal data
 
 ```bash
@@ -96,6 +143,12 @@ TRAK_REHEARSAL_PASSWORD='<set a fresh one, do not commit it>' node seed-pilot-re
 
 Two squads, ~30 players, six weeks of fixtures, matches, assessments and awards under
 `@rehearsal.trak.dev` / "Rehearsal FC". Reset with `--purge`.
+
+The seed signs its staff in with the app key. Re-running it over the existing rehearsal
+accounts works. **After `--purge`**, it would re-create the academy but be refused
+moving the coaches into it. Their logins survive the purge, so run only step 2 above
+first: `director@` as `club` with academy name "Rehearsal FC", then `coach.u15@`,
+`coach.u17@` and `coach.gk@` into it. Then run the seed.
 
 `telemetry_events` stays **empty** after seeding — it is written by the app, not the script. That
 is deliberate: metrics 4, 6 and 7 stay blank until you click through the smoke test below.

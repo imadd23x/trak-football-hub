@@ -45,14 +45,16 @@ export default function CoachSquadPage() {
   useEffect(() => {
     if (!user) return
     let cancelled = false
-    setLoadFailed(false)
     // AuthContext hands out a new user object on every same-account token
     // refresh (hourly, and on returning to the tab), which re-runs this load.
     // That re-run keeps the chips on screen and replaces them from its own
     // checks, instead of blinking them all off (TRAK-79). A first load, a
     // Retry and a different account still start from nothing.
     const background = loadedFor.current?.userId === user.id && loadedFor.current.retry === retry
-    if (!background) setConsent({})
+    // A background run also keeps a failure on screen until its own read
+    // succeeds, so a refresh never shows an empty squad in its place (UC-X02;
+    // Tarek, #149 review).
+    if (!background) { setConsent({}); setLoadFailed(false) }
 
     // Fetch squad players.
     // The error must be checked: falling through to `data || []` renders a
@@ -70,6 +72,7 @@ export default function CoachSquadPage() {
           setLoadFailed(true)
           return
         }
+        setLoadFailed(false)
         setPlayers(data || [])
         // One check per player, the same predicate the RLS policy evaluates. A
         // pilot squad is about 25 players, so this stays a handful of requests.

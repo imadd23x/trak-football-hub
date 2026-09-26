@@ -59,6 +59,48 @@ academy/window and observed values. Permission alone does not prove that numbers
 are correct. The legacy checker skips these reports; it cannot attest to their
 contents or migration state using an application key.
 
+### J7 — the one-minute answer (TRAK-10)
+
+"How many assessments did each coach make this week, and how many player and
+parent opens were there?" Same operator workflow as above:
+
+```sql
+BEGIN READ ONLY;
+SET LOCAL ROLE service_role;
+SELECT * FROM public.pilot_j7_this_week;
+ROLLBACK;
+```
+
+One row per pilot coach (`metric = 'assessments'`, 0 if they assessed nobody),
+plus `player_opens` and `parent_opens`. `week` is the current pilot week.
+
+What counts, and what does not:
+
+| Number | Counts | Never counts |
+|---|---|---|
+| Assessments | Distinct assessments a coach saved from the assessment screen this week (`assessment_submitted`), where the row exists and is theirs. An edit counts as that week's work; `created` in the drill-down tells new from edited. | Seeded rows (no UI event), the same assessment saved twice, an event naming someone else's or a missing row |
+| Player opens | Distinct (child, assessment) pairs where the child's home showed the coach's **published** message (`feedback_opened`) | Repeat views, unpublished messages, another child's message |
+| Parent opens | Distinct (parent, assessment) pairs where parent home showed the child's latest assessment, i.e. the bands (`assessment_viewed`). Parents never see the message (TRAK-63). | Repeat views, a parent not linked to that child |
+
+Everyone counted is in the pilot academy (`pilot_config.org_id`) and not a
+synthetic account (`@trak.dev`, `@*.trak.dev`, `example.*`, `*.test`,
+`*.invalid`, `*.example`, `*.localhost`).
+
+Another week, or the detail behind a number:
+
+```sql
+SELECT week, coach_user_id, count(*) AS assessments FROM pilot_j7_assessments GROUP BY 1, 2 ORDER BY 1, 2;
+SELECT week, role, count(*) AS opens, count(DISTINCT user_id) AS people FROM pilot_j7_opens GROUP BY 1, 2 ORDER BY 1, 2;
+```
+
+**Rehearsal only:** `UPDATE pilot_config SET count_synthetic = true;` makes the
+Rehearsal FC accounts count, so TRAK-24 can see the numbers move. Set it back
+to `false` before the pilot. With it `false`, the report on today's database
+correctly shows nothing, because every account on it is synthetic.
+
+Assessment events from before 26 Sep carry no `assessment_id` and are not
+counted; they were all synthetic.
+
 ### Drill-downs
 
 Run these reports and the H4 query below through the same authorized workflow.
@@ -103,12 +145,12 @@ is deliberate: metrics 4, 6 and 7 stay blank until you click through the smoke t
 ## Smoke test — the gate on week 0
 
 `trackEvent` fails silently for the user, so a missing table looks exactly like a working one.
-Nine event types must appear before the pilot starts; a missing event cannot be backfilled.
+Ten event types must appear before the pilot starts; a missing event cannot be backfilled.
 
 | Do this | Event |
 |---|---|
 | Open the app | `app_opened` |
-| One full assessment | `assessment_submitted` (non-null `duration_ms`) |
+| One full assessment | `assessment_submitted` (non-null `duration_ms` and `assessment_id`) |
 | Quick-assess 3 players | `quick_assess_completed` (`players: 3`) |
 | Build a roster | `roster_built` |
 | Log a match | `match_logged` (`actor: 'coach'`) |
@@ -116,6 +158,7 @@ Nine event types must appear before the pilot starts; a missing event cannot be 
 | Ask the assistant | `assistant_used` |
 | As player, open feedback | `feedback_opened` |
 | As parent, open alerts | `alert_opened` |
+| As parent, open home with an assessed child | `assessment_viewed` (`assessment_id`) |
 
 ```sql
 SELECT event_type, role, count(*), max(created_at)

@@ -393,6 +393,8 @@ function CoachAssessmentForm() {
       trackEvent('assessment_submitted', {
         mode: 'full',
         players: 1,
+        // J7 counts distinct assessments per coach, checked against this row.
+        assessment_id: saved.id,
         squad_player_id: playerId,
         band,
         updated: existingId !== null,

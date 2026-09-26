@@ -10,6 +10,7 @@ import { goalsKey, assistsKey } from '@/lib/match-input-keys'
 import { trackEvent } from '@/lib/telemetry'
 import { validateMatchInput, teamGoalsViolation, MATCH_LIMITS } from '@/lib/match-input-rules'
 import { localTodayISO } from '@/lib/event-time'
+import { TRAINING_FOCUS, trainingTypeFrom } from '@/lib/training-focus'
 
 type SquadPlayer = {
   id: string
@@ -253,6 +254,9 @@ export default function CoachAddSession() {
         coach_user_id: user.id,
         title:         sessionTitle,
         session_type:  type,
+        // The focus on its own, for the family's training history (TRAK-75).
+        // Only the fixed labels; the coach's theme stays in the title.
+        training_type: type === 'training' ? trainingTypeFrom(trainingFocus) : null,
         session_date:  date,
         notes: (() => {
           if (type === 'training') {
@@ -813,16 +817,7 @@ export default function CoachAddSession() {
             <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]">
               <MetadataLabel text="SESSION FOCUS" />
               <div className="grid grid-cols-2 gap-2 mt-3">
-                {[
-                  { key: 'Technical',   sub: 'Passing, control, dribbling' },
-                  { key: 'Tactical',    sub: 'Shape, pressing, transitions' },
-                  { key: 'Finishing',   sub: 'Shooting & scoring' },
-                  { key: 'Set Pieces',  sub: 'Corners, free kicks, penalties' },
-                  { key: 'Physical',    sub: 'Fitness & conditioning' },
-                  { key: 'Possession',  sub: 'Rondos, keep-ball' },
-                  { key: 'Goalkeeper', sub: 'GK-specific work' },
-                  { key: 'Game Based', sub: 'SSGs & match scenarios' },
-                ].map(({ key, sub }) => {
+                {TRAINING_FOCUS.map(({ key, sub }) => {
                   const on = trainingFocus.has(key)
                   return (
                     <button key={key}

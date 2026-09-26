@@ -4,8 +4,8 @@ Performance tracking app for youth football players, coaches, parents, and club 
 
 ## Prerequisites
 
-- Node.js 20+
-- npm 10+
+- Node.js 22.15 or later 22.x (matching CI; `.nvmrc` selects the latest 22.x). On 22.14 `npm test` fails with unhandled `BroadcastChannel` errors.
+- npm 11.6.0 (the version declared by `packageManager`)
 - A [Supabase](https://supabase.com) project (free tier works)
 
 ## Local Setup
@@ -15,8 +15,11 @@ Performance tracking app for youth football players, coaches, parents, and club 
 git clone https://github.com/kostasanastasioubusiness-lang/trak-football-hub.git
 cd trak-football-hub
 
-# 2. Install dependencies
-npm install
+# 2. Select Node 22 and install locked dependencies
+# If you use nvm:
+nvm install
+nvm use
+npm ci
 
 # 3. Configure environment
 cp .env.example .env
@@ -31,6 +34,8 @@ npm run dev
 ```
 
 The app runs at http://localhost:8080.
+
+Without nvm, install Node 22 some other way. npm refuses a different Node major (`devEngines` in `package.json`). Don't bypass it: on Node 24 the enforced assessment test (UC-C04) fails because jsdom's AbortSignal is rejected by Node's native `Request`.
 
 ## Running Tests
 

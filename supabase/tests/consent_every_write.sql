@@ -317,6 +317,29 @@ SELECT pg_temp.ce_refused(format('INSERT INTO public.coach_assessments (coach_us
   pg_temp.ce(10), current_setting('trak.ce_adult_sp')),
   '3b G1 a linked player with no date of birth is treated as a minor');
 
+-- ── 3c. A child admitted through the roster (#128) needs consent too ───────
+-- The pilot's children arrive this way: an unlinked squad row with the roster's
+-- date of birth and no account yet. Coach writes wait for a guardian's consent.
+
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('trak.ce_roster', public.admit_roster_child(pg_temp.ce(100), pg_temp.ce(10), 'Roster Synthetic', 'U14',
+    (current_date - interval '13 years')::date, 'roster.child@consent-every-write.test',
+    ARRAY['roster.guardian@consent-every-write.test'], 'consent_every_write')::text, true);
+RESET ROLE;
+SELECT set_config('trak.ce_roster_sp', (SELECT squad_player_id::text FROM public.roster_children
+  WHERE id = current_setting('trak.ce_roster')::uuid), true);
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.ce_as(pg_temp.ce(10), 'coach@consent-every-write.test');
+SELECT pg_temp.ce_assert(public.coach_squad_player_consent_required(current_setting('trak.ce_roster_sp')::uuid) IS TRUE,
+  '3c G1 a rostered child with no account counts as needing consent');
+SELECT pg_temp.ce_refused(format('INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, work_rate, tactical, attitude, technical, physical, coachability) VALUES (%L, %L, 7,7,7,7,7,7)',
+  pg_temp.ce(10), current_setting('trak.ce_roster_sp')),
+  '3c G1 the coach cannot assess a rostered child before consent');
+SELECT pg_temp.ce_refused(format('INSERT INTO public.session_attendance (session_id, squad_player_id, status) VALUES (%L, %L, %L)',
+  current_setting('trak.ce_s1'), current_setting('trak.ce_roster_sp'), 'present'),
+  '3c G1 the coach cannot record attendance for a rostered child before consent');
+
 -- ── 4. The child cannot write match records about themselves ──────────────
 
 SELECT pg_temp.ce_as(pg_temp.ce(20), 'player@consent-every-write.test');
@@ -424,8 +447,8 @@ DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.ce_results;
-  IF total <> 49 THEN
-    RAISE EXCEPTION 'Consent on every write: % assertions ran; expected exactly 49', total;
+  IF total <> 52 THEN
+    RAISE EXCEPTION 'Consent on every write: % assertions ran; expected exactly 52', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'Consent on every write: % of % failed: %', failed, total,

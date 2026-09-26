@@ -19,7 +19,7 @@ import { trackEvent } from '@/lib/telemetry'
  * migrations since 20260611000001 and was improved again in 20260901000006 to
  * claim the coach's existing roster row rather than duplicate it.
  */
-export function CoachLinkCard() {
+export function CoachLinkCard({ hideWhenLinked = false }: { hideWhenLinked?: boolean } = {}) {
   const { user } = useAuth()
   const [linked, setLinked] = useState<{ coachName: string | null } | null>(null)
   const [checking, setChecking] = useState(true)
@@ -121,6 +121,9 @@ export function CoachLinkCard() {
       </div>
     )
   }
+
+  // On Profile, Connections already names the coach (TRAK-71).
+  if (linked && hideWhenLinked) return null
 
   if (linked) {
     return (

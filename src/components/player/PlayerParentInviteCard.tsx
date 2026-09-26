@@ -32,11 +32,11 @@ function readInvites(value: unknown, playerId: string): PlayerParentInvite[] {
 }
 
 /** A key resets local notices and revealed links immediately on account change. */
-export function PlayerParentInviteCard({ playerUserId, showWhenEmpty = false }: { playerUserId: string; showWhenEmpty?: boolean }) {
-  return <PlayerInvitations key={playerUserId} playerUserId={playerUserId} showWhenEmpty={showWhenEmpty} />
+export function PlayerParentInviteCard({ playerUserId, showWhenEmpty = false, hideWhenLinked = false }: { playerUserId: string; showWhenEmpty?: boolean; hideWhenLinked?: boolean }) {
+  return <PlayerInvitations key={playerUserId} playerUserId={playerUserId} showWhenEmpty={showWhenEmpty} hideWhenLinked={hideWhenLinked} />
 }
 
-function PlayerInvitations({ playerUserId, showWhenEmpty }: { playerUserId: string; showWhenEmpty: boolean }) {
+function PlayerInvitations({ playerUserId, showWhenEmpty, hideWhenLinked }: { playerUserId: string; showWhenEmpty: boolean; hideWhenLinked: boolean }) {
   const queryClient = useQueryClient()
   const mounted = useRef(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -169,6 +169,9 @@ function PlayerInvitations({ playerUserId, showWhenEmpty }: { playerUserId: stri
   }
 
   if (!showWhenEmpty && !query.isPending && !query.isError && invites.length === 0) return null
+  // Home only (TRAK-71): once a parent is linked there is nothing to act on here.
+  if (hideWhenLinked && !query.isPending && !query.isError && invites.length > 0
+    && invites.every(invite => invite.status === 'accepted')) return null
   return (
     <section aria-label="Parent invitations" className="rounded-xl border border-border bg-card p-4 my-4">
       <h2 className="text-sm font-medium text-foreground">Parent invitations</h2>

@@ -170,8 +170,12 @@ SELECT pg_temp.p47check(public.export_my_account()->'profile'->>'full_name'='Edi
 SELECT pg_temp.p47actor(21);
 SELECT pg_temp.p47probe('SELECT public.provision_my_profile(''{"role":"player","full_name":"New Audit Player"}''::jsonb)','Profile provision RPC allowed',1);
 SELECT pg_temp.p47probe('SELECT public.delete_my_account()','Account deletion RPC allowed',1);
+-- Trak sets up staff (TRAK-12, #151): the operator creates an academy admin
+-- and their academy, and no parked-feature policy may block that.
+RESET ROLE;
+SELECT pg_temp.p47probe(format('SELECT public.admit_staff_member(%L,''club'',''New Audit Admin'',NULL,''New Audit Academy'')',pg_temp.p47id(3)),'Club profile and organization provision allowed',1);
+SET LOCAL ROLE authenticated;
 SELECT pg_temp.p47actor(3);
-SELECT pg_temp.p47probe('SELECT public.provision_my_profile(''{"role":"club","full_name":"New Audit Admin","club_details":{"academy_name":"New Audit Academy"}}''::jsonb)','Club profile and organization provision allowed',1);
 SELECT pg_temp.p47check((SELECT count(*) FROM public.organizations WHERE admin_user_id=pg_temp.p47id(3))=1,'Organization actually provisioned');
 SELECT pg_temp.p47actor(20);
 SELECT pg_temp.p47writes('Player');

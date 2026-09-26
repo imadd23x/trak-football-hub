@@ -120,8 +120,15 @@ SELECT pg_temp.account_check(EXISTS (SELECT 1 FROM public.player_details WHERE u
 
 -- Released records must remain inaccessible after removal, transfer AND the
 -- original academy's deletion. Do not assert a particular status spelling.
+-- Prepare departures through the trusted incident path, preserving the
+-- original owning-admin checks and every authenticated account-rights check.
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', jsonb_build_object('sub', pg_temp.account_id(1), 'role', 'service_role')::text, true);
 SELECT public.remove_coach_from_org(pg_temp.account_id(4));
 SELECT public.remove_coach_from_org(pg_temp.account_id(5));
+RESET ROLE;
+SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', jsonb_build_object('sub', pg_temp.account_id(4), 'role', 'authenticated')::text, true);
 SELECT public.join_organization('DELETE-B');
 SELECT pg_temp.account_check(NOT EXISTS (SELECT 1 FROM public.squad_players WHERE id = pg_temp.account_id(203)), 'transferred coach cannot read released academy A row before deletion');

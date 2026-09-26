@@ -31,6 +31,13 @@ const ROLE_GUARDED: Record<string, string> = {
 
 interface Policy { name: string; table: string; op: string; body: string; file: string }
 
+// A literal false WITH CHECK admits no new row on INSERT or UPDATE. It needs
+// no role/ownership predicate. Keep checking every policy that can admit one;
+// do not treat a broader expression such as (false OR true) as a denial.
+// Actual privileges and overlapping policies are exercised by the SQL suite.
+const deniesEveryWrite = (policy: Policy) =>
+  /\bWITH\s+CHECK\s*\(\s*false\s*\)\s*$/i.test(policy.body)
+
 function loadPolicies(): Policy[] {
   const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
   const created: Policy[] = []
@@ -75,13 +82,13 @@ describe('RLS write policies require a role, not just claimed ownership', () => 
   })
 
   for (const [table, guard] of Object.entries(ROLE_GUARDED)) {
-    it(`${table}: every live INSERT/UPDATE policy calls ${guard}()`, () => {
+    it(`${table}: every live INSERT/UPDATE policy denies writes or calls ${guard}()`, () => {
       const writes = live.filter(p => p.table === table && ['INSERT', 'UPDATE', 'ALL'].includes(p.op))
       expect(writes.length, `no write policy found for ${table} — did it get renamed?`).toBeGreaterThan(0)
 
       for (const p of writes) {
         expect(
-          p.body.includes(`${guard}()`),
+          deniesEveryWrite(p) || p.body.includes(`${guard}()`),
           `Policy "${p.name}" on ${table} (${p.file}) permits a write without checking ${guard}(). ` +
             `An ownership-only check lets any authenticated user set the owner column to their own id.`,
         ).toBe(true)
@@ -135,12 +142,12 @@ describe('RLS writes prove ownership of the row they reference', () => {
   }
 
   for (const [table, helpers] of Object.entries(REFERENCE_GUARDED)) {
-    it(`${table}: every live INSERT/UPDATE policy proves ownership`, () => {
+    it(`${table}: every live INSERT/UPDATE policy denies writes or proves ownership`, () => {
       const writes = live.filter(p => p.table === table && ['INSERT', 'UPDATE', 'ALL'].includes(p.op))
       expect(writes.length, `no write policy found for ${table} — did it get renamed?`).toBeGreaterThan(0)
 
       for (const p of writes) {
-        const called = helpers.some(h => p.body.includes(`${h}(`))
+        const called = deniesEveryWrite(p) || helpers.some(h => p.body.includes(`${h}(`))
         expect(
           called,
           `Policy "${p.name}" on ${table} (${p.file}) writes a row that references another ` +
@@ -158,7 +165,7 @@ describe('RLS writes prove ownership of the row they reference', () => {
     expect(inserts.length).toBeGreaterThan(0)
     for (const p of inserts) {
       expect(
-        p.body.includes('my_coach_organization_id()'),
+        deniesEveryWrite(p) || p.body.includes('my_coach_organization_id()'),
         `Policy "${p.name}" on ${p.table} (${p.file}) does not pin organization_id to the writer's ` +
           `own academy. The BEFORE INSERT trigger only fills a NULL, so a supplied value survives ` +
           `and the row appears on another academy's dashboard.`,

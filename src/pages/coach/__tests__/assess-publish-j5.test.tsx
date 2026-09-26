@@ -1,6 +1,6 @@
 /**
  * J5 (MVP Requirements): everything on one screen. Six sliders produce the
- * band, then "Message to [first name]: they and their parents will see this."
+ * band, then "Message to [first name]: only [first name] sees this." (TRAK-63)
  * and an optional "Private note: only you can see this." Nothing reaches the
  * family until the coach presses Publish. A waiting-for-parent player cannot be
  * opened, and a consent withdrawal mid-edit fails the save and keeps the values.
@@ -21,7 +21,7 @@ vi.mock('@/lib/telemetry', () => ({ trackEvent: vi.fn(), startTimer: () => () =>
 const endpoint = (table: string) => `${SUPABASE_URL}/rest/v1/${table}`
 const RLS_REFUSAL = { code: '42501', details: null, hint: null, message: 'new row violates row-level security policy' }
 const existing = { id: 'assessment-a', work_rate: 8, tactical: 8, attitude: 8,
-  technical: 8, physical: 8, coachability: 8, appearance: 'sub', session_id: null }
+  technical: 8, physical: 8, coachability: 8, appearance: 'sub', session_id: 'session-1' }
 
 interface Write { table: string; method: 'post' | 'patch'; body: Record<string, unknown> }
 let writes: Write[]
@@ -40,6 +40,14 @@ function showForm() {
 async function choose(player: 'player-a' | 'player-b') {
   const option = await screen.findByRole('option', { name: 'Alex Synthetic' })
   await userEvent.selectOptions(option.closest('select') as HTMLSelectElement, player)
+  await chooseSessionIfNone()
+}
+
+// TRAK-68: an assessment needs a past session. It stays chosen across players.
+async function chooseSessionIfNone() {
+  await screen.findByRole('option', { name: /vs Synthetic FC/ })
+  const session = screen.getByRole('combobox', { name: 'Session' }) as HTMLSelectElement
+  if (session.value === '') await userEvent.selectOptions(session, 'session-1')
 }
 
 const messageBox = () => screen.getByLabelText(/^Message to/i)
@@ -55,7 +63,7 @@ beforeEach(() => {
       { id: 'player-a', player_name: 'Alex Synthetic' },
       { id: 'player-b', player_name: 'Bella Synthetic' },
     ])),
-    http.get(endpoint('coach_sessions'), () => HttpResponse.json([])),
+    http.get(endpoint('coach_sessions'), () => HttpResponse.json([{ id: 'session-1', title: 'vs Synthetic FC', session_date: '2026-09-20' }])),
     http.get(endpoint('coach_assessments'), ({ request }) => {
       const player = new URL(request.url).searchParams.get('squad_player_id')?.replace('eq.', '')
       return HttpResponse.json(player === 'player-a' ? [existing] : [])
@@ -90,52 +98,74 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('J5: one screen, message to the player, private note, publish', () => {
-  it('labels the message for the player and parents, and the note as private, message first', async () => {
+  it('labels the message for the player only, and the note as private, message first', async () => {
     showForm()
     await choose('player-b')
     await waitFor(() => expect(messageBox()).toBeEnabled())
-    expect(screen.getByText('They and their parents will see this.')).toBeInTheDocument()
+    // TRAK-63 (25 Sep): parents see bands only, never the coach's message.
+    expect(screen.getByText('Only Bella sees this.')).toBeInTheDocument()
+    expect(screen.queryByText(/parents/i)).toBeNull()
     expect(screen.getByText('Only you can see this.')).toBeInTheDocument()
     expect(screen.getByText(/Message to Bella/)).toBeInTheDocument()
     // Message box comes before the private note.
     expect(messageBox().compareDocumentPosition(noteBox()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    // The old label promised the player alone; parents read published messages too.
-    expect(screen.queryByText(/only the player sees this/i)).toBeNull()
   })
 
-  it('Save keeps a new message as an unpublished draft', async () => {
+  // TRAK-64 (Imad, 25 Sep): Save and Publish are the same action, one button.
+  it('Save sends a new message to the player', async () => {
     showForm()
     await choose('player-b')
     await waitFor(() => expect(messageBox()).toBeEnabled())
     await userEvent.type(messageBox(), 'Good pressing today')
-    expect(screen.getByRole('button', { name: 'Publish to Bella' })).toBeEnabled()
+    expect(screen.getByText(/Not sent yet\. Saving sends it to Bella/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /save assessment/i }))
-    await screen.findByText('Coach home')
-    expect(shared()).toEqual([expect.objectContaining({ body: 'Good pressing today', published_at: null })])
-  })
-
-  it('Publish sends the message', async () => {
-    showForm()
-    await choose('player-b')
-    await waitFor(() => expect(messageBox()).toBeEnabled())
-    await userEvent.type(messageBox(), 'Good pressing today')
-    await userEvent.click(screen.getByRole('button', { name: 'Publish to Bella' }))
     await screen.findByText('Coach home')
     expect(shared()).toHaveLength(1)
     expect(shared()[0]).toMatchObject({ body: 'Good pressing today' })
     expect(typeof shared()[0].published_at).toBe('string')
   })
 
-  it('an edit to a published message is withdrawn on Save until it is published again', async () => {
+  it('an edited published message is sent again on Save', async () => {
     showForm()
     await choose('player-a')
     await screen.findByDisplayValue('Published feedback for Alex')
-    expect(screen.getByText(/Published\. They can read it now/)).toBeInTheDocument()
+    expect(screen.getByText(/Published\. Alex can read it now/)).toBeInTheDocument()
     await userEvent.type(messageBox(), ' and more')
-    expect(screen.getByText(/Edited since you published it/)).toBeInTheDocument()
+    expect(screen.getByText(/Edited\. Saving sends Alex the new version/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /save assessment/i }))
     await screen.findByText('Coach home')
-    expect(shared()).toEqual([expect.objectContaining({ body: 'Published feedback for Alex and more', published_at: null })])
+    expect(shared()).toHaveLength(1)
+    expect(shared()[0]).toMatchObject({ body: 'Published feedback for Alex and more' })
+    expect(typeof shared()[0].published_at).toBe('string')
+  })
+
+  it('an unchanged published message is not sent again', async () => {
+    showForm()
+    await choose('player-a')
+    await screen.findByDisplayValue('Published feedback for Alex')
+    await waitFor(() => expect(noteBox()).toBeEnabled())
+    await userEvent.type(noteBox(), 'Private follow-up')
+    await userEvent.click(screen.getByRole('button', { name: /save assessment/i }))
+    await screen.findByText('Coach home')
+    expect(shared()).toEqual([])
+  })
+
+  it('an empty message box sends nothing', async () => {
+    showForm()
+    await choose('player-b')
+    await waitFor(() => expect(messageBox()).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: /save assessment/i }))
+    await screen.findByText('Coach home')
+    expect(shared()).toEqual([])
+  })
+
+  it('has one save button and no separate Publish', async () => {
+    showForm()
+    await choose('player-b')
+    await waitFor(() => expect(messageBox()).toBeEnabled())
+    await userEvent.type(messageBox(), 'Good pressing today')
+    expect(screen.queryByRole('button', { name: /^Publish/ })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /save assessment/i })).toHaveLength(1)
   })
 
   it('Unpublish retracts a published message at once, and writes nothing else', async () => {
@@ -144,17 +174,10 @@ describe('J5: one screen, message to the player, private note, publish', () => {
     await screen.findByDisplayValue('Published feedback for Alex')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Unpublish message' })).toBeEnabled())
     await userEvent.click(screen.getByRole('button', { name: 'Unpublish message' }))
-    await screen.findByText(/Not sent\. Nothing reaches them/)
+    await screen.findByText(/Not sent yet\. Saving sends it to Alex/)
     expect(writes).toEqual([{ table: 'coach_shared_feedback', method: 'patch', body: { published_at: null } }])
     expect(screen.queryByRole('button', { name: 'Unpublish message' })).toBeNull()
     expect(messageBox()).toHaveValue('Published feedback for Alex')
-  })
-
-  it('offers no Publish when there is no message', async () => {
-    showForm()
-    await choose('player-b')
-    await waitFor(() => expect(messageBox()).toBeEnabled())
-    expect(screen.queryByRole('button', { name: /^Publish/ })).toBeNull()
   })
 })
 
@@ -187,7 +210,7 @@ describe('J5: consent', () => {
     fireEvent.change(screen.getAllByRole('slider')[0], { target: { value: '9' } })
     await userEvent.type(messageBox(), 'Great week')
     await userEvent.type(noteBox(), 'Watch the left foot')
-    await userEvent.click(screen.getByRole('button', { name: 'Publish to Bella' }))
+    await userEvent.click(screen.getByRole('button', { name: /save assessment/i }))
 
     expect(await screen.findByText(/waiting for a parent/i)).toBeInTheDocument()
     expect(screen.queryByText('Coach home')).toBeNull()
@@ -210,7 +233,7 @@ describe('J5: Unpublish is a retraction and nothing else', () => {
     fireEvent.change(screen.getAllByRole('slider')[0], { target: { value: '3' } })
     await userEvent.type(noteBox(), 'Private draft')
     await userEvent.click(screen.getByRole('button', { name: 'Unpublish message' }))
-    await screen.findByText(/Not sent\. Nothing reaches them/)
+    await screen.findByText(/Not sent yet\. Saving sends it to Alex/)
     expect(writes.map(w => w.table)).toEqual(['coach_shared_feedback'])
     // The unsaved edits are still on screen, still unsaved.
     expect(screen.getAllByRole('slider')[0]).toHaveValue('3')
@@ -225,7 +248,7 @@ describe('J5: Unpublish is a retraction and nothing else', () => {
     await waitFor(() => expect(noteBox()).toBeEnabled())
     await userEvent.type(noteBox(), 'Private draft')
     await userEvent.click(screen.getByRole('button', { name: 'Unpublish message' }))
-    await screen.findByText(/Not sent\. Nothing reaches them/)
+    await screen.findByText(/Not sent yet\. Saving sends it to Alex/)
     expect(shared()).toEqual([{ published_at: null }])
   })
 
@@ -251,6 +274,6 @@ describe('J5: Unpublish is a retraction and nothing else', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Unpublish message' })).toBeEnabled())
     await userEvent.click(screen.getByRole('button', { name: 'Unpublish message' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Unpublish message' })).toBeEnabled())
-    expect(screen.getByText(/Published\. They can read it now/)).toBeInTheDocument()
+    expect(screen.getByText(/Published\. Alex can read it now/)).toBeInTheDocument()
   })
 })

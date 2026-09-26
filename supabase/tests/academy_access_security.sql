@@ -95,8 +95,24 @@ UPDATE public.squad_players SET organization_id = pg_temp.academy_id(11) WHERE i
 UPDATE public.squad_players SET organization_id = NULL WHERE id = pg_temp.academy_id(20);
 UPDATE public.coach_assessments SET organization_id = pg_temp.academy_id(11) WHERE id = pg_temp.academy_id(30);
 UPDATE public.coach_assessments SET organization_id = NULL WHERE id = pg_temp.academy_id(30);
-UPDATE public.recognition_awards SET organization_id = pg_temp.academy_id(11) WHERE id = pg_temp.academy_id(40);
-UPDATE public.recognition_awards SET organization_id = NULL WHERE id = pg_temp.academy_id(40);
+-- Award authoring is parked for application roles. Exercise the actual pin
+-- through trusted maintenance, then resume the original authenticated reads.
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(3), 'role', 'service_role')::text, true);
+WITH changed AS (
+  UPDATE public.recognition_awards SET organization_id = pg_temp.academy_id(11)
+  WHERE id = pg_temp.academy_id(40) RETURNING id
+)
+SELECT pg_temp.academy_assert((SELECT count(*) = 1 FROM changed), 'trusted award lateral UPDATE reaches the pin trigger');
+WITH changed AS (
+  UPDATE public.recognition_awards SET organization_id = NULL
+  WHERE id = pg_temp.academy_id(40) RETURNING id
+)
+SELECT pg_temp.academy_assert((SELECT count(*) = 1 FROM changed), 'trusted award clearing UPDATE reaches the pin trigger');
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(3), 'role', 'authenticated')::text, true);
 SELECT pg_temp.academy_assert(
   (SELECT organization_id = pg_temp.academy_id(10) FROM public.squad_players WHERE id = pg_temp.academy_id(20))
   AND (SELECT organization_id = pg_temp.academy_id(10) FROM public.coach_assessments WHERE id = pg_temp.academy_id(30))
@@ -111,7 +127,14 @@ SELECT pg_temp.academy_assert((SELECT count(*) = 1 FROM public.profiles WHERE us
 SELECT pg_temp.academy_assert((SELECT count(*) = 1 FROM public.player_details WHERE user_id = pg_temp.academy_id(5)), 'current academy reads its player DOB');
 SELECT pg_temp.academy_assert((SELECT count(*) = 0 FROM public.profiles WHERE user_id = pg_temp.academy_id(7)), 'legacy wrong-role roster link does not reveal parent profile to admin');
 SELECT pg_temp.academy_assert(NOT public.player_in_my_org(pg_temp.academy_id(7)), 'helper rejects a non-player legacy target');
+-- Departure is now a trusted incident operation with an owning-admin
+-- identity; all transfer/history access assertions remain authenticated.
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(1), 'role', 'service_role')::text, true);
 SELECT public.remove_coach_from_org(pg_temp.academy_id(3));
+RESET ROLE;
+SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(3), 'role', 'authenticated')::text, true);
 SELECT public.join_organization('ACCESS-B');
 SELECT set_config('request.jwt.claims', json_build_object('sub', pg_temp.academy_id(1), 'role', 'authenticated')::text, true);

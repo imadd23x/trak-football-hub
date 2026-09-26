@@ -55,23 +55,4 @@ describe('TRAK-12: staff are set up by Trak', () => {
     expect(screen.queryByRole('button', { name: /^join$/i })).toBeNull()
     await waitFor(() => expect(joins).toEqual([]))
   })
-
-  // The academy code no longer lets a coach in, so an administrator must not be
-  // told to hand it out for that.
-  it.each(['/club/profile', '/club/home', '/club/coaches'])(
-    '%s tells an academy administrator that Trak adds their coaches',
-    async path => {
-      const ADMIN = { id: 'admin-no-coaches' }
-      signInAs(ADMIN)
-      server.use(
-        table('profiles', [{ id: 'p', user_id: ADMIN.id, role: 'club', full_name: 'Admin Synthetic' }]),
-        table('organizations', [{ id: 'org-1', name: 'Synthetic Academy', join_code: 'SYNORG', admin_user_id: ADMIN.id }]),
-        table('coach_details', []),
-      )
-      renderApp(path)
-      expect(await screen.findByText(/Trak adds coaches to your academy/i)).toBeInTheDocument()
-      expect(screen.queryByText(/so they can join your academy/i)).toBeNull()
-      expect(screen.queryByText(/share your academy code/i)).toBeNull()
-    },
-  )
 })

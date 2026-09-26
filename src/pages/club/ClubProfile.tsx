@@ -122,12 +122,12 @@ export default function ClubProfile() {
         </ClubCard>
       )}
 
-      {/* Academy code. Since TRAK-12 (#151) it no longer lets a coach join. */}
+      {/* Academy Join Code */}
       {joinCode && (
         <ClubCard className="p-5 mb-5">
-          <SectionLabel>Academy Code</SectionLabel>
+          <SectionLabel>Academy Join Code</SectionLabel>
           <p className="mt-1" style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-            Trak adds coaches to your academy. Quote this code when you ask Trak to add one.
+            Share this code with coaches so they can join your academy.
           </p>
           <button
             onClick={copyCode}

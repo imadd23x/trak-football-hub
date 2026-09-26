@@ -150,7 +150,7 @@ export default function ClubHome() {
         {loading ? (
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>Loading…</div>
         ) : coaches.length === 0 ? (
-          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>No coaches yet. Trak adds coaches to your academy: ask Trak to add yours.</div>
+          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>No coaches connected yet. Share your academy code with coaches to get started.</div>
         ) : (
           coaches.map(c => (
             <ClubCard key={c.userId} className="p-4">

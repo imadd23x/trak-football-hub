@@ -8,8 +8,9 @@ import { MobileShell, MetadataLabel } from '@/components/trak'
 import { computeMatchScore } from '@/lib/rating-engine'
 import { goalsKey, assistsKey } from '@/lib/match-input-keys'
 import { trackEvent } from '@/lib/telemetry'
-import { validateMatchInput, MATCH_LIMITS } from '@/lib/match-input-rules'
+import { validateMatchInput, teamGoalsViolation, MATCH_LIMITS } from '@/lib/match-input-rules'
 import { localTodayISO } from '@/lib/event-time'
+import { TRAINING_FOCUS, trainingTypeFrom } from '@/lib/training-focus'
 
 type SquadPlayer = {
   id: string
@@ -214,7 +215,13 @@ export default function CoachAddSession() {
       teamScore: scoreUs === '' ? undefined : Number(scoreUs),
     }).length > 0)
 
-  const canSave = !saving && incompleteRecords.length === 0 && impossibleRecords.length === 0 && (
+  const teamGoalsError = !isMatch ? null : teamGoalsViolation(
+    squad.filter(p => details[p.id]?.played && typeof details[p.id].goals === 'number')
+      .map(p => details[p.id].goals as number),
+    scoreUs === '' ? undefined : Number(scoreUs),
+  )
+
+  const canSave = !saving && incompleteRecords.length === 0 && impossibleRecords.length === 0 && !teamGoalsError && (
     isMatch    ? opponent.trim().length > 0 && scoreUs !== '' && scoreThem !== ''
     : type === 'training' ? trainingFocus.size > 0
     : title.trim().length > 0
@@ -244,6 +251,9 @@ export default function CoachAddSession() {
         coach_user_id: user.id,
         title:         sessionTitle,
         session_type:  type,
+        // The focus on its own, for the family's training history (TRAK-75).
+        // Only the fixed labels; the coach's theme stays in the title.
+        training_type: type === 'training' ? trainingTypeFrom(trainingFocus) : null,
         session_date:  date,
         notes: (() => {
           if (type === 'training') {
@@ -804,16 +814,7 @@ export default function CoachAddSession() {
             <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]">
               <MetadataLabel text="SESSION FOCUS" />
               <div className="grid grid-cols-2 gap-2 mt-3">
-                {[
-                  { key: 'Technical',   sub: 'Passing, control, dribbling' },
-                  { key: 'Tactical',    sub: 'Shape, pressing, transitions' },
-                  { key: 'Finishing',   sub: 'Shooting & scoring' },
-                  { key: 'Set Pieces',  sub: 'Corners, free kicks, penalties' },
-                  { key: 'Physical',    sub: 'Fitness & conditioning' },
-                  { key: 'Possession',  sub: 'Rondos, keep-ball' },
-                  { key: 'Goalkeeper', sub: 'GK-specific work' },
-                  { key: 'Game Based', sub: 'SSGs & match scenarios' },
-                ].map(({ key, sub }) => {
+                {TRAINING_FOCUS.map(({ key, sub }) => {
                   const on = trainingFocus.has(key)
                   return (
                     <button key={key}
@@ -1022,6 +1023,12 @@ export default function CoachAddSession() {
       {/* Sticky save */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-5 pb-5 pt-3"
         style={{ background: 'linear-gradient(180deg,rgba(10,10,11,0) 0%,#0A0A0B 35%)' }}>
+        {teamGoalsError && (
+          <p role="alert" className="text-[11px] text-center text-[rgb(251,191,36)] mb-2"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            {teamGoalsError}
+          </p>
+        )}
         {incompleteRecords.length > 0 && (
           <p role="status" className="text-[11px] text-center text-[rgb(251,191,36)] mb-2"
             style={{ fontFamily: "'DM Sans', sans-serif" }}>

@@ -51,8 +51,8 @@ INSERT INTO public.organizations (id, admin_user_id, name, join_code)
 VALUES (pg_temp.pi(100), pg_temp.pi(1), 'Profile Insert FC', 'PINS01');
 
 -- Slice 3 (TRAK-48): a new player or parent must be on the academy roster.
--- The squad belongs to a separate fixture coach, so the coach under test still
--- starts with no profile.
+-- The squad belongs to a separate fixture coach, so the coach under test is
+-- only the one Trak admits below.
 INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
   (pg_temp.pi(11), 'squad-coach@profile-insert.test', now());
 INSERT INTO public.profiles (user_id, role, full_name) VALUES (pg_temp.pi(11), 'coach', 'Squad Coach');
@@ -63,6 +63,9 @@ INSERT INTO public.roster_children (id, organization_id, squad_player_id, date_o
   (pg_temp.pi(50), pg_temp.pi(100), pg_temp.pi(40), (current_date - interval '19 years')::date, 'player@profile-insert.test', 'fixture');
 INSERT INTO public.roster_guardians (roster_child_id, email, loaded_by) VALUES
   (pg_temp.pi(50), 'parent@profile-insert.test', 'fixture');
+-- TRAK-12: Trak sets up staff. The operator admits the coach first; their
+-- signup below then completes that profile (self-made staff: g3_staff_admission).
+SELECT public.admit_staff_member(pg_temp.pi(10), 'coach', 'Admitted Coach', pg_temp.pi(100));
 
 SET LOCAL ROLE authenticated;
 
@@ -91,7 +94,7 @@ SELECT pg_temp.pi_as(10);
 SELECT pg_temp.pi_run($$SELECT public.provision_my_profile(jsonb_build_object(
   'role', 'coach', 'full_name', 'Provisioned Coach',
   'coach_details', jsonb_build_object('academy_code', 'PINS01')))$$,
-  false, 'CONTROL a coach signs up through provision_my_profile');
+  false, 'CONTROL a coach Trak admitted completes signup through provision_my_profile');
 SELECT pg_temp.pi_run(format($$UPDATE public.profiles SET full_name = 'Renamed Coach' WHERE user_id = %L$$, pg_temp.pi(10)),
   false, 'CONTROL a user can still edit their own profile');
 RESET ROLE;

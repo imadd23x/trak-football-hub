@@ -427,26 +427,48 @@ INSERT INTO public.coach_shared_feedback (assessment_id, coach_user_id, body, pu
 INSERT INTO public.player_parent_links (player_user_id, parent_user_id) VALUES
   ('b0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000009');
 
+-- ── TRAK-15 (G4) / TRAK-63: superseded, 26 Sep ──────────────────────────
+--
+-- The decision above was reversed on 25 Sep: parents see the bands, never the
+-- coach's message (TRAK-63). 20260926120000 drops the parent read, so the
+-- claim is now that a parent reads NONE of the messages, their own child's
+-- included, while still reading the child's assessment.
+--
+-- The zeros below are only evidence if the row is really there and really
+-- published, and the parent's identity really works. So: the child reads it,
+-- and the parent reads the assessment it hangs off.
 SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"b0000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_shared_feedback
+    WHERE assessment_id = 'd0000000-0000-0000-0000-000000000001'
+      AND published_at IS NOT NULL) = 1,
+  'PREMISE: Child One reads their own published message, so it exists and is published');
+
 SELECT set_config('request.jwt.claims',
   '{"sub":"b0000000-0000-0000-0000-000000000009","role":"authenticated"}', true);
 
--- POSITIVE CONTROL first. Child One's row was published earlier in this suite,
--- so if this returns 0 every denial below would pass for the wrong reason.
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.coach_assessments
+    WHERE id = 'd0000000-0000-0000-0000-000000000001') = 1,
+  'CONTROL: the parent reads their own child''s assessment (the bands)');
+
+-- THE assertion. The parent's own child, published, consent not required.
 SELECT pg_temp.assert_true(
   (SELECT count(*) FROM public.coach_shared_feedback
-    WHERE assessment_id = 'd0000000-0000-0000-0000-000000000001') = 1,
-  'K9: a parent reads their own child''s PUBLISHED feedback');
+    WHERE assessment_id = 'd0000000-0000-0000-0000-000000000001') = 0,
+  'TRAK-15: a parent does NOT read their own child''s published message');
 
--- THE assertion. Same coach, same academy, different family.
 SELECT pg_temp.assert_true(
   (SELECT count(*) FROM public.coach_shared_feedback
     WHERE body = 'CHILD-TWO-FEEDBACK-CANARY') = 0,
   'K9: a parent does NOT read another child''s feedback, even under the same coach');
 
 SELECT pg_temp.assert_true(
-  (SELECT count(*) FROM public.coach_shared_feedback) = 1,
-  'K9: exactly one row is visible to the parent — their child''s, and no other');
+  (SELECT count(*) FROM public.coach_shared_feedback) = 0,
+  'TRAK-15: no message at all is visible to the parent');
 
 -- The parent sees what the CHILD sees. A private note is neither.
 SELECT pg_temp.assert_true(
@@ -454,6 +476,10 @@ SELECT pg_temp.assert_true(
   'K9: a parent reads no coach private note — parent access does not reopen K9');
 
 -- ── A dependency this suite could not otherwise see ─────────────────────
+--
+-- (History: the parent message policy below was dropped by 20260926120000.
+-- The assertion stays, because the bands a parent sees now rest on this
+-- scoping directly.)
 --
 -- Found by mutation, and it survived: replacing the parent policy's join
 -- condition with ON true — so that ANY parent link belonging to the caller
@@ -477,26 +503,9 @@ SELECT pg_temp.assert_true(
   'K9 DEPENDENCY: a parent reads only their own child''s assessment. '
   'The parent feedback policy leans on this scoping — widening it widens that.');
 
--- Unpublished means unpublished for the parent too. Retract Child One's row and
--- the parent loses it, exactly as the child does.
+-- (The retraction check that stood here, "retraction removes the row from the
+-- parent", has nothing left to test: the parent never had the row.)
 RESET ROLE;
-UPDATE public.coach_shared_feedback
-   SET published_at = NULL
- WHERE assessment_id = 'd0000000-0000-0000-0000-000000000001';
-
-SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims',
-  '{"sub":"b0000000-0000-0000-0000-000000000009","role":"authenticated"}', true);
-
-SELECT pg_temp.assert_true(
-  (SELECT count(*) FROM public.coach_shared_feedback) = 0,
-  'K9: retraction removes the row from the parent as well as the child');
-
--- Put it back, so the last state of the fixture matches the decided behaviour.
-RESET ROLE;
-UPDATE public.coach_shared_feedback
-   SET published_at = now()
- WHERE assessment_id = 'd0000000-0000-0000-0000-000000000001';
 
 -- An unrelated parent is linked to nobody here and must read nothing. Without
 -- this, a policy keyed on "is a parent at all" would pass everything above.
@@ -589,8 +598,8 @@ SELECT set_config('request.jwt.claims',
   '{"sub":"b0000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
 SELECT pg_temp.assert_true(
   (SELECT count(*) FROM public.coach_shared_feedback
-    WHERE body = 'CONSENT-WITHDRAWAL-CANARY') = 1,
-  'K9 control: with consent, the linked parent reads it too');
+    WHERE body = 'CONSENT-WITHDRAWAL-CANARY') = 0,
+  'TRAK-15: even with consent granted, the linked parent does not read the message');
 
 -- The guardian withdraws, as themselves.
 SET LOCAL ROLE authenticated;
@@ -618,7 +627,7 @@ SELECT set_config('request.jwt.claims',
 SELECT pg_temp.assert_true(
   (SELECT count(*) FROM public.coach_shared_feedback
     WHERE body = 'CONSENT-WITHDRAWAL-CANARY') = 0,
-  'K9: and stops the withdrawing parent reading it themselves');
+  'TRAK-15: and the withdrawing parent still reads nothing');
 
 -- The coach must NOT be locked out of their own words. A coach who cannot see
 -- what they wrote cannot retract it, which is the one action withdrawal should

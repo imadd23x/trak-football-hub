@@ -77,7 +77,9 @@ INSERT INTO public.roster_children (id, organization_id, squad_player_id, date_o
   ('80000000-0000-0000-0000-000000000003', '60000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000003', '2013-01-01', 'newchild@p1.test', NULL, 'fixture');
 INSERT INTO public.roster_guardians (roster_child_id, email, loaded_by) VALUES
   ('80000000-0000-0000-0000-000000000001', 'newparent@p1.test', 'fixture'),
-  ('80000000-0000-0000-0000-000000000001', 'newunverified@p1.test', 'fixture');
+  ('80000000-0000-0000-0000-000000000001', 'newunverified@p1.test', 'fixture'),
+  -- TRAK-18 (G2): a rostered child may invite only a guardian the academy named.
+  ('80000000-0000-0000-0000-000000000003', 'newguardian@p1.test', 'fixture');
 
 -- Reproduce the original breach with a real authenticated call first.
 SET LOCAL ROLE authenticated;

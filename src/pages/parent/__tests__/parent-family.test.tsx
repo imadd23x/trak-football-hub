@@ -179,6 +179,37 @@ describe('parent family navigation', () => {
   })
 })
 
+// J7 (TRAK-10): a parent open is the child's latest assessment on screen.
+describe('J7 parent open', () => {
+  const views = async () => {
+    const { trackEvent } = await import('@/lib/telemetry')
+    return vi.mocked(trackEvent).mock.calls.filter(([type]) => type === 'assessment_viewed').map(([, meta]) => meta)
+  }
+  beforeEach(async () => { const { trackEvent } = await import('@/lib/telemetry'); vi.mocked(trackEvent).mockClear() })
+
+  it('records the shown assessment once, and the sibling\'s when the parent switches child', async () => {
+    renderFamily()
+    expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
+    await waitFor(async () => expect(await views()).toEqual([{ assessment_id: 'assessment-Alex' }]))
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Following' }), 'Zara')
+    expect(await screen.findByText('Zara opposition')).toBeInTheDocument()
+    await waitFor(async () => expect(await views()).toEqual([{ assessment_id: 'assessment-Alex' }, { assessment_id: 'assessment-Zara' }]))
+  })
+
+  it('records nothing when the assessment failed to load or there is none', async () => {
+    server.use(http.get(endpoint('coach_assessments'), fail))
+    const failed = renderFamily()
+    expect(await screen.findByRole('button', { name: /retry|try again/i })).toBeInTheDocument()
+    expect(await views()).toEqual([])
+    failed.unmount()
+
+    server.use(http.get(endpoint('coach_assessments'), () => HttpResponse.json([])))
+    renderFamily()
+    expect(await screen.findByText('No coach assessments yet.')).toBeInTheDocument()
+    expect(await views()).toEqual([])
+  })
+})
+
 describe('parent loading, empty and error states', () => {
   it('shows loading until links resolve, then a genuine empty family', async () => {
     let release!: () => void

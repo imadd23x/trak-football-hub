@@ -5,11 +5,13 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, MetadataLabel, CategoryBar, BandPill, LoadError} from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
 import { BANDS } from '@/lib/types'
+import { openable } from '@/lib/openable'
 import { ChevronLeft, Trophy } from 'lucide-react'
 
 function avgScore(a: any) {
   return (a.work_rate + a.tactical + a.attitude + a.technical + a.physical + a.coachability) / 6
 }
+
 
 export default function CoachPlayerProfilePage() {
   const { id } = useParams()
@@ -18,6 +20,9 @@ export default function CoachPlayerProfilePage() {
   const [player, setPlayer] = useState<any>(null)
   const [assessments, setAssessments] = useState<any[]>([])
   const [notesById, setNotesById] = useState<Record<string, string>>({})
+  // Whether each assessment's message reached the player. Undefined when the
+  // read failed: then the page says nothing rather than "No message".
+  const [messageSentById, setMessageSentById] = useState<Record<string, boolean> | undefined>({})
   /* Four states, not one.
      `if (!player) return <spinner>` conflated every pre-data condition into a
      spinner that never stops: a failed read set `player` to null and the coach
@@ -46,7 +51,7 @@ export default function CoachPlayerProfilePage() {
      way — a shared state field here is a bug that hides itself. */
   const loadAssessments = useCallback(async () => {
     if (!id || !user) return
-    const { data, error } = await supabase.from('coach_assessments').select('*')
+    const { data, error } = await supabase.from('coach_assessments').select('*, coach_sessions(title, session_date)')
       .eq('squad_player_id', id).eq('coach_user_id', user.id)
       .order('created_at', { ascending: false })
     if (error) { setAssessmentsFailed(true); return }
@@ -54,12 +59,17 @@ export default function CoachPlayerProfilePage() {
     const list = data || []
     setAssessments(list)
     if (list.length) {
-      const { data: notes } = await supabase.from('coach_assessment_notes')
-        .select('assessment_id, note')
-        .in('assessment_id', list.map((a: any) => a.id))
+      const ids = list.map((a: any) => a.id)
+      const [{ data: notes }, shared] = await Promise.all([
+        supabase.from('coach_assessment_notes').select('assessment_id, note').in('assessment_id', ids),
+        supabase.from('coach_shared_feedback' as any).select('assessment_id, published_at').in('assessment_id', ids),
+      ])
       const map: Record<string, string> = {}
       notes?.forEach((n: any) => { map[n.assessment_id] = n.note })
       setNotesById(map)
+      if (shared.error) setMessageSentById(undefined)
+      else setMessageSentById(Object.fromEntries(ids.map((assessmentId: string) =>
+        [assessmentId, ((shared.data ?? []) as any[]).some(f => f.assessment_id === assessmentId && f.published_at != null)])))
     }
   }, [id, user])
 
@@ -103,6 +113,13 @@ export default function CoachPlayerProfilePage() {
   )
 
   const latest = assessments[0]
+  const openAssessment = (assessmentId: string) => navigate(`/coach/assess?assessment=${assessmentId}`)
+  const shortDate = (a: any) => new Date(a.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  const messageTag = (a: any) => messageSentById === undefined ? null : (
+    <span className="text-[9px] text-white/40" style={{ fontFamily: "'DM Mono', monospace" }}>
+      {messageSentById[a.id] ? 'Message sent' : 'No message'}
+    </span>
+  )
   const initials = player.player_name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
 
   return (
@@ -162,8 +179,10 @@ export default function CoachPlayerProfilePage() {
 
         {/* Latest assessment */}
         {latest && (
-          <div className="rounded-[18px] p-4"
-            style={{ background: '#101012', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="rounded-[18px] p-4 cursor-pointer active:scale-[0.99] transition-transform"
+            style={{ background: '#101012', border: '1px solid rgba(255,255,255,0.07)' }}
+            {...openable(`Open latest assessment, ${shortDate(latest)}${latest.coach_sessions?.title ? `, ${latest.coach_sessions.title}` : ''}`,
+              () => openAssessment(latest.id))}>
             <div className="flex items-center justify-between mb-3">
               <MetadataLabel text="LATEST ASSESSMENT" />
               <div className="flex items-center gap-2">
@@ -183,9 +202,16 @@ export default function CoachPlayerProfilePage() {
               <CategoryBar label="Attitude"     score={latest.attitude}     />
               <CategoryBar label="Tactical"     score={latest.tactical}     />
             </div>
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-[11px] text-white/45">{latest.coach_sessions?.title ?? 'No session recorded'}</span>
+              {messageTag(latest)}
+            </div>
             {notesById[latest.id] && (
-              <p className="text-[11px] text-white/45 mt-3 italic"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}>"{notesById[latest.id]}"</p>
+              <div className="mt-3">
+                <MetadataLabel text="PRIVATE NOTE · ONLY YOU" />
+                <p className="text-[11px] text-white/45 mt-1 italic"
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>"{notesById[latest.id]}"</p>
+              </div>
             )}
           </div>
         )}
@@ -198,18 +224,24 @@ export default function CoachPlayerProfilePage() {
               const band = scoreToBand(avgScore(a))
               const bandColor = BANDS.find(b => b.word.toLowerCase() === band)?.color
               return (
-                <div key={a.id} className="flex items-center justify-between rounded-[12px] px-4 py-3"
-                  style={{ background: '#101012', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div key={a.id} className="flex items-center justify-between rounded-[12px] px-4 py-3 cursor-pointer active:scale-[0.99] transition-transform"
+                  style={{ background: '#101012', border: '1px solid rgba(255,255,255,0.07)' }}
+                  {...openable(`Open assessment from ${new Date(a.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })}${a.coach_sessions?.title ? `, ${a.coach_sessions.title}` : ''}`,
+                    () => openAssessment(a.id))}>
                   <div>
                     <p className="text-[12px] text-white/60"
                       style={{ fontFamily: "'DM Mono', monospace" }}>
                       {new Date(a.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })}
                     </p>
+                    {a.coach_sessions?.title && (
+                      <p className="text-[11px] text-white/55 mt-0.5">{a.coach_sessions.title}</p>
+                    )}
                     {a.appearance && (
                       <p className="text-[10px] text-white/35 mt-0.5 capitalize">{a.appearance}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    {messageTag(a)}
                     <span className="text-[11px] font-medium" style={{ color: bandColor }}>
                       {avgScore(a).toFixed(1)}
                     </span>

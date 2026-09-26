@@ -8,6 +8,9 @@
 -- take attendance, and log a match through log_match_for_player. A child could
 -- also write match rows about themselves, although player logging is cut.
 --
+-- recognition_awards is not handled here: awards are parked (TRAK-47, #134
+-- 20260924000002), so app roles can't write them at all.
+--
 -- Each policy below is recreated with its existing clauses plus the consent
 -- predicate, through the RLS bridge trak_private.squad_player_consent_required
 -- (20260921182442). Consent is enforced by policies, so account deletion and
@@ -169,16 +172,6 @@ CREATE POLICY "Coaches can update attendance for own sessions"
     AND NOT trak_private.squad_player_consent_required(squad_player_id)
   );
 
--- ── recognition_awards: editing needs consent, as creating already does ─────
-DROP POLICY IF EXISTS "Coaches can update own awards" ON public.recognition_awards;
-CREATE POLICY "Coaches can update own awards"
-  ON public.recognition_awards FOR UPDATE TO authenticated
-  USING (coach_user_id = auth.uid() AND public.is_coach() AND public.squad_player_is_mine(squad_player_id))
-  WITH CHECK (
-    coach_user_id = auth.uid() AND public.is_coach() AND public.squad_player_is_mine(squad_player_id)
-    AND NOT trak_private.squad_player_consent_required(squad_player_id)
-  );
-
 -- ── matches: player logging is cut (MVP Requirements), so its writes close ──
 -- The coach logs through log_match_for_player. No app screen writes matches as
 -- a player; DevSetupPage (local development only) did.
@@ -321,10 +314,6 @@ DROP TRIGGER IF EXISTS trg_keep_development_subject ON public.coach_shared_feedb
 CREATE TRIGGER trg_keep_development_subject AFTER UPDATE ON public.coach_shared_feedback
   FOR EACH ROW EXECUTE FUNCTION trak_private.reject_development_subject_reassignment('assessment_id');
 
-DROP TRIGGER IF EXISTS trg_keep_development_subject ON public.recognition_awards;
-CREATE TRIGGER trg_keep_development_subject AFTER UPDATE ON public.recognition_awards
-  FOR EACH ROW EXECUTE FUNCTION trak_private.reject_development_subject_reassignment('squad_player_id');
-
 DROP TRIGGER IF EXISTS trg_keep_development_subject ON public.session_attendance;
 CREATE TRIGGER trg_keep_development_subject AFTER UPDATE ON public.session_attendance
   FOR EACH ROW EXECUTE FUNCTION trak_private.reject_development_subject_reassignment('squad_player_id');
@@ -342,8 +331,7 @@ BEGIN
     ('coach_shared_feedback',  'Coaches insert own shared feedback'),
     ('coach_shared_feedback',  'Coaches update own shared feedback'),
     ('session_attendance',     'Coaches can insert attendance for own sessions'),
-    ('session_attendance',     'Coaches can update attendance for own sessions'),
-    ('recognition_awards',     'Coaches can update own awards')
+    ('session_attendance',     'Coaches can update attendance for own sessions')
   ) AS t(tbl, pol)
   LOOP
     IF NOT EXISTS (

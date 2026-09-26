@@ -256,19 +256,15 @@ function CoachAssessmentForm() {
   }, [playerId])
 
   /* --- save ---
-     J5: "Nothing reaches the family until the coach presses publish."
-       save      — sliders, note and message as a draft. A published message
-                   stays published only if its text is unchanged; edited text
-                   is withdrawn until it is published again.
-       publish   — the same, and the message goes to the player and parents.
+     TRAK-64 (Imad, 25 Sep): one button. Saving stores the sliders and the
+     private note and sends the message to the player; an edited message is
+     sent again, and an emptied box takes a published one back.
      Unpublish is not a save: see handleUnpublish below. */
-  const handleSave = async (action: 'save' | 'publish' = 'save') => {
+  const handleSave = async () => {
     if (!user || !playerId || saving || !formReady || consentWait || saveRequest.current) return
-    if (action === 'publish' && !message) return
-    const sharedPublishedNext = action === 'publish' ? true : liveUnchanged
     // Rewriting an unchanged, still-published message would re-stamp it and
-    // mark it "new" for the family again. Leave it alone.
-    const writeShared = (message.length > 0 || sharedExists) && !(action === 'save' && liveUnchanged)
+    // mark it "new" for the player again. Leave it alone.
+    const writeShared = (message.length > 0 || sharedExists) && !liveUnchanged
     const controller = new AbortController()
     saveRequest.current = controller
     const isCurrent = () => !controller.signal.aborted && currentScope.current === scope
@@ -369,7 +365,7 @@ function CoachAssessmentForm() {
           coach_user_id: user.id,
           body:          message,
           // NULL retracts: the child stops seeing it immediately.
-          published_at:  sharedPublishedNext && message ? new Date().toISOString() : null,
+          published_at:  message ? new Date().toISOString() : null,
         }, { onConflict: 'assessment_id' }).abortSignal(controller.signal)
         if (!isCurrent()) return
         if (sharedError) {
@@ -390,16 +386,10 @@ function CoachAssessmentForm() {
           return
         }
         setSharedExists(true)
-        setSharedPublished(sharedPublishedNext && message.length > 0)
-        setPublishedBody(sharedPublishedNext && message ? message : null)
+        setSharedPublished(message.length > 0)
+        setPublishedBody(message || null)
       }
-      if (action === 'publish') {
-        toast.success(`Published. ${firstName} can read your message now.`)
-      } else if (message && !sharedPublishedNext) {
-        toast.success(`Assessment saved. Your message to ${firstName} has not been sent.`)
-      } else {
-        toast.success('Assessment saved.')
-      }
+      toast.success(writeShared && message ? `Saved. ${firstName} can read your message now.` : 'Assessment saved.')
       trackEvent('assessment_submitted', {
         mode: 'full',
         players: 1,
@@ -673,12 +663,12 @@ function CoachAssessmentForm() {
           />
           <p role="status" className="text-[10px] text-white/40" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             {liveUnchanged
-              ? 'Published. They can read it now.'
+              ? `Published. ${firstName} can read it now.`
               : sharedPublished
-                ? 'Edited since you published it. Publish again to send the new version.'
+                ? `Edited. Saving sends ${firstName} the new version.`
                 : message
-                  ? 'Not sent. Nothing reaches them until you press Publish.'
-                  : 'Optional. Nothing reaches them until you press Publish.'}
+                  ? `Not sent yet. Saving sends it to ${firstName}.`
+                  : 'Optional.'}
           </p>
         </div>
 
@@ -713,25 +703,13 @@ function CoachAssessmentForm() {
 
         {/* ---- 9. actions ---- */}
         <div className="space-y-2">
-          {message && !liveUnchanged ? (
-            <button
-              type="button"
-              onClick={() => handleSave('publish')}
-              disabled={!playerId || saving || !formReady || consentWait}
-              className="w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity"
-            >
-              {saving ? 'Saving...' : `Publish to ${firstName}`}
-            </button>
-          ) : null}
           <button
             type="button"
-            onClick={() => handleSave('save')}
+            onClick={() => void handleSave()}
             disabled={!playerId || saving || !formReady || consentWait}
-            className={message && !liveUnchanged
-              ? 'w-full py-3 rounded-[10px] bg-white/[0.04] border border-white/[0.09] text-white/70 font-semibold text-sm disabled:opacity-40 transition-opacity'
-              : 'w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity'}
+            className="w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity"
           >
-            {saving ? 'Saving...' : message && !liveUnchanged ? 'Save Assessment (message not sent)' : 'Save Assessment \u2192'}
+            {saving ? 'Saving...' : 'Save Assessment \u2192'}
           </button>
         </div>
         </fieldset>

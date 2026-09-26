@@ -161,7 +161,7 @@ $test$;
 
 SELECT pg_temp.ce_as(pg_temp.ce(10), 'coach@consent-every-write.test');
 DO $test$
-DECLARE v_sp uuid := current_setting('trak.ce_sp')::uuid; v_a1 uuid; v_a2 uuid; v_s1 uuid; v_award uuid;
+DECLARE v_sp uuid := current_setting('trak.ce_sp')::uuid; v_a1 uuid; v_a2 uuid; v_s1 uuid;
 BEGIN
   PERFORM pg_temp.ce_assert(public.coach_squad_player_consent_required(v_sp) IS FALSE,
     '1 setup: the parent''s approval is active');
@@ -175,15 +175,12 @@ BEGIN
   INSERT INTO public.coach_sessions (coach_user_id, session_type, title, session_date)
   VALUES (pg_temp.ce(10), 'training', 'Tuesday training', current_date) RETURNING id INTO v_s1;
   INSERT INTO public.session_attendance (session_id, squad_player_id, status) VALUES (v_s1, v_sp, 'present');
-  INSERT INTO public.recognition_awards (coach_user_id, squad_player_id, award_type)
-  VALUES (pg_temp.ce(10), v_sp, 'player_of_week') RETURNING id INTO v_award;
   PERFORM public.log_match_for_player(pg_temp.ce(20), 'Rivals FC', 2, 1, 'League', 'Home',
     'Defender', 'U16', 60, 0, 1, NULL, NULL, NULL, 6.5, current_date);
   PERFORM set_config('trak.ce_a1', v_a1::text, true);
   PERFORM set_config('trak.ce_a2', v_a2::text, true);
   PERFORM set_config('trak.ce_s1', v_s1::text, true);
-  PERFORM set_config('trak.ce_award', v_award::text, true);
-  PERFORM pg_temp.ce_assert(true, '1 with consent the coach assesses, notes, publishes, takes attendance, awards and logs a match');
+  PERFORM pg_temp.ce_assert(true, '1 with consent the coach assesses, notes, publishes, takes attendance and logs a match');
 END;
 $test$;
 SELECT pg_temp.ce_allowed(format('UPDATE public.coach_assessments SET work_rate = 8 WHERE id = %L', current_setting('trak.ce_a1')), 1,
@@ -215,8 +212,6 @@ SELECT pg_temp.ce_refused(format('INSERT INTO public.session_attendance (session
   '3 G1 the coach cannot record attendance after withdrawal');
 SELECT pg_temp.ce_refused(format('UPDATE public.session_attendance SET status = %L WHERE session_id = %L', 'absent', current_setting('trak.ce_s1')),
   '3 G1 the coach cannot change attendance after withdrawal');
-SELECT pg_temp.ce_refused(format('UPDATE public.recognition_awards SET awarded_for = %L WHERE id = %L', 'edited', current_setting('trak.ce_award')),
-  '3 G1 the coach cannot edit an award after withdrawal');
 SELECT pg_temp.ce_refused(format($$SELECT public.log_match_for_player(%L, 'Rivals FC', 1, 1, 'League', 'Away', 'Defender', 'U16', 45, 0, 0, NULL, NULL, NULL, 6.0, current_date)$$,
   pg_temp.ce(20)),
   '3 G1 log_match_for_player refuses a child without consent');
@@ -279,9 +274,6 @@ SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_assessments SET squ
 SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_assessment_notes SET assessment_id = %L, note = %L WHERE assessment_id = %L',
   current_setting('trak.ce_adult_a'), 'Moved after withdrawal', current_setting('trak.ce_a1')),
   'REVIEW G6 a withdrawn private note cannot be moved and edited through a consent-ready assessment');
-SELECT pg_temp.ce_review_refused(format('UPDATE public.recognition_awards SET squad_player_id = %L, awarded_for = %L WHERE id = %L',
-  current_setting('trak.ce_adult_sp'), 'Moved after withdrawal', current_setting('trak.ce_award')),
-  'REVIEW G6 a withdrawn award cannot be moved and edited through a consent-ready roster row');
 SELECT pg_temp.ce_review_refused(format('UPDATE public.session_attendance SET squad_player_id = %L, status = %L WHERE session_id = %L AND squad_player_id = %L',
   current_setting('trak.ce_adult_sp'), 'late', current_setting('trak.ce_s1'), current_setting('trak.ce_sp')),
   'REVIEW G6 withdrawn attendance cannot be moved and edited through a consent-ready roster row');
@@ -407,7 +399,6 @@ SELECT pg_temp.ce_as(pg_temp.ce(10), 'coach@consent-every-write.test');
 SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_assessments SET work_rate=9 WHERE id=%L', current_setting('trak.ce_a1')), 'CANDIDATE active-consent assessment edit');
 SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_assessment_notes SET note=%L WHERE assessment_id=%L', 'ordinary edit', current_setting('trak.ce_a1')), 'CANDIDATE active-consent note edit');
 SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_shared_feedback SET body=%L WHERE assessment_id=%L', 'ordinary edit', current_setting('trak.ce_a1')), 'CANDIDATE active-consent feedback edit');
-SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.recognition_awards SET awarded_for=%L WHERE id=%L', 'ordinary edit', current_setting('trak.ce_award')), 'CANDIDATE active-consent award edit');
 SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.session_attendance SET status=%L WHERE session_id=%L AND squad_player_id=%L', 'late', current_setting('trak.ce_s1'), current_setting('trak.ce_sp')), 'CANDIDATE active-consent attendance edit');
 SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_shared_feedback SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_a2'), current_setting('trak.ce_a1')), 'CANDIDATE feedback cannot be attached to a different assessment of the same child');
 SELECT pg_temp.ce_review_refused(format('UPDATE public.coach_assessment_notes SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_a2'), current_setting('trak.ce_a1')), 'CANDIDATE note cannot be attached to a different assessment of the same child');
@@ -423,7 +414,6 @@ SET LOCAL ROLE service_role;
 SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_assessments SET squad_player_id=%L WHERE id=%L', current_setting('trak.ce_adult_sp'), current_setting('trak.ce_a1')), 'CANDIDATE privileged assessment maintenance');
 SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_assessment_notes SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_adult_a'), current_setting('trak.ce_a1')), 'CANDIDATE privileged note maintenance');
 SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.coach_shared_feedback SET assessment_id=%L WHERE assessment_id=%L', current_setting('trak.ce_adult_a'), current_setting('trak.ce_a1')), 'CANDIDATE privileged feedback maintenance');
-SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.recognition_awards SET squad_player_id=%L WHERE id=%L', current_setting('trak.ce_adult_sp'), current_setting('trak.ce_award')), 'CANDIDATE privileged award maintenance');
 SELECT pg_temp.ce_allowed_rollback(format('UPDATE public.session_attendance SET squad_player_id=%L WHERE session_id=%L AND squad_player_id=%L', current_setting('trak.ce_adult_sp'), current_setting('trak.ce_s1'), current_setting('trak.ce_sp')), 'CANDIDATE privileged attendance maintenance');
 
 RESET ROLE;
@@ -447,8 +437,8 @@ DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.ce_results;
-  IF total <> 52 THEN
-    RAISE EXCEPTION 'Consent on every write: % assertions ran; expected exactly 52', total;
+  IF total <> 48 THEN
+    RAISE EXCEPTION 'Consent on every write: % assertions ran; expected exactly 48', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'Consent on every write: % of % failed: %', failed, total,

@@ -131,9 +131,11 @@ refuses all of it. The operator creates staff, one person at a time:
    they first sign in. A coach's `invite_code` is what their players type to link.
 
 **Moving a coach** to another academy: run the coach call again with the new
-academy. **Removing** one: the academy admin does it from *Coaches*, or run
-`UPDATE public.coach_details SET organization_id = NULL WHERE user_id = …` as the
-operator. Never hand out service credentials to do any of this from a client.
+academy. **Removing** one: run
+`UPDATE public.coach_details SET organization_id = NULL WHERE user_id = …` in the
+same editor. The academy screens are "Coming soon" for the pilot (TRAK-43), so an
+admin can't do it in the app. Never hand out service credentials to do any of this
+from a client.
 
 ## Rehearsal data
 

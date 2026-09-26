@@ -332,12 +332,14 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   await page.getByRole('combobox').selectOption(zaraId);
 
   await page.getByRole('button', { name: 'Alerts', exact: true }).click();
-  await expect(page.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
-  await expect(page.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
-  await page.getByRole('combobox').selectOption(alexId);
-  await expect(page.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Coming soon' })).toBeVisible();
+  await expect(page.getByRole('combobox')).toHaveCount(0);
   await expect(page.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toHaveCount(0);
-  await page.getByRole('combobox').selectOption(zaraId);
+  await expect(page.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Back to home' }).click();
+  await expect(page.getByRole('combobox')).toHaveValue(zaraId);
+  await expect(page.getByText(zara.opponent, { exact: true })).toBeVisible();
+  await expect(page.getByText(alex.opponent, { exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Profile', exact: true }).click();
   await expect(page.getByText(`Following ${zara.name} · 2 children linked`, { exact: true })).toBeVisible();

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
@@ -9,6 +9,7 @@ import { scoreToBand } from '@/lib/rating-engine'
 import { BANDS } from '@/lib/types'
 import type { BandType } from '@/lib/types'
 import { deriveCardStats } from '@/lib/cardStats'
+import { localTodayISO } from '@/lib/event-time'
 import { trackEvent, startTimer } from '@/lib/telemetry'
 import { ChevronLeft, ChevronDown } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
@@ -101,12 +102,13 @@ function CoachAssessmentForm() {
   const [saving, setSaving] = useState(false)
   const [noteExists, setNoteExists] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
-  const scope = JSON.stringify([userId, playerId])
+  const scope = JSON.stringify([userId, playerId, sessionId])
   const currentScope = useRef(scope)
   currentScope.current = scope
   const [loadState, setLoadState] = useState<{ scope: string; status: 'loading' | 'ready' | 'error' }>({ scope: '', status: 'loading' })
   const formReady = loadState.scope === scope && loadState.status === 'ready'
     && !choicesLoading && !choicesError && players.some(player => player.id === playerId)
+    && sessions.some(session => session.id === sessionId)
   const saveRequest = useRef<AbortController | null>(null)
   useEffect(() => () => { saveRequest.current?.abort() }, [scope])
 
@@ -118,11 +120,10 @@ function CoachAssessmentForm() {
     timerRef.current = playerId ? startTimer() : null
   }, [playerId])
 
-  /* Today's existing assessment for the selected player, if any.
-     The page only ever INSERTed, so a coach who saved and then came back to
-     add a note created a SECOND assessment — with every slider at its default
-     5, which reads as a real "Mixed" verdict. Same bad-data trap the quick
-     assess fix closed. Now the day's assessment is loaded and updated. */
+  /* The existing assessment for this player in this session, if any (TRAK-68).
+     One assessment per player per session: coming back to add a note edits it,
+     and a second session the same day gets its own assessment. Keying on the
+     day instead silently moved the first one to the second match. */
   const [existingId, setExistingId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -133,19 +134,18 @@ function CoachAssessmentForm() {
     setExistingId(null)
     setWorkRate(5); setTactical(5); setAttitude(5)
     setTechnical(5); setPhysical(5); setCoachability(5)
-    setAppearance('started'); setSessionId('')
+    setAppearance('started')
     setNote(''); setNoteExists(false)
     setShared(''); setSharedPublished(false); setSharedExists(false); setPublishedBody(null)
     setSaving(false)
     setLoadState({ scope, status: 'loading' })
-    if (userId && playerId) {
+    if (userId && playerId && sessionId) {
       void (async () => {
         try {
-          const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
           const { data, error } = await supabase.from('coach_assessments')
             .select('id, work_rate, tactical, attitude, technical, physical, coachability, appearance, session_id')
             .eq('coach_user_id', userId).eq('squad_player_id', playerId)
-            .gte('created_at', startOfDay.toISOString())
+            .eq('session_id', sessionId)
             .order('created_at', { ascending: false }).limit(1).abortSignal(controller.signal).maybeSingle()
           if (cancelled) return
           if (error) throw error
@@ -168,7 +168,6 @@ function CoachAssessmentForm() {
             setAttitude(data.attitude); setTechnical(data.technical)
             setPhysical(data.physical); setCoachability(data.coachability)
             setAppearance((data.appearance as 'started' | 'sub' | 'training') ?? 'started')
-            setSessionId(data.session_id ?? '')
             setNote(privateResult.data?.note ?? '')
             setNoteExists(privateResult.data != null)
             setShared(sf?.body ?? '')
@@ -185,7 +184,7 @@ function CoachAssessmentForm() {
       })()
     }
     return () => { cancelled = true; controller.abort() }
-  }, [userId, playerId, scope, loadAttempt])
+  }, [userId, playerId, sessionId, scope, loadAttempt])
 
   /* Account-bound choices: a late response from another coach cannot repopulate them. */
   useEffect(() => {
@@ -203,7 +202,9 @@ function CoachAssessmentForm() {
           const [roster, events] = await Promise.all([
             supabase.from('squad_players').select('*').eq('coach_user_id', userId)
               .order('player_name').abortSignal(controller.signal),
+            // Only sessions that already happened can be assessed (TRAK-68).
             supabase.from('coach_sessions').select('*').eq('coach_user_id', userId)
+              .lte('session_date', localTodayISO())
               .order('session_date', { ascending: false }).limit(20).abortSignal(controller.signal),
           ])
           if (cancelled) return
@@ -232,6 +233,8 @@ function CoachAssessmentForm() {
     [players, playerId],
   )
   const firstName: string = selectedPlayer?.player_name?.trim().split(/\s+/)[0] || 'the player'
+  const selectedSession = sessions.find(s => s.id === sessionId)
+  const sessionLabel = (s: any) => `${s.title || 'Session'}${s.session_date ? ` · ${s.session_date}` : ''}`
   const message = shared.trim()
   // True only while the box holds exactly what the family can already read.
   const liveUnchanged = sharedPublished && publishedBody !== null && message === publishedBody.trim()
@@ -253,19 +256,15 @@ function CoachAssessmentForm() {
   }, [playerId])
 
   /* --- save ---
-     J5: "Nothing reaches the family until the coach presses publish."
-       save      — sliders, note and message as a draft. A published message
-                   stays published only if its text is unchanged; edited text
-                   is withdrawn until it is published again.
-       publish   — the same, and the message goes to the player and parents.
+     TRAK-64 (Imad, 25 Sep): one button. Saving stores the sliders and the
+     private note and sends the message to the player; an edited message is
+     sent again, and an emptied box takes a published one back.
      Unpublish is not a save: see handleUnpublish below. */
-  const handleSave = async (action: 'save' | 'publish' = 'save') => {
+  const handleSave = async () => {
     if (!user || !playerId || saving || !formReady || consentWait || saveRequest.current) return
-    if (action === 'publish' && !message) return
-    const sharedPublishedNext = action === 'publish' ? true : liveUnchanged
     // Rewriting an unchanged, still-published message would re-stamp it and
-    // mark it "new" for the family again. Leave it alone.
-    const writeShared = (message.length > 0 || sharedExists) && !(action === 'save' && liveUnchanged)
+    // mark it "new" for the player again. Leave it alone.
+    const writeShared = (message.length > 0 || sharedExists) && !liveUnchanged
     const controller = new AbortController()
     saveRequest.current = controller
     const isCurrent = () => !controller.signal.aborted && currentScope.current === scope
@@ -276,7 +275,7 @@ function CoachAssessmentForm() {
         coach_user_id: user.id,
         coach_name_snapshot: profile?.full_name || null,
         squad_player_id: playerId,
-        session_id: sessionId || null,
+        session_id: sessionId,
         appearance,
         // raw coach inputs
         work_rate: workRate,
@@ -365,8 +364,8 @@ function CoachAssessmentForm() {
           assessment_id: saved.id,
           coach_user_id: user.id,
           body:          message,
-          // NULL retracts: the child and their parents stop seeing it immediately.
-          published_at:  sharedPublishedNext && message ? new Date().toISOString() : null,
+          // NULL retracts: the child stops seeing it immediately.
+          published_at:  message ? new Date().toISOString() : null,
         }, { onConflict: 'assessment_id' }).abortSignal(controller.signal)
         if (!isCurrent()) return
         if (sharedError) {
@@ -387,16 +386,10 @@ function CoachAssessmentForm() {
           return
         }
         setSharedExists(true)
-        setSharedPublished(sharedPublishedNext && message.length > 0)
-        setPublishedBody(sharedPublishedNext && message ? message : null)
+        setSharedPublished(message.length > 0)
+        setPublishedBody(message || null)
       }
-      if (action === 'publish') {
-        toast.success(`Published. ${firstName} and their parents can read your message now.`)
-      } else if (message && !sharedPublishedNext) {
-        toast.success(`Assessment saved. Your message to ${firstName} has not been sent.`)
-      } else {
-        toast.success('Assessment saved.')
-      }
+      toast.success(writeShared && message ? `Saved. ${firstName} can read your message now.` : 'Assessment saved.')
       trackEvent('assessment_submitted', {
         mode: 'full',
         players: 1,
@@ -438,7 +431,7 @@ function CoachAssessmentForm() {
       if (!isCurrent()) return
       if (error) {
         console.error('Unpublish failed:', error)
-        toast.error(`Not unpublished (${error.message}). ${firstName} and their parents can still see the message. Try again.`, { duration: 12000 })
+        toast.error(`Not unpublished (${error.message}). ${firstName} can still see the message. Try again.`, { duration: 12000 })
         return
       }
       // No row back means nothing changed: the message may have been removed,
@@ -450,7 +443,7 @@ function CoachAssessmentForm() {
       }
       setSharedPublished(false)
       setPublishedBody(null)
-      toast.success(`Unpublished. ${firstName} and their parents can no longer see the message.`)
+      toast.success(`Unpublished. ${firstName} can no longer see the message.`)
     } catch (error) {
       if (isCurrent()) {
         console.error('Unpublish interrupted:', error)
@@ -542,7 +535,43 @@ function CoachAssessmentForm() {
           </div>
         </div>
 
-        {((playerId && !formReady) || choicesError) && (
+        {/* ---- 3. session selector (required, TRAK-68) ----
+            Outside the locked fieldset: the form stays locked until a session
+            is chosen, so the coach must be able to choose one. */}
+        <div className="space-y-1.5">
+          <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
+            SESSION
+          </span>
+          {!choicesLoading && !choicesError && sessions.length === 0 ? (
+            <p role="status" className="text-[12px] text-white/55">
+              No past sessions yet. Log the session first, then assess it.{' '}
+              <Link to="/coach/sessions" className="underline text-[#C8F25A]">Log a session</Link>
+            </p>
+          ) : (
+            <div className="relative">
+              <select
+                aria-label="Session"
+                disabled={saving || choicesLoading}
+                value={sessionId}
+                onChange={e => setSessionId(e.target.value)}
+                className="w-full px-4 py-3 pr-10 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none appearance-none"
+              >
+                <option value="" disabled>Select session...</option>
+                {sessions.map(s => (
+                  <option key={s.id} value={s.id}>{sessionLabel(s)}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+            </div>
+          )}
+          {existingId && formReady && selectedSession ? (
+            <p role="status" className="text-[11px] text-white/55">
+              Editing your assessment for {sessionLabel(selectedSession)}
+            </p>
+          ) : null}
+        </div>
+
+        {((playerId && sessionId && !formReady) || choicesError) && (
           (choicesError || (loadState.scope === scope && loadState.status === 'error')) ? (
             <div role="alert" className="text-sm text-amber-300">
               Could not load this assessment. Retry before editing or saving.
@@ -554,28 +583,6 @@ function CoachAssessmentForm() {
             withdrawn mid-edit, the refused save sets consentWait: the form
             locks, and everything the coach entered stays in state. */}
         <fieldset disabled={!formReady || saving || consentWait} className="contents">
-        {/* ---- 3. session selector ---- */}
-        <div className="space-y-1.5">
-          <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
-            SESSION <span className="text-white/25">— OPTIONAL</span>
-          </span>
-          <div className="relative">
-            <select
-              value={sessionId}
-              onChange={e => setSessionId(e.target.value)}
-              className="w-full px-4 py-3 pr-10 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none appearance-none"
-            >
-              <option value="">{sessions.length ? 'No session' : 'No sessions yet — leave blank'}</option>
-              {sessions.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.title || s.session_date || s.id}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-          </div>
-        </div>
-
         {/* ---- 4. appearance selector ---- */}
         <div className="space-y-1.5">
           <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
@@ -628,9 +635,9 @@ function CoachAssessmentForm() {
 
         {/* ---- 7. message to the player (K9, J5) ----
             Two boxes rather than one, because the schema has two tables and the
-            coach needs to see which words the family will read. Nothing copies
-            the private note into here. Parents read published messages too
-            (20260919150000), so the label says so. */}
+            coach needs to see which words the player will read. Nothing copies
+            the private note into here. Parents see the bands only, never this
+            message (TRAK-63, 25 Sep), so the label names the player alone. */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
             <div>
@@ -638,7 +645,7 @@ function CoachAssessmentForm() {
                 Message to {firstName}
               </label>
               <p className="text-[10px] text-white/45 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                They and their parents will see this.
+                Only {firstName} sees this.
               </p>
             </div>
             <span className="text-[10px] text-white/25">{shared.length}/300</span>
@@ -656,12 +663,12 @@ function CoachAssessmentForm() {
           />
           <p role="status" className="text-[10px] text-white/40" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             {liveUnchanged
-              ? 'Published. They can read it now.'
+              ? `Published. ${firstName} can read it now.`
               : sharedPublished
-                ? 'Edited since you published it. Publish again to send the new version.'
+                ? `Edited. Saving sends ${firstName} the new version.`
                 : message
-                  ? 'Not sent. Nothing reaches them until you press Publish.'
-                  : 'Optional. Nothing reaches them until you press Publish.'}
+                  ? `Not sent yet. Saving sends it to ${firstName}.`
+                  : 'Optional.'}
           </p>
         </div>
 
@@ -696,25 +703,13 @@ function CoachAssessmentForm() {
 
         {/* ---- 9. actions ---- */}
         <div className="space-y-2">
-          {message && !liveUnchanged ? (
-            <button
-              type="button"
-              onClick={() => handleSave('publish')}
-              disabled={!playerId || saving || !formReady || consentWait}
-              className="w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity"
-            >
-              {saving ? 'Saving...' : `Publish to ${firstName}`}
-            </button>
-          ) : null}
           <button
             type="button"
-            onClick={() => handleSave('save')}
+            onClick={() => void handleSave()}
             disabled={!playerId || saving || !formReady || consentWait}
-            className={message && !liveUnchanged
-              ? 'w-full py-3 rounded-[10px] bg-white/[0.04] border border-white/[0.09] text-white/70 font-semibold text-sm disabled:opacity-40 transition-opacity'
-              : 'w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity'}
+            className="w-full py-4 rounded-[10px] bg-[#C8F25A] text-black font-bold text-sm disabled:opacity-40 transition-opacity"
           >
-            {saving ? 'Saving...' : message && !liveUnchanged ? 'Save Assessment (message not sent)' : 'Save Assessment \u2192'}
+            {saving ? 'Saving...' : 'Save Assessment \u2192'}
           </button>
         </div>
         </fieldset>

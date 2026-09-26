@@ -473,8 +473,10 @@ SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_shared_feedback 
 SELECT pg_temp.pc_expect_denied('SELECT published_text FROM public.player_feedback',
   'D3 player: active consent does not expose retained deferred feedback');
 SELECT pg_temp.pc_as('authenticated', 5);
-SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
-  'D3 parent: published shared feedback remains readable');
+SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_assessments WHERE id = pg_temp.pc_id(401)),
+  'D3 parent control: the parent reads the consented assessment (the bands)');
+SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
+  'D3 parent (TRAK-15): published coach messages are not readable by the parent');
 SELECT pg_temp.pc_as('authenticated', 8);
 SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
   'D3 unrelated player: manual feedback does not disclose the target');
@@ -484,7 +486,7 @@ SELECT pg_temp.pc_expect_denied('SELECT published_text FROM public.player_feedba
 SELECT pg_temp.pc_as('authenticated', 5);
 SELECT public.withdraw_parental_consent(pg_temp.pc_id(2));
 SELECT pg_temp.pc_assert((SELECT count(*) = 0 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
-  'D4 parent: withdrawal hides shared feedback');
+  'D4 parent: after withdrawal the parent still reads no shared feedback');
 SELECT pg_temp.pc_as('authenticated', 2);
 SELECT pg_temp.pc_assert(public.my_consent_status()->>'required' = 'true',
   'D4 player: scoped status reflects withdrawal');

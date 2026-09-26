@@ -10,7 +10,8 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => auth }))
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('signup password visibility', () => {
-  it.each(['player', 'coach', 'club'])('lets %s reveal each password independently without advancing or submitting', async role => {
+  // Coach and club signup forms are gone: Trak sets up staff (TRAK-12, staff-set-up-by-trak.test.tsx).
+  it.each(['player'])('lets %s reveal each password independently without advancing or submitting', async role => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={[`/onboarding/${role}`]}><Routes>
       <Route path="/onboarding/:role" element={<OnboardingPage />} />

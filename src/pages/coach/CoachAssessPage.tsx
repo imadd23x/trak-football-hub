@@ -78,6 +78,13 @@ function CoachAssessmentForm() {
   const rosterAccount = useRef(userId)
   const [playerId, setPlayerId] = useState((location.state as any)?.preselectedPlayerId || '')
   const [sessionId, setSessionId] = useState('')
+  /* TRAK-69: /coach/assess?assessment=<id> opens that exact saved row. It is
+     resolved to its player and session, and loaded by id while that pair stays
+     selected, so a row from before sessions were required, or one whose session
+     is older than the picker's list, still opens and saves in place. */
+  const openId = new URLSearchParams(location.search).get('assessment')
+  const [opened, setOpened] = useState<{ id: string; playerId: string; sessionId: string; createdAt: string; session: any | null } | null>(null)
+  const [openState, setOpenState] = useState<'idle' | 'loading' | 'missing' | 'error'>(openId ? 'loading' : 'idle')
   const [appearance, setAppearance] = useState<'started' | 'sub' | 'training'>('started')
   const [workRate, setWorkRate]         = useState(5)
   const [tactical, setTactical]         = useState(5)
@@ -102,13 +109,16 @@ function CoachAssessmentForm() {
   const [saving, setSaving] = useState(false)
   const [noteExists, setNoteExists] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
-  const scope = JSON.stringify([userId, playerId, sessionId])
+  const byId = opened !== null && opened.playerId === playerId && opened.sessionId === sessionId
+  const sessionOptions = useMemo(() => opened?.session && !sessions.some(s => s.id === opened.session.id)
+    ? [...sessions, opened.session] : sessions, [sessions, opened])
+  const scope = JSON.stringify([userId, playerId, sessionId, byId ? opened?.id : null])
   const currentScope = useRef(scope)
   currentScope.current = scope
   const [loadState, setLoadState] = useState<{ scope: string; status: 'loading' | 'ready' | 'error' }>({ scope: '', status: 'loading' })
   const formReady = loadState.scope === scope && loadState.status === 'ready'
     && !choicesLoading && !choicesError && players.some(player => player.id === playerId)
-    && sessions.some(session => session.id === sessionId)
+    && (sessionOptions.some(session => session.id === sessionId) || (byId && sessionId === ''))
   const saveRequest = useRef<AbortController | null>(null)
   useEffect(() => () => { saveRequest.current?.abort() }, [scope])
 
@@ -125,6 +135,31 @@ function CoachAssessmentForm() {
      and a second session the same day gets its own assessment. Keying on the
      day instead silently moved the first one to the second match. */
   const [existingId, setExistingId] = useState<string | null>(null)
+  const openedRowId = byId ? opened?.id ?? null : null
+
+  // Resolve ?assessment=<id> to its player and session. Owner-scoped: another
+  // coach's id resolves to nothing, and the form stays blank.
+  useEffect(() => {
+    if (!userId || !openId) return
+    let cancelled = false
+    const controller = new AbortController()
+    setOpenState('loading')
+    void (async () => {
+      const { data, error } = await supabase.from('coach_assessments')
+        .select('id, squad_player_id, session_id, created_at, coach_sessions(id, title, session_date)')
+        .eq('id', openId).eq('coach_user_id', userId).abortSignal(controller.signal).maybeSingle()
+      if (cancelled) return
+      if (error) { console.error('Opening the assessment failed:', error); setOpenState('error'); return }
+      if (!data) { setOpenState('missing'); return }
+      const row = data as any
+      setOpened({ id: row.id, playerId: row.squad_player_id, sessionId: row.session_id ?? '',
+        createdAt: row.created_at, session: row.coach_sessions ?? null })
+      setPlayerId(row.squad_player_id)
+      setSessionId(row.session_id ?? '')
+      setOpenState('idle')
+    })()
+    return () => { cancelled = true; controller.abort() }
+  }, [userId, openId, loadAttempt])
 
   useEffect(() => {
     let cancelled = false
@@ -139,13 +174,13 @@ function CoachAssessmentForm() {
     setShared(''); setSharedPublished(false); setSharedExists(false); setPublishedBody(null)
     setSaving(false)
     setLoadState({ scope, status: 'loading' })
-    if (userId && playerId && sessionId) {
+    if (userId && playerId && (sessionId || openedRowId)) {
       void (async () => {
         try {
-          const { data, error } = await supabase.from('coach_assessments')
+          const query = supabase.from('coach_assessments')
             .select('id, work_rate, tactical, attitude, technical, physical, coachability, appearance, session_id')
             .eq('coach_user_id', userId).eq('squad_player_id', playerId)
-            .eq('session_id', sessionId)
+          const { data, error } = await (openedRowId ? query.eq('id', openedRowId) : query.eq('session_id', sessionId))
             .order('created_at', { ascending: false }).limit(1).abortSignal(controller.signal).maybeSingle()
           if (cancelled) return
           if (error) throw error
@@ -184,7 +219,7 @@ function CoachAssessmentForm() {
       })()
     }
     return () => { cancelled = true; controller.abort() }
-  }, [userId, playerId, sessionId, scope, loadAttempt])
+  }, [userId, playerId, sessionId, openedRowId, scope, loadAttempt])
 
   /* Account-bound choices: a late response from another coach cannot repopulate them. */
   useEffect(() => {
@@ -233,7 +268,7 @@ function CoachAssessmentForm() {
     [players, playerId],
   )
   const firstName: string = selectedPlayer?.player_name?.trim().split(/\s+/)[0] || 'the player'
-  const selectedSession = sessions.find(s => s.id === sessionId)
+  const selectedSession = sessionOptions.find(s => s.id === sessionId)
   const sessionLabel = (s: any) => `${s.title || 'Session'}${s.session_date ? ` · ${s.session_date}` : ''}`
   const message = shared.trim()
   // True only while the box holds exactly what the family can already read.
@@ -275,7 +310,8 @@ function CoachAssessmentForm() {
         coach_user_id: user.id,
         coach_name_snapshot: profile?.full_name || null,
         squad_player_id: playerId,
-        session_id: sessionId,
+        // Null only for a row opened by id that predates required sessions.
+        session_id: sessionId || null,
         appearance,
         // raw coach inputs
         work_rate: workRate,
@@ -393,6 +429,8 @@ function CoachAssessmentForm() {
       trackEvent('assessment_submitted', {
         mode: 'full',
         players: 1,
+        // J7 counts distinct assessments per coach, checked against this row.
+        assessment_id: saved.id,
         squad_player_id: playerId,
         band,
         updated: existingId !== null,
@@ -542,7 +580,14 @@ function CoachAssessmentForm() {
           <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
             SESSION
           </span>
-          {!choicesLoading && !choicesError && sessions.length === 0 ? (
+          {openState === 'missing' || openState === 'error' ? (
+            <p role="alert" className="text-[12px] text-amber-300">
+              {openState === 'missing'
+                ? "We couldn't open that assessment. It may have been removed, or it isn't one of yours."
+                : "We couldn't open that assessment. Check your connection and try again."}
+            </p>
+          ) : null}
+          {!choicesLoading && !choicesError && sessionOptions.length === 0 ? (
             <p role="status" className="text-[12px] text-white/55">
               No past sessions yet. Log the session first, then assess it.{' '}
               <Link to="/coach/sessions" className="underline text-[#C8F25A]">Log a session</Link>
@@ -557,7 +602,7 @@ function CoachAssessmentForm() {
                 className="w-full px-4 py-3 pr-10 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none appearance-none"
               >
                 <option value="" disabled>Select session...</option>
-                {sessions.map(s => (
+                {sessionOptions.map(s => (
                   <option key={s.id} value={s.id}>{sessionLabel(s)}</option>
                 ))}
               </select>
@@ -568,10 +613,14 @@ function CoachAssessmentForm() {
             <p role="status" className="text-[11px] text-white/55">
               Editing your assessment for {sessionLabel(selectedSession)}
             </p>
+          ) : existingId && formReady && openedRowId && opened ? (
+            <p role="status" className="text-[11px] text-white/55">
+              Editing your assessment from {new Date(opened.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} (no session recorded)
+            </p>
           ) : null}
         </div>
 
-        {((playerId && sessionId && !formReady) || choicesError) && (
+        {((playerId && (sessionId || openedRowId) && !formReady) || choicesError) && (
           (choicesError || (loadState.scope === scope && loadState.status === 'error')) ? (
             <div role="alert" className="text-sm text-amber-300">
               Could not load this assessment. Retry before editing or saving.

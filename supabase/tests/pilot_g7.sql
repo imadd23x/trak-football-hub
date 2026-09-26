@@ -215,8 +215,10 @@ SELECT pg_temp.g7actor(20);
 SELECT pg_temp.g7assert((SELECT body FROM public.coach_shared_feedback WHERE assessment_id = pg_temp.g7id(300)) = 'Manual coach words',
   'CONTROL coach can publish manual words and player can read them');
 SELECT pg_temp.g7actor(30);
-SELECT pg_temp.g7assert((SELECT body FROM public.coach_shared_feedback WHERE assessment_id = pg_temp.g7id(300)) = 'Manual coach words',
-  'CONTROL linked parent still reads published manual feedback');
+SELECT pg_temp.g7assert((SELECT count(*) FROM public.coach_assessments WHERE id = pg_temp.g7id(300)) = 1,
+  'CONTROL linked parent still reads the assessment (the bands)');
+SELECT pg_temp.g7assert((SELECT count(*) FROM public.coach_shared_feedback WHERE assessment_id = pg_temp.g7id(300)) = 0,
+  'TRAK-15: linked parent does not read the published manual message');
 SELECT pg_temp.g7denied('SELECT generated_text FROM public.ai_feedback_drafts', 'parent cannot read retained AI drafts');
 SELECT pg_temp.g7denied('SELECT published_text FROM public.player_feedback', 'parent cannot read retained AI publications');
 

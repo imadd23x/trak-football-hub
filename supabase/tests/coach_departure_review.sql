@@ -110,8 +110,14 @@ SELECT pg_temp.departure_check(
   'CONTROL', 'current coach can read the session attendance before departure'
 );
 
-SELECT set_config('request.jwt.claims', '{"sub":"90000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
+-- Trusted incident cleanup retains the owning admin identity. Application
+-- departure/transfer assertions below still execute as authenticated users.
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', '{"sub":"90000000-0000-0000-0000-000000000003","role":"service_role"}', true);
 SELECT public.remove_coach_from_org('90000000-0000-0000-0000-000000000001');
+RESET ROLE;
+SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{"sub":"90000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
 
 -- F2: departure must cover archived/released records too, not only active.

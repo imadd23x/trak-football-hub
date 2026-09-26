@@ -62,7 +62,12 @@ await context.route('**/*',async route=>{
  await expect(page.getByText('Alex Opposition',{exact:true})).toBeVisible();
  await page.getByRole('combobox').selectOption(zara);
  await page.getByRole('button',{name:'Alerts',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Coming soon'})).toBeVisible();
+ await expect(page.getByRole('combobox')).toHaveCount(0);
+ await page.getByRole('link',{name:'Back to home'}).click();
  await expect(page.getByRole('combobox')).toHaveValue(zara);
+ await expect(page.getByText('Zara Opposition',{exact:true})).toBeVisible();
+ await expect(page.getByText('Alex Opposition',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Profile',exact:true}).click();
  await expect(page.getByText('Following Zara Example · 2 children linked',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:/Account settings/}).click();

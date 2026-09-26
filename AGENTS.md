@@ -2,6 +2,15 @@
 
 Quick orientation for AI agents and new contributors.
 
+## Pilot work and coordination
+
+Read `MVP Requirements` and your assigned Linear issue before coding. Agents
+work only their human's issues. Use one PR per issue with its `TRAK-#` key and
+J/G (or scope/launch-gate) purpose in the title. Record blockers in Linear.
+Imad posts the current merge queue in #coding-agents-at-work. Follow
+`docs/release/merge-gate.md`.
+Merged/deployed work enters Verifying; Done requires Makis's FINAL OK.
+
 ## Tech Stack
 
 | Layer | Technology |

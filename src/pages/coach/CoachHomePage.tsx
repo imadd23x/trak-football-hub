@@ -11,6 +11,7 @@ import { calculateSquadAnalytics, type SquadAnalytics } from '@/lib/squad-analyt
 import { trackEvent } from '@/lib/telemetry'
 import { generateCode } from '@/lib/invite-codes'
 import { openable } from '@/lib/openable'
+import { timeOfDayGreeting } from '@/lib/greeting'
 
 // Derived from BANDS rather than restated. CLAUDE.md says colours never live
 // outside the BANDS config, and this file had a seventh-hand copy of them: the
@@ -145,9 +146,7 @@ export default function CoachHomePage() {
     return () => { cancelled = true }
   }, [user])
 
-  // Greeting based on time of day
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning,' : hour < 18 ? 'Good afternoon,' : 'Good evening,'
+  const greeting = timeOfDayGreeting()
 
   // Squad bands: one chip per band that any player is currently in, in that
   // band's own colour.

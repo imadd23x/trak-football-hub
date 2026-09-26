@@ -228,11 +228,26 @@ BEGIN
                 AND cmd = 'DELETE' AND coalesce(qual, '') IN ('false', '(false)')),
       format('A1c: %s still carries its no-deletion policy (both barriers, not one)', t));
   END LOOP;
-  -- Positive control: the two tables a real journey deletes from keep DELETE.
+  -- Retained attendance keeps DELETE; parked calendar authoring has both
+  -- privilege and restrictive-policy barriers, while its history stays readable.
   FOREACH t IN ARRAY ARRAY['session_attendance', 'coach_calendar_events'] LOOP
-    PERFORM pg_temp.pc_assert(
-      has_table_privilege('authenticated', ('public.' || t)::regclass, 'DELETE'),
-      format('A1c positive control: %s keeps DELETE, a real journey uses it', t));
+    IF t = 'coach_calendar_events' THEN
+      PERFORM pg_temp.pc_assert(
+        NOT has_table_privilege('authenticated', ('public.' || t)::regclass, 'DELETE'),
+        format('A1c parked control: %s no longer grants DELETE', t));
+      PERFORM pg_temp.pc_assert(
+        EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = t
+          AND cmd = 'DELETE' AND permissive = 'RESTRICTIVE'
+          AND coalesce(qual, '') IN ('false', '(false)')),
+        format('A1c parked control: %s retains its restrictive deletion barrier', t));
+      PERFORM pg_temp.pc_assert(
+        has_table_privilege('authenticated', ('public.' || t)::regclass, 'SELECT'),
+        format('A1c parked control: %s keeps historical SELECT', t));
+    ELSE
+      PERFORM pg_temp.pc_assert(
+        has_table_privilege('authenticated', ('public.' || t)::regclass, 'DELETE'),
+        format('A1c positive control: %s keeps DELETE, a real journey uses it', t));
+    END IF;
   END LOOP;
 END;
 $test$;
@@ -416,14 +431,24 @@ SELECT pg_temp.pc_assert((public.my_consent_status()->>'age')::integer > 18,
   'D2 unrelated player: scoped status describes the caller, not the target minor');
 SELECT pg_temp.pc_reset();
 
--- Positive controls cover the active assessment/award/manual-feedback policies.
+-- Positive controls cover active assessment/manual-feedback and retained award reads.
 -- G7 deliberately removes the deferred player_feedback policies and publisher;
 -- retained rows must be inaccessible even while consent is active.
 SELECT pg_temp.pc_as('authenticated', 1);
 INSERT INTO public.coach_assessments (id, coach_user_id, squad_player_id, organization_id)
 VALUES (pg_temp.pc_id(401), pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101));
+-- Active consent cannot reopen parked award authoring. Seed retained history
+-- through the trusted role, then resume every application read/consent check.
+SELECT pg_temp.pc_expect_denied(format(
+  'INSERT INTO public.recognition_awards (coach_user_id, squad_player_id, organization_id, award_type) VALUES (%L,%L,%L,%L)',
+  pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101), 'player_of_the_week'),
+  'D3 coach: active consent cannot reopen parked award insert');
+SELECT pg_temp.pc_reset();
+SELECT pg_temp.pc_as('service_role', 1);
 INSERT INTO public.recognition_awards (id, coach_user_id, squad_player_id, organization_id, award_type)
 VALUES (pg_temp.pc_id(402), pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101), 'player_of_the_week');
+SELECT pg_temp.pc_reset();
+SELECT pg_temp.pc_as('authenticated', 1);
 INSERT INTO public.coach_shared_feedback (assessment_id, coach_user_id, body, published_at)
 VALUES (pg_temp.pc_id(401), pg_temp.pc_id(1), 'PRIVATE-BRIDGE-SHARED-CANARY', now());
 SELECT pg_temp.pc_expect_denied(format('SELECT public.publish_player_feedback(%L, %L)',
@@ -441,7 +466,7 @@ SELECT pg_temp.pc_reset();
 SELECT pg_temp.pc_as('authenticated', 1);
 SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_assessments WHERE id = pg_temp.pc_id(401))
   AND (SELECT count(*) = 1 FROM public.recognition_awards WHERE id = pg_temp.pc_id(402)),
-  'D3 coach: consented assessment and award inserts actually landed');
+  'D3 coach: consented assessment and retained award remain visible');
 SELECT pg_temp.pc_as('authenticated', 2);
 SELECT pg_temp.pc_assert((SELECT count(*) = 1 FROM public.coach_shared_feedback WHERE body = 'PRIVATE-BRIDGE-SHARED-CANARY'),
   'D3 player: published manual feedback remains usable');
@@ -473,7 +498,7 @@ SELECT pg_temp.pc_expect_denied(format(
   pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101)), 'D4 coach: withdrawal blocks assessment insert');
 SELECT pg_temp.pc_expect_denied(format(
   'INSERT INTO public.recognition_awards (coach_user_id, squad_player_id, organization_id, award_type) VALUES (%L,%L,%L,%L)',
-  pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101), 'player_of_the_week'), 'D4 coach: withdrawal blocks award insert');
+  pg_temp.pc_id(1), pg_temp.pc_id(201), pg_temp.pc_id(101), 'player_of_the_week'), 'D4 coach: parked award insert remains blocked after withdrawal');
 SELECT pg_temp.pc_reset();
 
 -- E. The coach UI gets a scoped boolean, never an arbitrary-ID predicate.

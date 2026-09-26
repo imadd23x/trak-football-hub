@@ -10,6 +10,8 @@ import { BANDS } from '@/lib/types'
 import { calculateSquadAnalytics, type SquadAnalytics } from '@/lib/squad-analytics'
 import { trackEvent } from '@/lib/telemetry'
 import { generateCode } from '@/lib/invite-codes'
+import { openable } from '@/lib/openable'
+import { timeOfDayGreeting } from '@/lib/greeting'
 
 // Derived from BANDS rather than restated. CLAUDE.md says colours never live
 // outside the BANDS config, and this file had a seventh-hand copy of them: the
@@ -144,9 +146,7 @@ export default function CoachHomePage() {
     return () => { cancelled = true }
   }, [user])
 
-  // Greeting based on time of day
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning,' : hour < 18 ? 'Good afternoon,' : 'Good evening,'
+  const greeting = timeOfDayGreeting()
 
   // Squad bands: one chip per band that any player is currently in, in that
   // band's own colour.
@@ -481,24 +481,23 @@ export default function CoachHomePage() {
 
         {/* Empty squad callout */}
         {playerCount === 0 && (
-          <button
-            onClick={() => navigate('/coach/squad/add')}
-            className="w-full mt-3 rounded-[14px] border p-4 text-left active:scale-[0.98] transition-transform"
+          <div
+            className="w-full mt-3 rounded-[14px] border p-4 text-left"
             style={{ background: '#101012', borderColor: 'rgba(255,255,255,0.07)' }}
           >
             <p className="text-[13px] font-medium text-white/70" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-              Add players to your squad
+              Your squad is being prepared
             </p>
             <p className="text-[10px] mt-0.5 text-white/35" style={{ fontFamily: "'DM Mono', monospace" }}>
-              Once you've added players you can assess them, log matches, and track progress →
+              Your academy will add players to this squad.
             </p>
-          </button>
+          </div>
         )}
 
-        {/* Quick Assess CTA */}
+        {/* Full assessment entry */}
         {playerCount > 0 && (
           <button
-            onClick={() => navigate('/coach/quick-assess')}
+            onClick={() => navigate('/coach/assess')}
             className="w-full mt-3 relative overflow-hidden rounded-[14px] border p-4 text-left active:scale-[0.98] transition-transform"
             style={{
               background: 'rgba(200,242,90,0.06)',
@@ -517,14 +516,14 @@ export default function CoachHomePage() {
                   className="text-[14px] font-semibold"
                   style={{ color: '#C8F25A', fontFamily: "'DM Sans', sans-serif" }}
                 >
-                  Quick Assess
+                  Assess players
                 </span>
               </div>
               <p
                 className="text-[11px] mt-1"
                 style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.3)' }}
               >
-                Swipe through your squad and rate each player fast
+                Choose a player and record their assessment
               </p>
             </div>
           </button>
@@ -565,8 +564,10 @@ export default function CoachHomePage() {
                 return (
                   <div
                     key={a.id}
-                    className="flex items-center gap-3 rounded-[14px] border border-white/[0.07] p-[13px_14px] mb-2"
+                    className="flex items-center gap-3 rounded-[14px] border border-white/[0.07] p-[13px_14px] mb-2 cursor-pointer active:scale-[0.99] transition-transform"
                     style={{ background: '#101012' }}
+                    {...openable(`Open assessment for ${playerName}, ${formattedDate}`,
+                      () => navigate(`/coach/assess?assessment=${a.id}`))}
                   >
                     {/* Initials avatar */}
                     <div

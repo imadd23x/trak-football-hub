@@ -1,7 +1,10 @@
 # Trak — MVP Requirements (first pilot)
 
-Status: proposed by Imad, 23 September 2026. Becomes the agreed pilot scope
-when it merges to main with a non-author approval (docs/release/merge-gate.md).
+Scope decisions recorded by the founders on 23 September 2026. Formal scope
+acceptance is tracked in [TRAK-21](https://linear.app/trak-football/issue/TRAK-21);
+the independent correctness review of this document is tracked separately in
+[TRAK-39](https://linear.app/trak-football/issue/TRAK-39). Follow the release gate
+in docs/release/merge-gate.md for changes.
 Replaces the April 2026 "pilot wedge" requirements (REQ-001 to REQ-005 and
 the 60% player-logging hypothesis). Those, and the April PRD, architecture,
 roadmap and milestone plans, are in git history at commit 9114f4c.
@@ -12,8 +15,9 @@ Progress against this scope is tracked in docs/use-cases/PILOT-INDEX.md.
 ## The idea
 
 Build a few essential journeys to a high standard and ship them sooner. Every
-other feature shows "coming soon". A PR that serves none of the journeys or
-guarantees below waits until the pilot has started.
+other feature shows "coming soon". A feature PR that serves none of the journeys or
+guarantees below waits until the pilot has started. Scope clarification and
+launch-gate work must name their assigned Linear issue.
 
 The loop:
 
@@ -82,12 +86,14 @@ J5. Coach assessment and message
     Imad on 25 September 2026 after the second use-case test: a message
     parents also read doubles the coach's workload and invites parent-coach
     friction. Revisit with pilot feedback (TRAK-63).
-  - Nothing reaches the family until the coach presses publish. If only part
-    of a save works, the screen says what was saved and what was not.
+  - One Save button: saving sends the message to the player; nothing reaches
+    them before the coach saves (Imad, 25 September 2026, TRAK-64). If only
+    part of a save works, the screen says what was saved and what was not.
   - An assessment belongs to a session that already happened: the session is
     required and there is one assessment per player per session (Imad, 25
     September 2026, TRAK-68).
-  - Quick Assess either meets the same contract or is hidden.
+  - Quick Assess is hidden for the pilot. /coach/assess is the only
+    assessment screen (see "Coming soon" below).
 
 J6. Player and parent see it
   - Player home shows the latest band, the six bars and the coach's message,
@@ -123,8 +129,10 @@ G4. Nothing reaches a child that a coach did not write and publish. Private
     notes stay private.
 G5. No message about a child goes to the wrong adult.
 G6. Withdrawal stops processing and hides published content immediately.
-G7. No AI processing, passport or export, and no child photos, in either the
-    UI or the backend.
+G7. No AI processing, player passport/export/sharing, or child photos, in
+    either the UI or the backend. Account data export and account deletion
+    are separate rights and stay in scope: deletion is in Settings, and export
+    is the `export_my_account()` function, which no screen offers yet.
 
 Bypass attempts that must fail against the API: self-signup without an
 invitation, changing a date of birth, linking by name or code, a coach
@@ -155,31 +163,43 @@ P0, must work:
   /parent-invite, /parent-info, /parent/home, /parent/matches,
   /parent/consent, /parent/profile, /coach/home, /coach/squad,
   /coach/player/:id, /coach/assess, /coach/sessions, /coach/sessions/add,
-  /coach/sessions/list, /coach/profile, /coach/manual, /player/home,
-  /player/feedback/:assessmentId, /player/matches, /player/match/:id,
-  /player/profile, /profile, /settings, /dashboard
+  /coach/sessions/quick, /coach/sessions/list, /coach/profile,
+  /coach/manual, /player/home, /player/feedback/:assessmentId,
+  /player/matches, /player/match/:id, /player/profile, /profile,
+  /settings, /dashboard
+
+  /coach/sessions/quick stays: it is the "Match" entry from
+  /coach/sessions and opens the same screen as /coach/sessions/add in
+  match mode. It is J4's match-logging path.
 
 Coming soon:
   /player/passport, /player/evolution, /coach/feedback/:assessmentId (AI
   draft review), /coach/assistant, /coach/schedule, /coach/recognition,
-  /coach/award, /parent/alerts, /club/radar
+  /coach/award, /parent/alerts, /club/home, /club/squads, /club/coaches,
+  /club/profile, /club/radar
+
+  The academy console is coming soon because the concierge roster (J1)
+  replaces it. /club/home is also where an academy director lands after
+  sign-in, so the placeholder must render there without errors.
 
 Remove for the pilot:
   /coach/squad/add (the academy registers players). Remove avatar upload
   from every profile page.
+  /coach/quick-assess: hidden. It saves sliders and a private note but has
+  no message to the player and no publish step, so it cannot meet J5. A
+  second assessment screen would also need its own proof for G1 and G4.
+  Its two entry points (the Coach Home button and the post-match prompt)
+  go to /coach/assess instead.
 
-Decide (owner in brackets):
-  /club/home, /club/squads, /club/coaches, /club/profile: recommend coming
-  soon, because concierge replaces the console (Kostas).
-  /coach/quick-assess: same contract as J5, or hidden (Kostas).
-  /coach/sessions/quick (Kostas).
+Route calls decided by Kostas on 23 September 2026 (TRAK-43).
 
 
 ## Cut from the pilot
 
   - AI feedback, the assistant and schedule parsing. Child data would go to a
     third party without processor paperwork.
-  - Passport, export and sharing.
+  - Player passport, its export and sharing. Account data export and account
+    deletion remain in scope.
   - Child photos and avatars, until storage access and backup are fixed.
   - Recognition and awards.
   - Parent goals.

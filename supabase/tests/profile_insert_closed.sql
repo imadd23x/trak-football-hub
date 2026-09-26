@@ -50,6 +50,19 @@ INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
 INSERT INTO public.organizations (id, admin_user_id, name, join_code)
 VALUES (pg_temp.pi(100), pg_temp.pi(1), 'Profile Insert FC', 'PINS01');
 
+-- Slice 3 (TRAK-48): a new player or parent must be on the academy roster.
+-- The squad belongs to a separate fixture coach, so the coach under test is
+-- only the one Trak admits below.
+INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
+  (pg_temp.pi(11), 'squad-coach@profile-insert.test', now());
+INSERT INTO public.profiles (user_id, role, full_name) VALUES (pg_temp.pi(11), 'coach', 'Squad Coach');
+INSERT INTO public.coach_details (user_id, organization_id) VALUES (pg_temp.pi(11), pg_temp.pi(100));
+INSERT INTO public.squad_players (id, coach_user_id, player_name, age_group) VALUES
+  (pg_temp.pi(40), pg_temp.pi(11), 'Provisioned Player', 'U19+');
+INSERT INTO public.roster_children (id, organization_id, squad_player_id, date_of_birth, child_email, loaded_by) VALUES
+  (pg_temp.pi(50), pg_temp.pi(100), pg_temp.pi(40), (current_date - interval '19 years')::date, 'player@profile-insert.test', 'fixture');
+INSERT INTO public.roster_guardians (roster_child_id, email, loaded_by) VALUES
+  (pg_temp.pi(50), 'parent@profile-insert.test', 'fixture');
 -- TRAK-12: Trak sets up staff. The operator admits the coach first; their
 -- signup below then completes that profile (self-made staff: g3_staff_admission).
 SELECT public.admit_staff_member(pg_temp.pi(10), 'coach', 'Admitted Coach', pg_temp.pi(100));

@@ -47,6 +47,29 @@ BEGIN
   coalesce(st = '42501',st IS NULL AND n = 0),
   coalesce(st||': '||msg,'affected rows='||n));
 END $$;
+-- Like p47denied, but the write never survives, even if it is wrongly
+-- allowed, so later fixtures and checks are not disturbed.
+CREATE FUNCTION pg_temp.p47denied_rb(statement text, label text) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE n bigint; st text; msg text;
+BEGIN
+ BEGIN
+  EXECUTE statement;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RAISE EXCEPTION USING ERRCODE = 'P9047', MESSAGE = 'roll back the probe';
+ EXCEPTION
+  WHEN SQLSTATE 'P9047' THEN NULL;
+  WHEN OTHERS THEN st := SQLSTATE; msg := SQLERRM;
+ END;
+ INSERT INTO pg_temp.p47_results VALUES(label,
+  coalesce(st = '42501',st IS NULL AND n = 0),
+  coalesce(st||': '||msg,'affected rows='||n));
+END $$;
+CREATE FUNCTION pg_temp.p47compliance(label text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+ PERFORM pg_temp.p47denied_rb(format('INSERT INTO public.staff_compliance(organization_id,coach_user_id,dbs_status) VALUES(%L,%L,%L)',pg_temp.p47id(100),pg_temp.p47id(10),'valid'),label||': compliance INSERT');
+ PERFORM pg_temp.p47denied_rb(format('UPDATE public.staff_compliance SET dbs_status=%L WHERE organization_id=%L AND coach_user_id=%L','expired',pg_temp.p47id(100),pg_temp.p47id(13)),label||': compliance UPDATE');
+ PERFORM pg_temp.p47denied_rb(format('DELETE FROM public.staff_compliance WHERE organization_id=%L AND coach_user_id=%L',pg_temp.p47id(100),pg_temp.p47id(13)),label||': compliance DELETE');
+END $$;
 CREATE FUNCTION pg_temp.p47writes(label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
  PERFORM pg_temp.p47denied(format('INSERT INTO public.coach_calendar_events(coach_user_id,title,starts_at) VALUES(%L,%L,%L)',pg_temp.p47id(10),'Blocked event','2026-10-02'),label||': calendar INSERT');
@@ -246,9 +269,21 @@ SELECT pg_temp.p47probe(format('DELETE FROM public.recognition_awards WHERE id=%
 RESET ROLE;
 SELECT pg_temp.p47unchanged('Trusted operation readback');
 
+-- The academy console is Coming soon (TRAK-43), so its compliance (DBS)
+-- records are read-only for app roles too (TRAK-47 follow-up, 26 Sep).
+-- The earlier removal deleted coach 12's row, so the probes aim at coach 13's
+-- (written here by the operator); a probe that matches nothing proves nothing.
+INSERT INTO public.staff_compliance(organization_id,coach_user_id,dbs_status) VALUES(pg_temp.p47id(100),pg_temp.p47id(13),'valid');
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.p47actor(1);
+SELECT pg_temp.p47compliance('Own academy admin');
+SELECT pg_temp.p47check(EXISTS(SELECT 1 FROM public.staff_compliance WHERE organization_id=pg_temp.p47id(100) AND coach_user_id=pg_temp.p47id(13)),'Own academy admin still reads compliance');
+RESET ROLE;
+
 -- Defense in depth: accidental broad grants AND overlapping permissive
 -- policies must not reopen the parked writers. Changes roll back with suite.
-GRANT SELECT,INSERT,UPDATE,DELETE ON public.coach_calendar_events,public.recognition_awards TO PUBLIC,anon,authenticated;
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.coach_calendar_events,public.recognition_awards,public.staff_compliance TO PUBLIC,anon,authenticated;
+CREATE POLICY p47_test_overlapping_allow ON public.staff_compliance FOR ALL TO PUBLIC USING(true) WITH CHECK(true);
 CREATE POLICY p47_test_overlapping_allow ON public.coach_calendar_events FOR ALL TO PUBLIC USING(true) WITH CHECK(true);
 CREATE POLICY p47_test_overlapping_allow ON public.recognition_awards FOR ALL TO PUBLIC USING(true) WITH CHECK(true);
 SET LOCAL ROLE authenticated;
@@ -258,6 +293,7 @@ SELECT pg_temp.p47actor(20);
 SELECT pg_temp.p47writes('Restored grants and overlapping policy: Player');
 SELECT pg_temp.p47actor(1);
 SELECT pg_temp.p47writes('Restored grants and overlapping policy: Club admin');
+SELECT pg_temp.p47compliance('Restored grants and overlapping policy: Club admin');
 RESET ROLE;
 SET LOCAL ROLE anon;
 SELECT set_config('request.jwt.claims','{"role":"anon"}',true);

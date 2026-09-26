@@ -143,6 +143,8 @@ INSERT INTO public.organizations (id, admin_user_id, name, join_code) VALUES
   (pg_temp.aid(101), pg_temp.aid(2), 'Academy B', 'ISOBB1');
 
 INSERT INTO public.profiles (user_id, role, full_name, invite_code) VALUES
+  (pg_temp.aid(1),  'club',   'Admin A',        NULL),
+  (pg_temp.aid(2),  'club',   'Admin B',        NULL),
   (pg_temp.aid(10), 'coach',  'Coach A',        'ISOCA'),
   (pg_temp.aid(11), 'coach',  'Coach B',        'ISOCB'),
   (pg_temp.aid(12), 'coach',  'Departed Coach', 'ISOCD'),
@@ -253,21 +255,19 @@ $test$;
 -- ── U8: the coach who has left ──────────────────────────────────────────────
 
 RESET ROLE;
--- remove_coach_from_org is how a departure actually happens.
-DO $test$
-BEGIN
-  PERFORM set_config('request.jwt.claims',
-    jsonb_build_object('role','service_role')::text, true);
-  BEGIN
-    PERFORM public.remove_coach_from_org(pg_temp.aid(12));
-  EXCEPTION WHEN OTHERS THEN
-    -- If the RPC is not callable this way, fall back to the state it produces
-    -- so the access assertions below are still meaningful.
-    UPDATE public.squad_players SET status = 'coach_departed' WHERE coach_user_id = pg_temp.aid(12);
-    UPDATE public.coach_details SET organization_id = NULL WHERE user_id = pg_temp.aid(12);
-  END;
-END;
-$test$;
+-- Real trusted departure with a complete owning-admin identity. Do not fall
+-- back to hand-written state: a broken incident RPC must fail this fixture.
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims',
+  jsonb_build_object('role','service_role','sub',pg_temp.aid(1))::text, true);
+SELECT public.remove_coach_from_org(pg_temp.aid(12));
+SELECT pg_temp.iassert(
+  (SELECT organization_id IS NULL FROM public.coach_details WHERE user_id = pg_temp.aid(12)),
+  'U8 fixture: trusted removal clears the target membership');
+SELECT pg_temp.iassert(
+  (SELECT status = 'coach_departed' FROM public.squad_players WHERE id = pg_temp.aid(201)),
+  'U8 fixture: trusted removal marks the target roster departed');
+RESET ROLE;
 
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.iactor(pg_temp.aid(12));

@@ -30,7 +30,7 @@ const StyledSelect = ({ value, onChange, placeholder, children, ...props }: Reac
   </div>
 );
 
-type Role = 'player' | 'coach' | 'club';
+type Role = 'player';
 
 const EmailConfirmationScreen = ({ email }: { email: string }) => {
   const [resending, setResending] = useState(false);
@@ -81,26 +81,27 @@ const EmailConfirmationScreen = ({ email }: { email: string }) => {
 
 /**
  * Shown instead of the plain confirmation screen to players below the
- * digital-consent age. Their account exists and is theirs — they are waiting
- * on a parent to finish, not to start. Saying that plainly matters: the whole
- * point of letting them sign up themselves is that it stays their account.
+ * consent threshold. It must say only what is true at this moment: signUp has
+ * returned, but for a duplicate email nothing was created, and even for a new
+ * account the parent invite is created and mailed only on the player's first
+ * sign-in after confirming (AuthContext → provision_my_profile →
+ * send-parent-invite). So it tells the child the steps that trigger the parent
+ * request instead of claiming it has already happened.
  */
-const AwaitingParentScreen = ({ email, parentEmail }: { email: string; parentEmail: string }) => (
+export const AwaitingParentScreen = ({ email, parentEmail }: { email: string; parentEmail: string }) => (
   <div className="flex flex-col items-center text-center py-6">
     <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center mb-6">
       <Mail className="w-10 h-10 text-primary" />
     </div>
     <h2 className="text-2xl text-foreground mb-2">Almost there</h2>
     <p className="text-sm text-muted-foreground mb-2">
-      Your account is created. We've asked your parent or guardian at
+      Confirm your email at {email}. As soon as you're signed in, we'll ask
+      your parent or guardian at
     </p>
     <p className="text-sm font-medium text-foreground mb-6">{parentEmail}</p>
-    <p className="text-xs text-muted-foreground mb-2">
-      to approve it. As soon as they do, your coach can start recording your
-      progress and you'll see it here.
-    </p>
     <p className="text-xs text-muted-foreground mb-8">
-      Confirm your own email at {email} in the meantime.
+      to approve your account. As soon as they do, your coach can start
+      recording your progress and you'll see it here.
     </p>
     <a href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
       ← Back to home
@@ -110,11 +111,14 @@ const AwaitingParentScreen = ({ email, parentEmail }: { email: string; parentEma
 
 const OnboardingPage = () => {
   const { role } = useParams<{ role: string }>();
-  const validRole = (role === 'player' || role === 'coach' || role === 'club') ? role as Role : null;
+  // TRAK-12: staff are set up by Trak (#151 refuses a self-made coach or
+  // academy admin), so these two addresses explain that instead of a form.
+  if (role === 'coach' || role === 'club') return <StaffSetUpByTrak />;
+  const validRole = role === 'player' ? role as Role : null;
 
   if (!validRole) return <div className="app-container p-6 text-foreground">Invalid role</div>;
 
-  const titles: Record<Role, string> = { player: 'Player', coach: 'Coach', club: 'Administrator' };
+  const titles: Record<Role, string> = { player: 'Player' };
 
   return (
     <div className="app-container px-6 py-8">
@@ -124,8 +128,6 @@ const OnboardingPage = () => {
       <h1 className="text-2xl text-foreground mb-1">{titles[validRole]} Registration</h1>
       <p className="text-muted-foreground text-sm mb-6">Create your Trak account</p>
       {validRole === 'player' && <PlayerOnboarding />}
-      {validRole === 'coach' && <CoachOnboarding />}
-      {validRole === 'club' && <ClubOnboarding />}
     </div>
   );
 };
@@ -223,6 +225,12 @@ const PlayerOnboarding = () => {
     // one. Above it the player consents for themselves and this never fires.
     if (needsConsent && !parentEmail.trim()) {
       toast.error("Please enter a parent or guardian's email so we can ask them to approve your account");
+      return;
+    }
+    // G5: the request would go to the child, not a parent. The database refuses
+    // it too, but only after the account exists, so stop it here.
+    if (parentEmail.trim() && parentEmail.trim().toLowerCase() === email.trim().toLowerCase()) {
+      toast.error("Your parent's email must be different from yours");
       return;
     }
 
@@ -373,182 +381,17 @@ const PlayerOnboarding = () => {
   );
 };
 
-const CoachOnboarding = () => {
-  const { signUp } = useAuth();
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-
-  const [name, setName] = useState('');
-  const [nationality, setNationality] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  const [club, setClub] = useState('');
-  const [team, setTeam] = useState('');
-  const [coachRole, setCoachRole] = useState('');
-  const [academyCode, setAcademyCode] = useState('');
-
-  const handleStep1 = () => {
-    if (!name || !nationality || !email || !password || !confirmPassword) {
-      toast.error('Please fill in all fields'); return;
-    }
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match'); return;
-    }
-    const pwError = validatePassword(password)
-    if (pwError) { toast.error(pwError); return; }
-    setStep(2);
-  };
-
-  const handleSubmit = async () => {
-    if (!club || !team || !coachRole) {
-      toast.error('Please fill in all fields'); return;
-    }
-    setLoading(true);
-    try {
-      const pendingProfile = {
-        role: 'coach' as const,
-        full_name: name,
-        nationality,
-        coach_details: {
-          current_club: club,
-          team,
-          coach_role: coachRole,
-          ...(academyCode ? { academy_code: academyCode } : {}),
-        },
-      };
-
-      const { user, error } = await signUp(email, password, pendingProfile);
-      if (error || !user) throw error || new Error('Signup failed');
-
-      setStep(3);
-    } catch (err: any) {
-      toast.error(err.message || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="space-y-2 mb-4">
-        <div className="flex gap-2">
-          {[1, 2].map(s => (
-            <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${s <= step ? 'bg-primary' : 'bg-muted'}`} />
-          ))}
-        </div>
-        <div className="flex justify-between">
-          {['Personal', 'Club Details'].map((label, i) => (
-            <span key={label} className={`text-[9px] uppercase tracking-wider ${i + 1 <= step ? 'text-primary' : 'text-white/22'}`}
-              style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
-          ))}
-        </div>
-      </div>
-
-      {step === 1 && (
-        <>
-          <Input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="bg-card" />
-          <StyledSelect value={nationality} onChange={e => setNationality(e.target.value)}>
-            <option value="">Select nationality</option>
-            {NATIONALITIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </StyledSelect>
-          <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="bg-card" />
-          <PasswordInput label="New password" autoComplete="new-password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
-          <PasswordInput label="Confirm password" autoComplete="new-password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
-          <Button onClick={handleStep1} className="w-full mt-2">Next</Button>
-        </>
-      )}
-
-      {step === 2 && (
-        <>
-          <Input placeholder="Current club" value={club} onChange={e => setClub(e.target.value)} className="bg-card" />
-          <StyledSelect value={team} onChange={e => setTeam(e.target.value)}>
-            <option value="">Select age group</option>
-            {AGE_GROUPS.map(a => <option key={a} value={a}>{a}</option>)}
-          </StyledSelect>
-          <StyledSelect value={coachRole} onChange={e => setCoachRole(e.target.value)}>
-            <option value="">Select role</option>
-            {COACH_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-          </StyledSelect>
-          <Input
-            placeholder="Academy code (optional)"
-            value={academyCode}
-            onChange={e => setAcademyCode(e.target.value)}
-            className="bg-card"
-          />
-          <p className="text-[10px] text-white/40 -mt-2">If your academy uses Trak, enter the code they gave you.</p>
-          <div className="flex gap-2 mt-2">
-            <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Back</Button>
-            <Button onClick={handleSubmit} disabled={loading} className="flex-1">
-              {loading ? 'Creating...' : 'Create Account'}
-            </Button>
-          </div>
-        </>
-      )}
-
-      {step === 3 && (
-        <EmailConfirmationScreen email={email} />
-      )}
-    </div>
-  );
-};
-
-const ClubOnboarding = () => {
-  const { signUp } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const [name,            setName]            = useState('');
-  const [academy,         setAcademy]         = useState('');
-  const [email,           setEmail]           = useState('');
-  const [password,        setPassword]        = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  const handleSubmit = async () => {
-    if (!name || !academy || !email || !password || !confirmPassword) {
-      toast.error('Please fill in all fields'); return;
-    }
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match'); return;
-    }
-    const pwError = validatePassword(password)
-    if (pwError) { toast.error(pwError); return; }
-    setLoading(true);
-    try {
-      const pendingProfile = {
-        role: 'club' as const,
-        full_name: name,
-        nationality: null,
-        club_details: { academy_name: academy },
-      };
-      const { user, error } = await signUp(email, password, pendingProfile);
-      if (error || !user) throw error || new Error('Signup failed');
-      setDone(true);
-    } catch (err: any) {
-      toast.error(err.message || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (done) return <EmailConfirmationScreen email={email} />;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground -mt-2 mb-2">
-        Administrator accounts give read-only access to all coaches and squads in your academy.
-      </p>
-      <Input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="bg-card" />
-      <Input placeholder="Academy / club name" value={academy} onChange={e => setAcademy(e.target.value)} className="bg-card" />
-      <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="bg-card" />
-      <PasswordInput label="New password" autoComplete="new-password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
-      <PasswordInput label="Confirm password" autoComplete="new-password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
-      <Button onClick={handleSubmit} disabled={loading} className="w-full mt-2">
-        {loading ? 'Creating account…' : 'Create Administrator Account'}
-      </Button>
-    </div>
-  );
-};
+const StaffSetUpByTrak = () => (
+  <div className="app-container px-6 py-8">
+    <a href="/" className="text-sm text-muted-foreground hover:text-primary mb-6 inline-block">
+      ← Back
+    </a>
+    <h1 className="text-2xl text-foreground mb-2">Staff accounts</h1>
+    <p className="text-muted-foreground text-sm leading-relaxed">
+      Trak sets up coach and academy accounts. Ask your academy, and Trak will
+      email you an invitation to sign in.
+    </p>
+  </div>
+);
 
 export default OnboardingPage;

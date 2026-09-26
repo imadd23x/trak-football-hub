@@ -62,6 +62,23 @@ INSERT INTO public.parent_invites (id, player_user_id, parent_email, invite_toke
   -- Old create_parent_invite allowed coaches to issue invitations. Fail closed.
   ('40000000-0000-0000-0000-000000000006', '30000000-0000-0000-0000-000000000001', 'parent1@p1.test', '50000000-0000-0000-0000-000000000006', now());
 
+-- TRAK-48 slice 3: a NEW player or parent profile needs the academy roster to
+-- name them. The two first-time accounts below (newparent, newchild) are on it;
+-- the unverified one is too, so it is refused for its email, not its absence.
+INSERT INTO public.organizations (id, admin_user_id, name, join_code) VALUES
+  ('60000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'P1 Academy', 'P1-ACADEMY');
+INSERT INTO public.coach_details (user_id, organization_id) VALUES
+  ('30000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001');
+INSERT INTO public.squad_players (id, coach_user_id, player_name, age_group, linked_player_id) VALUES
+  ('70000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'Test Child One', 'U15', '10000000-0000-0000-0000-000000000001'),
+  ('70000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000001', 'New Test Child', 'U15', NULL);
+INSERT INTO public.roster_children (id, organization_id, squad_player_id, date_of_birth, child_email, player_user_id, loaded_by) VALUES
+  ('80000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', '2013-01-01', 'child1@p1.test', '10000000-0000-0000-0000-000000000001', 'fixture'),
+  ('80000000-0000-0000-0000-000000000003', '60000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000003', '2013-01-01', 'newchild@p1.test', NULL, 'fixture');
+INSERT INTO public.roster_guardians (roster_child_id, email, loaded_by) VALUES
+  ('80000000-0000-0000-0000-000000000001', 'newparent@p1.test', 'fixture'),
+  ('80000000-0000-0000-0000-000000000001', 'newunverified@p1.test', 'fixture');
+
 -- Reproduce the original breach with a real authenticated call first.
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{"sub":"20000000-0000-0000-0000-000000000002","email":"parent2@p1.test","role":"authenticated"}', true);
@@ -138,6 +155,20 @@ SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public.get_player_invites_f
 SELECT public.create_parent_invite('newguardian@p1.test');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public.get_player_invites_for_current_user()), 'repeating creation is idempotent');
 SELECT pg_temp.assert_true((SELECT parent_email='newguardian@p1.test' FROM public.get_player_invites_for_current_user()), 'recipient is normalized server-side');
+-- G5 / TRAK-52: a child cannot name their own address as their parent's. The
+-- invite would never reach an adult, and the screen would say a parent was
+-- asked. Provisioning reaches the same check through create_parent_invite.
+DO $test$
+DECLARE v_state text := 'allowed';
+BEGIN
+  BEGIN
+    PERFORM public.create_parent_invite('  NewChild@P1.TEST ');
+  EXCEPTION WHEN OTHERS THEN v_state := SQLSTATE;
+  END;
+  PERFORM pg_temp.assert_true(v_state = '22023', 'a child cannot name their own email as their parent''s (got ' || v_state || ')');
+END;
+$test$;
+SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public.get_player_invites_for_current_user()), 'the refused own-email invitation created no row');
 
 -- Expiry, stable creation, explicit resend rotation and ownership.
 SELECT set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000002","role":"authenticated"}', true);

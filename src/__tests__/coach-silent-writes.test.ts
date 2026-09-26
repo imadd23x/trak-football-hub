@@ -28,7 +28,7 @@ const DIRS = [
 ]
 
 /** Components nothing imports or routes. Fixing them is editing dead code. */
-const UNREFERENCED = new Set(['CoachQuickMatchLog.tsx', 'CoachAssess.tsx', 'CoachSessionDetail.tsx'])
+const UNREFERENCED = new Set(['CoachQuickMatchLog.tsx', 'CoachSessionDetail.tsx'])
 
 function sources(): { name: string; path: string; code: string }[] {
   return DIRS.flatMap(dir =>
@@ -169,12 +169,14 @@ describe('routed coach surfaces do not treat a missing error as success', () => 
   // dashboard is empty in front of a customer.
   const academyJoiners = files.filter(f => f.code.includes("'join_organization'"))
 
-  it('finds the academy join path', () => {
+  // TRAK-12 (26 Sep): Trak sets a coach's academy. #151 revokes app-role
+  // EXECUTE on join_organization and refuses a self-chosen academy, so no
+  // screen may offer a code-join. If one ever returns, the checks below apply.
+  it('no coach surface calls join_organization', () => {
     expect(
-      academyJoiners.length,
-      'no coach surface calls join_organization — the signup warning tells coaches they can ' +
-        'join their academy later from their profile, so something must implement it.',
-    ).toBeGreaterThan(0)
+      academyJoiners.map(f => f.name),
+      'a coach surface calls join_organization, but a coach\'s academy is set by Trak (TRAK-12).',
+    ).toEqual([])
   })
 
   for (const { name, code } of academyJoiners) {

@@ -6,6 +6,9 @@ import { setTelemetryRole, trackSessionOpen } from '@/lib/telemetry';
 import { createOnboardingSession, type OnboardingSession } from '@/lib/onboarding-session';
 import { useQueryClient } from '@tanstack/react-query';
 
+// provision_my_profile's refusal for an email the academy roster does not name.
+const ACADEMY_HAS_NOT_ADDED = "Your academy hasn't added this email yet";
+
 type UserRole = 'player' | 'coach' | 'parent' | 'club';
 const PENDING_PROFILE_KEY = 'trak_pending_profile';
 
@@ -229,7 +232,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!isCurrent()) return;
         console.error('Failed to load account profile:', err);
         const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
-        toast.error(`Account setup hit a problem: ${message || 'unknown error'}. Pull to refresh or sign in again to retry.`);
+        // TRAK-48 slice 3: the roster does not name this email. Retrying cannot
+        // help until the academy adds it, so say what will.
+        if ((err as { code?: string })?.code === '42501' && message === ACADEMY_HAS_NOT_ADDED) {
+          toast.error(`${message}. Ask your academy to add it, then sign in again.`);
+        } else {
+          toast.error(`Account setup hit a problem: ${message || 'unknown error'}. Pull to refresh or sign in again to retry.`);
+        }
       } finally {
         if (isCurrent()) {
           setLoading(false);
@@ -276,8 +285,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // On the reset password page, suppress all auth redirects so the
       // form stays visible. ResetPassword.tsx handles its own auth events.
       if (window.location.pathname === '/reset-password') {
-        if (event === 'PASSWORD_RECOVERY') return;
-        if (event === 'SIGNED_IN') return;
+        acceptSession(session);
+        if (event === 'SIGNED_OUT') {
+          queryClient.clear();
+          discardLegacyPendingProfile();
+        }
+        return;
       }
 
       // Same on the confirmation page. It verifies, then signs out on purpose,
@@ -305,12 +318,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (disposed || receivedAuthEvent || generation.current !== initialGeneration) return;
-      // If we're on the reset password page, don't auto-redirect — let
-      // the ResetPassword component handle the PASSWORD_RECOVERY event.
-      if (window.location.pathname === '/reset-password') {
-        setLoading(false);
-        return;
-      }
       if (window.location.pathname === '/auth/confirm') {
         setLoading(false);
         return;

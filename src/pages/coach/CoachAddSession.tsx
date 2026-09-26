@@ -8,13 +8,16 @@ import { MobileShell, MetadataLabel } from '@/components/trak'
 import { computeMatchScore } from '@/lib/rating-engine'
 import { goalsKey, assistsKey } from '@/lib/match-input-keys'
 import { trackEvent } from '@/lib/telemetry'
-import { validateMatchInput, MATCH_LIMITS } from '@/lib/match-input-rules'
+import { validateMatchInput, teamGoalsViolation, MATCH_LIMITS } from '@/lib/match-input-rules'
+import { localTodayISO } from '@/lib/event-time'
+import { TRAINING_FOCUS, trainingTypeFrom } from '@/lib/training-focus'
 
 type SquadPlayer = {
   id: string
   player_name: string
   linked_player_id: string | null
   position: string | null
+  age_group: string | null
   age: number | null
 }
 
@@ -26,19 +29,43 @@ type CardType   = 'None' | 'Yellow' | 'Red'
 type PlayerDetail = {
   played:  boolean
   role:    'starter' | 'sub'
-  minutes: number
+  /* J4: "no invented defaults". null means the coach has not said. Position
+     starts from the roster (a fact, not a guess) and can be changed per match. */
+  position: string | null
+  minutes: number | null
   /* Exact counts. These were once `0 | 1 | 2` with 2 meaning "2+", so a
      hat-trick was stored as 2 and the only vocabulary the form had was the
      rating bucket. The bucket still exists — match-input-keys.ts — but it is
      now derived for the rating engine rather than being the thing recorded. */
-  goals:   number
-  assists: number
+  goals:   number | null
+  assists: number | null
   card:    CardType
 }
 
+/* Nothing about a child's match is pre-filled. This used to start every child
+   at 90 minutes, 0 goals and 0 assists, so a coach who only ticked "played"
+   saved numbers they never entered (MVP Requirements J4). */
 const DEFAULT_DETAIL: PlayerDetail = {
-  played: false, role: 'starter', minutes: 90,
-  goals: 0, assists: 0, card: 'None',
+  played: false, role: 'starter', position: null, minutes: null,
+  goals: null, assists: null, card: 'None',
+}
+
+const MATCH_POSITIONS = ['Goalkeeper', 'Defender', 'Midfielder', 'Attacker'] as const
+
+/** The roster's age group ('U14'), else the legacy integer age. Never invented. */
+function rosterAgeGroup(p: SquadPlayer): string | null {
+  return p.age_group ?? (p.age != null ? String(p.age) : null)
+}
+
+/** What still has to be entered before this child's match can be saved. */
+function missingFacts(p: SquadPlayer, d: PlayerDetail): string[] {
+  const missing: string[] = []
+  if (!d.position) missing.push('position')
+  if (d.minutes === null) missing.push('minutes')
+  if (d.goals === null) missing.push('goals')
+  if (d.assists === null) missing.push('assists')
+  if (!rosterAgeGroup(p)) missing.push('age group on the roster')
+  return missing
 }
 
 function mapPosition(raw: string | null) {
@@ -62,7 +89,7 @@ export default function CoachAddSession() {
     () => (window.location.pathname.endsWith('/sessions/quick') ? 'match' : 'training'),
   )
   const [title, setTitle] = useState('')
-  const [date,  setDate]  = useState(new Date().toISOString().split('T')[0])
+  const [date,  setDate]  = useState(localTodayISO)
   const [notes, setNotes] = useState('')
 
   // Training-specific
@@ -116,14 +143,14 @@ export default function CoachAddSession() {
     if (!user) return
     supabase
       .from('squad_players')
-      .select('id, player_name, linked_player_id, position, age')
+      .select('id, player_name, linked_player_id, position, age_group, age')
       .eq('coach_user_id', user.id)
       .order('player_name')
       .then(({ data }) => {
         const players = data || []
         setSquad(players)
         const init: Record<string, PlayerDetail> = {}
-        players.forEach(p => { init[p.id] = { ...DEFAULT_DETAIL } })
+        players.forEach(p => { init[p.id] = { ...DEFAULT_DETAIL, position: p.position } })
         setDetails(init)
       })
   }, [user])
@@ -159,13 +186,13 @@ export default function CoachAddSession() {
 
   const setAllStarters = () => {
     const all: Record<string, PlayerDetail> = {}
-    squad.forEach(p => { all[p.id] = { ...DEFAULT_DETAIL, played: true, role: 'starter' } })
+    squad.forEach(p => { all[p.id] = { ...DEFAULT_DETAIL, position: p.position, played: true, role: 'starter' } })
     setDetails(all)
   }
 
   const clearAll = () => {
     const none: Record<string, PlayerDetail> = {}
-    squad.forEach(p => { none[p.id] = { ...DEFAULT_DETAIL } })
+    squad.forEach(p => { none[p.id] = { ...DEFAULT_DETAIL, position: p.position } })
     setDetails(none)
     setExpanded(new Set())
   }
@@ -173,19 +200,28 @@ export default function CoachAddSession() {
   const playedCount = Object.values(details).filter(d => d.played).length
 
   // ── validation ───────────────────────────────────────────────────────────────
-  /* Only players marked as having played are checked. An untouched bench row
-     carries DEFAULT_DETAIL (90 minutes, no goals), which is valid anyway, but
-     checking it would mean a coach could be blocked by a row they never opened. */
-  const impossibleRecords = !isMatch ? [] : squad
+  /* Only players marked as having played are checked, so a coach is never
+     blocked by a bench row they did not open. A played row must be complete
+     (J4: no invented defaults) before its numbers are checked for sense. */
+  const incompleteRecords = !isMatch ? [] : squad
     .filter(p => details[p.id]?.played)
+    .filter(p => missingFacts(p, details[p.id]).length > 0)
+  const impossibleRecords = !isMatch ? [] : squad
+    .filter(p => details[p.id]?.played && missingFacts(p, details[p.id]).length === 0)
     .filter(p => validateMatchInput({
-      minutes: details[p.id].minutes,
-      goals:   details[p.id].goals,
-      assists: details[p.id].assists,
+      minutes: details[p.id].minutes as number,
+      goals:   details[p.id].goals as number,
+      assists: details[p.id].assists as number,
       teamScore: scoreUs === '' ? undefined : Number(scoreUs),
     }).length > 0)
 
-  const canSave = !saving && impossibleRecords.length === 0 && (
+  const teamGoalsError = !isMatch ? null : teamGoalsViolation(
+    squad.filter(p => details[p.id]?.played && typeof details[p.id].goals === 'number')
+      .map(p => details[p.id].goals as number),
+    scoreUs === '' ? undefined : Number(scoreUs),
+  )
+
+  const canSave = !saving && incompleteRecords.length === 0 && impossibleRecords.length === 0 && !teamGoalsError && (
     isMatch    ? opponent.trim().length > 0 && scoreUs !== '' && scoreThem !== ''
     : type === 'training' ? trainingFocus.size > 0
     : title.trim().length > 0
@@ -215,6 +251,9 @@ export default function CoachAddSession() {
         coach_user_id: user.id,
         title:         sessionTitle,
         session_type:  type,
+        // The focus on its own, for the family's training history (TRAK-75).
+        // Only the fixed labels; the coach's theme stays in the title.
+        training_type: type === 'training' ? trainingTypeFrom(trainingFocus) : null,
         session_date:  date,
         notes: (() => {
           if (type === 'training') {
@@ -289,7 +328,12 @@ export default function CoachAddSession() {
         // child two match rows for one match.
         if (nowLogged.has(p.linked_player_id!)) continue
         const d = details[p.id]
-        const pos = mapPosition(p.position)
+        // canSave guarantees every played row is complete; these never fall back.
+        const position = d.position as string
+        const minutes = d.minutes as number
+        const goals = d.goals as number
+        const assists = d.assists as number
+        const pos = mapPosition(position)
         const computed_rating = computeMatchScore({
           position:        pos,
           competition:     competition.toLowerCase() as 'league' | 'cup' | 'friendly',
@@ -297,7 +341,7 @@ export default function CoachAddSession() {
           opponent:        opponent.trim(),
           score_us:        Number(scoreUs)   || 0,
           score_them:      Number(scoreThem) || 0,
-          minutes_played:  d.minutes,
+          minutes_played:  minutes,
           card:            d.card.toLowerCase() as 'none' | 'yellow' | 'red',
           body_condition:  'good',
           self_rating:     'average',
@@ -307,8 +351,8 @@ export default function CoachAddSession() {
                everyone's assists, so one shared helper for both would send an
                attacker's third assist as '3+' — a key the assists branch has
                no case for, which pays exactly nothing. */
-            goals:   goalsKey(pos, d.goals),
-            assists: assistsKey(d.assists),
+            goals:   goalsKey(pos, goals),
+            assists: assistsKey(assists),
           },
           is_friendly: competition === 'Friendly',
         })
@@ -325,12 +369,12 @@ export default function CoachAddSession() {
           p_opponent_score:  Number(scoreThem) || 0,
           p_competition:     competition,
           p_venue:           venue,
-          p_position:        p.position  || 'Midfielder',
-          p_age_group:       p.age != null ? String(p.age) : 'U19+',
-          p_minutes_played:  d.minutes,
+          p_position:        position,
+          p_age_group:       rosterAgeGroup(p) as string,
+          p_minutes_played:  minutes,
           // The real numbers. The rating key is a band; the record is not.
-          p_goals:           d.goals,
-          p_assists:         d.assists,
+          p_goals:           goals,
+          p_assists:         assists,
           p_card_received:   d.card,
           // Null, not 'Average'. These are the player's own account of the
           // match and this is a coach logging it — nobody asked the child how
@@ -575,15 +619,15 @@ export default function CoachAddSession() {
                           {/* Position + mins badge (when played) */}
                           {d.played && (
                             <div className="flex items-center gap-2 flex-shrink-0">
-                              {p.position && (
+                              {d.position && (
                                 <span className="text-[8px] tracking-[0.08em] uppercase text-white/30 px-1.5 py-0.5 rounded-full"
                                   style={{ background: 'rgba(255,255,255,0.05)', fontFamily: "'DM Mono', monospace" }}>
-                                  {p.position}
+                                  {d.position}
                                 </span>
                               )}
                               <span className="text-[10px] text-white/40"
                                 style={{ fontFamily: "'DM Mono', monospace" }}>
-                                {d.minutes}'
+                                {d.minutes === null ? '—' : `${d.minutes}'`}
                               </span>
                             </div>
                           )}
@@ -623,20 +667,41 @@ export default function CoachAddSession() {
                                 ))}
                               </div>
 
-                              {/* Minutes stepper */}
-                              <div className="flex items-center gap-2 ml-auto">
+                              {/* Minutes: typed, not stepped from a guessed 90. Match
+                                  length differs by age group, so there is no honest default. */}
+                              <label className="flex items-center gap-2 ml-auto">
                                 <span className="text-[8px] tracking-[0.1em] uppercase text-white/30"
                                   style={{ fontFamily: "'DM Mono', monospace" }}>MINS</span>
-                                <button
-                                  onClick={() => setDetail(p.id, { minutes: Math.max(0, d.minutes - 15) })}
-                                  className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 text-sm">−</button>
-                                <span className="w-8 text-center text-[13px] text-white/88"
-                                  style={{ fontFamily: "'DM Mono', monospace" }}>
-                                  {d.minutes}
-                                </span>
-                                <button
-                                  onClick={() => setDetail(p.id, { minutes: Math.min(120, d.minutes + 15) })}
-                                  className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 text-sm">+</button>
+                                <input
+                                  type="number" inputMode="numeric"
+                                  min={MATCH_LIMITS.minutesMin} max={MATCH_LIMITS.minutesMax}
+                                  aria-label={`Minutes played by ${p.player_name}`}
+                                  placeholder="—"
+                                  value={d.minutes ?? ''}
+                                  onChange={e => setDetail(p.id, { minutes: e.target.value === '' ? null : Number(e.target.value) })}
+                                  className="w-14 h-7 rounded-[8px] bg-white/[0.06] text-center text-[13px] text-white/88 outline-none placeholder:text-white/30"
+                                  style={{ fontFamily: "'DM Mono', monospace" }} />
+                              </label>
+                            </div>
+
+                            {/* Position for this match. Starts from the roster; required. */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[8px] tracking-[0.1em] uppercase text-white/30 w-[44px] flex-shrink-0"
+                                style={{ fontFamily: "'DM Mono', monospace" }}>POS</span>
+                              <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Position for ${p.player_name}`}>
+                                {MATCH_POSITIONS.map(pos => (
+                                  <button key={pos} type="button" aria-pressed={d.position === pos}
+                                    onClick={() => setDetail(p.id, { position: pos })}
+                                    className="px-2 py-1 rounded-full text-[10px] transition-colors"
+                                    style={{
+                                      background: d.position === pos ? 'rgba(200,242,90,0.12)' : 'rgba(255,255,255,0.04)',
+                                      color: d.position === pos ? '#C8F25A' : 'rgba(255,255,255,0.4)',
+                                      border: `1px solid ${d.position === pos ? 'rgba(200,242,90,0.3)' : 'rgba(255,255,255,0.07)'}`,
+                                      fontFamily: "'DM Sans', sans-serif",
+                                    }}>
+                                    {pos}
+                                  </button>
+                                ))}
                               </div>
                             </div>
 
@@ -652,15 +717,15 @@ export default function CoachAddSession() {
                                   style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
                                 <button
                                   aria-label={`One fewer ${key} for ${p.player_name}`}
-                                  onClick={() => setDetail(p.id, { [key]: Math.max(0, value - 1) })}
+                                  onClick={() => setDetail(p.id, { [key]: value === null ? 0 : Math.max(0, value - 1) })}
                                   className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 text-sm">−</button>
                                 <span className="w-8 text-center text-[13px] text-white/88"
                                   style={{ fontFamily: "'DM Mono', monospace" }}>
-                                  {value}
+                                  {value ?? '—'}
                                 </span>
                                 <button
                                   aria-label={`One more ${key} for ${p.player_name}`}
-                                  onClick={() => setDetail(p.id, { [key]: Math.min(max, value + 1) })}
+                                  onClick={() => setDetail(p.id, { [key]: Math.min(max, (value ?? 0) + 1) })}
                                   className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 text-sm">+</button>
                               </div>
                             ))}
@@ -670,8 +735,17 @@ export default function CoachAddSession() {
                                 be the only place they are applied — but a coach
                                 should not have to learn them from a rejection. */}
                             {(() => {
+                              const missing = missingFacts(p, d)
+                              if (missing.length > 0) {
+                                return (
+                                  <p role="status" className="text-[10px] leading-snug text-[rgb(251,191,36)] pl-[52px]"
+                                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                                    Still needed: {missing.join(', ')}. Tap − for 0 goals or assists.
+                                  </p>
+                                )
+                              }
                               const problems = validateMatchInput({
-                                minutes: d.minutes, goals: d.goals, assists: d.assists,
+                                minutes: d.minutes as number, goals: d.goals as number, assists: d.assists as number,
                                 teamScore: scoreUs === '' ? undefined : Number(scoreUs),
                               })
                               if (problems.length === 0) return null
@@ -740,16 +814,7 @@ export default function CoachAddSession() {
             <div className="rounded-[18px] p-4 border border-white/[0.07] bg-[#101012]">
               <MetadataLabel text="SESSION FOCUS" />
               <div className="grid grid-cols-2 gap-2 mt-3">
-                {[
-                  { key: 'Technical',   sub: 'Passing, control, dribbling' },
-                  { key: 'Tactical',    sub: 'Shape, pressing, transitions' },
-                  { key: 'Finishing',   sub: 'Shooting & scoring' },
-                  { key: 'Set Pieces',  sub: 'Corners, free kicks, penalties' },
-                  { key: 'Physical',    sub: 'Fitness & conditioning' },
-                  { key: 'Possession',  sub: 'Rondos, keep-ball' },
-                  { key: 'Goalkeeper', sub: 'GK-specific work' },
-                  { key: 'Game Based', sub: 'SSGs & match scenarios' },
-                ].map(({ key, sub }) => {
+                {TRAINING_FOCUS.map(({ key, sub }) => {
                   const on = trainingFocus.has(key)
                   return (
                     <button key={key}
@@ -958,6 +1023,20 @@ export default function CoachAddSession() {
       {/* Sticky save */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-5 pb-5 pt-3"
         style={{ background: 'linear-gradient(180deg,rgba(10,10,11,0) 0%,#0A0A0B 35%)' }}>
+        {teamGoalsError && (
+          <p role="alert" className="text-[11px] text-center text-[rgb(251,191,36)] mb-2"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            {teamGoalsError}
+          </p>
+        )}
+        {incompleteRecords.length > 0 && (
+          <p role="status" className="text-[11px] text-center text-[rgb(251,191,36)] mb-2"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            {incompleteRecords.length === 1
+              ? `${incompleteRecords[0].player_name} still needs ${missingFacts(incompleteRecords[0], details[incompleteRecords[0].id]).join(', ')}.`
+              : `${incompleteRecords.length} players still need their match details.`}
+          </p>
+        )}
         <button onClick={handleSave} disabled={!canSave}
           className="w-full py-3.5 rounded-[12px] text-[14px] font-medium transition-opacity"
           style={{

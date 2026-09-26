@@ -6,6 +6,9 @@ import { setTelemetryRole, trackSessionOpen } from '@/lib/telemetry';
 import { createOnboardingSession, type OnboardingSession } from '@/lib/onboarding-session';
 import { useQueryClient } from '@tanstack/react-query';
 
+// provision_my_profile's refusal for an email the academy roster does not name.
+const ACADEMY_HAS_NOT_ADDED = "Your academy hasn't added this email yet";
+
 type UserRole = 'player' | 'coach' | 'parent' | 'club';
 const PENDING_PROFILE_KEY = 'trak_pending_profile';
 
@@ -16,7 +19,7 @@ interface PendingProfileData {
   player_details?: {
     date_of_birth: string;
     position: string;
-    current_club: string;
+    current_club?: string; // a rostered player's comes from the academy (TRAK-54)
     age_group: string;
     shirt_number: number | null;
   };
@@ -229,7 +232,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!isCurrent()) return;
         console.error('Failed to load account profile:', err);
         const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
-        toast.error(`Account setup hit a problem: ${message || 'unknown error'}. Pull to refresh or sign in again to retry.`);
+        // TRAK-48 slice 3: the roster does not name this email. Retrying cannot
+        // help until the academy adds it, so say what will.
+        if ((err as { code?: string })?.code === '42501' && message === ACADEMY_HAS_NOT_ADDED) {
+          toast.error(`${message}. Ask your academy to add it, then sign in again.`);
+        } else {
+          toast.error(`Account setup hit a problem: ${message || 'unknown error'}. Pull to refresh or sign in again to retry.`);
+        }
       } finally {
         if (isCurrent()) {
           setLoading(false);

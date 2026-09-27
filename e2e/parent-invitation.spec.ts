@@ -84,6 +84,10 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
       };
       return json(request.headers().accept?.includes('vnd.pgrst.object') ? profile : [profile]);
     }
+    // TRAK-13 (G6): an open player session re-checks consent (a read, over POST).
+    if (account === player && request.method() === 'POST' && url.pathname === '/rest/v1/rpc/my_consent_status') {
+      return json({ required: false, granted: true, invited_parent: null });
+    }
     if (account === parent) {
       if (url.pathname === '/rest/v1/player_parent_links' && request.method() === 'GET') return json([]);
       if (request.method() === 'POST') {
@@ -96,6 +100,8 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
           const id = (observed.body as { p_invite_id?: string }).p_invite_id;
           return json(id === zaraInvite ? zaraId : alexId);
         }
+        // TRAK-77: Matches lists the selected child's training (a read, over POST).
+        if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') {
           return json(claims.length ? [{ player_user_id: zaraId, full_name: 'Zara Example', age_years: 14 }] : []);
         }
@@ -157,7 +163,7 @@ test('shared phone switches from player to existing parent on the invitation and
 
   await page.getByRole('button', { name: 'Link Zara Example', exact: true }).click();
   await expect(page).toHaveURL(appOrigin + '/parent/consent');
-  await expect(page.getByRole('heading', { name: "Approve Zara's account", exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "Approve Zara Example's account", exact: true })).toBeVisible();
   expect(observed.claims).toEqual([{
     path: '/rest/v1/rpc/accept_parent_invite', method: 'POST',
     authorization: `Bearer ${observed.parent.access_token}`, body: { p_invite_id: zaraInvite },
@@ -228,6 +234,8 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
     if (request.method() === 'POST') {
       if (url.pathname === '/rest/v1/telemetry_events') return json(null, 201);
       if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') return json([]);
+      // TRAK-77: Matches lists the selected child's training (a read, over POST).
+      if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
       if (url.pathname === '/rest/v1/rpc/get_my_pending_parent_invites') return json(linked.has(zaraId) ? [] : [{
         invite_id: zaraInvite, player_user_id: zaraId, player_name: children[1].name,
         parent_email: parentEmail, expires_at: new Date(Date.now() + 86_400_000).toISOString(),
@@ -248,6 +256,12 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
     // No password/profile writes, provisioning, consent, logout or email calls
     // are permitted. An unexpected request must fail, not silently succeed.
     if (request.method() !== 'GET') return reject();
+    if (url.pathname === '/rest/v1/parental_consents') {
+      if (url.searchParams.get('parent_user_id') !== `eq.${parentId}`
+        || !linked.has((url.searchParams.get('player_user_id') ?? '').slice(3))
+        || url.searchParams.get('withdrawn_at') !== 'is.null') return reject();
+      return json([]);
+    }
     if (url.pathname === '/rest/v1/player_parent_links') {
       if (url.searchParams.get('parent_user_id') !== `eq.${parentId}`) return reject();
       memberships.push({ ids: [...linked], failed: failMembership });
@@ -368,7 +382,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   const allowedPosts = new Set([
     '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent',
     '/rest/v1/rpc/get_my_pending_parent_invites', '/rest/v1/rpc/get_parent_invite_by_token',
-    '/rest/v1/rpc/accept_parent_invite',
+    '/rest/v1/rpc/accept_parent_invite', '/rest/v1/rpc/family_training_history',
   ]);
   expect(observed.requests.filter(request => request.method !== 'GET')
     .every(request => request.method === 'POST' && allowedPosts.has(request.path))).toBe(true);

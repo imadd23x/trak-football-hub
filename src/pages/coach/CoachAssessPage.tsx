@@ -43,7 +43,7 @@ function OptPill({
   return (
     <button
       onClick={onClick}
-      className="rounded-[10px] p-[11px_8px] text-center text-[13px] font-medium transition-colors"
+      className="rounded-[10px] p-[11px_8px] text-center text-[13px] font-medium transition-colors disabled:opacity-40"
       style={{
         background: active ? 'rgba(200,242,90,0.12)' : '#0d0d0f',
         border: active ? '1.5px solid #C8F25A' : '1.5px solid rgba(255,255,255,0.06)',
@@ -690,7 +690,7 @@ function CoachAssessmentForm() {
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
             <div>
-              <label htmlFor="assess-message" className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
+              <label htmlFor="assess-message" className="text-[9px] font-medium tracking-[0.12em] uppercase text-sky-300/80" style={{ fontFamily: "'DM Mono', monospace" }}>
                 Message to {firstName}
               </label>
               <p className="text-[10px] text-white/45 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -708,7 +708,10 @@ function CoachAssessmentForm() {
             maxLength={300}
             rows={3}
             placeholder="e.g. Great week. Keep working on your first touch — try the cone drill before training."
-            className="w-full px-4 py-3 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none resize-none placeholder:text-white/20"
+            // Blue: words the player reads. The private note is yellow and the
+            // same size, so the two never look interchangeable (TRAK-72 item 7).
+            data-tone="message"
+            className="w-full px-4 py-3 rounded-[10px] bg-sky-400/[0.06] border border-sky-400/40 text-sm text-white/88 outline-none resize-none placeholder:text-white/20 disabled:opacity-40"
           />
           <p role="status" className="text-[10px] text-white/40" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             {liveUnchanged
@@ -728,7 +731,7 @@ function CoachAssessmentForm() {
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
             <div>
-              <label htmlFor="assess-note" className="text-[9px] font-medium tracking-[0.12em] uppercase text-white/45" style={{ fontFamily: "'DM Mono', monospace" }}>
+              <label htmlFor="assess-note" className="text-[9px] font-medium tracking-[0.12em] uppercase text-amber-200/80" style={{ fontFamily: "'DM Mono', monospace" }}>
                 Private note <span className="text-white/25">— optional</span>
               </label>
               <p className="text-[10px] text-white/45 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -746,7 +749,8 @@ function CoachAssessmentForm() {
             maxLength={300}
             rows={3}
             placeholder="e.g. First touch under pressure, positioning when defending set pieces"
-            className="w-full px-4 py-3 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none resize-none placeholder:text-white/20"
+            data-tone="private"
+            className="w-full px-4 py-3 rounded-[10px] bg-amber-300/[0.06] border border-amber-300/40 text-sm text-white/88 outline-none resize-none placeholder:text-white/20 disabled:opacity-40"
           />
         </div>
 

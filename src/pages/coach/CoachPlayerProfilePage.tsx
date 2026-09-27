@@ -159,12 +159,8 @@ export default function CoachPlayerProfilePage() {
                 <span className="h-5 px-2.5 rounded-full bg-white/[0.06] border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase text-white/45 inline-flex items-center"
                   style={{ fontFamily: "'DM Mono', monospace" }}>#{player.shirt_number}</span>
               )}
-              <span className="h-5 px-2.5 rounded-full bg-white/[0.06] border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase text-white/45 inline-flex items-center"
-                style={{ fontFamily: "'DM Mono', monospace" }}>
-                {assessmentsFailed && assessments.length === 0
-                  ? 'assessments unavailable'
-                  : `${assessments.length} assessments`}
-              </span>
+              {/* No assessment count here (TRAK-72 item 5). A failed read still
+                  shows its own error card below. */}
             </div>
           </div>
         </div>

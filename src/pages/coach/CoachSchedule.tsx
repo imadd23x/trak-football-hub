@@ -7,6 +7,7 @@ import { toInstant, localParts, normalizeInstant, calendarFields, calendarFields
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { trackEvent } from '@/lib/telemetry'
+import { useParked } from '@/components/trak/parked'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,8 @@ const BLANK_MODAL: AddEventModal = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CoachSchedule() {
+  // TRAK-85: parked, so actions say "Coming soon" and send nothing.
+  const { parked, comingSoon } = useParked()
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -200,6 +203,7 @@ export default function CoachSchedule() {
   }
 
   const saveEvent = async () => {
+    if (parked) return comingSoon()
     if (!user || !modal.title.trim()) return
     setSaving(true)
     // A naive string handed to timestamptz is read as UTC, so the coach's
@@ -234,6 +238,7 @@ export default function CoachSchedule() {
   }
 
   const togglePublish = async (ev: CalEvent) => {
+    if (parked) return comingSoon()
     if (ev.source !== 'calendar') return
     const current = calEvents.find(e => e.id === ev.id)
     const { error } = await supabase.from('coach_calendar_events')
@@ -244,6 +249,7 @@ export default function CoachSchedule() {
   }
 
   const deleteEvent = async (ev: CalEvent) => {
+    if (parked) return comingSoon()
     if (ev.source !== 'calendar') return
     const { error } = await supabase.from('coach_calendar_events').delete().eq('id', ev.id)
     if (error) { toast.error('Could not delete'); return }
@@ -252,6 +258,7 @@ export default function CoachSchedule() {
 
   // AI import
   const parseImport = async () => {
+    if (parked) return comingSoon()
     if (!importText.trim()) { toast.error('Paste some text first'); return }
     setParsing(true)
     try {
@@ -283,6 +290,7 @@ export default function CoachSchedule() {
   }
 
   const saveDraft = async (idx: number) => {
+    if (parked) return comingSoon()
     if (!user) return
     const ev = drafts[idx]
     const startsAt = normalizeInstant(ev.starts_at)
@@ -321,6 +329,7 @@ export default function CoachSchedule() {
   }
 
   const saveAllDrafts = async () => {
+    if (parked) return comingSoon()
     if (!user || !drafts.length) return
     // A draft the parser could not date is not silently dropped into the
     // calendar at the wrong moment — it is left behind and named.

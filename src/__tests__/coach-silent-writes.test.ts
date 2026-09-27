@@ -99,10 +99,16 @@ describe('routed coach surfaces do not treat a missing error as success', () => 
   // first: CoachProfilePage carried an identical copy, commented "same pattern
   // as CoachHomePage". The duplicate was deliberate, so a single-file check
   // would have proved nothing about the bug.
+  //
+  // TRAK-72 (26 Sep) removed the coach invite code from coach Home and Profile:
+  // players join through the academy roster (J1), so no coach surface
+  // generates a code any more. That is asserted, rather than letting the loop
+  // below run over nothing. Re-adding a generator fails here first, and the
+  // two checks below then apply to it.
   const codeGenerators = files.filter(f => f.code.includes('generateCode()'))
 
-  it('finds the invite-code generators', () => {
-    expect(codeGenerators.length, 'no coach surface generates an invite code').toBeGreaterThan(0)
+  it('no coach surface generates an invite code (TRAK-72)', () => {
+    expect(codeGenerators.map(f => f.name), 'a coach surface generates an invite code again').toEqual([])
   })
 
   for (const { name, code } of codeGenerators) {

@@ -111,6 +111,23 @@ describe('J5: one screen, message to the player, private note, publish', () => {
     expect(messageBox().compareDocumentPosition(noteBox()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  // TRAK-72 item 7: the player's message is blue, the private note yellow, and
+  // both are the same size, so the two can't be mistaken for each other.
+  it('colour-codes the message (blue) and the private note (yellow) at the same size', async () => {
+    showForm()
+    await choose('player-b')
+    await waitFor(() => expect(messageBox()).toBeEnabled())
+    const message = messageBox() as HTMLTextAreaElement
+    const note = noteBox() as HTMLTextAreaElement
+    expect(message.dataset.tone).toBe('message')
+    expect(note.dataset.tone).toBe('private')
+    expect(message.className).toMatch(/border-sky-/)
+    expect(note.className).toMatch(/border-amber-/)
+    expect(message.rows).toBe(note.rows)
+    expect(message.className.replace(/(bg|border)-(sky|amber)-\S+/g, ''))
+      .toBe(note.className.replace(/(bg|border)-(sky|amber)-\S+/g, ''))
+  })
+
   // TRAK-64 (Imad, 25 Sep): Save and Publish are the same action, one button.
   it('Save sends a new message to the player', async () => {
     showForm()

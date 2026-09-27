@@ -25,6 +25,7 @@ vi.mock('@/integrations/supabase/client', async () => {
 })
 
 const url = 'https://test.supabase.co'
+const orgNames: Record<string, string> = { 'org-a': 'Synthetic Academy', 'org-late': 'Late A academy', 'org-b': 'B academy' }
 const user = (id: string): User => ({ id, email: `${id}@synthetic.test.invalid`, aud: 'authenticated',
   app_metadata: {}, user_metadata: {}, created_at: '2026-09-18T00:00:00Z', email_confirmed_at: '2026-09-18T00:00:00Z' })
 const session = (id: string, token = `token-${id}`): Session => ({ user: user(id), access_token: token, refresh_token: `refresh-${id}`,
@@ -79,7 +80,16 @@ beforeEach(async () => {
       Object.assign(profiles[id], body)
       return rowResponse(request, { ...profiles[id] })
     }),
-    http.get(`${url}/rest/v1/coach_details`, ({ request }) => rowResponse(request, { current_club: 'Synthetic Academy', team: 'U15', coach_role: 'Head Coach' })),
+    // current_club is a stale free-text field; Settings must show the academy's name instead.
+    http.get(`${url}/rest/v1/coach_details`, ({ request }) => rowResponse(request, { current_club: 'Typed club', team: 'U15', coach_role: 'Head Coach', organization_id: 'org-a' })),
+    http.get(`${url}/rest/v1/organizations`, ({ request }) => {
+      const id = new URL(request.url).searchParams.get('id')?.slice(3) ?? ''
+      return rowResponse(request, orgNames[id] ? { name: orgNames[id] } : null)
+    }),
+    http.all(`${url}/rest/v1/coach_details`, ({ request }) => {
+      requests.push({ method: request.method, path: 'coach_details', authorization: request.headers.get('Authorization') })
+      return HttpResponse.json({ message: 'unexpected write' }, { status: 500 })
+    }),
     http.get(`${url}/rest/v1/player_details`, ({ request }) => rowResponse(request, { position: 'Midfielder', shirt_number: 0 })),
     http.get(`${url}/rest/v1/squad_players`, () => HttpResponse.json([])),
     http.get(`${url}/rest/v1/player_parent_links`, () => HttpResponse.json([])),
@@ -149,17 +159,16 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     expect(requests.filter(r => r.path === 'storage')).toEqual([])
   })
 
-  it('preserves name and coach drafts on a real same-user TOKEN_REFRESHED event', async () => {
+  it('preserves a coach name draft and does not reload coach details on a real same-user TOKEN_REFRESHED event', async () => {
     profiles.a.role = 'coach'
     let loads = 0
-    server.use(http.get(`${url}/rest/v1/coach_details`, ({ request }) => { loads++; return rowResponse(request, { current_club: 'Synthetic Academy', team: 'U15', coach_role: 'Head Coach' }) }),
+    server.use(http.get(`${url}/rest/v1/coach_details`, ({ request }) => { loads++; return rowResponse(request, { team: 'U15', coach_role: 'Head Coach', organization_id: 'org-a' }) }),
       http.post(`${url}/auth/v1/token`, () => HttpResponse.json(session('a', 'token-a-refreshed'))))
-    mount(); await ready(); await screen.findByDisplayValue('Synthetic Academy')
+    mount(); await ready(); await screen.findByText('Synthetic Academy')
     chooseName('Unsubmitted A name')
-    fireEvent.change(screen.getByPlaceholderText('Club name'), { target: { value: 'Unsubmitted A academy' } })
     await act(async () => { const { error } = await supabase.auth.refreshSession(); expect(error).toBeNull() })
     expect(screen.getByDisplayValue('Unsubmitted A name')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Unsubmitted A academy')).toBeInTheDocument()
+    expect(screen.getByText('Synthetic Academy')).toBeInTheDocument()
     expect(loads).toBe(1)
   })
 
@@ -167,16 +176,16 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     profiles.a.role = 'coach'; profiles.b.role = 'coach'
     const held = deferred(); let started = false; let failB = true
     server.use(http.get(`${url}/rest/v1/coach_details`, async ({ request }) => {
-      if (request.headers.get('Authorization') === 'Bearer token-a') { started = true; await held.promise; return rowResponse(request, { current_club: 'Late A academy' }) }
-      return failB ? HttpResponse.json({ message: 'unavailable' }, { status: 403 }) : rowResponse(request, { current_club: 'B academy' })
+      if (request.headers.get('Authorization') === 'Bearer token-a') { started = true; await held.promise; return rowResponse(request, { organization_id: 'org-late' }) }
+      return failB ? HttpResponse.json({ message: 'unavailable' }, { status: 403 }) : rowResponse(request, { organization_id: 'org-b' })
     }))
     mount(); await ready(); await waitFor(() => expect(started).toBe(true))
     await switchToB(); await screen.findByRole('alert')
     await act(async () => { held.resolve(); await held.promise; await new Promise(resolve => setTimeout(resolve, 20)) })
-    expect(screen.queryByDisplayValue('Late A academy')).not.toBeInTheDocument()
+    expect(screen.queryByText('Late A academy')).not.toBeInTheDocument()
     failB = false
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    await screen.findByDisplayValue('B academy')
+    await screen.findByText('B academy')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -259,20 +268,31 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     expect(screen.getAllByText('Not connected')).toHaveLength(2)
   })
 
-  it.each(['coach'] as const)('does not report a %s profile saved without a returned row, and allows retry', async role => {
-    profiles.a.role = role; let empty = true
-    server.use(http.post(`${url}/rest/v1/${role}_details`, ({ request }) => {
-      expect(request.headers.get('Authorization')).toBe('Bearer token-a')
-      return rowResponse(request, empty ? null : { user_id: 'a' })
-    }))
+  // TRAK-72 item 11 (25 Sep use-case test): Settings asked the coach to type a
+  // club name. Club, age group and role come from the academy and are read-only.
+  it('shows a coach their academy, age group and role read-only, and writes nothing', async () => {
+    profiles.a.role = 'coach'
     mount(); await ready()
-    await screen.findByDisplayValue('Synthetic Academy')
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
-    await waitFor(() => expect(messages.error).toHaveBeenCalledWith('Could not save profile'))
-    expect(messages.success).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
-    empty = false; fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
-    await waitFor(() => expect(messages.success).toHaveBeenCalledWith('Profile updated'))
+    await screen.findByText('Synthetic Academy')
+    expect(screen.getByText('U15')).toBeInTheDocument()
+    expect(screen.getByText('Head Coach')).toBeInTheDocument()
+    expect(screen.getByText('Your academy sets these. Ask them if something is wrong.')).toBeInTheDocument()
+    expect(screen.queryByText('Typed club')).toBeNull()
+    expect(screen.queryByPlaceholderText('Club name')).toBeNull()
+    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
+    // The only input left on the page is the display name, and only while editing it.
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(requests.filter(r => r.path === 'coach_details')).toEqual([])
+  })
+
+  it('shows a dash, not a typed club, for a coach with no academy', async () => {
+    profiles.a.role = 'coach'
+    server.use(http.get(`${url}/rest/v1/coach_details`, ({ request }) => rowResponse(request, { current_club: 'Typed club', team: null, coach_role: null, organization_id: null })))
+    mount(); await ready()
+    await screen.findByText('Your academy sets these. Ask them if something is wrong.')
+    expect(screen.getAllByText('—')).toHaveLength(3)
+    expect(screen.queryByText('Typed club')).toBeNull()
   })
 
   it('does not apply an A name response or success toast after B takes over', async () => {

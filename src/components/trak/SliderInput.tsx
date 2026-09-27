@@ -19,8 +19,10 @@ export const SliderInput = forwardRef<HTMLDivElement, SliderInputProps>(
     // 0..10 scale — 5 sits exactly at the centre of the track.
     const pct = (value / 10) * 100
 
+    // The real input is invisible, so a disabled slider (e.g. inside a locked
+    // fieldset) must be greyed out from here, or it looks usable.
     return (
-      <div ref={ref} className="space-y-2">
+      <div ref={ref} className="space-y-2 has-[:disabled]:opacity-40 has-[:disabled]:grayscale">
       {/* label row: category left, band word right */}
       <div className="flex justify-between items-center">
         <span className="text-[12px] font-medium text-white/[0.88]">

@@ -6,8 +6,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/integrations/supabase/client'
 import { IconHowItWorks } from '@/components/icons/TrakIcons'
 import { toast } from 'sonner'
+import { useParked } from '@/components/trak/parked'
 
 export default function ClubProfile() {
+  // TRAK-85: parked, so actions say "Coming soon" and send nothing.
+  const { parked, comingSoon } = useParked()
   const { user, profile } = useAuth()
   const navigate = useNavigate()
 
@@ -51,6 +54,7 @@ export default function ClubProfile() {
   }
 
   const copyCode = () => {
+    if (parked) return comingSoon()
     if (!joinCode) return
     navigator.clipboard.writeText(`TRK-${joinCode}`)
     setCopied(true)

@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
 import { UserMinus } from 'lucide-react'
+import { useParked } from '@/components/trak/parked'
 
 type CoachRow = {
   userId: string
@@ -22,6 +23,8 @@ function initials(name: string) {
 }
 
 export default function ClubCoaches() {
+  // TRAK-85: parked, so actions say "Coming soon" and send nothing.
+  const { parked, comingSoon } = useParked()
   const { user } = useAuth()
   const [coaches, setCoaches] = useState<CoachRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -110,11 +113,13 @@ export default function ClubCoaches() {
   }
 
   const copyCode = (code: string) => {
+    if (parked) return comingSoon()
     navigator.clipboard.writeText(`TRK-${code}`)
     toast.success('Invite code copied')
   }
 
   const handleRemoveCoach = async (coachUserId: string, coachName: string) => {
+    if (parked) return comingSoon()
     if (!confirm(`Remove ${coachName} from the academy? Their Trak account won't be affected — they just won't appear in your dashboard. Assessment history will be preserved.`)) return
 
     setRemoving(coachUserId)
@@ -139,7 +144,7 @@ export default function ClubCoaches() {
         {loading ? (
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>Loading…</div>
         ) : coaches.length === 0 ? (
-          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>No coaches connected yet. Share your academy code from your profile page.</div>
+          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, paddingTop: 8 }}>No coaches connected yet. Trak sets up your coaches' accounts.</div>
         ) : (
           coaches.map(c => (
             <ClubCard key={c.userId} className="p-4">
@@ -186,7 +191,7 @@ export default function ClubCoaches() {
       </div>
 
       <div className="px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, color: 'rgba(255,255,255,0.45)', fontSize: 12, lineHeight: 1.5 }}>
-        Tap a coach's invite code to copy it. Share codes with players to link them to their coach.
+        Players join through your academy's roster, not codes.
       </div>
     </ClubShell>
   )

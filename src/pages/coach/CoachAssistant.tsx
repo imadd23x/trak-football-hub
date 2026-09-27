@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, MetadataLabel, PitchDiagram, detectDiagrams, PRESETS } from '@/components/trak'
 import type { DiagramData } from '@/components/trak'
 import { trackEvent } from '@/lib/telemetry'
+import { useParked } from '@/components/trak/parked'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
 type Segment = { type: 'text'; content: string } | { type: 'diagram'; data: DiagramData }
@@ -94,6 +95,8 @@ function extractPlan(content: string) {
 }
 
 export default function CoachAssistant() {
+  // TRAK-85: parked, so actions say "Coming soon" and send nothing.
+  const { parked, comingSoon } = useParked()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [messages, setMessages] = useState<Msg[]>([])
@@ -122,6 +125,7 @@ export default function CoachAssistant() {
   }, [messages, isLoading])
 
   const send = async (textRaw?: string) => {
+    if (parked) return comingSoon()
     const text = (textRaw ?? input).trim()
     if (!text || isLoading) return
     const userMsg: Msg = { role: 'user', content: text }

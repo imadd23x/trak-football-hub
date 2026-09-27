@@ -6,6 +6,7 @@ import { MetadataLabel } from '@/components/trak'
 import { ChevronLeft, Sparkles, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { trackEvent } from '@/lib/telemetry'
+import { useParked } from '@/components/trak/parked'
 
 /**
  * T2 — the coach reviews every word before a child sees it.
@@ -37,6 +38,8 @@ function toPublishedText(draft: FeedbackDraft): string {
 }
 
 export default function CoachReviewFeedback() {
+  // TRAK-85: parked, so actions say "Coming soon" and send nothing.
+  const { parked, comingSoon } = useParked()
   const { assessmentId } = useParams<{ assessmentId: string }>()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -102,6 +105,7 @@ export default function CoachReviewFeedback() {
   }, [user, assessmentId])
 
   const generate = async () => {
+    if (parked) return comingSoon()
     if (!assessmentId) return
     setGenerating(true)
     setError(null)
@@ -134,6 +138,7 @@ export default function CoachReviewFeedback() {
   }
 
   const publish = async () => {
+    if (parked) return comingSoon()
     if (!draft || !squadPlayerId) return
     setPublishing(true)
     try {

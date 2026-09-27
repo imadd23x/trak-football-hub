@@ -6,6 +6,7 @@ import { MobileShell, NavBar } from '@/components/trak'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { captureElementToPng, shareOrSaveImage } from '@/lib/card-export'
+import { useParked } from '@/components/trak/parked'
 
 /**
  * TRAK Player Evolution Card
@@ -316,6 +317,8 @@ function computePositionQuests(
 }
 
 export default function PlayerEvolutionCard() {
+  // TRAK-85: parked, so actions say "Coming soon" and send nothing.
+  const { parked, comingSoon } = useParked()
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
@@ -488,6 +491,7 @@ export default function PlayerEvolutionCard() {
   // as plain writing. It now shares the card as an image, the way the passport
   // already did, through the one implementation in card-export.ts.
   const handleShare = async () => {
+    if (parked) return comingSoon()
     if (sharing) return
     setSharing(true)
     try {

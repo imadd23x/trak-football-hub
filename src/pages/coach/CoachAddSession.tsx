@@ -185,6 +185,13 @@ export default function CoachAddSession() {
     return () => { superseded = true }
   }, [user, rosterAttempt])
 
+  // A squad still loading is not an empty one (TRAK-72). Coaches don't add
+  // players: the academy roster decides the squad (#164).
+  const rosterEmpty = squad.length === 0 && notReady.length === 0 && !rosterFailed
+  const rosterEmptyText = rosterLoading
+    ? 'Loading your squad…'
+    : 'No squad yet. Players appear here once your academy adds them.'
+
   // Under each player list: why nobody is offered, or who is left out and why.
   const rosterNote = rosterFailed ? (
     <p role="alert" className="text-[12px] text-white/55 px-4 py-3" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -625,9 +632,9 @@ export default function CoachAddSession() {
                 </div>
               </div>
 
-              {squad.length === 0 && notReady.length === 0 && !rosterFailed ? (
-                <p className="px-4 pb-4 text-[12px] text-white/40">
-                  No squad yet. Add players from the Squad tab first.
+              {rosterEmpty ? (
+                <p role="status" className="px-4 pb-4 text-[12px] text-white/40">
+                  {rosterEmptyText}
                 </p>
               ) : (
                 <div className="divide-y divide-white/[0.05]">
@@ -966,8 +973,8 @@ export default function CoachAddSession() {
                     style={{ fontFamily: "'DM Mono', monospace" }}>NONE</button>
                 </div>
               </div>
-              {squad.length === 0 && notReady.length === 0 && !rosterFailed ? (
-                <p className="text-[12px] text-white/40 py-2">No squad yet. Add players from the Squad tab first.</p>
+              {rosterEmpty ? (
+                <p role="status" className="text-[12px] text-white/40 py-2">{rosterEmptyText}</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {squad.map(p => {
@@ -1033,8 +1040,8 @@ export default function CoachAddSession() {
                     style={{ fontFamily: "'DM Mono', monospace" }}>NONE</button>
                 </div>
               </div>
-              {squad.length === 0 && notReady.length === 0 && !rosterFailed ? (
-                <p className="text-[12px] text-white/40 py-2">No squad yet. Add players from the Squad tab first.</p>
+              {rosterEmpty ? (
+                <p role="status" className="text-[12px] text-white/40 py-2">{rosterEmptyText}</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {squad.map(p => {

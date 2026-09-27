@@ -85,9 +85,10 @@ describe('TRAK-47 parked feature boundary', () => {
 describe('retained coach entry points', () => {
   it('explains academy-managed admission without an Add Player action on coach Home', async () => {
     renderApp('/coach/home')
-    await screen.findByText('TRK-SYN047')
     expect(await screen.findByText('Your academy will add players to this squad.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add players to your squad/i })).toBeNull()
+    // TRAK-72: the coach invite code is gone from Home.
+    expect(screen.queryByText(/TRK-/)).toBeNull()
   })
 
   it('opens the full assessment from a populated coach Home', async () => {

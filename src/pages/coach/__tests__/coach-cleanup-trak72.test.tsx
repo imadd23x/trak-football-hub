@@ -147,3 +147,37 @@ describe('TRAK-72 item 4: one Player overview', () => {
     expect(screen.queryByText('Missed the last session')).toBeNull()
   })
 })
+
+// Item 11: every staff account Trak sets up has current_club = NULL, so a chip
+// that needed it never showed, and a stale typed club must not contradict the
+// academy.
+describe('TRAK-72 item 11: the club comes from the academy', () => {
+  function coachInAcademy(typedClub: string | null) {
+    signedInCoach()
+    server.use(
+      table('coach_details', [{ user_id: COACH.id, coach_role: 'Head Coach', team: 'U15s', current_club: typedClub, organization_id: 'org-72' }]),
+      table('organizations', [{ id: 'org-72', name: 'Synthetic Academy FC' }]),
+    )
+  }
+
+  it('Home shows the age group even though no club name was typed', async () => {
+    coachInAcademy(null)
+    renderApp('/coach/home')
+    expect(await screen.findByText('U15s')).toBeInTheDocument()
+  })
+
+  it('Profile names the academy and never shows a stale typed club', async () => {
+    coachInAcademy('Old Typed Club')
+    renderApp('/coach/profile')
+    expect(await screen.findByText('Synthetic Academy FC')).toBeInTheDocument()
+    expect(screen.getByText('U15s')).toBeInTheDocument()
+    expect(screen.queryByText('Old Typed Club')).toBeNull()
+  })
+
+  it('Home never shows a stale typed club either', async () => {
+    coachInAcademy('Old Typed Club')
+    renderApp('/coach/home')
+    expect(await screen.findByText('U15s')).toBeInTheDocument()
+    expect(screen.queryByText(/Old Typed Club/)).toBeNull()
+  })
+})

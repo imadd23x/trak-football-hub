@@ -136,7 +136,7 @@ export default function CoachHomePage() {
       .then(({ data, error }) => { if (error) { setLoadFailed(true); return } setAssessments(data || []) })
     supabase.from('coach_sessions').select('id', { count: 'exact' }).eq('coach_user_id', user.id)
       .then(({ count, error }) => { if (error) { setLoadFailed(true); return } setSessionCount(count || 0) })
-    supabase.from('coach_details').select('current_club, team, coach_role').eq('user_id', user.id).maybeSingle()
+    supabase.from('coach_details').select('team, coach_role').eq('user_id', user.id).maybeSingle()
       .then(({ data }) => setCoachDetails(data))
     // No coach invite code here any more (TRAK-72 item 1): players join through
     // the academy roster (J1), so a code on the coach's home did nothing.
@@ -251,7 +251,10 @@ export default function CoachHomePage() {
                 {coachDetails.coach_role}
               </span>
             )}
-            {coachDetails?.current_club && coachDetails?.team && (
+            {/* The age group alone (TRAK-72 item 11): it waited for the typed
+                current_club, which is empty for staff Trak sets up, so it never
+                showed. The academy's name is on Profile and Settings. */}
+            {coachDetails?.team && (
               <span
                 className="h-5 px-2.5 rounded-full border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase inline-flex items-center"
                 style={{
@@ -260,7 +263,7 @@ export default function CoachHomePage() {
                   color: 'rgba(255,255,255,0.45)',
                 }}
               >
-                {coachDetails.current_club} {coachDetails.team}
+                {coachDetails.team}
               </span>
             )}
           </div>

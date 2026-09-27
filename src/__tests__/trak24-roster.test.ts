@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { existsSync, rmSync } from 'node:fs'
+import { resolve } from 'node:path'
 // @ts-expect-error: plain .mjs script, no types
-import { rows, toCsv, COACHES } from '../../scripts/rehearsal/make-roster.mjs'
+import { rows, toCsv, COACHES, insideRepo } from '../../scripts/rehearsal/make-roster.mjs'
 import { parseCsv } from '../../scripts/load-roster.mjs'
 
+const REPO_ROOT = resolve(__dirname, '../..')
 const TODAY = new Date('2026-09-27T00:00:00Z')
 const PILOT_END = new Date('2026-11-29T00:00:00Z')
 const ageOn = (dob: string, day: Date) => {
@@ -47,5 +51,27 @@ describe('TRAK-24 rehearsal roster', () => {
 
   it('refuses an inbox that already carries a +tag', () => {
     expect(() => rows('tester+x@example.com', TODAY)).toThrow(/plain address/)
+  })
+
+  // Kostas's #169 review: the guard compared against the folder the script
+  // was run from, so `cd scripts && … --out ../x.csv` wrote real inboxes into
+  // the public repository.
+  it('treats any path under the repository root as inside, wherever it is run from', () => {
+    expect(insideRepo(resolve(REPO_ROOT, 'x.csv'), REPO_ROOT)).toBe(true)
+    expect(insideRepo(resolve(REPO_ROOT, 'scripts', '..', 'x.csv'), REPO_ROOT)).toBe(true)
+    expect(insideRepo(resolve(REPO_ROOT, '..data', 'x.csv'), REPO_ROOT)).toBe(true)
+    expect(insideRepo(resolve(REPO_ROOT, '..', 'outside.csv'), REPO_ROOT)).toBe(false)
+  })
+
+  it('refuses --out ../x.csv when run from scripts/, and writes nothing', () => {
+    const target = resolve(REPO_ROOT, 'leak-test.csv')
+    rmSync(target, { force: true })
+    const run = spawnSync(process.execPath, ['rehearsal/make-roster.mjs', '--inbox', 'tester@example.com', '--out', '../leak-test.csv'],
+      { cwd: resolve(REPO_ROOT, 'scripts'), encoding: 'utf8' })
+    const leaked = existsSync(target)
+    rmSync(target, { force: true })
+    expect(run.status).toBe(1)
+    expect(run.stderr).toMatch(/outside the repository/)
+    expect(leaked).toBe(false)
   })
 })

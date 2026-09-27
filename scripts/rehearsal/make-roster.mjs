@@ -16,8 +16,20 @@
 // the repository. Never commit the output or paste it into Slack or Linear;
 // load-roster.mjs itself prints only row numbers and counts.
 import { writeFile } from 'node:fs/promises';
-import { resolve, relative, isAbsolute } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { resolve, relative, isAbsolute, sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// The repository root, from this file's own location: scripts/rehearsal/.
+// Not the current folder, which is wherever the script happens to be run
+// from (Kostas, #169: `cd scripts && … --out ../x.csv` got past a cwd check).
+// Worked out when the command runs (a file: URL there), not at import.
+const repoRoot = () => fileURLToPath(new URL('../..', import.meta.url));
+
+/** True when `file` is the repository root or anywhere under it. */
+export function insideRepo(file, root = repoRoot()) {
+  const rel = relative(root, resolve(file));
+  return rel === '' || !(rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel));
+}
 
 export const COACHES = { U15: 'coach.u15@rehearsal.trak.dev', U17: 'coach.u17@rehearsal.trak.dev' };
 const SYNTH = 'rehearsal.trak.dev';
@@ -70,8 +82,7 @@ async function main() {
     (a.startsWith('--') ? [...acc, [a.slice(2), all[i + 1]]] : acc), []));
   if (!args.inbox || !args.out) throw new Error('Usage: --inbox you@gmail.com --out /path/outside/the/repo.csv');
   const out = resolve(args.out);
-  const rel = relative(process.cwd(), out);
-  if (!rel.startsWith('..') && !isAbsolute(rel)) throw new Error('--out must be outside the repository: the file holds real inboxes');
+  if (insideRepo(out)) throw new Error('--out must be outside the repository: the file holds real inboxes');
   const list = rows(args.inbox);
   await writeFile(out, toCsv(list), { mode: 0o600 });
   console.log(`[make-roster] ${list.length} children written (3 phone children, 22 that never sign up). Keep the file out of the repo and chat.`);

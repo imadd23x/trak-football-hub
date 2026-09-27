@@ -38,7 +38,8 @@ beforeEach(() => {
   state.role = 'player'
   server.use(
     table('player_details', [{ position: 'Midfielder', shirt_number: 8 }]),
-    table('coach_details', [{ current_club: 'Test Academy', team: 'U15', coach_role: 'Head Coach' }]),
+    table('coach_details', [{ team: 'U15', coach_role: 'Head Coach', organization_id: 'org-test' }]),
+    table('organizations', [{ name: 'Test Academy' }]),
     table('squad_players', []),
     table('player_parent_links', []),
   )
@@ -69,7 +70,8 @@ describe('settings controls reflect supported behavior', () => {
 
     // TRAK-71: a player has no position or shirt-number editor here.
     if (role === 'player') expect(screen.queryByDisplayValue('8')).toBeNull()
-    if (role === 'coach') await screen.findByDisplayValue('Test Academy')
+    // TRAK-72 item 11: the academy's name, shown read-only.
+    if (role === 'coach') await screen.findByText('Test Academy')
     if (role === 'parent') expect(screen.getByText('Linked children component')).toBeInTheDocument()
     expect(localStorage.getItem('trak.settings.v1')).toBe(legacy)
   })

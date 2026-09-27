@@ -28,6 +28,17 @@
 // Fix the line and run the same file again: children already admitted to
 // this academy are skipped by child_email and the rest load. A re-run never
 // changes a child who is already admitted.
+//
+// Invitations (TRAK-11 phase 3): right after each child is admitted, the
+// send-roster-invites function emails that child's guardians an invitation to
+// sign up. A skipped row is never invited, so a resumed load never re-sends. A
+// failed send doesn't undo or stop the admission; it is printed by line, and
+// the operator re-invites that child later. --no-invites loads without
+// emailing anyone: use it for every practice, rehearsal and synthetic load.
+// The key must be the project's legacy service_role JWT (the same value the
+// edge function sees as SUPABASE_SERVICE_ROLE_KEY).
+//
+//   node scripts/load-roster.mjs ... --apply --no-invites
 
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -136,11 +147,39 @@ export function planLoad(rows, admitted, org) {
   return { toLoad, skipped, conflicts };
 }
 
+// Admits each row in order, then (unless invite is null) asks for that child's
+// guardians to be invited. admit(row) resolves { data: rosterChildId, error };
+// invite(rosterChildId) resolves true when every invitation went. A refused
+// admission stops the load there; a failed invitation is only reported.
+export async function loadRows(toLoad, { admit, invite }, log) {
+  let loaded = 0;
+  let invited = 0;
+  const inviteFailed = [];
+  for (const r of toLoad) {
+    const { data: rosterChildId, error } = await admit(r);
+    if (error) {
+      // Rows before this one are admitted, each whole. A re-run skips them.
+      log(`[load-roster] Line ${r.line} refused (${error.code ?? 'error'}): ${error.message}`);
+      log(`[load-roster] Stopped. ${loaded} child(ren) admitted before line ${r.line}. Fix that line and run the same file again; admitted children are skipped.`);
+      return { loaded, invited, inviteFailed, stoppedAt: r.line };
+    }
+    loaded++;
+    if (!invite) continue;
+    if (await invite(rosterChildId).catch(() => false)) invited++;
+    else {
+      inviteFailed.push(r.line);
+      log(`[load-roster] Line ${r.line} admitted, but its invitation didn't go. Re-invite that child once the cause is fixed.`);
+    }
+  }
+  return { loaded, invited, inviteFailed };
+}
+
 function parseArgs(argv) {
-  const out = { apply: false };
+  const out = { apply: false, 'no-invites': false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--apply') out.apply = true;
+    else if (a === '--no-invites') out['no-invites'] = true;
     else if (['--file', '--org', '--loaded-by'].includes(a)) out[a.slice(2)] = argv[++i];
     else throw new Error(`Unknown argument: ${a}`);
   }
@@ -165,7 +204,7 @@ async function resolveCoaches(admin, emails) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.file || !args['loaded-by'] || !UUID.test(args.org ?? '')) {
-    throw new Error('Usage: --file <roster.csv> --org <academy uuid> --loaded-by <name> [--apply]');
+    throw new Error('Usage: --file <roster.csv> --org <academy uuid> --loaded-by <name> [--apply] [--no-invites]');
   }
   const { rows, errors } = validateRoster(await readFile(args.file, 'utf8'));
   const guardians = rows.reduce((n, r) => n + r.guardian_emails.length, 0);
@@ -176,6 +215,9 @@ async function main() {
     process.exitCode = 1;
     return;
   }
+  console.log(args['no-invites']
+    ? '[load-roster] --no-invites: nobody will be emailed.'
+    : `[load-roster] Loading will email up to ${guardians} guardian address(es) an invitation to sign up.`);
   if (!args.apply) {
     console.log('[load-roster] Dry run. Re-run with --apply to load.');
     return;
@@ -214,29 +256,31 @@ async function main() {
     console.log(`[load-roster] Line(s) ${skipped.join(', ')} already admitted to this academy; skipped, not changed.`);
   }
 
-  let loaded = 0;
-  for (const r of toLoad) {
-    const { error } = await admin.rpc('admit_roster_child', {
-      p_organization_id: args.org,
-      p_coach_user_id: coaches.get(r.coach_email),
-      p_child_name: r.child_name,
-      p_age_group: r.age_group,
-      p_date_of_birth: r.date_of_birth,
-      p_child_email: r.child_email,
-      p_guardian_emails: r.guardian_emails,
-      p_loaded_by: args['loaded-by'],
-      p_source_file: args.file.split('/').pop(),
+  const admit = (r) => admin.rpc('admit_roster_child', {
+    p_organization_id: args.org,
+    p_coach_user_id: coaches.get(r.coach_email),
+    p_child_name: r.child_name,
+    p_age_group: r.age_group,
+    p_date_of_birth: r.date_of_birth,
+    p_child_email: r.child_email,
+    p_guardian_emails: r.guardian_emails,
+    p_loaded_by: args['loaded-by'],
+    p_source_file: args.file.split('/').pop(),
+  });
+  const invite = args['no-invites'] ? null : async (rosterChildId) => {
+    const res = await fetch(`${url.replace(/\/+$/, '')}/functions/v1/send-roster-invites`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roster_child_id: rosterChildId }),
     });
-    if (error) {
-      // Rows before this one are admitted, each whole. A re-run skips them.
-      console.log(`[load-roster] Line ${r.line} refused (${error.code ?? 'error'}): ${error.message}`);
-      console.log(`[load-roster] Stopped. ${loaded} child(ren) admitted before line ${r.line}. Fix that line and run the same file again; admitted children are skipped.`);
-      process.exitCode = 1;
-      return;
-    }
-    loaded++;
-  }
+    const body = await res.json().catch(() => ({}));
+    return res.ok && body.failed === 0;
+  };
+  const { loaded, invited, inviteFailed, stoppedAt } = await loadRows(toLoad, { admit, invite }, console.log);
+  if (stoppedAt) { process.exitCode = 1; return; }
+  if (invite) console.log(`[load-roster] Invitations went for ${invited} child(ren); ${inviteFailed.length ? `not for line(s) ${inviteFailed.join(', ')}` : 'none failed'}.`);
   console.log(`[load-roster] Admitted ${loaded} child(ren) into ${args.org}; ${skipped.length} already admitted.`);
+  if (inviteFailed.length) process.exitCode = 1;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

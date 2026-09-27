@@ -21,6 +21,66 @@ export interface SquadAnalytics {
   needsAttention: { name: string; playerId: string; reason: string }[]
 }
 
+/**
+ * Who missed the coach's last training session (TRAK-72 item 4).
+ *
+ * A flag is a claim about a child, so every case that cannot support one says
+ * nothing rather than guessing:
+ *   - no session, or not a training: after a match, not playing is not missing;
+ *   - no attendance recorded for it: the coach did not take a register;
+ *   - a child still waiting for a parent: they cannot be ticked present (G1),
+ *     so their absence is not theirs;
+ *   - a child added to the roster after that session.
+ */
+export function missedLastSession(input: {
+  roster: { id: string; player_name: string; created_at?: string | null }[]
+  session: { session_date: string | null; session_type: string | null } | null
+  present: Set<string>
+  waitingForParent: Set<string>
+}): { playerId: string; name: string }[] {
+  const { roster, session, present, waitingForParent } = input
+  if (!session?.session_date || session.session_type !== 'training' || present.size === 0) return []
+  // Joined on the session's day or earlier. created_at is UTC and the date is
+  // the coach's local day, so compare by the day after, not to the minute.
+  const joinedBy = Date.parse(`${session.session_date}T00:00:00Z`) + 24 * 60 * 60 * 1000
+  return roster
+    .filter(p => !present.has(p.id) && !waitingForParent.has(p.id))
+    .filter(p => {
+      const joined = p.created_at ? Date.parse(p.created_at) : NaN
+      return !Number.isNaN(joined) && joined < joinedBy
+    })
+    .map(p => ({ playerId: p.id, name: p.player_name }))
+}
+
+export interface PlayerOverviewRow {
+  playerId: string
+  name: string
+  flags: { kind: 'attention' | 'missed' | 'improved'; label: string }[]
+}
+
+/**
+ * One "Player overview" list (TRAK-72 item 4): Needs Attention and Most
+ * Improved used to be two cards. One row per player, carrying every short flag
+ * that applies. Players who need attention come first, in the existing
+ * severity order, then missed-the-last-session, then most improved.
+ */
+export function playerOverview(
+  analytics: Pick<SquadAnalytics, 'needsAttention' | 'mostImproved'>,
+  missed: { playerId: string; name: string }[],
+): PlayerOverviewRow[] {
+  const rows = new Map<string, PlayerOverviewRow>()
+  const add = (playerId: string, name: string, flag: PlayerOverviewRow['flags'][number]) => {
+    const row = rows.get(playerId) ?? { playerId, name, flags: [] }
+    row.flags.push(flag)
+    rows.set(playerId, row)
+  }
+  for (const a of analytics.needsAttention) add(a.playerId, a.name, { kind: 'attention', label: a.reason })
+  for (const m of missed) add(m.playerId, m.name, { kind: 'missed', label: 'Missed the last session' })
+  const mi = analytics.mostImproved
+  if (mi) add(mi.playerId, mi.name, { kind: 'improved', label: `Most improved ↑ +${mi.improvement.toFixed(1)}` })
+  return [...rows.values()]
+}
+
 export function calculateSquadAnalytics(
   players: { id: string; player_name: string }[],
   // Nullable, because PostgREST returns it nullable and the caller was casting

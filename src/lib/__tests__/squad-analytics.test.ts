@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { calculateSquadAnalytics } from '../squad-analytics'
+import { calculateSquadAnalytics, missedLastSession, playerOverview } from '../squad-analytics'
 
 function makeAssessment(
   id: string,
@@ -276,5 +276,66 @@ describe('calculateSquadAnalytics', () => {
     const playerFlags = result.needsAttention.filter(n => n.playerId === 'p1')
     expect(playerFlags).toHaveLength(1)
     expect(playerFlags[0].reason).toBe('No assessment in 14+ days')
+  })
+})
+
+// TRAK-72 item 4: one Player overview, including "missed the last session".
+describe('missedLastSession', () => {
+  const roster = [
+    { id: 'here', player_name: 'Here', created_at: '2026-09-01T10:00:00Z' },
+    { id: 'away', player_name: 'Away', created_at: '2026-09-01T10:00:00Z' },
+    { id: 'waiting', player_name: 'Waiting', created_at: '2026-09-01T10:00:00Z' },
+    { id: 'new', player_name: 'New', created_at: '2026-09-21T09:00:00Z' },
+    { id: 'undated', player_name: 'Undated', created_at: null },
+  ]
+  const training = { session_date: '2026-09-20', session_type: 'training' }
+  const base = { roster, session: training, present: new Set(['here']), waitingForParent: new Set(['waiting']) }
+
+  it('flags only a rostered, consented child who was not ticked present', () => {
+    expect(missedLastSession(base)).toEqual([{ playerId: 'away', name: 'Away' }])
+  })
+
+  it('never flags a child waiting for a parent: they could not be ticked present', () => {
+    expect(missedLastSession({ ...base, waitingForParent: new Set() }).map(m => m.playerId)).toContain('waiting')
+    expect(missedLastSession(base).map(m => m.playerId)).not.toContain('waiting')
+  })
+
+  it('never flags a child who joined the roster after that session', () => {
+    expect(missedLastSession(base).map(m => m.playerId)).not.toContain('new')
+    const sameDay = { ...base, roster: [{ id: 'sameday', player_name: 'Same day', created_at: '2026-09-20T18:00:00Z' }] }
+    expect(missedLastSession(sameDay)).toEqual([{ playerId: 'sameday', name: 'Same day' }])
+  })
+
+  it('says nothing after a match, without a register, or without a session', () => {
+    expect(missedLastSession({ ...base, session: { session_date: '2026-09-20', session_type: 'match' } })).toEqual([])
+    expect(missedLastSession({ ...base, present: new Set() })).toEqual([])
+    expect(missedLastSession({ ...base, session: null })).toEqual([])
+    expect(missedLastSession({ ...base, session: { session_date: null, session_type: 'training' } })).toEqual([])
+  })
+})
+
+describe('playerOverview', () => {
+  it('merges every flag for a player into one row, attention first, then missed, then most improved', () => {
+    const rows = playerOverview(
+      {
+        needsAttention: [{ playerId: 'a', name: 'Alex', reason: 'No assessment in 14+ days' }],
+        mostImproved: { playerId: 'b', name: 'Bella', improvement: 1.25 },
+      },
+      [{ playerId: 'b', name: 'Bella' }, { playerId: 'a', name: 'Alex' }],
+    )
+    expect(rows).toEqual([
+      { playerId: 'a', name: 'Alex', flags: [
+        { kind: 'attention', label: 'No assessment in 14+ days' },
+        { kind: 'missed', label: 'Missed the last session' },
+      ] },
+      { playerId: 'b', name: 'Bella', flags: [
+        { kind: 'missed', label: 'Missed the last session' },
+        { kind: 'improved', label: 'Most improved ↑ +1.3' },
+      ] },
+    ])
+  })
+
+  it('is empty when nothing applies', () => {
+    expect(playerOverview({ needsAttention: [], mostImproved: null }, [])).toEqual([])
   })
 })

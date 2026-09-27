@@ -76,7 +76,9 @@ export default function CoachProfilePage() {
           <div className="flex justify-center gap-1.5 mt-2 flex-wrap">
             {/* Role, then the age group they coach (coach_details.team, e.g.
                 "U15s"), side by side (TRAK-72 item 9). The age group used to
-                show only when a club name was also set, so it never did. */}
+                show only when a club name was also set, so it never did. The
+                club is the academy card below (TRAK-72 item 11): the typed
+                current_club is empty for staff Trak sets up. */}
             {details?.coach_role && (
               <span className="h-5 px-2.5 rounded-full bg-white/[0.06] border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase text-white/45 inline-flex items-center"
                 style={{ fontFamily: "'DM Mono', monospace" }}>{details.coach_role}</span>
@@ -84,10 +86,6 @@ export default function CoachProfilePage() {
             {details?.team && (
               <span className="h-5 px-2.5 rounded-full bg-white/[0.06] border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase text-white/45 inline-flex items-center"
                 style={{ fontFamily: "'DM Mono', monospace" }}>{details.team}</span>
-            )}
-            {details?.current_club && (
-              <span className="h-5 px-2.5 rounded-full bg-white/[0.06] border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase text-white/45 inline-flex items-center"
-                style={{ fontFamily: "'DM Mono', monospace" }}>{details.current_club}</span>
             )}
           </div>
         </div>

@@ -19,6 +19,8 @@ function signedInAthlete() {
     // The Matches screen also lists training (TRAK-76); none here, so the
     // match assertions stay about matches.
     rpc('family_training_history', () => []),
+    // An open player session re-checks consent (G6, PlayerConsentWatcher).
+    rpc('my_consent_status', () => ({ required: false, granted: true, invited_parent: null })),
   )
 }
 

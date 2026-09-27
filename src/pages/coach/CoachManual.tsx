@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { MobileShell } from '@/components/trak'
 import {
-  IconOverview, IconSquad, IconCode, IconMatch, IconTraining,
+  IconOverview, IconSquad, IconMatch, IconTraining,
   IconAssess, IconProgress, IconAward, IconParentLink, IconSessions, IconTips,
 } from '@/components/icons/TrakIcons'
 
@@ -60,20 +60,10 @@ function ContentSquad() {
       <p>Your squad is the list of players you coach. Each player can exist in two states:</p>
       <div className="space-y-2">
         <StatusRow label="Unlinked" color="rgba(255,255,255,0.5)" dot="rgba(255,255,255,0.2)" desc="You've added the player's name and position. They appear in your squad but have no TRAK account yet." />
-        <StatusRow label="Linked" color="#C8F25A" dot="#C8F25A" desc="The player created a TRAK account and entered your invite code. Their match history, evolution card and passport are now live." />
+        <StatusRow label="Linked" color="#C8F25A" dot="#C8F25A" desc="The player's account is connected to their place on your roster. Their match history, evolution card and passport are now live." />
       </div>
       <Rule>Go to <b className="text-white/80">Squad → +</b> to add a player. Name, position and age group is all you need.</Rule>
       <p>Once a player links their account, any assessments or match logs you create for them automatically appear in their profile.</p>
-    </div>
-  )
-}
-
-function ContentInvite() {
-  return (
-    <div className="space-y-3 text-[13px] leading-relaxed text-white/60">
-      <p>Every coach has a unique invite code visible on your Profile tab (format: <b className="text-white/80">TRK-XXXX</b>). Share this with your players when you ask them to sign up.</p>
-      <p>When a player enters your code during onboarding, they're automatically added to your squad and their TRAK account is linked to their squad record. Any assessment or session you've already logged for them becomes visible immediately.</p>
-      <Rule>Players enter your code during sign-up. Existing players can link via Settings → Connections.</Rule>
     </div>
   )
 }
@@ -216,7 +206,6 @@ function ContentSchedule() {
 function ContentTips() {
   const steps: [string, string][] = [
     ["Add your full squad", "Even players without a TRAK account yet. You can assess them immediately — they will see the history when they join."],
-    ["Share your invite code", "Send a WhatsApp to your group chat with your TRK-XXXX code and a link to trakfootball.com. Ask players to sign up before your next session."],
     ["Log your next match with Quick Log", "Do it pitch-side at full time. Takes 90 seconds. This is the fastest way to show players that TRAK is real and active."],
     ["Do one full assessment per player", "After your first session, fill in the 6-dimension form for each player. This seeds their OVR and unlocks their card."],
     ["Give out one award", "Recognition costs nothing and means everything. Start with a Player of the Week after your first match."],
@@ -253,7 +242,6 @@ interface Section {
 const SECTIONS: Section[] = [
   { id: 'overview',    Icon: IconOverview,    title: 'What is TRAK?',          subtitle: 'The big picture',                    Content: ContentOverview    },
   { id: 'squad',       Icon: IconSquad,       title: 'Building Your Squad',    subtitle: 'Adding players and linking accounts', Content: ContentSquad       },
-  { id: 'invite',      Icon: IconCode,        title: 'Your Invite Code',       subtitle: 'How players connect to you',          Content: ContentInvite      },
   { id: 'matches',     Icon: IconMatch,       title: 'Logging Matches',        subtitle: 'Quick log vs full session',           Content: ContentMatches     },
   { id: 'training',    Icon: IconTraining,    title: 'Logging Training',       subtitle: 'Tracking attendance and sessions',    Content: ContentTraining    },
   { id: 'assessments', Icon: IconAssess,      title: 'Assessing Players',      subtitle: 'The 6-dimension framework',           Content: ContentAssessments },
@@ -320,7 +308,7 @@ export default function CoachManual() {
           <ChevronLeft size={14} className="text-white/88" />
         </button>
         <div>
-          <p className="text-[16px] font-medium text-white/88 leading-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>Coach Manual</p>
+          <p className="text-[16px] font-medium text-white/88 leading-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>How Trak works</p>
           <p className="text-[10px] text-white/30" style={{ fontFamily: "'DM Mono', monospace" }}>{SECTIONS.length} SECTIONS</p>
         </div>
       </div>

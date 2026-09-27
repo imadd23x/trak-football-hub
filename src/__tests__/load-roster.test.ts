@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { parseCsv, planLoad, validateRoster } from '../../scripts/load-roster.mjs'
+import { describe, expect, it, vi } from 'vitest'
+import { loadRows, parseCsv, planLoad, validateRoster } from '../../scripts/load-roster.mjs'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
 // written. Synthetic addresses only.
@@ -87,5 +87,51 @@ describe('load-roster validation', () => {
       skipped: [], conflicts: [3],
     })
     expect(planLoad(rows, [], org).toLoad).toHaveLength(3)
+  })
+})
+
+// TRAK-11 phase 3: after each admission the loader asks send-roster-invites to
+// invite that child's guardians. A skipped row is never invited, a failed send
+// never undoes or stops an admission, and --no-invites (invite = null) sends
+// nothing.
+describe('load-roster invitations', () => {
+  const rows = validateRoster(file(
+    'One Kid,2013-03-04,U13,kid1@roster.test,g1@roster.test,coach@roster.test',
+    'Two Kid,2013-05-06,U13,kid2@roster.test,g2@roster.test,coach@roster.test',
+    'Three Kid,2013-07-08,U13,kid3@roster.test,g3@roster.test,coach@roster.test',
+  ), TODAY).rows
+  const admitted: Parameters<typeof loadRows>[1]['admit'] = (r) => Promise.resolve({ data: `roster-${r.line}`, error: null })
+
+  it('invites once per admitted child, never for a row skipped as already admitted', async () => {
+    const { toLoad } = planLoad(rows, [{ child_email: 'kid2@roster.test', organization_id: 'org' }], 'org')
+    const invite = vi.fn().mockResolvedValue(true)
+    const out = await loadRows(toLoad, { admit: vi.fn(admitted), invite }, () => {})
+    expect(invite.mock.calls).toEqual([['roster-2'], ['roster-4']])
+    expect(out).toMatchObject({ loaded: 2, invited: 2, inviteFailed: [] })
+  })
+
+  it('sends nothing with --no-invites', async () => {
+    const out = await loadRows(rows, { admit: vi.fn(admitted), invite: null }, () => {})
+    expect(out).toMatchObject({ loaded: 3, invited: 0, inviteFailed: [] })
+  })
+
+  it('keeps loading after a failed send, and names the line without an address', async () => {
+    const admit = vi.fn(admitted)
+    const invite = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false).mockRejectedValueOnce(new Error('offline g3@roster.test'))
+    const log: string[] = []
+    const out = await loadRows(rows, { admit, invite }, (m: string) => log.push(m))
+    expect(admit).toHaveBeenCalledTimes(3)
+    expect(out).toMatchObject({ loaded: 3, invited: 1, inviteFailed: [3, 4] })
+    expect(log.join('\n')).toMatch(/line 3/i)
+    expect(log.join('\n')).not.toMatch(/@/)
+  })
+
+  it('stops at a refused admission and invites nobody for that line', async () => {
+    const admit = vi.fn(admitted).mockResolvedValueOnce({ data: 'roster-2', error: null })
+      .mockResolvedValueOnce({ data: null, error: { code: '23514', message: 'refused' } })
+    const invite = vi.fn().mockResolvedValue(true)
+    const out = await loadRows(rows, { admit, invite }, () => {})
+    expect(invite.mock.calls).toEqual([['roster-2']])
+    expect(out).toMatchObject({ loaded: 1, invited: 1, stoppedAt: 3 })
   })
 })

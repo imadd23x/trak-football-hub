@@ -38,7 +38,6 @@ async function reachParentStep(email: string) {
 
   const [position, ageGroup] = await screen.findAllByRole('combobox')
   fireEvent.change(position, { target: { value: (position as HTMLSelectElement).options[1].value } })
-  fireEvent.change(screen.getByPlaceholderText('Current club'), { target: { value: 'Synthetic FC' } })
   fireEvent.change(ageGroup, { target: { value: lowestEligibleAgeGroup(dob) } })
   fireEvent.click(screen.getByRole('button', { name: 'Next' }))
   return screen.findByPlaceholderText("Parent or guardian's email")

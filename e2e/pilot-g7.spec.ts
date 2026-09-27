@@ -32,6 +32,8 @@ for (const role of ['player', 'coach', 'club'] as const) {
         return failFeedback ? json({ message: 'Synthetic failure' }, 503) : json({ body: 'Look up before receiving. Your coach wrote this.' })
       }
       if (url.pathname === `/rest/v1/${role}_details`) return json({})
+      // TRAK-13 (G6): an open player session re-checks consent (a read, over POST).
+      if (role === 'player' && url.pathname === '/rest/v1/rpc/my_consent_status') return json({ required: false, granted: true, invited_parent: null })
       if (['/rest/v1/squad_players', '/rest/v1/player_parent_links', '/rest/v1/coach_sessions', '/rest/v1/coach_assessments'].includes(url.pathname)) return json([])
       unexpected.push(request.method() + ' ' + url.pathname)
       return json({ message: 'Unmocked request blocked' }, 500)

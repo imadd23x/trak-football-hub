@@ -20,3 +20,11 @@ export declare function planLoad(
   admitted: { child_email: string; organization_id: string }[],
   org: string,
 ): { toLoad: RosterRow[]; skipped: number[]; conflicts: number[] }
+export declare function loadRows(
+  toLoad: RosterRow[],
+  deps: {
+    admit(row: RosterRow): Promise<{ data: string | null; error: { code?: string; message: string } | null }>
+    invite: ((rosterChildId: string) => Promise<boolean>) | null
+  },
+  log: (message: string) => void,
+): Promise<{ loaded: number; invited: number; inviteFailed: number[]; stoppedAt?: number }>

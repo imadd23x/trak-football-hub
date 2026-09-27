@@ -67,7 +67,8 @@ describe('settings controls reflect supported behavior', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Delete my account' })).toBeEnabled()
 
-    if (role === 'player') await screen.findByDisplayValue('8')
+    // TRAK-71: a player has no position or shirt-number editor here.
+    if (role === 'player') expect(screen.queryByDisplayValue('8')).toBeNull()
     if (role === 'coach') await screen.findByDisplayValue('Test Academy')
     if (role === 'parent') expect(screen.getByText('Linked children component')).toBeInTheDocument()
     expect(localStorage.getItem('trak.settings.v1')).toBe(legacy)
@@ -95,7 +96,7 @@ describe('settings controls reflect supported behavior', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }))
       expect(confirm).toHaveBeenCalledWith(expect.stringContaining('academy history and consent records may be retained'))
       expect(confirm).not.toHaveBeenCalledWith(expect.stringContaining('deletes all your data'))
-      await screen.findByDisplayValue('8')
+      expect(await screen.findByRole('button', { name: 'Delete my account' })).toBeEnabled()
       expect(deletion).not.toHaveBeenCalled()
       expect(state.signOut).not.toHaveBeenCalled()
     } finally {

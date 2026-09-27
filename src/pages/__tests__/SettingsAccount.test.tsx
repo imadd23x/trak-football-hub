@@ -8,6 +8,7 @@ import { server } from '../../../tests/msw/server'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/integrations/supabase/client'
 import Settings from '../Settings'
+import { PlayerConnections } from '@/components/player/PlayerConnections'
 
 const messages = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: messages.success, error: messages.error, warning: vi.fn() } }))
@@ -95,6 +96,9 @@ function mount() {
     <Controls /><Routes><Route path="/settings" element={<Settings />} /><Route path="/" element={<h1>Signed out landing</h1>} /></Routes>
   </AuthProvider></MemoryRouter></QueryClientProvider>)
 }
+function mountConnections() {
+  return render(<QueryClientProvider client={client}><MemoryRouter><AuthProvider><PlayerConnections /></AuthProvider></MemoryRouter></QueryClientProvider>)
+}
 async function ready() { await screen.findByRole('button', { name: 'Synthetic Parent A' }) }
 async function switchToB() {
   fireEvent.click(screen.getByRole('button', { name: 'Sign in B' }))
@@ -176,7 +180,18 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('supports plural guardians/coaches without blocking the player profile or losing zero shirt numbers', async () => {
+  // TRAK-71 (25 Sep): position and shirt number are coach-owned, and the
+  // player's connections moved to the Profile tab (PlayerConnections).
+  it('gives a player no position or shirt-number editor and no connections in Settings', async () => {
+    profiles.a.role = 'player'
+    mount(); await ready()
+    expect(screen.queryByText('Position')).toBeNull()
+    expect(screen.queryByText('Shirt number')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
+    expect(screen.queryByText('Connections')).toBeNull()
+  })
+
+  it('lists plural guardians and coaches in PlayerConnections', async () => {
     profiles.a.role = 'player'
     const writes: unknown[] = []
     server.use(
@@ -188,18 +203,12 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
         }
         return rowResponse(request, { ...profiles.a })
       }),
-      http.post(`${url}/rest/v1/player_details`, async ({ request }) => {
-        expect(request.headers.get('Authorization')).toBe('Bearer token-a')
-        writes.push(await request.json()); return rowResponse(request, { user_id: 'a' })
-      }),
     )
-    mount(); await ready(); await screen.findByDisplayValue('0')
+    mountConnections()
     await screen.findByText('Synthetic Guardian One, Synthetic Guardian Two')
     expect(screen.getByText('Synthetic Coach One, Linked coach')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
-    await waitFor(() => expect(messages.success).toHaveBeenCalledWith('Profile updated'))
-    expect(writes).toEqual([{ user_id: 'a', position: 'Midfielder', shirt_number: 0 }])
+    expect(writes).toEqual([])
   })
 
   it('shows only active coaches while retained departed roster history remains readable', async () => {
@@ -233,34 +242,31 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
         return rowResponse(request, { ...profiles.a })
       }),
     )
-    mount(); await ready(); await screen.findByText(/Synthetic Current Coach/)
+    mountConnections(); await screen.findByText(/Synthetic Current Coach/)
     expect(selectedStatuses).toEqual(['eq.active'])
     expect(screen.queryByText(/Synthetic (Former|Archived|Released) Coach/)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
     expect(roster).toHaveLength(4)
   })
 
-  it('keeps player edits independent of connection failure and retries connections without resetting a draft', async () => {
+  it('says when connections failed and recovers on retry', async () => {
     profiles.a.role = 'player'; let fail = true
     server.use(http.get(`${url}/rest/v1/player_parent_links`, () => fail
       ? HttpResponse.json({ message: 'unavailable' }, { status: 403 }) : HttpResponse.json([])))
-    mount(); await ready(); const shirt = await screen.findByDisplayValue('0')
+    mountConnections()
     await screen.findByRole('button', { name: 'Retry connections' })
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
-    fireEvent.change(shirt, { target: { value: '9' } })
     fail = false; fireEvent.click(screen.getByRole('button', { name: 'Retry connections' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry connections' })).not.toBeInTheDocument())
-    expect(screen.getByDisplayValue('9')).toBeInTheDocument()
+    expect(screen.getAllByText('Not connected')).toHaveLength(2)
   })
 
-  it.each(['coach', 'player'] as const)('does not report a %s profile saved without a returned row, and allows retry', async role => {
+  it.each(['coach'] as const)('does not report a %s profile saved without a returned row, and allows retry', async role => {
     profiles.a.role = role; let empty = true
     server.use(http.post(`${url}/rest/v1/${role}_details`, ({ request }) => {
       expect(request.headers.get('Authorization')).toBe('Bearer token-a')
       return rowResponse(request, empty ? null : { user_id: 'a' })
     }))
     mount(); await ready()
-    await screen.findByDisplayValue(role === 'coach' ? 'Synthetic Academy' : '0')
+    await screen.findByDisplayValue('Synthetic Academy')
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(messages.error).toHaveBeenCalledWith('Could not save profile'))
     expect(messages.success).not.toHaveBeenCalled()

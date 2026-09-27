@@ -8,7 +8,8 @@
  *   3  the Sessions tile opens session history
  *   5  no assessment count under a player's name
  *   9  the coach's age group sits next to their role
- *  10  "How Trak works", not "Coach manual"
+ *  10  "How Trak works", not "Coach manual", and it no longer tells coaches
+ *      to share an invite code
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
@@ -88,6 +89,27 @@ describe('TRAK-72 coach Profile', () => {
     expect(screen.queryByText(/invite code/i)).toBeNull()
     await new Promise(resolve => setTimeout(resolve, 50))
     expect(writes).toEqual([])
+  })
+})
+
+describe('TRAK-72 How Trak works', () => {
+  it('never tells the coach to share an invite code, in any section', async () => {
+    signedInCoach()
+    renderApp('/coach/manual')
+    await screen.findByText('How Trak works')
+    expect(screen.queryByText(/invite code/i)).toBeNull()
+    // Sections render their body only while open, and one opens at a time,
+    // so open each in turn and check what it shows.
+    const titles = ['What is TRAK?', 'Building Your Squad', 'Logging Matches', 'Logging Training',
+      'Assessing Players', 'The Rating System', 'Recognition & Awards', 'Parent Connections',
+      'The Smart Calendar', 'Tips for Getting Started']
+    for (const title of titles) {
+      const header = screen.getByText(title)
+      if (!header.closest('button')!.nextElementSibling) await userEvent.click(header)
+      expect(header.closest('button')!.nextElementSibling).not.toBeNull()
+      expect(screen.queryByText(/TRK-/)).toBeNull()
+      expect(screen.queryByText(/invite code|your code/i)).toBeNull()
+    }
   })
 })
 

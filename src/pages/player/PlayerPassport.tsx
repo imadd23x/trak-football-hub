@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { scoreToBand } from '@/lib/rating-engine'
 import { toast } from 'sonner'
 import { captureElementToPng, shareOrSaveImage } from '@/lib/card-export'
+import { useParked } from '@/components/trak/parked'
 
 type BandKey = 'exceptional' | 'standout' | 'good' | 'steady' | 'mixed' | 'developing' | 'difficult'
 
@@ -59,6 +60,8 @@ const MONO: React.CSSProperties = { fontFamily: "'DM Mono', monospace" }
 const SANS: React.CSSProperties = { fontFamily: "'DM Sans', sans-serif" }
 
 export default function PlayerPassport() {
+  // TRAK-85: parked, so actions say "Coming soon" and send nothing.
+  const { parked, comingSoon } = useParked()
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -167,6 +170,7 @@ export default function PlayerPassport() {
   })
 
   const handleShare = async () => {
+    if (parked) return comingSoon()
     setExporting(true)
     try {
       const outcome = await shareOrSaveImage(await captureCard(), {
@@ -179,6 +183,7 @@ export default function PlayerPassport() {
   }
 
   const handleDownload = async () => {
+    if (parked) return comingSoon()
     setExporting(true)
     try {
       const blob = await captureCard()

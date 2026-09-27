@@ -227,6 +227,9 @@ SELECT pg_temp.ce_refused(format('UPDATE public.coach_shared_feedback SET body =
 -- ── 3b. Unknown age fails closed (MVP J1: a missing DOB counts as a minor) ──
 
 -- A roster row with no account behind it cannot hold consent.
+-- Since TRAK-48 slice 4 (#164) only the operator creates squad rows.
+RESET ROLE;
+SET LOCAL ROLE service_role;
 DO $test$
 DECLARE v_sp uuid;
 BEGIN
@@ -235,6 +238,8 @@ BEGIN
   PERFORM set_config('trak.ce_unknown', v_sp::text, true);
 END;
 $test$;
+RESET ROLE;
+SET LOCAL ROLE authenticated;
 SELECT pg_temp.ce_refused(format('INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, work_rate, tactical, attitude, technical, physical, coachability) VALUES (%L, %L, 7,7,7,7,7,7)',
   pg_temp.ce(10), current_setting('trak.ce_unknown')),
   '3b G1 an unlinked, unknown-age child cannot be assessed without consent');

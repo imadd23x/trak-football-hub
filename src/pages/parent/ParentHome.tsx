@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
-import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches } from '@/hooks/useParentData'
+import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches, useRosterChildrenAwaitingConsent } from '@/hooks/useParentData'
 import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
 import { BANDS } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
@@ -16,6 +16,11 @@ export default function ParentHome() {
   const matchQuery = useParentMatches()
   const developmentQuery = useParentDevelopment()
   const consentQuery = useChildrenAwaitingConsent()
+  const rosterConsentQuery = useRosterChildrenAwaitingConsent()
+  // Children waiting on this guardian: with an account, and rostered ones who
+  // have none yet (TRAK-11 phase 4; first names only).
+  const waitingNames = [...(consentQuery.data ?? []).map(child => child.full_name),
+    ...(rosterConsentQuery.data ?? []).map(child => child.first_name)]
   const matches = matchQuery.data ?? []
   const development = developmentQuery.data
   const assessment = development?.assessments[0]
@@ -36,13 +41,13 @@ export default function ParentHome() {
     <MobileShell>
       <div className="pt-3 pb-4">
         <h1 className="text-xl text-foreground mb-5">Home</h1>
-        {consentQuery.isError ? (
-          <ParentLoadError message="Couldn't check pending approvals." onRetry={() => { void consentQuery.refetch() }} />
-        ) : (consentQuery.data?.length ?? 0) > 0 && (
+        {consentQuery.isError || rosterConsentQuery.isError ? (
+          <ParentLoadError message="Couldn't check pending approvals." onRetry={() => { void consentQuery.refetch(); void rosterConsentQuery.refetch() }} />
+        ) : waitingNames.length > 0 && (
           <button onClick={() => navigate('/parent/consent')}
             className="w-full text-left rounded-xl border border-primary/30 bg-primary/10 p-4 mb-4">
             <p className="text-sm text-foreground">
-              {consentQuery.data!.map(child => child.full_name).join(', ')} {consentQuery.data!.length === 1 ? 'is' : 'are'} waiting on your approval
+              {waitingNames.join(', ')} {waitingNames.length === 1 ? 'is' : 'are'} waiting on your approval
             </p>
             <p className="text-xs text-muted-foreground mt-1">Review your children's pending approvals.</p>
           </button>

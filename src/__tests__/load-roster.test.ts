@@ -100,7 +100,7 @@ describe('load-roster invitations', () => {
     'Two Kid,2013-05-06,U13,kid2@roster.test,g2@roster.test,coach@roster.test',
     'Three Kid,2013-07-08,U13,kid3@roster.test,g3@roster.test,coach@roster.test',
   ), TODAY).rows
-  const admitted = (r: { line: number }) => Promise.resolve({ data: `roster-${r.line}`, error: null })
+  const admitted: Parameters<typeof loadRows>[1]['admit'] = (r) => Promise.resolve({ data: `roster-${r.line}`, error: null })
 
   it('invites once per admitted child, never for a row skipped as already admitted', async () => {
     const { toLoad } = planLoad(rows, [{ child_email: 'kid2@roster.test', organization_id: 'org' }], 'org')

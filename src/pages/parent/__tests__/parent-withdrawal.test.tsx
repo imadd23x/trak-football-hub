@@ -90,7 +90,7 @@ afterEach(() => { cleanup(); release?.(); expect(unexpected).toEqual([]); vi.uns
 async function open() {
   await supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
   window.history.replaceState({}, '', '/parent/profile'); render(<App />)
-  await screen.findByText('Following Amber Synthetic · 2 children linked')
+  await screen.findByText('Parent account · 2 children linked')
 }
 async function confirm(name = 'Amber Synthetic') {
   await userEvent.click(await screen.findByRole('button', { name: `Withdraw consent for ${name}` }))

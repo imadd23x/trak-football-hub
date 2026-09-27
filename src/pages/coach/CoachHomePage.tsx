@@ -3,13 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, MetadataLabel, BandPill, LoadError} from '@/components/trak'
-import { toast } from 'sonner'
 import { Zap } from 'lucide-react'
 import { scoreToBand } from '@/lib/rating-engine'
 import { BANDS } from '@/lib/types'
 import { calculateSquadAnalytics, type SquadAnalytics } from '@/lib/squad-analytics'
 import { trackEvent } from '@/lib/telemetry'
-import { generateCode } from '@/lib/invite-codes'
 import { openable } from '@/lib/openable'
 import { timeOfDayGreeting } from '@/lib/greeting'
 
@@ -33,12 +31,6 @@ export default function CoachHomePage() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [sessionCount, setSessionCount] = useState(0)
   const [coachDetails, setCoachDetails] = useState<any>(null)
-  const [inviteCode, setInviteCode] = useState('TRK-XXXX')
-  // Three states, not a boolean. A failure flag that nothing clears leaves a
-  // valid code showing as "Unavailable" after a later read succeeds, and while
-  // the first read is still in flight the copyable placeholder "TRK-XXXX" is on
-  // screen for a coach to hand over in good faith. Only 'ready' may be copied.
-  const [inviteStatus, setInviteStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
   const [squadAnalytics, setSquadAnalytics] = useState<SquadAnalytics | null>(null)
   // Distinguishes "nothing to show" from "we could not find out". Without it
   // the band strip and the distribution chart render their empty state on a
@@ -104,44 +96,8 @@ export default function CoachHomePage() {
       .then(({ count, error }) => { if (error) { setLoadFailed(true); return } setSessionCount(count || 0) })
     supabase.from('coach_details').select('current_club, team, coach_role').eq('user_id', user.id).maybeSingle()
       .then(({ data }) => setCoachDetails(data))
-    supabase.from('profiles').select('invite_code').eq('user_id', user.id).maybeSingle()
-      .then(async ({ data, error }) => {
-        // A failed read is not "this coach has no code". The error was
-        // discarded here, so an offline moment or an RLS denial fell through to
-        // the else branch and OVERWROTE the coach's existing invite code with a
-        // freshly generated one — silently rotating the code every player had
-        // already been given, and breaking every pending link.
-        if (cancelled) return
-        if (error) {
-          console.error('Invite code read failed:', error)
-          setInviteStatus('failed')
-          return
-        }
-
-        if (data?.invite_code) {
-          setInviteCode(`TRK-${data.invite_code}`)
-          setInviteStatus('ready')   // clears an earlier failure
-          return
-        }
-
-        // Genuinely no code yet. Only now is generating one correct.
-        const newCode = generateCode()
-        // select() back, so a zero-row update is not mistaken for a stored
-        // code. An absent profile row updates nothing and returns no error,
-        // and the coach would be shown a code the database never accepted —
-        // the same "no error means success" mistake, one layer down.
-        const { data: stored, error: writeError } = await supabase
-          .from('profiles').update({ invite_code: newCode })
-          .eq('user_id', user.id).select('invite_code').maybeSingle()
-        if (cancelled) return
-        if (writeError || stored?.invite_code !== newCode) {
-          console.error('Invite code write failed or stored nothing:', writeError)
-          setInviteStatus('failed')
-          return
-        }
-        setInviteCode(`TRK-${newCode}`)
-        setInviteStatus('ready')
-      })
+    // No coach invite code here any more (TRAK-72 item 1): players join through
+    // the academy roster (J1), so a code on the coach's home did nothing.
 
     return () => { cancelled = true }
   }, [user])
@@ -387,8 +343,8 @@ export default function CoachHomePage() {
           </div>
         </div>
 
-        {/* Quick actions grid: 3 columns */}
-        <div className="grid grid-cols-3 gap-2 mt-1">
+        {/* Quick actions grid */}
+        <div className="grid grid-cols-2 gap-2 mt-1">
           <button
             onClick={() => navigate('/coach/squad')}
             className="rounded-[10px] p-[11px_8px] text-center active:scale-95 transition-transform"
@@ -409,11 +365,13 @@ export default function CoachHomePage() {
               className="text-[8px] font-medium tracking-[0.1em] uppercase mt-[5px] block"
               style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.22)' }}
             >
-              Squad
+              {playerCount === 1 ? 'Player' : 'Players'}
             </span>
           </button>
+          {/* The count is of past sessions, so the tile opens their history,
+              not the log-a-session chooser (TRAK-72 item 3). */}
           <button
-            onClick={() => navigate('/coach/sessions')}
+            onClick={() => navigate('/coach/sessions/list')}
             className="rounded-[10px] p-[11px_8px] text-center active:scale-95 transition-transform"
             style={{ background: 'rgba(0,0,0,0.35)' }}
           >
@@ -433,48 +391,6 @@ export default function CoachHomePage() {
               style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.22)' }}
             >
               Sessions
-            </span>
-          </button>
-          <button
-            onClick={() => {
-              // Only a verified code may be copied. While the read is pending
-              // the placeholder is on screen and copying it hands a player a
-              // code that matches nothing.
-              if (inviteStatus !== 'ready') {
-                toast.error(
-                  inviteStatus === 'loading'
-                    ? 'Still loading your invite code — one moment.'
-                    : "Couldn't load your invite code — reload and try again.",
-                )
-                return
-              }
-              navigator.clipboard.writeText(inviteCode)
-              toast.success('Code copied!')
-            }}
-            className="rounded-[10px] p-[11px_8px] text-center border active:scale-95 transition-transform"
-            style={{
-              background: 'rgba(200,242,90,0.06)',
-              borderColor: 'rgba(200,242,90,0.2)',
-              boxShadow: '0 0 20px rgba(200,242,90,0.05)',
-            }}
-          >
-            <p
-              className="text-[13px] font-semibold leading-none mb-0.5"
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                letterSpacing: '0.04em',
-                color: '#C8F25A',
-              }}
-            >
-              {inviteStatus === 'ready' ? inviteCode
-                : inviteStatus === 'loading' ? '···'
-                : 'Unavailable'}
-            </p>
-            <span
-              className="text-[8px] font-medium tracking-[0.1em] uppercase mt-[5px] block"
-              style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.22)' }}
-            >
-              Tap to copy
             </span>
           </button>
         </div>

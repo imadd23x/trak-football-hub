@@ -1,21 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ChevronRight, Settings as SettingsIcon, BookOpen } from 'lucide-react'
+import { ChevronRight, Settings as SettingsIcon } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { MobileShell, NavBar, TrakCard, MetadataLabel, InviteCodeDisplay } from '@/components/trak'
-import { formatCoachCode, generateCode } from '@/lib/invite-codes'
+import { MobileShell, NavBar, TrakCard, MetadataLabel } from '@/components/trak'
+import { IconHowItWorks } from '@/components/icons/TrakIcons'
 
 export default function CoachProfilePage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [details, setDetails] = useState<any>(null)
-  const [inviteCode, setInviteCode] = useState('')
-  // InviteCodeDisplay always renders a working Copy button, so an unverified
-  // code must not be handed to it at all. It is a shared component and this is
-  // a coach-page concern, so the gate lives here rather than in its props.
-  const [inviteStatus, setInviteStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
 
   // Academy membership. `orgName` is null while unknown; `orgStatus` separates
   // "not in an academy" from "we could not find out", so a failed read is never
@@ -57,42 +52,8 @@ export default function CoachProfilePage() {
       setDetails(data)
     })
     void loadOrg(user.id)
-    // The real invite code lives on profiles.invite_code — it's what
-    // get_coach_id_by_invite_code matches when players link up.
-    supabase.from('profiles').select('invite_code').eq('user_id', user.id).maybeSingle()
-      .then(async ({ data, error }) => {
-        // The read's error was discarded here too, so a failed read looked
-        // exactly like "no code yet" and the self-heal below overwrote the
-        // coach's real invite code — the code players type to join. This page
-        // and CoachHomePage each rotated it independently, so an offline
-        // moment on either one invalidated every code already handed out.
-        if (error) {
-          console.error('Invite code read failed:', error)
-          setInviteStatus('failed')
-          return
-        }
-
-        if (data?.invite_code) {
-          setInviteCode(formatCoachCode(data.invite_code))
-          setInviteStatus('ready')
-          return
-        }
-
-        // Self-heal, now only when the read actually succeeded and found none.
-        const newCode = generateCode()
-        // select() back: a zero-row update returns no error, and showing the
-        // generated code then promises a player something never stored.
-        const { data: stored, error: writeError } = await supabase
-          .from('profiles').update({ invite_code: newCode })
-          .eq('user_id', user.id).select('invite_code').maybeSingle()
-        if (writeError || stored?.invite_code !== newCode) {
-          console.error('Invite code write failed or stored nothing:', writeError)
-          setInviteStatus('failed')
-          return
-        }
-        setInviteCode(formatCoachCode(newCode))
-        setInviteStatus('ready')
-      })
+    // No invite code on this page any more (TRAK-72 item 1): players join
+    // through the academy roster (J1).
   }, [user])
 
   return (
@@ -113,42 +74,23 @@ export default function CoachProfilePage() {
             {profile?.full_name || 'Coach'}
           </p>
           <div className="flex justify-center gap-1.5 mt-2 flex-wrap">
+            {/* Role, then the age group they coach (coach_details.team, e.g.
+                "U15s"), side by side (TRAK-72 item 9). The age group used to
+                show only when a club name was also set, so it never did. */}
             {details?.coach_role && (
               <span className="h-5 px-2.5 rounded-full bg-white/[0.06] border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase text-white/45 inline-flex items-center"
                 style={{ fontFamily: "'DM Mono', monospace" }}>{details.coach_role}</span>
             )}
+            {details?.team && (
+              <span className="h-5 px-2.5 rounded-full bg-white/[0.06] border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase text-white/45 inline-flex items-center"
+                style={{ fontFamily: "'DM Mono', monospace" }}>{details.team}</span>
+            )}
             {details?.current_club && (
               <span className="h-5 px-2.5 rounded-full bg-white/[0.06] border border-white/[0.07] text-[8px] font-medium tracking-[0.06em] uppercase text-white/45 inline-flex items-center"
-                style={{ fontFamily: "'DM Mono', monospace" }}>{details.current_club}{details.team ? ` · ${details.team}` : ''}</span>
+                style={{ fontFamily: "'DM Mono', monospace" }}>{details.current_club}</span>
             )}
           </div>
         </div>
-
-        {/* Invite code */}
-        <TrakCard>
-          {inviteStatus === 'ready' ? (
-            <InviteCodeDisplay code={inviteCode} label="YOUR INVITE CODE" />
-          ) : (
-            <div className="flex flex-col items-center gap-2 py-6">
-              <span
-                className="text-[9px] font-medium tracking-[0.12em] uppercase text-[rgba(255,255,255,0.45)]"
-                style={{ fontFamily: "'DM Mono', monospace" }}
-              >
-                YOUR INVITE CODE
-              </span>
-              <p className="text-[32px] tracking-wider text-[rgba(255,255,255,0.3)]"
-                 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300 }}>
-                {inviteStatus === 'loading' ? '···' : 'Unavailable'}
-              </p>
-              {inviteStatus === 'failed' && (
-                <span className="text-[11px] text-white/35">Reload to try again.</span>
-              )}
-            </div>
-          )}
-          <p className="text-[11px] text-white/45 text-center mt-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-            Share this code with your players so they can connect with you.
-          </p>
-        </TrakCard>
 
         {/* Academy. Trak sets it (TRAK-12): the database refuses a code-join
             (#151), so a coach outside an academy is told who to ask. */}
@@ -175,7 +117,8 @@ export default function CoachProfilePage() {
           )}
         </TrakCard>
 
-        {/* Coach manual */}
+        {/* How Trak works: the player's name and icon, the coach's own content
+            (TRAK-72 item 10). */}
         <button
           onClick={() => navigate('/coach/manual')}
           className="w-full flex items-center justify-between rounded-[18px] p-4 border border-white/[0.07] bg-[#101012] text-left hover:bg-[#141416] transition-colors"
@@ -183,12 +126,12 @@ export default function CoachProfilePage() {
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
               style={{ background: 'rgba(200,242,90,0.08)', border: '1px solid rgba(200,242,90,0.18)' }}>
-              <BookOpen size={16} className="text-[#C8F25A]" strokeWidth={1.5} />
+              <IconHowItWorks size={16} color="#C8F25A" />
             </div>
             <div>
-              <MetadataLabel text="COACH MANUAL" />
+              <MetadataLabel text="HOW TRAK WORKS" />
               <p className="text-[12px] text-white/55 mt-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                How to use TRAK with your squad
+                How to use Trak with your squad
               </p>
             </div>
           </div>

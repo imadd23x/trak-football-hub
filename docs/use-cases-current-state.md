@@ -15,7 +15,7 @@ additionally exercised in a running app against the database, signed in as that 
 
 | | Use case | Status | Evidence |
 |---|---|---|---|
-| C1 | Sign up, onboard, pick club/team/role | ✅ | **Verified live on a fresh account**: `provision_my_profile` wrote `profiles` + `coach_details` (club, team, role) and auto-generated a unique `invite_code` in one atomic call |
+| C1 | Sign up, onboard, pick club/team/role | ⬜ | Removed for the pilot (TRAK-12, 26 Sep): Trak creates coaches with `admit_staff_member`, which also generates their `invite_code`. See `docs/pilot-runbook.md` |
 | C2 | Add a player to my squad manually | ✅ | `CoachAddPlayer` inserts `squad_players`; RLS correct |
 | C3 | View my squad | ✅ | `CoachSquadPage` |
 | C4 | Assess a player on 6 sliders → band | ✅ | `CoachAssess`; `coach_rating` is a generated column; RLS correct. **Quick Assess** walks the whole squad and, since `a282d34`, starts each slider at that player's previous assessment rather than the midpoint — the coach moves only what changed instead of ~108 drags per squad |
@@ -86,8 +86,8 @@ additionally exercised in a running app against the database, signed in as that 
 
 | | Use case | Status | Evidence |
 |---|---|---|---|
-| K1 | Sign up, create the organization | ✅ | `organizations` table with unique `join_code`, created via `provision_my_profile` |
-| K2 | Coaches join via academy code | ✅ | `join_organization()` / `get_org_id_by_join_code()` RPCs; `coach_details.organization_id` |
+| K1 | Sign up, create the organization | ⬜ | Removed for the pilot (TRAK-12, 26 Sep): Trak creates the admin and their academy with `admit_staff_member`. See `docs/pilot-runbook.md` |
+| K2 | Coaches join via academy code | ⬜ | Removed for the pilot (TRAK-12, 26 Sep): app roles can no longer execute either RPC, and only the operator sets `coach_details.organization_id` |
 | K3 | View coaches in the organization | ✅ | `ClubCoaches`, org-scoped RLS |
 | K4 | View squads across the org | ✅ | `ClubSquads` |
 | K5 | Org dashboard, band distribution | ✅ | `ClubHome`. **Bug found and fixed** (`3bd1507`): the headline read "TOTAL PLAYERS 1" above squads summing to 29 — it counted linked accounts while the squads counted roster rows |

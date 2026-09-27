@@ -8,7 +8,6 @@ import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
 import { ParentConnections } from '@/components/parent/ParentConnections'
 import { supabase } from '@/integrations/supabase/client'
-import { COACH_ROLES, AGE_GROUPS } from '@/lib/constants'
 
 const nameSchema = z
   .string()
@@ -23,7 +22,7 @@ export default function Settings() {
   </RouteGuard>
 }
 
-type Operation = 'name' | 'coach' | 'player' | 'delete' | 'password' | 'signout'
+type Operation = 'name' | 'player' | 'delete' | 'password' | 'signout'
 
 function AccountSettings({ userId }: { userId: string }) {
   const navigate = useNavigate()
@@ -47,11 +46,12 @@ function AccountSettings({ userId }: { userId: string }) {
     if (isCurrent()) { operation.current = null; setPending(null) }
   }
   const saving = pending === 'name'
-  const savingCoach = pending === 'coach'
 
   const [editingName, setEditingName] = useState(false)
   const [displayName, setDisplayName] = useState(profile?.full_name ?? '')
   const [nameDraft, setNameDraft] = useState(profile?.full_name ?? '')
+  // TRAK-72 item 11: a coach's club, age group and role come from the academy
+  // (Trak sets up staff, TRAK-12), so Settings shows them and edits none.
   const [coachClub, setCoachClub] = useState('')
   const [coachTeam, setCoachTeam] = useState('')
   const [coachRoleVal, setCoachRoleVal] = useState('')
@@ -70,11 +70,20 @@ function AccountSettings({ userId }: { userId: string }) {
     setRoleData('loading')
     void (async () => {
       const { client } = await getSettingsAccount(userId, current)
-      const { data, error } = await client.from('coach_details').select('current_club, team, coach_role')
+      const { data, error } = await client.from('coach_details').select('team, coach_role, organization_id')
         .eq('user_id', userId).abortSignal(controller.signal).maybeSingle()
       if (error) throw error
+      // The club is the academy's name, not the free-text current_club (empty
+      // for every staff account Trak sets up). "Coaches can read own org".
+      let club = ''
+      if (data?.organization_id) {
+        const { data: org, error: orgError } = await client.from('organizations').select('name')
+          .eq('id', data.organization_id).abortSignal(controller.signal).maybeSingle()
+        if (orgError) throw orgError
+        club = org?.name ?? ''
+      }
       if (!current()) return
-      setCoachClub(data?.current_club ?? '')
+      setCoachClub(club)
       setCoachTeam(data?.team ?? '')
       setCoachRoleVal(data?.coach_role ?? '')
       if (current()) setRoleData('ready')
@@ -112,22 +121,6 @@ function AccountSettings({ userId }: { userId: string }) {
       if (error) throw error
       if (isCurrent()) toast.success('Check your email for a reset link')
     } catch { if (isCurrent()) toast.error('Could not send reset email') }
-    finally { finish() }
-  }
-
-  const saveCoachProfile = async () => {
-    if (roleData !== 'ready') return
-    if (!coachClub.trim()) { toast.error('Club name is required'); return }
-    if (!begin('coach')) return
-    try {
-      const { client } = await getSettingsAccount(userId, isCurrent)
-      const { data, error } = await client.from('coach_details')
-        .upsert({ user_id: userId, current_club: coachClub, team: coachTeam, coach_role: coachRoleVal }, { onConflict: 'user_id' })
-        .select('user_id').maybeSingle()
-      if (error) throw error
-      if (data?.user_id !== userId) throw new Error('Profile save was not confirmed')
-      if (isCurrent()) toast.success('Profile updated')
-    } catch { if (isCurrent()) toast.error('Could not save profile') }
     finally { finish() }
   }
 
@@ -246,33 +239,14 @@ function AccountSettings({ userId }: { userId: string }) {
         </div>}
 
         {/* Coach profile */}
-        {role === 'coach' && (
+        {role === 'coach' && roleData === 'ready' && (
           <Section label="My Profile">
-            <Row label="Club" right={
-              <input value={coachClub} disabled={!!pending || roleData !== 'ready'} onChange={e => setCoachClub(e.target.value)}
-                placeholder="Club name"
-                style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'rgba(255,255,255,0.88)', textAlign: 'right', width: 160 }} />
-            } />
-            <Row label="Age Group" right={
-              <select value={coachTeam} disabled={!!pending || roleData !== 'ready'} onChange={e => setCoachTeam(e.target.value)}
-                style={{ background: '#101012', border: 'none', outline: 'none', fontSize: 13, color: coachTeam ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.35)', textAlign: 'right' }}>
-                <option value="">Select…</option>
-                {AGE_GROUPS.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            } />
-            <Row label="Role" right={
-              <select value={coachRoleVal} disabled={!!pending || roleData !== 'ready'} onChange={e => setCoachRoleVal(e.target.value)}
-                style={{ background: '#101012', border: 'none', outline: 'none', fontSize: 13, color: 'rgba(255,255,255,0.88)', textAlign: 'right' }}>
-                <option value="">Select…</option>
-                {COACH_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            } />
-            <div className="py-3">
-              <button onClick={saveCoachProfile} disabled={!!pending || roleData !== 'ready'}
-                style={{ fontSize: 13, color: '#C8F25A' }}>
-                {savingCoach ? 'Saving…' : 'Save changes'}
-              </button>
-            </div>
+            <Row label="Club" right={<Value>{coachClub || '—'}</Value>} />
+            <Row label="Age Group" right={<Value>{coachTeam || '—'}</Value>} />
+            <Row label="Role" right={<Value>{coachRoleVal || '—'}</Value>} />
+            <p className="py-3" style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+              Your academy sets these. Ask them if something is wrong.
+            </p>
           </Section>
         )}
 

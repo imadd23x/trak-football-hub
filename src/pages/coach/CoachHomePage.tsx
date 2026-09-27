@@ -6,7 +6,8 @@ import { MobileShell, NavBar, MetadataLabel, BandPill, LoadError} from '@/compon
 import { Zap } from 'lucide-react'
 import { scoreToBand } from '@/lib/rating-engine'
 import { BANDS } from '@/lib/types'
-import { calculateSquadAnalytics, type SquadAnalytics } from '@/lib/squad-analytics'
+import { calculateSquadAnalytics, missedLastSession, playerOverview, type SquadAnalytics } from '@/lib/squad-analytics'
+import { localTodayISO } from '@/lib/event-time'
 import { trackEvent } from '@/lib/telemetry'
 import { openable } from '@/lib/openable'
 import { timeOfDayGreeting } from '@/lib/greeting'
@@ -20,6 +21,10 @@ import { timeOfDayGreeting } from '@/lib/greeting'
 const BAND_COLORS: Record<string, string> = Object.fromEntries(
   BANDS.map(b => [b.word.toLowerCase(), b.color]),
 )
+
+// Player overview flags. Not band colours: these describe what a coach should
+// look at, not how a child played.
+const FLAG_COLORS = { attention: '#fb923c', missed: '#facc15', improved: '#4ade80' } as const
 
 export default function CoachHomePage() {
   const { user, profile } = useAuth()
@@ -36,6 +41,10 @@ export default function CoachHomePage() {
   // the band strip and the distribution chart render their empty state on a
   // failed read, which is a claim about the squad rather than about the network.
   const [analyticsFailed, setAnalyticsFailed] = useState(false)
+  // Who missed the last training (TRAK-72 item 4). A failed check is shown as
+  // such, never as "everyone was there".
+  const [missed, setMissed] = useState<{ playerId: string; name: string }[]>([])
+  const [missedFailed, setMissedFailed] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -50,7 +59,39 @@ export default function CoachHomePage() {
        and distribution, loadFailed covers the two reads #44 never checked
        (recent assessments, session count) and suppresses their false zeros.
        Taking either side whole would have dropped the other's coverage. */
-    supabase.from('squad_players').select('id, player_name').eq('coach_user_id', user.id)
+    // The last training's register, with the children who could not have been
+    // ticked present (waiting for a parent) left out by missedLastSession.
+    const loadMissed = async (roster: { id: string; player_name: string; created_at: string | null }[]) => {
+      const { data: last, error: lastError } = await supabase.from('coach_sessions')
+        .select('id, session_date, session_type')
+        .eq('coach_user_id', user.id).eq('session_type', 'training')
+        .lte('session_date', localTodayISO())
+        .order('session_date', { ascending: false }).limit(1).maybeSingle()
+      if (cancelled) return
+      if (lastError) { setMissedFailed(true); return }
+      if (!last) { setMissed([]); setMissedFailed(false); return }
+      const [attendance, ...consent] = await Promise.all([
+        supabase.from('session_attendance').select('squad_player_id')
+          .eq('session_id', last.id).eq('status', 'present'),
+        ...roster.map(p => supabase.rpc('coach_squad_player_consent_required' as never,
+          { p_squad_player_id: p.id } as never) as unknown as Promise<{ data: boolean | null; error: unknown }>),
+      ])
+      if (cancelled) return
+      // Any unknown answer means the flag could be wrong, so none are shown.
+      if (attendance.error || consent.some(c => c.error || typeof c.data !== 'boolean')) {
+        setMissedFailed(true)
+        return
+      }
+      setMissedFailed(false)
+      setMissed(missedLastSession({
+        roster,
+        session: last,
+        present: new Set((attendance.data ?? []).map(a => a.squad_player_id)),
+        waitingForParent: new Set(roster.filter((_, i) => consent[i].data === true).map(p => p.id)),
+      }))
+    }
+
+    supabase.from('squad_players').select('id, player_name, created_at').eq('coach_user_id', user.id)
       .then(({ data, error }) => {
         if (cancelled) return
         // A failed roster read is not an empty roster. Falling through to
@@ -66,6 +107,7 @@ export default function CoachHomePage() {
         }
         const players = data || []
         setPlayerCount(players.length)
+        void loadMissed(players)
         // Fetch all assessments for analytics
         supabase.from('coach_assessments').select('id, squad_player_id, coach_rating, created_at')
           .eq('coach_user_id', user.id)
@@ -103,6 +145,7 @@ export default function CoachHomePage() {
   }, [user])
 
   const greeting = timeOfDayGreeting()
+  const overviewRows = squadAnalytics ? playerOverview(squadAnalytics, missed) : []
 
   // Squad bands: one chip per band that any player is currently in, in that
   // band's own colour.
@@ -588,76 +631,61 @@ export default function CoachHomePage() {
               </div>
             </div>
 
-            {/* Most Improved */}
-            {squadAnalytics.mostImproved && (
-              <div
-                className="rounded-[18px] border border-white/[0.07] p-4 mb-3"
-                style={{ background: '#101012' }}
-              >
-                <span
-                  className="text-[9px] font-medium tracking-[0.08em] uppercase block mb-2"
-                  style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.3)' }}
-                >
-                  Most Improved
-                </span>
-                <div className="flex items-center justify-between">
-                  <span
-                    className="text-[14px] font-medium"
-                    style={{ fontFamily: "'DM Sans', sans-serif", color: 'rgba(255,255,255,0.88)' }}
-                  >
-                    {squadAnalytics.mostImproved.name}
-                  </span>
-                  <span
-                    className="text-[13px] font-semibold"
-                    style={{ fontFamily: "'DM Mono', monospace", color: '#4ade80' }}
-                  >
-                    ↑ +{squadAnalytics.mostImproved.improvement.toFixed(1)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Needs Attention — max 3, only players with prior history */}
-            {squadAnalytics.needsAttention.length > 0 && (
-              <div
-                className="rounded-[18px] border border-white/[0.07] p-4"
-                style={{ background: '#101012' }}
-              >
-                <span
-                  className="text-[9px] font-medium tracking-[0.08em] uppercase block mb-2.5"
-                  style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.3)' }}
-                >
-                  Needs Attention
-                </span>
-                <div className="flex flex-col gap-2">
-                  {squadAnalytics.needsAttention.map(item => (
-                    <div
-                      key={item.playerId}
-                      className="rounded-[10px] py-2.5 px-3"
-                      style={{
-                        background: 'rgba(251,146,60,0.06)',
-                        borderLeft: '3px solid #fb923c',
-                      }}
-                    >
-                      <p
-                        className="text-[13px] font-medium"
-                        style={{ fontFamily: "'DM Sans', sans-serif", color: 'rgba(255,255,255,0.78)' }}
-                      >
-                        {item.name}
-                      </p>
-                      <p
-                        className="text-[10px] mt-[2px]"
-                        style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.3)' }}
-                      >
-                        {item.reason}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
           </div>
+        )}
+
+        {/* Player overview (TRAK-72 item 4): one list of short flags per
+            player, replacing the separate Most Improved and Needs Attention
+            cards. Outside the assessments gate, because "missed the last
+            session" is about attendance, not assessments. */}
+        {squadAnalytics && (overviewRows.length > 0 || missedFailed) && (
+          <section
+            aria-label="Player overview"
+            className="rounded-[18px] border border-white/[0.07] p-4 mt-3"
+            style={{ background: '#101012' }}
+          >
+            <span
+              className="text-[9px] font-medium tracking-[0.08em] uppercase block mb-2.5"
+              style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.3)' }}
+            >
+              Player overview
+            </span>
+            <ul className="flex flex-col gap-2">
+              {overviewRows.map(row => (
+                <li
+                  key={row.playerId}
+                  className="rounded-[10px] py-2.5 px-3"
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    borderLeft: `3px solid ${FLAG_COLORS[row.flags[0].kind]}`,
+                  }}
+                >
+                  <p
+                    className="text-[13px] font-medium"
+                    style={{ fontFamily: "'DM Sans', sans-serif", color: 'rgba(255,255,255,0.78)' }}
+                  >
+                    {row.name}
+                  </p>
+                  <p className="flex flex-wrap gap-x-2 mt-[2px]">
+                    {row.flags.map(flag => (
+                      <span
+                        key={flag.kind}
+                        className="text-[10px]"
+                        style={{ fontFamily: "'DM Mono', monospace", color: FLAG_COLORS[flag.kind] }}
+                      >
+                        {flag.label}
+                      </span>
+                    ))}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            {missedFailed && (
+              <p className="text-[10px] text-white/40 mt-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                Couldn't check the last session's attendance. Reload to try again.
+              </p>
+            )}
+          </section>
         )}
       </div>
       <NavBar role="coach" activeTab={location.pathname} onNavigate={navigate} />

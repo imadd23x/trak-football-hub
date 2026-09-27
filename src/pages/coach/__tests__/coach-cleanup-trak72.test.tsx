@@ -12,12 +12,13 @@
  *      to share an invite code
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
-import { table } from '../../../../tests/msw/supabase'
+import { SUPABASE_URL, table } from '../../../../tests/msw/supabase'
+import { http, HttpResponse } from 'msw'
 
 const COACH = { id: 'coach-72' }
 
@@ -124,5 +125,47 @@ describe('TRAK-72 player page', () => {
     expect(await screen.findByText('Midfielder')).toBeInTheDocument()
     expect(screen.getByText('#8')).toBeInTheDocument()
     expect(screen.queryByText(/^\d+ assessments?$/)).toBeNull()
+  })
+})
+
+describe('TRAK-72 item 4: one Player overview', () => {
+  const ROSTER = [
+    { id: 'sp-1', coach_user_id: COACH.id, player_name: 'Alex Synthetic', linked_player_id: 'child-1', created_at: '2026-09-01T10:00:00Z' },
+    { id: 'sp-2', coach_user_id: COACH.id, player_name: 'Bella Synthetic', linked_player_id: 'child-2', created_at: '2026-09-01T10:00:00Z' },
+    { id: 'sp-3', coach_user_id: COACH.id, player_name: 'Cara Waiting', linked_player_id: 'child-3', created_at: '2026-09-01T10:00:00Z' },
+  ]
+  function withLastTraining(consent: (id: string) => Response) {
+    signedInCoach()
+    server.use(
+      table('squad_players', ROSTER),
+      table('coach_sessions', [{ id: 's-1', coach_user_id: COACH.id, session_date: '2026-09-20', session_type: 'training' }]),
+      table('session_attendance', [{ squad_player_id: 'sp-1' }]),
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_player_consent_required`, async ({ request }) => {
+        const { p_squad_player_id } = await request.json() as { p_squad_player_id: string }
+        return consent(p_squad_player_id)
+      }),
+    )
+  }
+
+  it('flags the consented child who missed training, never the one waiting for a parent', async () => {
+    withLastTraining(id => HttpResponse.json(id === 'sp-3'))
+    renderApp('/coach/home')
+    const overview = await screen.findByRole('region', { name: 'Player overview' })
+    // Exactly one "missed" flag, on Bella's row. Cara may still be listed for
+    // another reason (no assessments yet), but never as missing a session she
+    // could not be ticked into; Alex was there.
+    await waitFor(() => expect(within(overview).getAllByText('Missed the last session')).toHaveLength(1))
+    const missedRow = within(overview).getByText('Missed the last session').closest('li') as HTMLElement
+    expect(within(missedRow).getByText('Bella Synthetic')).toBeInTheDocument()
+    // The two old cards are one list now.
+    expect(screen.queryByText(/^Needs Attention$/i)).toBeNull()
+    expect(screen.queryByText(/^Most Improved$/i)).toBeNull()
+  })
+
+  it('says it could not check, rather than flagging nobody, when a consent check fails', async () => {
+    withLastTraining(() => HttpResponse.json({ message: 'unavailable' }, { status: 500 }))
+    renderApp('/coach/home')
+    expect(await screen.findByText(/Couldn't check the last session's attendance/)).toBeInTheDocument()
+    expect(screen.queryByText('Missed the last session')).toBeNull()
   })
 })

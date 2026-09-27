@@ -98,8 +98,15 @@ SELECT pg_temp.fr_as(pg_temp.fr(3));
 SELECT pg_temp.fr_check(pg_temp.fr_seen(pg_temp.fr(3)) = 'a=1 w=1 mc=1 ms=1',
   '1 CONTROL a consented child reads their assessment, award and both matches', pg_temp.fr_seen(pg_temp.fr(3)));
 -- The child tries to relabel the coach's match as their own before a
--- withdrawal, to keep it afterwards.
-UPDATE public.matches SET logged_by = pg_temp.fr(3), logged_by_role = 'player' WHERE id = pg_temp.fr(60);
+-- withdrawal, to keep it afterwards. Refused outright once players lose match
+-- writes (#123), or kept as it was by keep_match_actor; either way the label
+-- must not change.
+DO $test$
+BEGIN
+  UPDATE public.matches SET logged_by = pg_temp.fr(3), logged_by_role = 'player' WHERE id = pg_temp.fr(60);
+EXCEPTION WHEN insufficient_privilege THEN NULL;
+END;
+$test$;
 SELECT pg_temp.fr_as(pg_temp.fr(5));
 SELECT pg_temp.fr_check(pg_temp.fr_seen(pg_temp.fr(3)) = 'a=1 w=1 mc=1 ms=1',
   '1 CONTROL their parent reads the same', pg_temp.fr_seen(pg_temp.fr(3)));

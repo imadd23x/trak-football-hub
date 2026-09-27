@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ParentChildrenProvider } from "@/contexts/ParentChildrenContext";
 import { RouteGuard } from "@/components/layout/RouteGuard";
+import { PlayerConsentWatcher } from "@/components/player/PlayerConsentWatcher";
 import { ErrorBoundary } from "@/components/trak/ErrorBoundary";
 
 // Landing eagerly loaded so the first paint is instant
@@ -78,6 +79,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ParentChildrenProvider>
+          {/* G6: an open player session drops coach content on withdrawal (TRAK-13). */}
+          <PlayerConsentWatcher />
           {DevSwitcher && <DevSwitcher />}
           <Suspense fallback={<RouteFallback />}>
           <Routes>

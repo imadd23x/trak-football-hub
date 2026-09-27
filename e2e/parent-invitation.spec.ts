@@ -84,6 +84,10 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
       };
       return json(request.headers().accept?.includes('vnd.pgrst.object') ? profile : [profile]);
     }
+    // TRAK-13 (G6): an open player session re-checks consent (a read, over POST).
+    if (account === player && request.method() === 'POST' && url.pathname === '/rest/v1/rpc/my_consent_status') {
+      return json({ required: false, granted: true, invited_parent: null });
+    }
     if (account === parent) {
       if (url.pathname === '/rest/v1/player_parent_links' && request.method() === 'GET') return json([]);
       if (request.method() === 'POST') {

@@ -9,6 +9,11 @@ import { server } from '../../tests/msw/server'
 import { table, rpc, SUPABASE_URL } from '../../tests/msw/supabase'
 import { supabase } from '@/integrations/supabase/client'
 
+// These tests count Home's own my_consent_status requests to order stale
+// responses. The G6 open-session watcher asks the same thing on its own
+// schedule; it has its own tests (PlayerConsentWatcher, player-open-session).
+vi.mock('@/components/player/PlayerConsentWatcher', () => ({ PlayerConsentWatcher: () => null }))
+
 const endpoint = (name: string) => `${SUPABASE_URL}/rest/v1/${name}`
 const failure = () => HttpResponse.json({ code: '42501', message: 'Synthetic denied read' }, { status: 403 })
 const WORDS = 'Keep your head up before receiving the ball.'

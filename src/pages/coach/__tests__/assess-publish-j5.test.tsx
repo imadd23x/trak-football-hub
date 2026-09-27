@@ -111,6 +111,23 @@ describe('J5: one screen, message to the player, private note, publish', () => {
     expect(messageBox().compareDocumentPosition(noteBox()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  // TRAK-72 item 7: the player's message is blue, the private note yellow, and
+  // both are the same size, so the two can't be mistaken for each other.
+  it('colour-codes the message (blue) and the private note (yellow) at the same size', async () => {
+    showForm()
+    await choose('player-b')
+    await waitFor(() => expect(messageBox()).toBeEnabled())
+    const message = messageBox() as HTMLTextAreaElement
+    const note = noteBox() as HTMLTextAreaElement
+    expect(message.dataset.tone).toBe('message')
+    expect(note.dataset.tone).toBe('private')
+    expect(message.className).toMatch(/border-sky-/)
+    expect(note.className).toMatch(/border-amber-/)
+    expect(message.rows).toBe(note.rows)
+    expect(message.className.replace(/(bg|border)-(sky|amber)-\S+/g, ''))
+      .toBe(note.className.replace(/(bg|border)-(sky|amber)-\S+/g, ''))
+  })
+
   // TRAK-64 (Imad, 25 Sep): Save and Publish are the same action, one button.
   it('Save sends a new message to the player', async () => {
     showForm()
@@ -123,6 +140,30 @@ describe('J5: one screen, message to the player, private note, publish', () => {
     expect(shared()).toHaveLength(1)
     expect(shared()[0]).toMatchObject({ body: 'Good pressing today' })
     expect(typeof shared()[0].published_at).toBe('string')
+  })
+
+  // J7 (TRAK-10): the pilot count is distinct assessments per coach, so the
+  // event must name the row the database returned, new or edited.
+  it('the save event names the saved assessment, for a new one and an edit', async () => {
+    const { trackEvent } = await import('@/lib/telemetry')
+    const saves = () => vi.mocked(trackEvent).mock.calls.filter(([type]) => type === 'assessment_submitted')
+    vi.mocked(trackEvent).mockClear()
+    showForm()
+    await choose('player-b')
+    await waitFor(() => expect(messageBox()).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: /save assessment/i }))
+    await screen.findByText('Coach home')
+    expect(saves()).toHaveLength(1)
+    expect(saves()[0][1]).toMatchObject({ assessment_id: 'assessment-b', updated: false })
+
+    cleanup()
+    showForm()
+    await choose('player-a')
+    await screen.findByDisplayValue('Published feedback for Alex')
+    await userEvent.click(screen.getByRole('button', { name: /save assessment/i }))
+    await screen.findByText('Coach home')
+    expect(saves()).toHaveLength(2)
+    expect(saves()[1][1]).toMatchObject({ assessment_id: 'assessment-a', updated: true })
   })
 
   it('an edited published message is sent again on Save', async () => {

@@ -9,6 +9,11 @@ import { server } from '../../tests/msw/server'
 import { table, rpc, SUPABASE_URL } from '../../tests/msw/supabase'
 import { supabase } from '@/integrations/supabase/client'
 
+// These tests count Home's own my_consent_status requests to order stale
+// responses. The G6 open-session watcher asks the same thing on its own
+// schedule; it has its own tests (PlayerConsentWatcher, player-open-session).
+vi.mock('@/components/player/PlayerConsentWatcher', () => ({ PlayerConsentWatcher: () => null }))
+
 const endpoint = (name: string) => `${SUPABASE_URL}/rest/v1/${name}`
 const failure = () => HttpResponse.json({ code: '42501', message: 'Synthetic denied read' }, { status: 403 })
 const WORDS = 'Keep your head up before receiving the ball.'
@@ -93,6 +98,8 @@ beforeEach(() => {
     rpc('get_player_invites_for_current_user', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),
     rpc('get_children_awaiting_consent', () => []),
+    // Player and parent Matches also list training (TRAK-76/77); none here.
+    rpc('family_training_history', () => []),
     http.post(`${SUPABASE_URL}/auth/v1/token`, () => {
       const previous = JSON.parse(localStorage.getItem('sb-test-auth-token')!)
       const user = structuredClone(previous.user)

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { IconRolePlayer, IconRoleCoach, IconRoleParent, IconRoleClub } from '@/components/icons/TrakIcons';
+import { IconRolePlayer, IconRoleParent } from '@/components/icons/TrakIcons';
 import { Eye, EyeOff } from 'lucide-react';
 import { requireDevPassword } from '@/lib/dev-credentials';
 
@@ -310,28 +310,12 @@ function RegisterView({
       border: 'rgba(200,242,90,0.18)',
     },
     {
-      role: 'coach',
-      icon: <IconRoleCoach size={24} />,
-      name: 'Coach',
-      desc: 'Manage your squad, assess players and log sessions',
-      bg: 'rgba(96,165,250,0.08)',
-      border: 'rgba(96,165,250,0.18)',
-    },
-    {
       role: 'parent',
       icon: <IconRoleParent size={24} />,
       name: 'Parent',
       desc: "Follow your child's development and progress",
       bg: 'rgba(74,222,128,0.08)',
       border: 'rgba(74,222,128,0.18)',
-    },
-    {
-      role: 'club',
-      icon: <IconRoleClub size={24} />,
-      name: 'Administrator',
-      desc: 'Academy overview across all coaches and squads',
-      bg: 'rgba(255,255,255,0.04)',
-      border: 'rgba(255,255,255,0.10)',
     },
   ];
 
@@ -379,6 +363,14 @@ function RegisterView({
           </button>
         ))}
       </div>
+      {/* TRAK-12: staff are set up by Trak; the database refuses a self-made
+          coach or academy admin (#151), so the screen does not offer one. */}
+      <p
+        className="text-white/45 text-[12px] mt-4 text-center leading-snug"
+        style={{ fontFamily: "'DM Sans', sans-serif" }}
+      >
+        Coach or academy staff? Trak sets up coach and academy accounts. Ask your academy.
+      </p>
 
       <button
         onClick={onBack}

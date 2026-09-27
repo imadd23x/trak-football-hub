@@ -30,7 +30,7 @@ const StyledSelect = ({ value, onChange, placeholder, children, ...props }: Reac
   </div>
 );
 
-type Role = 'player' | 'coach' | 'club';
+type Role = 'player';
 
 const EmailConfirmationScreen = ({ email }: { email: string }) => {
   const [resending, setResending] = useState(false);
@@ -111,11 +111,14 @@ export const AwaitingParentScreen = ({ email, parentEmail }: { email: string; pa
 
 const OnboardingPage = () => {
   const { role } = useParams<{ role: string }>();
-  const validRole = (role === 'player' || role === 'coach' || role === 'club') ? role as Role : null;
+  // TRAK-12: staff are set up by Trak (#151 refuses a self-made coach or
+  // academy admin), so these two addresses explain that instead of a form.
+  if (role === 'coach' || role === 'club') return <StaffSetUpByTrak />;
+  const validRole = role === 'player' ? role as Role : null;
 
   if (!validRole) return <div className="app-container p-6 text-foreground">Invalid role</div>;
 
-  const titles: Record<Role, string> = { player: 'Player', coach: 'Coach', club: 'Administrator' };
+  const titles: Record<Role, string> = { player: 'Player' };
 
   return (
     <div className="app-container px-6 py-8">
@@ -125,8 +128,6 @@ const OnboardingPage = () => {
       <h1 className="text-2xl text-foreground mb-1">{titles[validRole]} Registration</h1>
       <p className="text-muted-foreground text-sm mb-6">Create your Trak account</p>
       {validRole === 'player' && <PlayerOnboarding />}
-      {validRole === 'coach' && <CoachOnboarding />}
-      {validRole === 'club' && <ClubOnboarding />}
     </div>
   );
 };
@@ -146,12 +147,10 @@ const PlayerOnboarding = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [position, setPosition] = useState('');
-  const [club, setClub] = useState('');
   const [ageGroup, setAgeGroup] = useState('');
   const [shirtNumber, setShirtNumber] = useState('');
 
   const [parentEmail, setParentEmail] = useState('');
-  const [coachCode, setCoachCode] = useState('');
 
   // Built once from the three selects, so the age check and the value sent to
   // the database can never disagree.
@@ -201,7 +200,7 @@ const PlayerOnboarding = () => {
   };
 
   const handleStep2 = () => {
-    if (!position || !club || !ageGroup) {
+    if (!position || !ageGroup) {
       toast.error('Please fill in all required fields'); return;
     }
     // The age group and the date of birth were independent fields, so any
@@ -239,15 +238,15 @@ const PlayerOnboarding = () => {
         role: 'player' as const,
         full_name: name,
         nationality,
+        // No club: the academy roster supplies it (TRAK-54, #144).
         player_details: {
           date_of_birth: dateOfBirth!,
           position,
-          current_club: club,
           age_group: ageGroup,
           shirt_number: shirtNumber ? parseInt(shirtNumber, 10) : null,
         },
+        // No coach code: the roster links the child's coach (TRAK-53).
         parent_email: parentEmail || null,
-        coach_invite_code: coachCode.trim() || null,
       };
 
       const { user, error } = await signUp(email, password, pendingProfile);
@@ -312,7 +311,7 @@ const PlayerOnboarding = () => {
             <option value="">Select position</option>
             {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
           </StyledSelect>
-          <Input placeholder="Current club" value={club} onChange={e => setClub(e.target.value)} className="bg-card" />
+          <p className="text-xs text-muted-foreground">Your academy adds your club and coach.</p>
           <StyledSelect value={ageGroup} onChange={e => setAgeGroup(e.target.value)}>
             <option value="">Select age group</option>
             {AGE_GROUPS.map(a => <option key={a} value={a}>{a}</option>)}
@@ -327,19 +326,9 @@ const PlayerOnboarding = () => {
 
       {step === 3 && (
         <>
-          <p className="text-sm text-muted-foreground mb-2">
-            Have a coach invite code? Enter it to link with your coach (optional).
-          </p>
-          <Input
-            placeholder="Coach code e.g. TRK-AB2K (optional)"
-            value={coachCode}
-            onChange={e => setCoachCode(e.target.value.toUpperCase())}
-            className="bg-card"
-            maxLength={8}
-          />
           {needsConsent ? (
             <>
-              <p className="text-sm text-foreground mt-3 mb-1">
+              <p className="text-sm text-foreground mb-1">
                 You're under {CONSENT_THRESHOLD_AGE}, so a parent or guardian needs to approve your account first.
               </p>
               <p className="text-xs text-muted-foreground mb-2">
@@ -356,7 +345,7 @@ const PlayerOnboarding = () => {
             </>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground mt-3 mb-2">
+              <p className="text-sm text-muted-foreground mb-2">
                 Want to invite a parent? Enter their email below (optional).
               </p>
               <Input type="email" placeholder="Parent's email (optional)" value={parentEmail} onChange={e => setParentEmail(e.target.value)} className="bg-card" />
@@ -380,182 +369,17 @@ const PlayerOnboarding = () => {
   );
 };
 
-const CoachOnboarding = () => {
-  const { signUp } = useAuth();
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-
-  const [name, setName] = useState('');
-  const [nationality, setNationality] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  const [club, setClub] = useState('');
-  const [team, setTeam] = useState('');
-  const [coachRole, setCoachRole] = useState('');
-  const [academyCode, setAcademyCode] = useState('');
-
-  const handleStep1 = () => {
-    if (!name || !nationality || !email || !password || !confirmPassword) {
-      toast.error('Please fill in all fields'); return;
-    }
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match'); return;
-    }
-    const pwError = validatePassword(password)
-    if (pwError) { toast.error(pwError); return; }
-    setStep(2);
-  };
-
-  const handleSubmit = async () => {
-    if (!club || !team || !coachRole) {
-      toast.error('Please fill in all fields'); return;
-    }
-    setLoading(true);
-    try {
-      const pendingProfile = {
-        role: 'coach' as const,
-        full_name: name,
-        nationality,
-        coach_details: {
-          current_club: club,
-          team,
-          coach_role: coachRole,
-          ...(academyCode ? { academy_code: academyCode } : {}),
-        },
-      };
-
-      const { user, error } = await signUp(email, password, pendingProfile);
-      if (error || !user) throw error || new Error('Signup failed');
-
-      setStep(3);
-    } catch (err: any) {
-      toast.error(err.message || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="space-y-2 mb-4">
-        <div className="flex gap-2">
-          {[1, 2].map(s => (
-            <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${s <= step ? 'bg-primary' : 'bg-muted'}`} />
-          ))}
-        </div>
-        <div className="flex justify-between">
-          {['Personal', 'Club Details'].map((label, i) => (
-            <span key={label} className={`text-[9px] uppercase tracking-wider ${i + 1 <= step ? 'text-primary' : 'text-white/22'}`}
-              style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
-          ))}
-        </div>
-      </div>
-
-      {step === 1 && (
-        <>
-          <Input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="bg-card" />
-          <StyledSelect value={nationality} onChange={e => setNationality(e.target.value)}>
-            <option value="">Select nationality</option>
-            {NATIONALITIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </StyledSelect>
-          <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="bg-card" />
-          <PasswordInput label="New password" autoComplete="new-password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
-          <PasswordInput label="Confirm password" autoComplete="new-password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
-          <Button onClick={handleStep1} className="w-full mt-2">Next</Button>
-        </>
-      )}
-
-      {step === 2 && (
-        <>
-          <Input placeholder="Current club" value={club} onChange={e => setClub(e.target.value)} className="bg-card" />
-          <StyledSelect value={team} onChange={e => setTeam(e.target.value)}>
-            <option value="">Select age group</option>
-            {AGE_GROUPS.map(a => <option key={a} value={a}>{a}</option>)}
-          </StyledSelect>
-          <StyledSelect value={coachRole} onChange={e => setCoachRole(e.target.value)}>
-            <option value="">Select role</option>
-            {COACH_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-          </StyledSelect>
-          <Input
-            placeholder="Academy code (optional)"
-            value={academyCode}
-            onChange={e => setAcademyCode(e.target.value)}
-            className="bg-card"
-          />
-          <p className="text-[10px] text-white/40 -mt-2">If your academy uses Trak, enter the code they gave you.</p>
-          <div className="flex gap-2 mt-2">
-            <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Back</Button>
-            <Button onClick={handleSubmit} disabled={loading} className="flex-1">
-              {loading ? 'Creating...' : 'Create Account'}
-            </Button>
-          </div>
-        </>
-      )}
-
-      {step === 3 && (
-        <EmailConfirmationScreen email={email} />
-      )}
-    </div>
-  );
-};
-
-const ClubOnboarding = () => {
-  const { signUp } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const [name,            setName]            = useState('');
-  const [academy,         setAcademy]         = useState('');
-  const [email,           setEmail]           = useState('');
-  const [password,        setPassword]        = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  const handleSubmit = async () => {
-    if (!name || !academy || !email || !password || !confirmPassword) {
-      toast.error('Please fill in all fields'); return;
-    }
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match'); return;
-    }
-    const pwError = validatePassword(password)
-    if (pwError) { toast.error(pwError); return; }
-    setLoading(true);
-    try {
-      const pendingProfile = {
-        role: 'club' as const,
-        full_name: name,
-        nationality: null,
-        club_details: { academy_name: academy },
-      };
-      const { user, error } = await signUp(email, password, pendingProfile);
-      if (error || !user) throw error || new Error('Signup failed');
-      setDone(true);
-    } catch (err: any) {
-      toast.error(err.message || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (done) return <EmailConfirmationScreen email={email} />;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground -mt-2 mb-2">
-        Administrator accounts give read-only access to all coaches and squads in your academy.
-      </p>
-      <Input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="bg-card" />
-      <Input placeholder="Academy / club name" value={academy} onChange={e => setAcademy(e.target.value)} className="bg-card" />
-      <Input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="bg-card" />
-      <PasswordInput label="New password" autoComplete="new-password" placeholder={PASSWORD_HINT} value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
-      <PasswordInput label="Confirm password" autoComplete="new-password" placeholder="Confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-card" />
-      <Button onClick={handleSubmit} disabled={loading} className="w-full mt-2">
-        {loading ? 'Creating account…' : 'Create Administrator Account'}
-      </Button>
-    </div>
-  );
-};
+const StaffSetUpByTrak = () => (
+  <div className="app-container px-6 py-8">
+    <a href="/" className="text-sm text-muted-foreground hover:text-primary mb-6 inline-block">
+      ← Back
+    </a>
+    <h1 className="text-2xl text-foreground mb-2">Staff accounts</h1>
+    <p className="text-muted-foreground text-sm leading-relaxed">
+      Trak sets up coach and academy accounts. Ask your academy, and Trak will
+      email you an invitation to sign in.
+    </p>
+  </div>
+);
 
 export default OnboardingPage;

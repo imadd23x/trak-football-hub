@@ -38,7 +38,8 @@ beforeEach(() => {
   state.role = 'player'
   server.use(
     table('player_details', [{ position: 'Midfielder', shirt_number: 8 }]),
-    table('coach_details', [{ current_club: 'Test Academy', team: 'U15', coach_role: 'Head Coach' }]),
+    table('coach_details', [{ team: 'U15', coach_role: 'Head Coach', organization_id: 'org-test' }]),
+    table('organizations', [{ name: 'Test Academy' }]),
     table('squad_players', []),
     table('player_parent_links', []),
   )
@@ -67,8 +68,10 @@ describe('settings controls reflect supported behavior', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Delete my account' })).toBeEnabled()
 
-    if (role === 'player') await screen.findByDisplayValue('8')
-    if (role === 'coach') await screen.findByDisplayValue('Test Academy')
+    // TRAK-71: a player has no position or shirt-number editor here.
+    if (role === 'player') expect(screen.queryByDisplayValue('8')).toBeNull()
+    // TRAK-72 item 11: the academy's name, shown read-only.
+    if (role === 'coach') await screen.findByText('Test Academy')
     if (role === 'parent') expect(screen.getByText('Linked children component')).toBeInTheDocument()
     expect(localStorage.getItem('trak.settings.v1')).toBe(legacy)
   })
@@ -95,7 +98,7 @@ describe('settings controls reflect supported behavior', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }))
       expect(confirm).toHaveBeenCalledWith(expect.stringContaining('academy history and consent records may be retained'))
       expect(confirm).not.toHaveBeenCalledWith(expect.stringContaining('deletes all your data'))
-      await screen.findByDisplayValue('8')
+      expect(await screen.findByRole('button', { name: 'Delete my account' })).toBeEnabled()
       expect(deletion).not.toHaveBeenCalled()
       expect(state.signOut).not.toHaveBeenCalled()
     } finally {

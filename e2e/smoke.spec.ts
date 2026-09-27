@@ -61,10 +61,11 @@ test.describe('Player onboarding', () => {
 })
 
 test.describe('Coach onboarding', () => {
-  test('registration form renders club and role fields', async ({ page }) => {
+  // TRAK-12: Trak sets up coach and academy accounts, so there is no form.
+  test('explains that Trak sets up staff accounts', async ({ page }) => {
     await page.goto(`${BASE}/onboarding/coach`)
-    await expect(page.getByPlaceholder(/full name/i)).toBeVisible()
-    await expect(page.getByPlaceholder(/email/i)).toBeVisible()
+    await expect(page.getByText(/Trak sets up coach and academy accounts/i)).toBeVisible()
+    await expect(page.getByPlaceholder(/full name/i)).toHaveCount(0)
   })
 })
 

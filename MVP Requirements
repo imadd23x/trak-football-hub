@@ -1,7 +1,10 @@
 # Trak — MVP Requirements (first pilot)
 
-Status: proposed by Imad, 23 September 2026. Becomes the agreed pilot scope
-when it merges to main with a non-author approval (docs/release/merge-gate.md).
+Scope decisions recorded by the founders on 23 September 2026. Formal scope
+acceptance is tracked in [TRAK-21](https://linear.app/trak-football/issue/TRAK-21);
+the independent correctness review of this document is tracked separately in
+[TRAK-39](https://linear.app/trak-football/issue/TRAK-39). Follow the release gate
+in docs/release/merge-gate.md for changes.
 Replaces the April 2026 "pilot wedge" requirements (REQ-001 to REQ-005 and
 the 60% player-logging hypothesis). Those, and the April PRD, architecture,
 roadmap and milestone plans, are in git history at commit 9114f4c.
@@ -12,8 +15,9 @@ Progress against this scope is tracked in docs/use-cases/PILOT-INDEX.md.
 ## The idea
 
 Build a few essential journeys to a high standard and ship them sooner. Every
-other feature shows "coming soon". A PR that serves none of the journeys or
-guarantees below waits until the pilot has started.
+other feature shows "coming soon". A feature PR that serves none of the journeys or
+guarantees below waits until the pilot has started. Scope clarification and
+launch-gate work must name their assigned Linear issue.
 
 The loop:
 
@@ -125,8 +129,10 @@ G4. Nothing reaches a child that a coach did not write and publish. Private
     notes stay private.
 G5. No message about a child goes to the wrong adult.
 G6. Withdrawal stops processing and hides published content immediately.
-G7. No AI processing, passport or export, and no child photos, in either the
-    UI or the backend.
+G7. No AI processing, player passport/export/sharing, or child photos, in
+    either the UI or the backend. Account data export and account deletion
+    are separate rights and stay in scope: deletion is in Settings, and export
+    is the `export_my_account()` function, which no screen offers yet.
 
 Bypass attempts that must fail against the API: self-signup without an
 invitation, changing a date of birth, linking by name or code, a coach
@@ -192,7 +198,8 @@ Route calls decided by Kostas on 23 September 2026 (TRAK-43).
 
   - AI feedback, the assistant and schedule parsing. Child data would go to a
     third party without processor paperwork.
-  - Passport, export and sharing.
+  - Player passport, its export and sharing. Account data export and account
+    deletion remain in scope.
   - Child photos and avatars, until storage access and backup are fixed.
   - Recognition and awards.
   - Parent goals.
@@ -233,7 +240,8 @@ says go. A date on its own never admits anyone.
      rehearsed, and the go decision records that risk.
   7. A named support inbox. The founders jointly own support and escalation.
   8. `pilot_config` points at the real academy. Today it points at
-     "Rehearsal FC", starting 28 September.
+     "Rehearsal FC", starting Monday 5 October (provisional; Kostas,
+     26 September), so pilot weeks run Monday to Sunday.
 
 Friday 25 September is a synthetic demo, not admission.
 

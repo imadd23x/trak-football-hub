@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -30,6 +30,9 @@ export default function CoachSquadPage() {
   const [ageFilter, setAgeFilter] = useState<string>('All')
   const [loadFailed, setLoadFailed] = useState(false)
   const [retry, setRetry] = useState(0)
+  // The account and Retry count of the last squad read that finished. A run
+  // for the same pair is a background refresh (see the load below).
+  const loadedFor = useRef<{ userId: string; retry: number } | null>(null)
 
   // Age group label: prefer the age_group text column ('U12'), fall back to legacy integer age
   const ageLabel = (p: any): string | null => p.age_group ?? (p.age != null ? String(p.age) : null)
@@ -42,8 +45,16 @@ export default function CoachSquadPage() {
   useEffect(() => {
     if (!user) return
     let cancelled = false
-    setLoadFailed(false)
-    setConsent({})
+    // AuthContext hands out a new user object on every same-account token
+    // refresh (hourly, and on returning to the tab), which re-runs this load.
+    // That re-run keeps the chips on screen and replaces them from its own
+    // checks, instead of blinking them all off (TRAK-79). A first load, a
+    // Retry and a different account still start from nothing.
+    const background = loadedFor.current?.userId === user.id && loadedFor.current.retry === retry
+    // A background run also keeps a failure on screen until its own read
+    // succeeds, so a refresh never shows an empty squad in its place (UC-X02;
+    // Tarek, #149 review).
+    if (!background) { setConsent({}); setLoadFailed(false) }
 
     // Fetch squad players.
     // The error must be checked: falling through to `data || []` renders a
@@ -56,10 +67,12 @@ export default function CoachSquadPage() {
       .order('player_name')
       .then(({ data, error }) => {
         if (cancelled) return
+        loadedFor.current = { userId: user.id, retry }
         if (error) {
           setLoadFailed(true)
           return
         }
+        setLoadFailed(false)
         setPlayers(data || [])
         // One check per player, the same predicate the RLS policy evaluates. A
         // pilot squad is about 25 players, so this stays a handful of requests.

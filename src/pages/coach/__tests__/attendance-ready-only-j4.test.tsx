@@ -48,7 +48,9 @@ describe('J4 attendance offers only consent-confirmed players', () => {
     const user = userEvent.setup()
     renderApp('/coach/sessions/add')
 
-    await screen.findByRole('button', { name: /Rea Ready/ })
+    // The file's first render loads the session screen cold; on a busy CI
+    // runner that took over the default 1 s (run 36270474713).
+    await screen.findByRole('button', { name: /Rea Ready/ }, { timeout: 5000 })
     expect(screen.queryByRole('button', { name: /Wes Waiting/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /Uma Unchecked/ })).toBeNull()
     expect(screen.getByText(/Wes Waiting \(waiting for a parent\)/)).toBeInTheDocument()

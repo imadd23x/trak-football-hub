@@ -54,7 +54,7 @@ if (!PW) {
   console.error('Set TRAK_REHEARSAL_PASSWORD in the environment before checking pilot state.')
   process.exit(1)
 }
-const D  = 'rehearsal.trakfootball.com'
+const D  = 'rehearsal.trak.test'
 
 const dirUser = await login(`director@${D}`, PW)
 if (!dirUser) {

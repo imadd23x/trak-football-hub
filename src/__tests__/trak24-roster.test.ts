@@ -22,7 +22,7 @@ describe('TRAK-24 rehearsal roster', () => {
   it('has 25 children: 3 phone children at the tester inbox, 22 at the synthetic domain', () => {
     expect(list).toHaveLength(25)
     expect(list.filter((r: { child_email: string }) => r.child_email.endsWith('@example.com'))).toHaveLength(3)
-    expect(list.filter((r: { child_email: string }) => r.child_email.endsWith('@rehearsal.trakfootball.com'))).toHaveLength(22)
+    expect(list.filter((r: { child_email: string }) => r.child_email.endsWith('@rehearsal.trak.dev'))).toHaveLength(22)
   })
 
   it('keeps every child under 18 and over 12 for the whole pilot, so every one needs consent', () => {

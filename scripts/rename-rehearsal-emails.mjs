@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // TRAK-89: move the rehearsal accounts off @rehearsal.trak.dev, a domain we
 // don't own (its owner could turn mail on and receive our password resets),
-// to @rehearsal.trakfootball.com, which is ours and accepts no mail.
+// to @rehearsal.trak.test. .test is reserved (RFC 6761): nobody can register
+// it or receive mail there, and J7 already counts it as synthetic.
 //
 //   node scripts/rename-rehearsal-emails.mjs            dry run: counts only
 //   node scripts/rename-rehearsal-emails.mjs --apply    changes the accounts
@@ -14,13 +15,10 @@
 // mail is sent. The id, password, profile and every record stay the same. An
 // account already moved is skipped, so a re-run is safe. The first error stops
 // the run with everything before it done.
-//
-// Run it only after migration 20260928110000 is live: J7 must already count
-// the new domain as synthetic.
 import { pathToFileURL } from 'node:url';
 
 const OLD = '@rehearsal.trak.dev';
-const NEW = '@rehearsal.trakfootball.com';
+const NEW = '@rehearsal.trak.test';
 
 /** The new address for a rehearsal account, or null for any other account. */
 export function renamed(email) {

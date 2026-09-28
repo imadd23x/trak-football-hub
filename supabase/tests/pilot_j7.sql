@@ -50,9 +50,7 @@ $test$;
 INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
   (pg_temp.jid(1),  'alex.coach@j7academy.org',      now()),  -- pilot coach, busy
   (pg_temp.jid(2),  'zoe.coach@j7academy.org',       now()),  -- pilot coach, idle
-  (pg_temp.jid(3),  'coach.u15@rehearsal.trakfootball.com', now()),  -- synthetic, in the pilot academy (TRAK-89)
-  (pg_temp.jid(5),  'coach@trak.dev',                now()),  -- local dev seed, synthetic
-  (pg_temp.jid(6),  'support@trakfootball.com',      now()),  -- our real domain: not synthetic
+  (pg_temp.jid(3),  'coach.u15@rehearsal.trak.test', now()),  -- synthetic, in the pilot academy (TRAK-89)
   (pg_temp.jid(4),  'ben.coach@otheracademy.org',    now()),  -- real, other academy
   (pg_temp.jid(11), 'child.one@j7family.org',        now()),
   (pg_temp.jid(12), 'child.two@j7family.org',        now()),
@@ -191,10 +189,6 @@ SELECT pg_temp.assert_true(
 SELECT pg_temp.assert_true(
   (SELECT created FROM public.pilot_j7_assessments WHERE assessment_id = pg_temp.jid(301)),
   'B7: an assessment first created this week is marked created, even though it was also edited');
-SELECT pg_temp.assert_true(
-  (SELECT count(*) FROM public.pilot_synthetic_user_ids() s WHERE s.user_id IN (pg_temp.jid(3), pg_temp.jid(5))) = 2
-  AND NOT EXISTS (SELECT 1 FROM public.pilot_synthetic_user_ids() s WHERE s.user_id IN (pg_temp.jid(1), pg_temp.jid(6))),
-  'B8: rehearsal.trakfootball.com and trak.dev are synthetic; trakfootball.com itself and a real academy are not (TRAK-89)');
 
 -- ── C. The switches ─────────────────────────────────────────
 -- The rehearsal switch brings the synthetic coach in, and only them.

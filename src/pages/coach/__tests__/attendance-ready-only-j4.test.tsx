@@ -85,6 +85,30 @@ describe('J4 attendance offers only consent-confirmed players', () => {
     expect(screen.queryByText(/Couldn't load your squad/)).toBeNull()
   })
 
+  // TRAK-72: a squad still loading is not an empty one, and coaches don't add
+  // players (the academy roster does, #164).
+  it('says the squad is loading until the read answers, then that the academy adds players', async () => {
+    roster([])
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    let asked = false
+    server.use(http.get(`${SUPABASE_URL}/rest/v1/squad_players`, async () => {
+      asked = true
+      await held
+      return HttpResponse.json([])
+    }))
+    renderApp('/coach/sessions/quick')
+
+    await waitFor(() => expect(asked).toBe(true), { timeout: 5000 })
+    expect(screen.getByText('Loading your squad…')).toBeInTheDocument()
+    expect(screen.queryByText(/No squad yet/)).toBeNull()
+
+    release()
+    expect(await screen.findByText('No squad yet. Players appear here once your academy adds them.')).toBeInTheDocument()
+    expect(screen.queryByText('Loading your squad…')).toBeNull()
+    expect(screen.queryByText(/Add players from the Squad tab/)).toBeNull()
+  })
+
   it('match: only the confirmed player can be marked as played', async () => {
     roster([])
     renderApp('/coach/sessions/quick')

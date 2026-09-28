@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,11 @@ const OnboardingPage = () => {
   // TRAK-12: staff are set up by Trak (#151 refuses a self-made coach or
   // academy admin), so these two addresses explain that instead of a form.
   if (role === 'coach' || role === 'club') return <StaffSetUpByTrak />;
+  // TRAK-11: an account already set up in this role followed a sign-in link
+  // (the roster invitation for someone who already has an account). Go home;
+  // a guardian first picks up any child added for them since sign-up.
+  if (!loading && profile?.role === 'parent' && role === 'parent') return <ExistingGuardianArrival />;
+  if (!loading && profile?.role === 'player' && role === 'player') return <Navigate to="/player/home" replace />;
   // TRAK-11 phase 4: a guardian arrives from the roster invitation. There is
   // no guardian signup form; anyone else here is sent to their invitation.
   if (role === 'parent') return <GuardianOnboarding loading={loading} invited={invited} />;
@@ -111,6 +116,34 @@ const OnboardingPage = () => {
       {validRole === 'player' && (loading
         ? <div role="status" aria-label="Loading" className="h-40 rounded-xl bg-card/50 animate-pulse" />
         : invited ? <InvitedPlayerSetup /> : <PlayerOnboarding />)}
+    </div>
+  );
+};
+
+// Claims the roster rows the academy added for this guardian after they signed
+// up (the sign-up rule, in claim_my_roster_guardian_rows), then goes to parent
+// home, which lists the new child for approval. A failure is shown, not skipped:
+// home would otherwise miss the child.
+const ExistingGuardianArrival = () => {
+  const navigate = useNavigate();
+  const [attempt, setAttempt] = useState(0);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let current = true;
+    setFailed(false);
+    void supabase.rpc('claim_my_roster_guardian_rows' as never).then(({ error }) => {
+      if (!current) return;
+      if (error) setFailed(true);
+      else navigate('/parent/home', { replace: true });
+    });
+    return () => { current = false; };
+  }, [attempt, navigate]);
+  return (
+    <div className="app-container px-6 py-8">
+      {failed ? <>
+        <p role="alert" className="text-sm text-foreground mb-4">Couldn't add your new child to your account. Check your connection and try again.</p>
+        <Button onClick={() => setAttempt(n => n + 1)}>Retry</Button>
+      </> : <div role="status" aria-label="Loading" className="h-40 rounded-xl bg-card/50 animate-pulse" />}
     </div>
   );
 };

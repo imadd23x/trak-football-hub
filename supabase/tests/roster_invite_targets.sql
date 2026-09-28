@@ -127,6 +127,27 @@ SELECT pg_temp.ri_check(
   AND (SELECT invite_count = 1 AND invited_at IS NOT NULL FROM public.roster_children WHERE id = pg_temp.ri(71)),
   '4 J2 each delivery is counted on the row it went to, and only that row');
 
+-- ── 4b. TRAK-84: a child without an email is never a target ───────────────
+-- Their guardian creates the login instead. Counted as rows: ri_targets builds
+-- text, and a NULL address would drop out of it silently.
+INSERT INTO public.squad_players (id, coach_user_id, player_name, age_group) VALUES
+  (pg_temp.ri(63), pg_temp.ri(2), 'Eve Synthetic', 'U11'),
+  (pg_temp.ri(64), pg_temp.ri(2), 'Finn Synthetic', 'Senior');
+INSERT INTO public.roster_children (id, organization_id, squad_player_id, date_of_birth, child_email, loaded_by) VALUES
+  (pg_temp.ri(73), pg_temp.ri(50), pg_temp.ri(63), '2016-02-03', NULL, 'fixture'),
+  (pg_temp.ri(74), pg_temp.ri(50), pg_temp.ri(64), '2000-02-03', NULL, 'fixture');
+INSERT INTO public.roster_guardians (roster_child_id, email, parent_user_id, loaded_by) VALUES
+  (pg_temp.ri(73), 'g1@roster-invite.test', pg_temp.ri(20), 'fixture'),
+  (pg_temp.ri(74), 'g5@roster-invite.test', NULL, 'fixture');
+SELECT pg_temp.ri_consent(pg_temp.ri(73), pg_temp.ri(20));
+SELECT pg_temp.ri_check(
+  (SELECT count(*) FROM public.roster_invite_targets(pg_temp.ri(73), pg_temp.ri(20))) = 0,
+  '4b J3 a consented guardian asking for an email-less child gets no invitation target (they create the login)');
+SELECT pg_temp.ri_check(
+  (SELECT count(*) FILTER (WHERE kind = 'child') = 0 AND count(*) FILTER (WHERE kind = 'guardian') = 1
+   FROM public.roster_invite_targets(pg_temp.ri(74), NULL)),
+  '4b J2 the operator still invites the guardian of an email-less adult, and never the child');
+
 -- ── 5. Only the edge function's service role can call either ───────────────
 SELECT pg_temp.ri_check(
   NOT has_function_privilege('authenticated', 'public.roster_invite_targets(uuid, uuid)', 'EXECUTE')
@@ -142,8 +163,8 @@ DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.ri_results;
-  IF total <> 10 THEN
-    RAISE EXCEPTION 'Roster invite targets: % assertions ran; expected exactly 10', total;
+  IF total <> 12 THEN
+    RAISE EXCEPTION 'Roster invite targets: % assertions ran; expected exactly 12', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'Roster invite targets: % of % failed: %', failed, total,

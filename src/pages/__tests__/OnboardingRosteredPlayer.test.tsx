@@ -41,26 +41,22 @@ async function reachFootballStep() {
 }
 
 describe('rostered player signup (TRAK-53, TRAK-54)', () => {
-  it('asks for no club: position and age group are enough to continue', async () => {
+  it('asks for no club: position and age group are enough to create the account', async () => {
     await reachFootballStep()
     expect(screen.queryByPlaceholderText('Current club')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    expect(await screen.findByPlaceholderText("Parent or guardian's email")).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Create Account' }))
+    await vi.waitFor(() => expect(auth.signUp).toHaveBeenCalledTimes(1))
     expect(toast.error).not.toHaveBeenCalled()
   })
 
   it('asks for no coach code', async () => {
     await reachFootballStep()
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    await screen.findByPlaceholderText("Parent or guardian's email")
     expect(screen.queryByPlaceholderText(/coach code/i)).toBeNull()
     expect(screen.queryByText(/coach invite code/i)).toBeNull()
   })
 
   it('sends neither a club nor a coach code: the roster supplies both', async () => {
     await reachFootballStep()
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    fireEvent.change(await screen.findByPlaceholderText("Parent or guardian's email"), { target: { value: 'parent@synthetic.test' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create Account' }))
     await vi.waitFor(() => expect(auth.signUp).toHaveBeenCalledTimes(1))
     const profile = (auth.signUp.mock.calls[0] as unknown[])[2] as Record<string, any>

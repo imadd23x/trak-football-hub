@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { loadRows, parseCsv, planLoad, validateRoster } from '../../scripts/load-roster.mjs'
+import { loadRows, parseArgs, parseCsv, planLoad, validateRoster } from '../../scripts/load-roster.mjs'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
 // written. Synthetic addresses only.
@@ -133,5 +133,19 @@ describe('load-roster invitations', () => {
     const out = await loadRows(rows, { admit, invite }, () => {})
     expect(invite.mock.calls).toEqual([['roster-2']])
     expect(out).toMatchObject({ loaded: 1, invited: 1, stoppedAt: 3 })
+  })
+})
+
+// Until phase 4's landing pages exist, an invitation link lands on a page that
+// can't finish signup, so the loader sends nothing unless asked (Tarek, #178).
+describe('load-roster invitation switch', () => {
+  const base = ['--file', 'r.csv', '--org', 'org', '--loaded-by', 'op', '--apply']
+  it('sends no invitations unless --send-invites is given', () => {
+    expect(parseArgs(base)['send-invites']).toBe(false)
+    expect(parseArgs([...base, '--no-invites'])['send-invites']).toBe(false)
+    expect(parseArgs([...base, '--send-invites'])['send-invites']).toBe(true)
+  })
+  it('refuses both switches at once', () => {
+    expect(() => parseArgs([...base, '--send-invites', '--no-invites'])).toThrow(/either/)
   })
 })

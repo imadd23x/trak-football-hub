@@ -46,6 +46,7 @@ beforeEach(() => {
       return HttpResponse.json(['Alex', 'Zara'].filter(id => filter.includes(id)).map(user_id => ({ user_id, full_name: user_id })))
     }),
     http.get(endpoint('matches'), () => HttpResponse.json([])),
+    http.post(endpoint('rpc/get_roster_children_awaiting_consent'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_children_awaiting_consent'), () => HttpResponse.json([])),
   )
 })

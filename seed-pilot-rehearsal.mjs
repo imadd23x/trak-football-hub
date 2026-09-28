@@ -10,7 +10,7 @@
  * Run:   node seed-pilot-rehearsal.mjs
  * Reset: node seed-pilot-rehearsal.mjs --purge
  *
- * Everything it creates lives under the @rehearsal.trak.dev domain and the
+ * Everything it creates lives under the @rehearsal.trakfootball.com domain and the
  * organisation named "Rehearsal FC", so it is unambiguous what is throwaway.
  *
  * PREREQUISITE: migrations 20260901000001-3 must be applied. The script checks
@@ -43,7 +43,7 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   process.exit(1)
 }
 
-const DOMAIN = 'rehearsal.trak.dev'
+const DOMAIN = 'rehearsal.trakfootball.com'
 // Never commit this. The repository is public, and these accounts are created
 // in whatever project VITE_SUPABASE_URL points at — which the runbook points at
 // the pilot project. A literal here is a working credential for a live account

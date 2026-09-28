@@ -7,7 +7,7 @@
 //   - 3 phone children who really sign up, at plus-addresses of --inbox:
 //     two siblings (U15 and U17) who share one guardian, and one child whose
 //     guardian will withhold consent;
-//   - 22 children who never sign up, at @rehearsal.trak.dev (undeliverable
+//   - 22 children who never sign up, at @rehearsal.trakfootball.com (undeliverable
 //     on purpose), each with a guardian at the same domain.
 // Every child is under 18, so every one needs consent (G1).
 //
@@ -31,8 +31,8 @@ export function insideRepo(file, root = repoRoot()) {
   return rel === '' || !(rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel));
 }
 
-export const COACHES = { U15: 'coach.u15@rehearsal.trak.dev', U17: 'coach.u17@rehearsal.trak.dev' };
-const SYNTH = 'rehearsal.trak.dev';
+export const COACHES = { U15: 'coach.u15@rehearsal.trakfootball.com', U17: 'coach.u17@rehearsal.trakfootball.com' };
+const SYNTH = 'rehearsal.trakfootball.com';
 
 const plus = (inbox, tag) => {
   const [local, domain] = inbox.split('@');

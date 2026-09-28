@@ -83,7 +83,7 @@ What counts, and what does not:
 | Parent opens | Distinct (parent, assessment) pairs where parent home showed the child's latest assessment, i.e. the bands (`assessment_viewed`). Parents never see the message (TRAK-63). | Repeat views, a parent not linked to that child |
 
 Everyone counted is in the pilot academy (`pilot_config.org_id`) and not a
-synthetic account (`@trak.dev`, `@*.trak.dev`, `example.*`, `*.test`,
+synthetic account (`@rehearsal.trakfootball.com`, `@trak.dev`, `@*.trak.dev`, `example.*`, `*.test`,
 `*.invalid`, `*.example`, `*.localhost`).
 
 Another week, or the detail behind a number:
@@ -186,7 +186,7 @@ TRAK_REHEARSAL_PASSWORD='<set a fresh one, do not commit it>' node seed-pilot-re
 ```
 
 Two squads, ~30 players, six weeks of fixtures, matches, assessments and awards under
-`@rehearsal.trak.dev` / "Rehearsal FC". Reset with `--purge`.
+`@rehearsal.trakfootball.com` / "Rehearsal FC". Reset with `--purge`.
 
 The seed signs its staff in with the app key, so it can only use staff who already
 exist. Re-running it over the rehearsal academy works, including after `--purge`: the

@@ -14,6 +14,7 @@ import { renderApp } from '../../tests/support/render-app'
 import { signInAs } from '../../tests/support/session'
 import { server } from '../../tests/msw/server'
 import { rpc, SUPABASE_URL } from '../../tests/msw/supabase'
+import { localTodayISO } from '@/lib/event-time'
 
 const canvas = vi.hoisted(() => vi.fn())
 vi.mock('html2canvas', () => ({ default: canvas }))
@@ -35,7 +36,9 @@ let requests: { method: string; path: string }[]
 const share = vi.fn()
 const clipboard = vi.fn()
 
-const today = new Date().toISOString().slice(0, 10)
+// The app's own "today" (local time): a UTC date is a different day for a
+// few hours after local midnight east of UTC, and the event falls off the week.
+const today = localTodayISO()
 function fixtures() {
   const table = (name: string, rows: unknown[]) => http.get(`${SUPABASE_URL}/rest/v1/${name}`, () => HttpResponse.json(rows))
   return [

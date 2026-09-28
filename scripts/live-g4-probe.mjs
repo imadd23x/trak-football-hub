@@ -40,7 +40,7 @@ if (!URL || !KEY || !PW) {
   process.exit(2)
 }
 
-const DOMAIN = '@rehearsal.trak.dev'
+const DOMAIN = '@rehearsal.trak.test'
 const CHILD = 'andreas.papadakis'
 const OWN = ['444a067f-97b1-49e6-9d80-706b4668cdb7', '6f22e040-b583-4f88-a1c5-f31e527b2d06']
 const OTHER_FAMILY = '1880e5b1-268c-4708-acaf-544c2be449bc'

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { InvitedPlayerSetup } from '@/components/player/InvitedPlayerSetup';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -12,7 +13,7 @@ import {
 } from '@/lib/constants';
 import { Mail, RefreshCw, ChevronDown } from 'lucide-react';
 import { validatePassword, PASSWORD_HINT } from '@/lib/password'
-import { CONSENT_THRESHOLD_AGE, ageFromDateOfBirth } from '@/lib/consent'
+import { ageFromDateOfBirth } from '@/lib/consent'
 import { isRealCalendarDate, daysInMonth } from '@/lib/calendar'
 import { ageGroupMatches, lowestEligibleAgeGroup } from '@/lib/age-group'
 
@@ -79,41 +80,19 @@ const EmailConfirmationScreen = ({ email }: { email: string }) => {
   );
 };
 
-/**
- * Shown instead of the plain confirmation screen to players below the
- * consent threshold. It must say only what is true at this moment: signUp has
- * returned, but for a duplicate email nothing was created, and even for a new
- * account the parent invite is created and mailed only on the player's first
- * sign-in after confirming (AuthContext → provision_my_profile →
- * send-parent-invite). So it tells the child the steps that trigger the parent
- * request instead of claiming it has already happened.
- */
-export const AwaitingParentScreen = ({ email, parentEmail }: { email: string; parentEmail: string }) => (
-  <div className="flex flex-col items-center text-center py-6">
-    <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center mb-6">
-      <Mail className="w-10 h-10 text-primary" />
-    </div>
-    <h2 className="text-2xl text-foreground mb-2">Almost there</h2>
-    <p className="text-sm text-muted-foreground mb-2">
-      Confirm your email at {email}. As soon as you're signed in, we'll ask
-      your parent or guardian at
-    </p>
-    <p className="text-sm font-medium text-foreground mb-6">{parentEmail}</p>
-    <p className="text-xs text-muted-foreground mb-8">
-      to approve your account. As soon as they do, your coach can start
-      recording your progress and you'll see it here.
-    </p>
-    <a href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-      ← Back to home
-    </a>
-  </div>
-);
-
 const OnboardingPage = () => {
   const { role } = useParams<{ role: string }>();
+  // TRAK-11 phase 4: a child who followed the roster's invitation arrives
+  // signed in, with no password and no profile, so they finish setting up
+  // instead of seeing the email signup form.
+  const { user, profile, loading } = useAuth();
+  const invited = !!user && !profile && !loading;
   // TRAK-12: staff are set up by Trak (#151 refuses a self-made coach or
   // academy admin), so these two addresses explain that instead of a form.
   if (role === 'coach' || role === 'club') return <StaffSetUpByTrak />;
+  // TRAK-11 phase 4: a guardian arrives from the roster invitation. There is
+  // no guardian signup form; anyone else here is sent to their invitation.
+  if (role === 'parent') return <GuardianOnboarding loading={loading} invited={invited} />;
   const validRole = role === 'player' ? role as Role : null;
 
   if (!validRole) return <div className="app-container p-6 text-foreground">Invalid role</div>;
@@ -127,10 +106,29 @@ const OnboardingPage = () => {
       </a>
       <h1 className="text-2xl text-foreground mb-1">{titles[validRole]} Registration</h1>
       <p className="text-muted-foreground text-sm mb-6">Create your Trak account</p>
-      {validRole === 'player' && <PlayerOnboarding />}
+      {/* Until the session is known, show neither form: an invited child must
+          not start typing into the signup form that is about to be replaced. */}
+      {validRole === 'player' && (loading
+        ? <div role="status" aria-label="Loading" className="h-40 rounded-xl bg-card/50 animate-pulse" />
+        : invited ? <InvitedPlayerSetup /> : <PlayerOnboarding />)}
     </div>
   );
 };
+
+const GuardianOnboarding = ({ loading, invited }: { loading: boolean; invited: boolean }) => (
+  <div className="app-container px-6 py-8">
+    <a href="/" className="text-sm text-muted-foreground hover:text-primary mb-6 inline-block">
+      ← Back
+    </a>
+    <h1 className="text-2xl text-foreground mb-1">Parent or guardian</h1>
+    <p className="text-muted-foreground text-sm mb-6">Your academy added you to Trak</p>
+    {loading
+      ? <div role="status" aria-label="Loading" className="h-40 rounded-xl bg-card/50 animate-pulse" />
+      : invited
+        ? <InvitedPlayerSetup role="parent" />
+        : <p className="text-sm text-muted-foreground">Open the invitation your academy emailed you to set up your account.</p>}
+  </div>
+);
 
 const PlayerOnboarding = () => {
   const { signUp } = useAuth();
@@ -149,8 +147,6 @@ const PlayerOnboarding = () => {
   const [position, setPosition] = useState('');
   const [ageGroup, setAgeGroup] = useState('');
   const [shirtNumber, setShirtNumber] = useState('');
-
-  const [parentEmail, setParentEmail] = useState('');
 
   // Built once from the three selects, so the age check and the value sent to
   // the database can never disagree.
@@ -174,7 +170,6 @@ const PlayerOnboarding = () => {
     ? `${dobYear}-${String(monthIndex).padStart(2, '0')}-${String(dobDay).padStart(2, '0')}`
     : null;
   const age = dateOfBirth ? ageFromDateOfBirth(dateOfBirth) : null;
-  const needsConsent = age !== null && age < CONSENT_THRESHOLD_AGE;
 
   const handleStep1 = () => {
     if (!name || !dobDay || !dobMonth || !dobYear || !nationality || !email || !password || !confirmPassword) {
@@ -199,7 +194,11 @@ const PlayerOnboarding = () => {
     setStep(2);
   };
 
-  const handleStep2 = () => {
+  // TRAK-18 phase 4 (consent-first spec): the Football step is the last one.
+  // A rostered child's guardians come from the academy roster, never from the
+  // child (G2), and the loader invites them (TRAK-11 phase 3), so there is no
+  // Parent step and the signup carries no guardian address.
+  const handleSubmit = async () => {
     if (!position || !ageGroup) {
       toast.error('Please fill in all required fields'); return;
     }
@@ -212,23 +211,6 @@ const PlayerOnboarding = () => {
       toast.error(lowest
         ? `That date of birth doesn't fit ${ageGroup}. The youngest group you can join is ${lowest} — you can pick an older one.`
         : `That date of birth doesn't fit ${ageGroup}.`);
-      return;
-    }
-    setStep(3);
-  };
-
-  const handleSubmit = async () => {
-    // Below the digital-consent age a parent has to authorise before anything
-    // can be recorded about them, so we cannot proceed without a way to reach
-    // one. Above it the player consents for themselves and this never fires.
-    if (needsConsent && !parentEmail.trim()) {
-      toast.error("Please enter a parent or guardian's email so we can ask them to approve your account");
-      return;
-    }
-    // G5: the request would go to the child, not a parent. The database refuses
-    // it too, but only after the account exists, so stop it here.
-    if (parentEmail.trim() && parentEmail.trim().toLowerCase() === email.trim().toLowerCase()) {
-      toast.error("Your parent's email must be different from yours");
       return;
     }
 
@@ -246,13 +228,13 @@ const PlayerOnboarding = () => {
           shirt_number: shirtNumber ? parseInt(shirtNumber, 10) : null,
         },
         // No coach code: the roster links the child's coach (TRAK-53).
-        parent_email: parentEmail || null,
+        // No guardian address: the roster names the guardians (TRAK-18).
       };
 
       const { user, error } = await signUp(email, password, pendingProfile);
       if (error || !user) throw error || new Error('Signup failed');
 
-      setStep(4);
+      setStep(3);
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
     } finally {
@@ -264,12 +246,12 @@ const PlayerOnboarding = () => {
     <div className="flex flex-col gap-4">
       <div className="space-y-2 mb-4">
         <div className="flex gap-2">
-          {[1, 2, 3].map(s => (
+          {[1, 2].map(s => (
             <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${s <= step ? 'bg-primary' : 'bg-muted'}`} />
           ))}
         </div>
         <div className="flex justify-between">
-          {['Personal', 'Football', 'Parent'].map((label, i) => (
+          {['Personal', 'Football'].map((label, i) => (
             <span key={label} className={`text-[9px] uppercase tracking-wider ${i + 1 <= step ? 'text-primary' : 'text-white/22'}`}
               style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
           ))}
@@ -319,40 +301,6 @@ const PlayerOnboarding = () => {
           <Input type="number" placeholder="Shirt number (optional)" value={shirtNumber} onChange={e => setShirtNumber(e.target.value)} className="bg-card" />
           <div className="flex gap-2 mt-2">
             <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Back</Button>
-            <Button onClick={handleStep2} className="flex-1">Next</Button>
-          </div>
-        </>
-      )}
-
-      {step === 3 && (
-        <>
-          {needsConsent ? (
-            <>
-              <p className="text-sm text-foreground mb-1">
-                You're under {CONSENT_THRESHOLD_AGE}, so a parent or guardian needs to approve your account first.
-              </p>
-              <p className="text-xs text-muted-foreground mb-2">
-                We'll email them. You can finish signing up now — you'll get in as soon as they say yes.
-              </p>
-              <Input
-                type="email"
-                placeholder="Parent or guardian's email"
-                value={parentEmail}
-                onChange={e => setParentEmail(e.target.value)}
-                className="bg-card"
-                required
-              />
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground mb-2">
-                Want to invite a parent? Enter their email below (optional).
-              </p>
-              <Input type="email" placeholder="Parent's email (optional)" value={parentEmail} onChange={e => setParentEmail(e.target.value)} className="bg-card" />
-            </>
-          )}
-          <div className="flex gap-2 mt-2">
-            <Button variant="outline" onClick={() => setStep(2)} className="flex-1">Back</Button>
             <Button onClick={handleSubmit} disabled={loading} className="flex-1">
               {loading ? 'Creating...' : 'Create Account'}
             </Button>
@@ -360,11 +308,7 @@ const PlayerOnboarding = () => {
         </>
       )}
 
-      {step === 4 && (
-        needsConsent
-          ? <AwaitingParentScreen email={email} parentEmail={parentEmail} />
-          : <EmailConfirmationScreen email={email} />
-      )}
+      {step === 3 && <EmailConfirmationScreen email={email} />}
     </div>
   );
 };

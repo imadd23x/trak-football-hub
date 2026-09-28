@@ -1,0 +1,115 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
+import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/integrations/supabase/client'
+import { POSITIONS } from '@/lib/constants'
+import { validatePassword, PASSWORD_HINT } from '@/lib/password'
+
+/* TRAK-11 phase 4, player side: a rostered child follows the invitation the
+   academy's roster sent and arrives here already signed in, with no password
+   and no profile. They set a password and confirm their name;
+   provision_my_profile admits them from the roster, which supplies their date
+   of birth, academy and age group (J1, TRAK-54). They never name a guardian
+   (G2). The database refuses anyone the roster doesn't name, and (phase 2) an
+   under-18 whose guardian hasn't approved; either refusal is shown as said.
+
+   The guardian the roster names arrives the same way at /onboarding/parent
+   (role 'parent'): the same password step, then just their name;
+   provision_my_profile admits them from roster_guardians and claims those
+   rows, and parent home lists the child waiting for their approval. */
+
+export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'parent' }) {
+  const guardian = role === 'parent'
+  const { user, refreshProfile } = useAuth()
+  const navigate = useNavigate()
+  const meta = (user?.user_metadata ?? {}) as { child_first_name?: unknown; academy_name?: unknown }
+  const firstName = typeof meta.child_first_name === 'string' ? meta.child_first_name.trim() : ''
+  const academy = typeof meta.academy_name === 'string' ? meta.academy_name.trim() : ''
+
+  const [step, setStep] = useState<'password' | 'profile'>('password')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  // The invitation names the child; a guardian types their own name.
+  const [name, setName] = useState(guardian ? '' : firstName)
+  const [position, setPosition] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+
+  const savePassword = async () => {
+    if (busy) return
+    const weak = validatePassword(password)
+    if (weak) { setProblem(weak); return }
+    if (password !== confirm) { setProblem('Passwords do not match'); return }
+    setBusy(true)
+    setProblem(null)
+    const { error } = await supabase.auth.updateUser({ password })
+    setBusy(false)
+    if (error) { setProblem("Couldn't set your password. Check your connection and try again."); return }
+    setStep('profile')
+  }
+
+  const finish = async () => {
+    if (busy) return
+    if (!name.trim()) { setProblem('Please enter your name'); return }
+    setBusy(true)
+    setProblem(null)
+    const { error } = await supabase.rpc('provision_my_profile' as never, {
+      p: guardian
+        ? { role: 'parent', full_name: name.trim() }
+        : { role: 'player', full_name: name.trim(), player_details: position ? { position } : {} },
+    } as never)
+    if (error) {
+      setBusy(false)
+      // 42501 carries the academy's own reason (not on the roster, or waiting
+      // for a guardian's approval); anything else is a fault, not a rule.
+      setProblem(error.code === '42501' ? error.message : "Couldn't finish setting up your account. Please try again.")
+      return
+    }
+    await refreshProfile()
+    navigate(guardian ? '/parent/home' : '/player/home', { replace: true })
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-xl text-foreground">{!guardian && firstName ? `Welcome, ${firstName}` : 'Welcome'}</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {guardian
+            ? `${academy || 'Your academy'} has added you as ${firstName ? `${firstName}'s` : "a child's"} parent or guardian.`
+            : academy ? `${academy} has added you to Trak.` : 'Your academy has added you to Trak.'}{' '}
+          {step === 'password' ? 'Choose a password to sign in with next time.' : 'Check your name, then you’re in.'}
+        </p>
+      </div>
+
+      {step === 'password' ? (
+        <>
+          <PasswordInput label="New password" autoComplete="new-password" placeholder={PASSWORD_HINT}
+            value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
+          <PasswordInput label="Confirm password" autoComplete="new-password" placeholder="Confirm password"
+            value={confirm} onChange={e => setConfirm(e.target.value)} className="bg-card" />
+          {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
+          <Button onClick={savePassword} disabled={busy} className="w-full">{busy ? 'Saving…' : 'Set password'}</Button>
+        </>
+      ) : (
+        <>
+          <label className="text-xs text-muted-foreground" htmlFor="invited-name">Your name</label>
+          <Input id="invited-name" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="bg-card" />
+          {!guardian && <>
+            <label className="text-xs text-muted-foreground" htmlFor="invited-position">Position (optional)</label>
+            <select id="invited-position" value={position} onChange={e => setPosition(e.target.value)}
+              className="w-full appearance-none bg-card border border-border rounded-xl px-4 py-3 text-sm text-foreground">
+              <option value="">Choose later</option>
+              {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <p className="text-xs text-muted-foreground">Your academy has your date of birth and age group.</p>
+          </>}
+          {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
+          <Button onClick={finish} disabled={busy} className="w-full">{busy ? 'Finishing…' : 'Finish'}</Button>
+        </>
+      )}
+    </div>
+  )
+}

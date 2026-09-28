@@ -102,6 +102,7 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
         }
         // TRAK-77: Matches lists the selected child's training (a read, over POST).
         if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
+        if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') {
           return json(claims.length ? [{ player_user_id: zaraId, full_name: 'Zara Example', age_years: 14 }] : []);
         }
@@ -234,6 +235,7 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
     if (request.method() === 'POST') {
       if (url.pathname === '/rest/v1/telemetry_events') return json(null, 201);
       if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') return json([]);
+      if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
       // TRAK-77: Matches lists the selected child's training (a read, over POST).
       if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
       if (url.pathname === '/rest/v1/rpc/get_my_pending_parent_invites') return json(linked.has(zaraId) ? [] : [{
@@ -379,7 +381,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
     authorization: `Bearer ${observed.parent.access_token}`, body: { p_invite_id: zaraInvite },
   }]);
   const allowedPosts = new Set([
-    '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent',
+    '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent',
     '/rest/v1/rpc/get_my_pending_parent_invites', '/rest/v1/rpc/get_parent_invite_by_token',
     '/rest/v1/rpc/accept_parent_invite', '/rest/v1/rpc/family_training_history',
   ]);

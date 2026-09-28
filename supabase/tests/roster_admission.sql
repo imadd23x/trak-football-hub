@@ -238,12 +238,19 @@ $$) = '42501', 'a coach cannot delete a rostered child''s squad row');
 SELECT pg_temp.assert_true(
   (SELECT count(*) = 1 FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000002'),
   'the refused squad row is still there');
+-- TRAK-86 (Imad, 28 Sep): no coach deletes any squad row, rostered or not.
+-- Deleting cascades the child's assessments and messages, and since #164
+-- the academy roster, not the coach, decides the squad.
 SELECT pg_temp.assert_true(pg_temp.outcome($$
   DELETE FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000005'
-$$) = 'allowed', 'CONTROL a coach can still delete their own unrostered squad row');
+$$) = '42501', 'a coach cannot delete their own unrostered squad row either');
 SELECT pg_temp.assert_true(
-  (SELECT count(*) = 0 FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000005'),
-  'CONTROL the unrostered squad row is gone');
+  (SELECT count(*) = 1 FROM public.squad_players WHERE id = 'a9200000-0000-0000-0000-000000000005'),
+  'the unrostered squad row is still there');
+SELECT pg_temp.assert_true(
+  NOT has_table_privilege('authenticated', 'public.squad_players', 'DELETE')
+  AND NOT has_table_privilege('anon', 'public.squad_players', 'DELETE'),
+  'app roles hold no DELETE privilege on squad_players');
 RESET ROLE;
 -- A trusted function called while the coach is signed in is refused too.
 SELECT set_config('request.jwt.claims', '{"sub":"a9000000-0000-0000-0000-000000000003","role":"authenticated"}', true);

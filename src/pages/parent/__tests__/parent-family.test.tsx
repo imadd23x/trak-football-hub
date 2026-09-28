@@ -270,6 +270,20 @@ describe('parent loading, empty and error states', () => {
     expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
   })
 
+  // TRAK-73 (Kostas's #182 review): Profile shows each family state once, not
+  // once for withdrawal and again for Connections.
+  it('shows the empty family and a links failure once on Profile', async () => {
+    server.use(http.get(endpoint('player_parent_links'), () => HttpResponse.json([])))
+    const empty = renderFamily('/parent/profile')
+    expect(await screen.findAllByText('No child linked yet')).toHaveLength(1)
+    empty.unmount()
+
+    server.use(http.get(endpoint('player_parent_links'), fail))
+    renderFamily('/parent/profile')
+    expect(await screen.findAllByRole('alert')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1)
+  })
+
   it('reports an offline failure instead of leaving a paused loading screen forever', async () => {
     onlineManager.setOnline(false)
     server.use(http.get(endpoint('player_parent_links'), () => HttpResponse.error()))

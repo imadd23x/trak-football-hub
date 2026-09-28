@@ -42,9 +42,8 @@ export default function ParentProfilePage() {
         <ParentChildSelector />
         <ParentFamilyContent>
           <ParentConsentWithdrawal />
+          <ParentConnections />
         </ParentFamilyContent>
-
-        <ParentConnections />
 
         {/* Account info */}
         <Section label="ACCOUNT">

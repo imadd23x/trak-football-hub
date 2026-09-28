@@ -95,6 +95,7 @@ beforeEach(async () => {
       const body = messages[params.get('assessment_id')?.slice(3) ?? '']
       return HttpResponse.json(body ? [{ body }] : [])
     }),
+    http.post(table('rpc/get_roster_children_awaiting_consent'), () => HttpResponse.json([])),
     http.post(table('rpc/get_children_awaiting_consent'), () => HttpResponse.json([])),
   )
 })

@@ -59,6 +59,7 @@ beforeEach(() => {
     http.get(endpoint('squad_players'), () => HttpResponse.json([])),
     http.get(endpoint('coach_assessments'), () => HttpResponse.json([])),
     http.get(endpoint('recognition_awards'), () => HttpResponse.json([])),
+    http.post(endpoint('rpc/get_roster_children_awaiting_consent'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_children_awaiting_consent'), () => {
       approvalReads += 1
       return awaiting === 'fail' ? HttpResponse.json({ message: 'unavailable' }, { status: 503 }) : HttpResponse.json(awaiting)

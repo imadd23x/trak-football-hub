@@ -98,6 +98,8 @@ beforeEach(() => {
     rpc('get_player_invites_for_current_user', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),
     rpc('get_children_awaiting_consent', () => []),
+    // TRAK-11 phase 4: parent Home and consent also list account-less roster children.
+    rpc('get_roster_children_awaiting_consent', () => []),
     // Player and parent Matches also list training (TRAK-76/77); none here.
     rpc('family_training_history', () => []),
     http.post(`${SUPABASE_URL}/auth/v1/token`, () => {

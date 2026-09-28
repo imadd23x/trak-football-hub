@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { InvitedPlayerSetup } from '@/components/player/InvitedPlayerSetup';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -81,6 +82,11 @@ const EmailConfirmationScreen = ({ email }: { email: string }) => {
 
 const OnboardingPage = () => {
   const { role } = useParams<{ role: string }>();
+  // TRAK-11 phase 4: a child who followed the roster's invitation arrives
+  // signed in, with no password and no profile, so they finish setting up
+  // instead of seeing the email signup form.
+  const { user, profile, loading } = useAuth();
+  const invited = !!user && !profile && !loading;
   // TRAK-12: staff are set up by Trak (#151 refuses a self-made coach or
   // academy admin), so these two addresses explain that instead of a form.
   if (role === 'coach' || role === 'club') return <StaffSetUpByTrak />;
@@ -97,7 +103,11 @@ const OnboardingPage = () => {
       </a>
       <h1 className="text-2xl text-foreground mb-1">{titles[validRole]} Registration</h1>
       <p className="text-muted-foreground text-sm mb-6">Create your Trak account</p>
-      {validRole === 'player' && <PlayerOnboarding />}
+      {/* Until the session is known, show neither form: an invited child must
+          not start typing into the signup form that is about to be replaced. */}
+      {validRole === 'player' && (loading
+        ? <div role="status" aria-label="Loading" className="h-40 rounded-xl bg-card/50 animate-pulse" />
+        : invited ? <InvitedPlayerSetup /> : <PlayerOnboarding />)}
     </div>
   );
 };

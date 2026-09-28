@@ -29,16 +29,19 @@
 // this academy are skipped by child_email and the rest load. A re-run never
 // changes a child who is already admitted.
 //
-// Invitations (TRAK-11 phase 3): right after each child is admitted, the
-// send-roster-invites function emails that child's guardians an invitation to
-// sign up. A skipped row is never invited, so a resumed load never re-sends. A
-// failed send doesn't undo or stop the admission; it is printed by line, and
-// the operator re-invites that child later. --no-invites loads without
-// emailing anyone: use it for every practice, rehearsal and synthetic load.
+// Invitations (TRAK-11 phase 3): with --send-invites, right after each child is
+// admitted, the send-roster-invites function emails that child's guardians an
+// invitation to sign up. A skipped row is never invited, so a resumed load
+// never re-sends. A failed send doesn't undo or stop the admission; it is
+// printed by line, and the operator re-invites that child later.
+// Without --send-invites nobody is emailed (--no-invites says so explicitly).
+// Invitations stay opt-in until phase 4's landing pages exist: until then the
+// link lands on a page that can't finish signup. Never send for a practice,
+// rehearsal or synthetic load.
 // The key must be the project's legacy service_role JWT (the same value the
 // edge function sees as SUPABASE_SERVICE_ROLE_KEY).
 //
-//   node scripts/load-roster.mjs ... --apply --no-invites
+//   node scripts/load-roster.mjs ... --apply --send-invites
 
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -174,15 +177,18 @@ export async function loadRows(toLoad, { admit, invite }, log) {
   return { loaded, invited, inviteFailed };
 }
 
-function parseArgs(argv) {
-  const out = { apply: false, 'no-invites': false };
+export function parseArgs(argv) {
+  const out = { apply: false, 'send-invites': false };
+  let noInvites = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--apply') out.apply = true;
-    else if (a === '--no-invites') out['no-invites'] = true;
+    else if (a === '--send-invites') out['send-invites'] = true;
+    else if (a === '--no-invites') noInvites = true;
     else if (['--file', '--org', '--loaded-by'].includes(a)) out[a.slice(2)] = argv[++i];
     else throw new Error(`Unknown argument: ${a}`);
   }
+  if (noInvites && out['send-invites']) throw new Error('Use either --send-invites or --no-invites, not both');
   return out;
 }
 
@@ -204,7 +210,7 @@ async function resolveCoaches(admin, emails) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.file || !args['loaded-by'] || !UUID.test(args.org ?? '')) {
-    throw new Error('Usage: --file <roster.csv> --org <academy uuid> --loaded-by <name> [--apply] [--no-invites]');
+    throw new Error('Usage: --file <roster.csv> --org <academy uuid> --loaded-by <name> [--apply] [--send-invites]');
   }
   const { rows, errors } = validateRoster(await readFile(args.file, 'utf8'));
   const guardians = rows.reduce((n, r) => n + r.guardian_emails.length, 0);
@@ -215,8 +221,8 @@ async function main() {
     process.exitCode = 1;
     return;
   }
-  console.log(args['no-invites']
-    ? '[load-roster] --no-invites: nobody will be emailed.'
+  console.log(!args['send-invites']
+    ? '[load-roster] Nobody will be emailed (add --send-invites to invite the guardians).'
     : `[load-roster] Loading will email up to ${guardians} guardian address(es) an invitation to sign up.`);
   if (!args.apply) {
     console.log('[load-roster] Dry run. Re-run with --apply to load.');
@@ -267,7 +273,7 @@ async function main() {
     p_loaded_by: args['loaded-by'],
     p_source_file: args.file.split('/').pop(),
   });
-  const invite = args['no-invites'] ? null : async (rosterChildId) => {
+  const invite = !args['send-invites'] ? null : async (rosterChildId) => {
     const res = await fetch(`${url.replace(/\/+$/, '')}/functions/v1/send-roster-invites`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },

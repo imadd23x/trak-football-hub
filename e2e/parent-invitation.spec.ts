@@ -347,13 +347,14 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   await expect(page.getByText(zara.opponent, { exact: true })).toHaveCount(0);
   await page.getByRole('combobox').selectOption(zaraId);
 
-  await page.getByRole('button', { name: 'Alerts', exact: true }).click();
-  // TRAK-85: Alerts is its real screen, parked, and shows only the selected child's activity.
-  await expect(page.getByRole('note', { name: 'This screen is coming soon' })).toContainText('Coming soon');
-  await expect(page.getByRole('combobox')).toHaveValue(zaraId);
-  await expect(page.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
-  await expect(page.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  // TRAK-74: alerts are a bell on Home and show only the selected child's activity.
   await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await page.getByRole('button', { name: /^Alerts/ }).click();
+  const alertsSheet = page.getByRole('dialog', { name: 'Alerts' });
+  await expect(alertsSheet.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
+  await expect(alertsSheet.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(alertsSheet).toHaveCount(0);
   await expect(page.getByRole('combobox')).toHaveValue(zaraId);
   await expect(page.getByText(zara.opponent, { exact: true })).toBeVisible();
   await expect(page.getByText(alex.opponent, { exact: true })).toHaveCount(0);

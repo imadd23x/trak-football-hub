@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ParentChildrenProvider } from '@/contexts/ParentChildrenContext'
@@ -78,6 +78,8 @@ function installFamily() {
   )
 }
 
+const MatchDetailProbe = () => <p>Match detail {useParams().id}</p>
+
 const clients: QueryClient[] = []
 function renderFamily(route = '/parent/home') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } })
@@ -89,6 +91,7 @@ function renderFamily(route = '/parent/home') {
           <Route path="/parent/home" element={<ParentHome />} />
           <Route path="/parent/matches" element={<ParentMatches />} />
           <Route path="/parent/alerts" element={<ParentAlerts />} />
+          <Route path="/parent/match/:id" element={<MatchDetailProbe />} />
           <Route path="/parent/profile" element={<ParentProfilePage />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
@@ -116,9 +119,14 @@ describe('parent family navigation', () => {
     await user.click(screen.getByRole('button', { name: 'Matches' }))
     expect(await screen.findByText('Zara opposition')).toBeInTheDocument()
     expect(screen.getByRole('combobox')).toHaveValue('Zara')
-    await user.click(screen.getByRole('button', { name: 'Alerts' }))
-    expect(await screen.findByText('vs Zara opposition · 0–0')).toBeInTheDocument()
-    expect(screen.queryByText(/vs Alex opposition/)).not.toBeInTheDocument()
+    // TRAK-74: alerts are a bell on Home, not a tab.
+    await user.click(screen.getByRole('button', { name: 'Home' }))
+    await user.click(await screen.findByRole('button', { name: /^Alerts/ }))
+    const alertsSheet = await screen.findByRole('dialog', { name: 'Alerts' })
+    expect(await within(alertsSheet).findByText('vs Zara opposition · 0–0')).toBeInTheDocument()
+    expect(within(alertsSheet).queryByText(/vs Alex opposition/)).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: 'Profile' }))
     expect(await screen.findByText('Following Zara · 2 children linked')).toBeInTheDocument()
     expect(screen.getByRole('combobox')).toHaveValue('Zara')
@@ -179,6 +187,71 @@ describe('parent family navigation', () => {
     expect(await screen.findByRole('option', { name: 'Zara' })).toBeInTheDocument()
     await userEvent.selectOptions(screen.getByRole('combobox'), 'Zara')
     expect(screen.getByText('Following Zara · 2 children linked')).toBeInTheDocument()
+  })
+})
+
+// TRAK-74 (decision 25 Sep): alerts are a bell at the top of parent Home, not a tab.
+describe('parent alerts bell', () => {
+  beforeEach(() => localStorage.clear())
+  const openAlerts = async () => {
+    await userEvent.click(await screen.findByRole('button', { name: /^Alerts/ }))
+    return screen.findByRole('dialog', { name: 'Alerts' })
+  }
+
+  it("counts the selected child's unseen alerts, lists matches and assessments but no awards, and clears on open", async () => {
+    renderFamily()
+    expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull()
+    expect(await screen.findByRole('button', { name: 'Alerts, 2 new' })).toBeInTheDocument()
+    const sheet = await openAlerts()
+    expect(within(sheet).getByText('vs Alex opposition · 0–0')).toBeInTheDocument()
+    expect(within(sheet).getByText('New coach assessment')).toBeInTheDocument()
+    expect(within(sheet).queryByText('Player Of Week')).toBeNull()
+    expect(within(sheet).queryByText(/teamwork/)).toBeNull()
+    await userEvent.keyboard('{Escape}')
+    expect(await screen.findByRole('button', { name: 'Alerts' })).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Following' }), 'Zara')
+    expect(await screen.findByRole('button', { name: 'Alerts, 2 new' })).toBeInTheDocument()
+    const zaraSheet = await openAlerts()
+    expect(within(zaraSheet).getByText('vs Zara opposition · 0–0')).toBeInTheDocument()
+    expect(within(zaraSheet).queryByText(/Alex opposition/)).toBeNull()
+  })
+
+  it('counts again only what arrives after the last open', async () => {
+    const { client } = renderFamily()
+    expect(await screen.findByRole('button', { name: 'Alerts, 2 new' })).toBeInTheDocument()
+    await openAlerts()
+    await userEvent.keyboard('{Escape}')
+    expect(await screen.findByRole('button', { name: 'Alerts' })).toBeInTheDocument()
+    server.use(http.get(endpoint('matches'), () => HttpResponse.json([
+      match('Alex'), { ...match('Later'), created_at: new Date(Date.now() + 60_000).toISOString() },
+    ])))
+    await act(async () => { await client.invalidateQueries({ queryKey: ['parent', 'parent-a', 'Alex', 'matches'] }) })
+    expect(await screen.findByRole('button', { name: 'Alerts, 1 new' })).toBeInTheDocument()
+  })
+
+  it('a match alert opens that match; an assessment alert shows its bands', async () => {
+    renderFamily()
+    const sheet = await openAlerts()
+    await userEvent.click(within(sheet).getByRole('button', { name: /New coach assessment/ }))
+    const bands = within(sheet).getByRole('region', { name: 'Assessment bands' })
+    for (const label of ['Work Rate', 'Tactical', 'Attitude', 'Technical', 'Physical', 'Coachability']) {
+      expect(within(bands).getByText(label)).toBeInTheDocument()
+    }
+    await userEvent.click(within(sheet).getByRole('button', { name: /Match logged/ }))
+    expect(await screen.findByText('Match detail match-Alex')).toBeInTheDocument()
+  })
+
+  it('shows a failed read as an error, never as no alerts', async () => {
+    server.use(http.get(endpoint('matches'), fail))
+    renderFamily()
+    // Home shows the failure; the bell claims no count from the half that loaded.
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument()
+    const sheet = await openAlerts()
+    expect(await within(sheet).findByRole('alert')).toHaveTextContent("Couldn't load alerts")
+    expect(within(sheet).queryByText('No alerts yet')).toBeNull()
   })
 })
 

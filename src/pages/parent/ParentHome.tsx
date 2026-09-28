@@ -1,12 +1,11 @@
 import { useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
-import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
+import { ParentAssessmentBands, ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
+import { ParentAlertsBell } from '@/components/parent/ParentAlertsBell'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches, useRosterChildrenAwaitingConsent } from '@/hooks/useParentData'
 import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
-import { BANDS } from '@/lib/types'
-import { scoreToBand } from '@/lib/rating-engine'
 import { trackEvent } from '@/lib/telemetry'
 
 export default function ParentHome() {
@@ -40,7 +39,11 @@ export default function ParentHome() {
   return (
     <MobileShell>
       <div className="pt-3 pb-4">
-        <h1 className="text-xl text-foreground mb-5">Home</h1>
+        {/* TRAK-74: alerts are a bell here, not a tab. */}
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="text-xl text-foreground">Home</h1>
+          <ParentAlertsBell />
+        </div>
         {consentQuery.isError || rosterConsentQuery.isError ? (
           <ParentLoadError message="Couldn't check pending approvals." onRetry={() => { void consentQuery.refetch(); void rosterConsentQuery.refetch() }} />
         ) : waitingNames.length > 0 && (
@@ -90,26 +93,7 @@ export default function ParentHome() {
                         </div>
                         <ParentRating rating={assessment.coach_rating} missing="Not assessed" />
                       </div>
-                      <div className="space-y-3">
-                        {[
-                          { label: 'Work Rate', score: assessment.work_rate },
-                          { label: 'Tactical', score: assessment.tactical },
-                          { label: 'Attitude', score: assessment.attitude },
-                          { label: 'Technical', score: assessment.technical },
-                          { label: 'Physical', score: assessment.physical },
-                          { label: 'Coachability', score: assessment.coachability },
-                        ].map(category => {
-                          const rated = category.score != null && Number.isFinite(category.score)
-                          const band = rated ? BANDS.find(item => item.word.toLowerCase() === scoreToBand(category.score)) : null
-                          return <div key={category.label} className="flex items-center gap-3">
-                            <span className="w-24 text-xs text-muted-foreground">{category.label}</span>
-                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden" aria-hidden="true">
-                              {rated && <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(10, category.score)) * 10}%`, backgroundColor: band?.color }} />}
-                            </div>
-                            <span className="text-xs w-20 text-right text-muted-foreground" style={band ? { color: band.color } : undefined}>{band?.word ?? 'Not assessed'}</span>
-                          </div>
-                        })}
-                      </div>
+                      <ParentAssessmentBands assessment={assessment} />
                     </div>
                   ) : <p className="py-4 text-sm text-muted-foreground">No coach assessments yet.</p>}
                 </section>

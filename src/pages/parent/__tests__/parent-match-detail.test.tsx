@@ -131,7 +131,9 @@ describe('parent match detail (TRAK-73)', () => {
   it('stays in the parent app: parent nav, back to parent matches', async () => {
     renderParent('/parent/match/match-Zara')
     expect(await screen.findByText('3–1')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument()
+    // TRAK-74: alerts are a bell on Home, not a tab.
+    expect(screen.queryByRole('button', { name: 'Alerts' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Card' })).not.toBeInTheDocument()
   })
 })

@@ -32,7 +32,7 @@ describe('TRAK-24 rehearsal roster', () => {
     expect(SYNTHETIC_DOMAIN).toBe('rehearsal.trak.test')
     expect(isSyntheticDomain(SYNTHETIC_DOMAIN)).toBe(true)
     const addresses = list.flatMap((r: Record<string, string>) => [r.child_email, r.guardian_emails, r.coach_email])
-    expect(addresses.filter(a => /trak\.dev$/i.test(a))).toEqual([])
+    expect(addresses.filter((a: string) => /trak\.dev$/i.test(a))).toEqual([])
     expect(Object.values(COACHES).every(c => (c as string).endsWith(`@${SYNTHETIC_DOMAIN}`))).toBe(true)
   })
 

@@ -29,9 +29,25 @@ export declare function loadRows(
   },
   log: (message: string) => void,
 ): Promise<{ loaded: number; invited: number; inviteFailed: number[]; alreadyOnRoster: number[]; stoppedAt?: number }>
+export declare function planReinvite(
+  rows: RosterRow[],
+  onRoster: {
+    id: string
+    child_email: string | null
+    date_of_birth: string
+    player_name: string
+    guardians: { invited_at: string | null; parent_user_id: string | null }[]
+  }[],
+): { toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[] }
+export declare function reinviteRows(
+  toInvite: { line: number; rosterChildId: string }[],
+  invite: (rosterChildId: string) => Promise<boolean>,
+  log: (message: string) => void,
+): Promise<{ invited: number; failed: number[] }>
 export declare function parseArgs(argv: string[]): {
   apply: boolean
   'send-invites': boolean
+  reinvite: boolean
   file?: string
   org?: string
   'loaded-by'?: string

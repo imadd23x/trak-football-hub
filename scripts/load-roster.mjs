@@ -35,7 +35,14 @@
 // admitted, the send-roster-invites function emails that child's guardians an
 // invitation to sign up. A skipped row is never invited, so a resumed load
 // never re-sends. A failed send doesn't undo or stop the admission; it is
-// printed by line, and the operator re-invites that child later.
+// printed by line, and the operator re-invites that child later with
+// --reinvite (TRAK-91): the same file again, which loads nothing and re-sends
+// only where a guardian was never invited and hasn't signed up. Without
+// --apply it only says which lines it would re-invite (it still needs the key
+// to read the roster).
+//
+//   node scripts/load-roster.mjs ... --reinvite            (read-only: what would go)
+//   node scripts/load-roster.mjs ... --reinvite --apply    (sends them)
 // Without --send-invites nobody is emailed (--no-invites says so explicitly).
 // Invitations stay opt-in until phase 4's landing pages exist: until then the
 // link lands on a page that can't finish signup. Never send for a practice,
@@ -189,18 +196,59 @@ export async function loadRows(toLoad, { admit, invite }, log) {
   return { loaded, invited, inviteFailed, alreadyOnRoster };
 }
 
+// TRAK-91: which rows of the file --reinvite asks to invite again. onRoster is
+// this academy's roster children as { id, child_email, date_of_birth,
+// player_name, guardians: [{ invited_at, parent_user_id }] }. A row is matched
+// by child_email, or, without one, by name and date of birth (TRAK-84). It is
+// re-invited only if a guardian was never invited and hasn't signed up, so a
+// family that already has its email, or an account, is never sent another.
+export function planReinvite(rows, onRoster) {
+  const byEmail = new Map(onRoster.filter(c => c.child_email).map(c => [normalizeEmail(c.child_email), c]));
+  const person = (name, dob) => `${String(name ?? '').trim().toLowerCase()}|${dob}`;
+  const byPerson = new Map(onRoster.filter(c => !c.child_email).map(c => [person(c.player_name, c.date_of_birth), c]));
+  const toInvite = [];
+  const upToDate = [];
+  const notOnRoster = [];
+  for (const r of rows) {
+    const child = r.child_email ? byEmail.get(r.child_email) : byPerson.get(person(r.child_name, r.date_of_birth));
+    if (!child) notOnRoster.push(r.line);
+    else if (child.guardians.some(g => !g.invited_at && !g.parent_user_id)) toInvite.push({ line: r.line, rosterChildId: child.id });
+    else upToDate.push(r.line);
+  }
+  return { toInvite, upToDate, notOnRoster };
+}
+
+// Sends each re-invitation in turn. A failure is reported by line and the rest
+// still go; nothing is admitted or changed apart from the invitation itself.
+export async function reinviteRows(toInvite, invite, log) {
+  let invited = 0;
+  const failed = [];
+  for (const { line, rosterChildId } of toInvite) {
+    if (await invite(rosterChildId).catch(() => false)) invited++;
+    else {
+      failed.push(line);
+      log(`[load-roster] Line ${line}: the invitation didn't go again. Run --reinvite once more when the cause is fixed.`);
+    }
+  }
+  return { invited, failed };
+}
+
 export function parseArgs(argv) {
-  const out = { apply: false, 'send-invites': false };
+  const out = { apply: false, 'send-invites': false, reinvite: false };
   let noInvites = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--apply') out.apply = true;
     else if (a === '--send-invites') out['send-invites'] = true;
     else if (a === '--no-invites') noInvites = true;
+    else if (a === '--reinvite') out.reinvite = true;
     else if (['--file', '--org', '--loaded-by'].includes(a)) out[a.slice(2)] = argv[++i];
     else throw new Error(`Unknown argument: ${a}`);
   }
   if (noInvites && out['send-invites']) throw new Error('Use either --send-invites or --no-invites, not both');
+  if (out.reinvite && (noInvites || out['send-invites'])) {
+    throw new Error('--reinvite sends invitations by itself and loads nothing; leave out --send-invites and --no-invites');
+  }
   return out;
 }
 
@@ -219,10 +267,46 @@ async function resolveCoaches(admin, emails) {
   return found;
 }
 
+// TRAK-91: the recovery for invitations that never went. Reads this academy's
+// roster, then (with --apply) re-sends only what planReinvite picks.
+async function reinvite(admin, args, rows, sendInvite) {
+  const { data, error } = await admin
+    .from('roster_children')
+    .select('id, child_email, date_of_birth, squad_players(player_name), roster_guardians(invited_at, parent_user_id)')
+    .eq('organization_id', args.org);
+  if (error) throw new Error(`Could not read the roster: ${error.message}`);
+  const onRoster = (data ?? []).map(c => ({
+    id: c.id,
+    child_email: c.child_email,
+    date_of_birth: c.date_of_birth,
+    player_name: c.squad_players?.player_name ?? '',
+    guardians: c.roster_guardians ?? [],
+  }));
+  const { toInvite, upToDate, notOnRoster } = planReinvite(rows, onRoster);
+  if (notOnRoster.length) {
+    console.log(`[load-roster] Line(s) ${notOnRoster.join(', ')} aren't on this academy's roster. --reinvite loads nothing: load them first.`);
+  }
+  if (upToDate.length) {
+    console.log(`[load-roster] Line(s) ${upToDate.join(', ')}: every guardian is already invited or signed up; left alone.`);
+  }
+  if (!toInvite.length) {
+    console.log('[load-roster] Nothing to re-invite.');
+    return;
+  }
+  const lines = toInvite.map(t => t.line).join(', ');
+  if (!args.apply) {
+    console.log(`[load-roster] Dry run. Would re-invite the guardians on line(s) ${lines}. Re-run with --apply to send.`);
+    return;
+  }
+  const { invited, failed } = await reinviteRows(toInvite, sendInvite, console.log);
+  console.log(`[load-roster] Re-invitations went for ${invited} child(ren); ${failed.length ? `not for line(s) ${failed.join(', ')}` : 'none failed'}.`);
+  if (failed.length) process.exitCode = 1;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.file || !args['loaded-by'] || !UUID.test(args.org ?? '')) {
-    throw new Error('Usage: --file <roster.csv> --org <academy uuid> --loaded-by <name> [--apply] [--send-invites]');
+    throw new Error('Usage: --file <roster.csv> --org <academy uuid> --loaded-by <name> [--apply] [--send-invites | --reinvite]');
   }
   const { rows, errors } = validateRoster(await readFile(args.file, 'utf8'));
   const guardians = rows.reduce((n, r) => n + r.guardian_emails.length, 0);
@@ -233,17 +317,20 @@ async function main() {
     process.exitCode = 1;
     return;
   }
-  console.log(!args['send-invites']
-    ? '[load-roster] Nobody will be emailed (add --send-invites to invite the guardians).'
-    : `[load-roster] Loading will email up to ${guardians} guardian address(es) an invitation to sign up.`);
-  if (!args.apply) {
+  console.log(args.reinvite
+    ? '[load-roster] --reinvite: loads nothing; re-sends invitations only where a guardian was never invited and hasn\'t signed up.'
+    : !args['send-invites']
+      ? '[load-roster] Nobody will be emailed (add --send-invites to invite the guardians).'
+      : `[load-roster] Loading will email up to ${guardians} guardian address(es) an invitation to sign up.`);
+  // --reinvite reads the roster even without --apply, to say what it would send.
+  if (!args.apply && !args.reinvite) {
     console.log('[load-roster] Dry run. Re-run with --apply to load.');
     return;
   }
 
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required with --apply');
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required with --apply or --reinvite');
   const host = new URL(url).host;
   if (process.env.TRAK_CONFIRM_HOST !== host) {
     throw new Error(`Set TRAK_CONFIRM_HOST=${host} to confirm this is the project you mean to load into`);
@@ -251,6 +338,20 @@ async function main() {
 
   const { createClient } = await import('@supabase/supabase-js');
   const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const sendInvite = async (rosterChildId) => {
+    const res = await fetch(`${url.replace(/\/+$/, '')}/functions/v1/send-roster-invites`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roster_child_id: rosterChildId }),
+    });
+    const body = await res.json().catch(() => ({}));
+    return res.ok && body.failed === 0;
+  };
+  if (args.reinvite) {
+    await reinvite(admin, args, rows, sendInvite);
+    return;
+  }
+
   const coaches = await resolveCoaches(admin, [...new Set(rows.map(r => r.coach_email))]);
   const unknown = rows.filter(r => !coaches.has(r.coach_email)).map(r => r.line);
   if (unknown.length) {
@@ -285,15 +386,7 @@ async function main() {
     p_loaded_by: args['loaded-by'],
     p_source_file: args.file.split('/').pop(),
   });
-  const invite = !args['send-invites'] ? null : async (rosterChildId) => {
-    const res = await fetch(`${url.replace(/\/+$/, '')}/functions/v1/send-roster-invites`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roster_child_id: rosterChildId }),
-    });
-    const body = await res.json().catch(() => ({}));
-    return res.ok && body.failed === 0;
-  };
+  const invite = args['send-invites'] ? sendInvite : null;
   const { loaded, invited, inviteFailed, alreadyOnRoster, stoppedAt } = await loadRows(toLoad, { admit, invite }, console.log);
   if (stoppedAt) { process.exitCode = 1; return; }
   if (invite) console.log(`[load-roster] Invitations went for ${invited} child(ren); ${inviteFailed.length ? `not for line(s) ${inviteFailed.join(', ')}` : 'none failed'}.`);

@@ -71,6 +71,7 @@ function installFamily() {
         award_type: 'player_of_week', awarded_for: `${child} teamwork`, note: null,
       })))
     }),
+    http.post(endpoint('rpc/get_roster_children_awaiting_consent'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_children_awaiting_consent'), () => HttpResponse.json([])),
     // TRAK-77: Matches also lists the selected child's training; none here.
     http.post(endpoint('rpc/family_training_history'), () => HttpResponse.json([])),

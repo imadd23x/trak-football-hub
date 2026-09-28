@@ -6,6 +6,7 @@ import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { ChevronLeft, ChevronDown, Trophy, Medal, TrendingUp, Target, type LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router-dom'
+import { useParked } from '@/components/trak/parked'
 
 const AWARD_TYPES: { value: string; label: string; icon: LucideIcon }[] = [
   { value: 'player_of_week', label: 'Player of the Week', icon: Trophy },
@@ -30,6 +31,8 @@ function OptPill({ label, icon: Icon, active, onClick }: { label: string; icon?:
 }
 
 export default function CoachAwardPlayer() {
+  // TRAK-85: parked, so actions say "Coming soon" and send nothing.
+  const { parked, comingSoon } = useParked()
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -48,6 +51,7 @@ export default function CoachAwardPlayer() {
   }, [user])
 
   const handleSave = async () => {
+    if (parked) return comingSoon()
     if (!user || !playerId || !awardType || saving) return
     setSaving(true)
     const { error } = await supabase.from('recognition_awards').insert({

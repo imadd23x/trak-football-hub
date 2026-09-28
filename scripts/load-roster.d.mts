@@ -28,3 +28,10 @@ export declare function loadRows(
   },
   log: (message: string) => void,
 ): Promise<{ loaded: number; invited: number; inviteFailed: number[]; stoppedAt?: number }>
+export declare function parseArgs(argv: string[]): {
+  apply: boolean
+  'send-invites': boolean
+  file?: string
+  org?: string
+  'loaded-by'?: string
+}

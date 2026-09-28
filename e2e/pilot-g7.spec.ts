@@ -35,6 +35,9 @@ for (const role of ['player', 'coach', 'club'] as const) {
       // TRAK-13 (G6): an open player session re-checks consent (a read, over POST).
       if (role === 'player' && url.pathname === '/rest/v1/rpc/my_consent_status') return json({ required: false, granted: true, invited_parent: null })
       if (['/rest/v1/squad_players', '/rest/v1/player_parent_links', '/rest/v1/coach_sessions', '/rest/v1/coach_assessments'].includes(url.pathname)) return json([])
+      // TRAK-85: the parked screens render for real, so their reads (GET only) are answered.
+      if (request.method() === 'GET' && ['/rest/v1/organizations', '/rest/v1/coach_details', '/rest/v1/matches', '/rest/v1/player_details',
+        '/rest/v1/recognition_awards', '/rest/v1/coach_calendar_events'].includes(url.pathname)) return json([])
       unexpected.push(request.method() + ' ' + url.pathname)
       return json({ message: 'Unmocked request blocked' }, 500)
     })
@@ -42,15 +45,14 @@ for (const role of ['player', 'coach', 'club'] as const) {
     const paths = role === 'player' ? ['/player/passport', '/player/evolution']
       : role === 'club' ? ['/club/home', '/club/squads', '/club/coaches', '/club/profile', '/club/radar']
         : ['/coach/assistant', '/coach/feedback/synthetic-assessment', '/coach/schedule', '/coach/recognition', '/coach/award']
+    // TRAK-85: each parked route shows its real screen with the "Coming soon" pill.
     for (const path of paths) {
       await page.goto(path)
-      await expect(page.getByRole('heading', { name: 'Coming soon' })).toBeVisible()
-      await expect(page.getByRole('link', { name: role === 'club' ? 'Account settings' : 'Back to home' }))
-        .toHaveAttribute('href', role === 'club' ? '/settings' : `/${role}/home`)
+      await expect(page.getByRole('note', { name: 'This screen is coming soon' })).toContainText('Coming soon')
+      await expect(page.getByRole('heading', { name: 'Coming soon' })).toHaveCount(0)
     }
     await page.screenshot({ path: testInfo.outputPath('coming-soon-mobile.png'), fullPage: true })
-    if (role === 'club') await page.getByRole('link', { name: 'Account settings' }).click()
-    else await page.goto('/settings')
+    await page.goto('/settings')
     await expect(page.getByRole('button', { name: 'Synthetic Pilot', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Delete my account' })).toBeVisible()
     await expect(page.locator('input[type=file], img')).toHaveCount(0)

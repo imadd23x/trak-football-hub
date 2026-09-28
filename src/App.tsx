@@ -9,12 +9,12 @@ import { ParentChildrenProvider } from "@/contexts/ParentChildrenContext";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PlayerConsentWatcher } from "@/components/player/PlayerConsentWatcher";
 import { ErrorBoundary } from "@/components/trak/ErrorBoundary";
+import { ParkedScreen } from "@/components/trak/ParkedScreen";
 
 // Landing eagerly loaded so the first paint is instant
 import LandingPage from "./pages/LandingPage";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
-import ComingSoonPage from "./pages/ComingSoonPage";
 
 // Lazy-loaded routes — split bundles so navigating between sections is fast
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
@@ -56,6 +56,22 @@ const ParentMatches = lazy(() => import("./pages/parent/ParentMatches"));
 const ParentMatchDetail = lazy(() => import("./pages/parent/ParentMatchDetail"));
 const ParentProfilePage = lazy(() => import("./pages/parent/ParentProfilePage"));
 const ParentConsent = lazy(() => import("./pages/parent/ParentConsent"));
+
+// TRAK-85: parked screens show as designed, inside ParkedScreen ("Coming soon"
+// pill; actions say so and send nothing). Their backend writes stay closed (G7).
+const PlayerPassport = lazy(() => import("./pages/player/PlayerPassport"));
+const PlayerEvolutionCard = lazy(() => import("./pages/player/PlayerEvolutionCard"));
+const CoachReviewFeedback = lazy(() => import("./pages/coach/CoachReviewFeedback"));
+const CoachAssistant = lazy(() => import("./pages/coach/CoachAssistant"));
+const CoachSchedule = lazy(() => import("./pages/coach/CoachSchedule"));
+const CoachRecognition = lazy(() => import("./pages/coach/CoachRecognition"));
+const CoachAwardPlayer = lazy(() => import("./pages/coach/CoachAwardPlayer"));
+const ParentAlerts = lazy(() => import("./pages/parent/ParentAlerts"));
+const ClubHome = lazy(() => import("./pages/club/ClubHome"));
+const ClubSquads = lazy(() => import("./pages/club/ClubSquads"));
+const ClubCoaches = lazy(() => import("./pages/club/ClubCoaches"));
+const ClubProfile = lazy(() => import("./pages/club/ClubProfile"));
+const ClubRadar = lazy(() => import("./pages/club/ClubRadar"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -99,8 +115,8 @@ const App = () => (
             <Route path="/player/matches" element={<RouteGuard allowedRole="player"><PlayerMatches /></RouteGuard>} />
             <Route path="/player/match/:id" element={<RouteGuard allowedRole="player"><PlayerMatchDetail /></RouteGuard>} />
             <Route path="/player/profile" element={<RouteGuard allowedRole="player"><PlayerProfilePage /></RouteGuard>} />
-            <Route path="/player/passport" element={<RouteGuard allowedRole="player"><ComingSoonPage feature="Player passport" home="/player/home" /></RouteGuard>} />
-            <Route path="/player/evolution" element={<RouteGuard allowedRole="player"><ComingSoonPage feature="Evolution card" home="/player/home" /></RouteGuard>} />
+            <Route path="/player/passport" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerPassport /></ParkedScreen></RouteGuard>} />
+            <Route path="/player/evolution" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerEvolutionCard /></ParkedScreen></RouteGuard>} />
             <Route path="/player/feedback/:assessmentId" element={<RouteGuard allowedRole="player"><PlayerFeedback /></RouteGuard>} />
             <Route path="/how-it-works" element={<HowTrakWorks />} />
 
@@ -109,7 +125,7 @@ const App = () => (
             <Route path="/coach/squad" element={<RouteGuard allowedRole="coach"><CoachSquadPage /></RouteGuard>} />
             <Route path="/coach/squad/add" element={<RouteGuard allowedRole="coach"><Navigate to="/coach/squad" replace /></RouteGuard>} />
             <Route path="/coach/assess" element={<RouteGuard allowedRole="coach"><CoachAssessPage /></RouteGuard>} />
-            <Route path="/coach/feedback/:assessmentId" element={<RouteGuard allowedRole="coach"><ComingSoonPage feature="AI feedback" home="/coach/home" /></RouteGuard>} />
+            <Route path="/coach/feedback/:assessmentId" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachReviewFeedback /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/sessions" element={<RouteGuard allowedRole="coach"><CoachSessionsChooser /></RouteGuard>} />
             <Route path="/coach/sessions/list" element={<RouteGuard allowedRole="coach"><CoachSessionsPage /></RouteGuard>} />
             {/* Quick match log now resolves to the full session screen, preset to Match.
@@ -124,25 +140,25 @@ const App = () => (
             <Route path="/coach/manual" element={<CoachManual />} />
             <Route path="/coach/quick-assess" element={<RouteGuard allowedRole="coach"><Navigate to="/coach/assess" replace /></RouteGuard>} />
             <Route path="/coach/player/:id" element={<RouteGuard allowedRole="coach"><CoachPlayerProfilePage /></RouteGuard>} />
-            <Route path="/coach/recognition" element={<RouteGuard allowedRole="coach"><ComingSoonPage feature="Recognition" home="/coach/home" /></RouteGuard>} />
-            <Route path="/coach/award" element={<RouteGuard allowedRole="coach"><ComingSoonPage feature="Awards" home="/coach/home" /></RouteGuard>} />
-            <Route path="/coach/schedule" element={<RouteGuard allowedRole="coach"><ComingSoonPage feature="Schedule" home="/coach/home" /></RouteGuard>} />
-            <Route path="/coach/assistant" element={<RouteGuard allowedRole="coach"><ComingSoonPage feature="Coach assistant" home="/coach/home" /></RouteGuard>} />
+            <Route path="/coach/recognition" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachRecognition /></ParkedScreen></RouteGuard>} />
+            <Route path="/coach/award" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachAwardPlayer /></ParkedScreen></RouteGuard>} />
+            <Route path="/coach/schedule" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachSchedule /></ParkedScreen></RouteGuard>} />
+            <Route path="/coach/assistant" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachAssistant /></ParkedScreen></RouteGuard>} />
 
             {/* Parent routes */}
             <Route path="/parent/home" element={<RouteGuard allowedRole="parent"><ParentHome /></RouteGuard>} />
             <Route path="/parent/matches" element={<RouteGuard allowedRole="parent"><ParentMatches /></RouteGuard>} />
             <Route path="/parent/match/:id" element={<RouteGuard allowedRole="parent"><ParentMatchDetail /></RouteGuard>} />
-            <Route path="/parent/alerts" element={<RouteGuard allowedRole="parent"><ComingSoonPage feature="Alerts" home="/parent/home" /></RouteGuard>} />
+            <Route path="/parent/alerts" element={<RouteGuard allowedRole="parent"><ParkedScreen><ParentAlerts /></ParkedScreen></RouteGuard>} />
             <Route path="/parent/profile" element={<RouteGuard allowedRole="parent"><ParentProfilePage /></RouteGuard>} />
             <Route path="/parent/consent" element={<RouteGuard allowedRole="parent"><ParentConsent /></RouteGuard>} />
 
             {/* Club admin routes */}
-            <Route path="/club/home" element={<RouteGuard allowedRole="club"><ComingSoonPage feature="Academy dashboard" home="/settings" homeLabel="Account settings" /></RouteGuard>} />
-            <Route path="/club/squads" element={<RouteGuard allowedRole="club"><ComingSoonPage feature="Academy squads" home="/settings" homeLabel="Account settings" /></RouteGuard>} />
-            <Route path="/club/coaches" element={<RouteGuard allowedRole="club"><ComingSoonPage feature="Academy coaches" home="/settings" homeLabel="Account settings" /></RouteGuard>} />
-            <Route path="/club/profile" element={<RouteGuard allowedRole="club"><ComingSoonPage feature="Academy profile" home="/settings" homeLabel="Account settings" /></RouteGuard>} />
-            <Route path="/club/radar" element={<RouteGuard allowedRole="club"><ComingSoonPage feature="Academy radar" home="/settings" homeLabel="Account settings" /></RouteGuard>} />
+            <Route path="/club/home" element={<RouteGuard allowedRole="club"><ParkedScreen><ClubHome /></ParkedScreen></RouteGuard>} />
+            <Route path="/club/squads" element={<RouteGuard allowedRole="club"><ParkedScreen><ClubSquads /></ParkedScreen></RouteGuard>} />
+            <Route path="/club/coaches" element={<RouteGuard allowedRole="club"><ParkedScreen><ClubCoaches /></ParkedScreen></RouteGuard>} />
+            <Route path="/club/profile" element={<RouteGuard allowedRole="club"><ParkedScreen><ClubProfile /></ParkedScreen></RouteGuard>} />
+            <Route path="/club/radar" element={<RouteGuard allowedRole="club"><ParkedScreen><ClubRadar /></ParkedScreen></RouteGuard>} />
 
             {/* Legacy redirects */}
             <Route path="/dashboard" element={<RouteGuard allowedRole="player"><PlayerHome /></RouteGuard>} />

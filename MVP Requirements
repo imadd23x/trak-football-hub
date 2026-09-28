@@ -155,8 +155,10 @@ Value (proposed; founders set the targets before launch):
 
 ## Coming soon (by route, from src/App.tsx)
 
-"Coming soon" means the route shows a static placeholder AND its backend
-writes are closed. Hiding a button is not enough.
+"Coming soon" means the screen shows as designed with a "Coming soon" pill;
+its actions show "Coming soon" and send nothing; its backend writes stay
+closed. Hiding a button is not enough: the closed backend is the protection
+(founders' call, 26 September 2026; TRAK-85).
 
 P0, must work:
   /, /auth/confirm, /reset-password, /onboarding/:role (invitation only),
@@ -180,7 +182,7 @@ Coming soon:
 
   The academy console is coming soon because the concierge roster (J1)
   replaces it. /club/home is also where an academy director lands after
-  sign-in, so the placeholder must render there without errors.
+  sign-in, so the screen must render there without errors.
 
 Remove for the pilot:
   /coach/squad/add (the academy registers players). Remove avatar upload

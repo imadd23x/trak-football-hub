@@ -14,39 +14,59 @@ let role = 'coach'
 let account: string
 let reads: string[]
 const endpoint = (name: string) => `${SUPABASE_URL}/rest/v1/${name}`
-const parked = [
-  ['player', '/player/passport'], ['player', '/player/evolution'],
-  ['coach', '/coach/assistant'], ['coach', '/coach/feedback/audit-assessment'],
-  ['coach', '/coach/schedule'], ['coach', '/coach/recognition'], ['coach', '/coach/award'],
-  ['parent', '/parent/alerts'], ['club', '/club/home'], ['club', '/club/squads'],
-  ['club', '/club/coaches'], ['club', '/club/profile'], ['club', '/club/radar'],
+// TRAK-85: each parked route shows its real screen (this text proves it) with
+// the "Coming soon" pill. The backend stays closed (pilot_g7.sql,
+// parked_feature_boundary.sql); the actions are in parked-screens-coming-soon.
+const parked: [string, string, RegExp][] = [
+  ['player', '/player/passport', /PLAYER PASSPORT/i], ['player', '/player/evolution', /EVOLUTION CARD/i],
+  ['coach', '/coach/assistant', /TRY ASKING/i], ['coach', '/coach/feedback/audit-assessment', /Review feedback/i],
+  ['coach', '/coach/schedule', /Calendar/], ['coach', '/coach/recognition', /Give Recognition/], ['coach', '/coach/award', /Give Award/],
+  ['parent', '/parent/alerts', /^Alerts$/], ['club', '/club/home', /Pilot Active/], ['club', '/club/squads', /Filter by age group/],
+  ['club', '/club/coaches', /Connected Coaches/], ['club', '/club/profile', /Administrator/], ['club', '/club/radar', /Movement Radar/],
 ]
+// Reads that travel as POST, and the app's own page-view telemetry.
+const READ_POSTS = ['/rest/v1/telemetry_events', ...['get_children_awaiting_consent', 'get_roster_children_awaiting_consent', 'get_player_invites_for_current_user',
+  'my_consent_status', 'coach_squad_player_consent_required'].map(name => `/rest/v1/rpc/${name}`)]
+let sent: string[]
 beforeEach(() => {
   vi.stubEnv('DEV', false)
   account = `parked-audit-${++sequence}`
   role = 'coach'
   reads = []
+  sent = []
   signInAs({ id: account })
+  server.events.on('request:start', ({ request }) => {
+    const { pathname } = new URL(request.url)
+    if (request.method !== 'GET' && !pathname.startsWith('/auth/') && !READ_POSTS.includes(pathname)) sent.push(`${request.method} ${pathname}`)
+  })
+  // jsdom has no element scrolling; the coach assistant scrolls its thread.
+  Element.prototype.scrollTo = () => {}
   server.use(
     http.get(endpoint('profiles'), () => HttpResponse.json([{ id: account, user_id: account, role, full_name: 'Synthetic Actor', invite_code: 'SYN047' }])),
     ...['organizations', 'coach_details', 'squad_players', 'coach_assessments', 'recognition_awards',
       'coach_calendar_events', 'coach_sessions', 'matches', 'player_details', 'player_parent_links'].map(name =>
       http.get(endpoint(name), () => { reads.push(name); return HttpResponse.json([]) })),
     rpc('get_children_awaiting_consent', () => []),
+    // TRAK-11 phase 4: parent Home and consent also list account-less roster children.
+    rpc('get_roster_children_awaiting_consent', () => []),
     rpc('get_player_invites_for_current_user', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),
     rpc('coach_squad_player_consent_required', () => false),
+    http.post(endpoint('telemetry_events'), () => HttpResponse.json(null, { status: 201 })),
+    http.get(endpoint(':other'), () => HttpResponse.json([])),
   )
 })
-afterEach(() => { cleanup(); vi.unstubAllEnvs() })
+afterEach(() => { cleanup(); vi.unstubAllEnvs(); server.events.removeAllListeners() })
 
 describe('TRAK-47 parked feature boundary', () => {
-  it.each(parked)('%s receives a static placeholder at %s', async (actor, path) => {
+  it.each(parked)('%s sees the real screen at %s with the "Coming soon" pill, and only reads', async (actor, path, landmark) => {
     role = actor
     renderApp(path)
-    expect(await screen.findByRole('heading', { name: 'Coming soon' })).toBeInTheDocument()
-    expect(reads.filter(name => name !== 'player_parent_links')).toEqual([])
-    if (actor === 'club') expect(screen.getByRole('link', { name: 'Account settings' })).toHaveAttribute('href', '/settings')
+    expect((await screen.findAllByText(landmark, {}, { timeout: 4000 })).length).toBeGreaterThan(0)
+    expect(screen.getByRole('note', { name: 'This screen is coming soon' })).toHaveTextContent('Coming soon')
+    expect(screen.queryByRole('heading', { name: 'Coming soon' })).toBeNull()
+    await new Promise(r => setTimeout(r, 300))
+    expect(sent).toEqual([])
   })
 
   it.each([

@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { scoreToBand } from '@/lib/rating-engine'
 import { BANDS } from '@/lib/types'
+import { useParked } from '@/components/trak/parked'
 
 type SquadPlayer = {
   id: string
@@ -28,6 +29,8 @@ function initials(name: string) {
 }
 
 export default function CoachRecognition() {
+  // TRAK-85: parked, so actions say "Coming soon" and send nothing.
+  const { parked, comingSoon } = useParked()
   const navigate = useNavigate()
   const { user, profile } = useAuth()
 
@@ -118,6 +121,7 @@ export default function CoachRecognition() {
   }
 
   const handleAward = async () => {
+    if (parked) return comingSoon()
     if (!selectedId || !user || saving) return
     const player = players.find(p => p.id === selectedId)
     if (!player) return

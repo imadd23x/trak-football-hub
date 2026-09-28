@@ -25,7 +25,7 @@ const parked: [string, string, RegExp][] = [
   ['club', '/club/coaches', /Connected Coaches/], ['club', '/club/profile', /Administrator/], ['club', '/club/radar', /Movement Radar/],
 ]
 // Reads that travel as POST, and the app's own page-view telemetry.
-const READ_POSTS = ['/rest/v1/telemetry_events', ...['get_children_awaiting_consent', 'get_player_invites_for_current_user',
+const READ_POSTS = ['/rest/v1/telemetry_events', ...['get_children_awaiting_consent', 'get_roster_children_awaiting_consent', 'get_player_invites_for_current_user',
   'my_consent_status', 'coach_squad_player_consent_required'].map(name => `/rest/v1/rpc/${name}`)]
 let sent: string[]
 beforeEach(() => {
@@ -47,6 +47,8 @@ beforeEach(() => {
       'coach_calendar_events', 'coach_sessions', 'matches', 'player_details', 'player_parent_links'].map(name =>
       http.get(endpoint(name), () => { reads.push(name); return HttpResponse.json([]) })),
     rpc('get_children_awaiting_consent', () => []),
+    // TRAK-11 phase 4: parent Home and consent also list account-less roster children.
+    rpc('get_roster_children_awaiting_consent', () => []),
     rpc('get_player_invites_for_current_user', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),
     rpc('coach_squad_player_consent_required', () => false),

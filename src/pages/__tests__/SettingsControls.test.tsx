@@ -72,7 +72,8 @@ describe('settings controls reflect supported behavior', () => {
     if (role === 'player') expect(screen.queryByDisplayValue('8')).toBeNull()
     // TRAK-72 item 11: the academy's name, shown read-only.
     if (role === 'coach') await screen.findByText('Test Academy')
-    if (role === 'parent') expect(screen.getByText('Linked children component')).toBeInTheDocument()
+    // TRAK-73: a parent's linked children moved to the Profile tab, like the player's (TRAK-71).
+    if (role === 'parent') expect(screen.queryByText('Linked children component')).toBeNull()
     expect(localStorage.getItem('trak.settings.v1')).toBe(legacy)
   })
 

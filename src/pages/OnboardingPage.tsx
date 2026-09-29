@@ -90,6 +90,9 @@ const OnboardingPage = () => {
   // TRAK-12: staff are set up by Trak (#151 refuses a self-made coach or
   // academy admin), so these two addresses explain that instead of a form.
   if (role === 'coach' || role === 'club') return <StaffSetUpByTrak />;
+  // TRAK-11 phase 4: a guardian arrives from the roster invitation. There is
+  // no guardian signup form; anyone else here is sent to their invitation.
+  if (role === 'parent') return <GuardianOnboarding loading={loading} invited={invited} />;
   const validRole = role === 'player' ? role as Role : null;
 
   if (!validRole) return <div className="app-container p-6 text-foreground">Invalid role</div>;
@@ -111,6 +114,21 @@ const OnboardingPage = () => {
     </div>
   );
 };
+
+const GuardianOnboarding = ({ loading, invited }: { loading: boolean; invited: boolean }) => (
+  <div className="app-container px-6 py-8">
+    <a href="/" className="text-sm text-muted-foreground hover:text-primary mb-6 inline-block">
+      ← Back
+    </a>
+    <h1 className="text-2xl text-foreground mb-1">Parent or guardian</h1>
+    <p className="text-muted-foreground text-sm mb-6">Your academy added you to Trak</p>
+    {loading
+      ? <div role="status" aria-label="Loading" className="h-40 rounded-xl bg-card/50 animate-pulse" />
+      : invited
+        ? <InvitedPlayerSetup role="parent" />
+        : <p className="text-sm text-muted-foreground">Open the invitation your academy emailed you to set up your account.</p>}
+  </div>
+);
 
 const PlayerOnboarding = () => {
   const { signUp } = useAuth();

@@ -100,8 +100,9 @@ beforeEach(async () => {
   )
 })
 afterEach(() => { cleanup(); client.clear() })
-function mount() {
-  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/parent/home']}><AuthProvider>
+// TRAK-74: /parent/alerts (parked, with awards) has no tab any more; open it by address.
+function mount(path = '/parent/home') {
+  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><AuthProvider>
     <ParentChildrenProvider><Routes>
       <Route path="/parent/home" element={<RouteGuard allowedRole="parent"><ParentHome /></RouteGuard>} />
       <Route path="/parent/alerts" element={<RouteGuard allowedRole="parent"><ParentAlerts /></RouteGuard>} />
@@ -126,7 +127,7 @@ describe('parent retained coach history through the real AuthProvider and SDK', 
     expect(screen.getByText('Alex recognition 1')).toBeInTheDocument()
     expectPreserved(alex)
     expect(nameFilters).toEqual(mode === 'all-null' ? [] : [`in.(${coachA})`])
-    fireEvent.click(screen.getByRole('button', { name: 'Alerts' }))
+    cleanup(); mount('/parent/alerts')
     await screen.findByText('vs Alex opposition · 0–0')
     expect(screen.getAllByText('New coach assessment')).toHaveLength(2)
     expect(screen.getAllByText('Player Of Week')).toHaveLength(2)
@@ -151,7 +152,7 @@ describe('parent retained coach history through the real AuthProvider and SDK', 
     expect(within(screen.getByRole('region', { name: 'Latest coach assessment' })).getByText(hidden ? 'Coach' : 'Synthetic Alex Coach')).toBeInTheDocument()
     expect(nameFilters).toEqual([`in.(${coachA})`])
     expectPreserved(alex)
-    fireEvent.click(screen.getByRole('button', { name: 'Alerts' }))
+    cleanup(); mount('/parent/alerts')
     await screen.findByText(`Alex recognition 1 · by ${hidden ? 'Coach' : 'Synthetic Alex Coach'}`)
     expect(screen.getAllByText('New coach assessment')).toHaveLength(2)
   })

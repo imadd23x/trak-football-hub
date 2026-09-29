@@ -4,16 +4,8 @@ import { MobileShell, NavBar } from '@/components/trak'
 import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading } from '@/components/parent/ParentFamily'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { useParentDevelopment, useParentMatches } from '@/hooks/useParentData'
-import { formatParentAward, formatParentDate } from '@/lib/parent-data'
-import { scoreToBand } from '@/lib/rating-engine'
+import { formatParentDate, parentAlerts } from '@/lib/parent-data'
 import { trackEvent } from '@/lib/telemetry'
-
-interface ParentAlert {
-  id: string
-  title: string
-  description: string
-  date: string | null
-}
 
 export default function ParentAlerts() {
   const navigate = useNavigate()
@@ -23,24 +15,7 @@ export default function ParentAlerts() {
   const development = useParentDevelopment()
   const hasError = matches.isError || development.isError
   const loading = matches.isPending || development.isPending
-  const alerts: ParentAlert[] = [
-    // Activity is ordered by when it was recorded, including backfilled games.
-    // Copy first: the shared query cache remains in match-date order.
-    ...[...(matches.data ?? [])]
-      .sort((a, b) => (Date.parse(b.created_at ?? '') || 0) - (Date.parse(a.created_at ?? '') || 0))
-      .slice(0, 20).map(match => ({
-      id: `match-${match.id}`, title: 'Match logged', date: match.created_at,
-      description: `vs ${match.opponent || match.competition || 'Unknown'}${match.team_score != null && match.opponent_score != null ? ` · ${match.team_score}–${match.opponent_score}` : ''}`,
-    })),
-    ...(development.data?.assessments ?? []).map(assessment => ({
-      id: `assessment-${assessment.id}`, title: 'New coach assessment', date: assessment.created_at,
-      description: `by ${(assessment.coach_user_id && development.data?.coachNames[assessment.coach_user_id]) || 'Coach'} · ${assessment.coach_rating == null ? 'Not assessed' : scoreToBand(assessment.coach_rating)}`,
-    })),
-    ...(development.data?.awards ?? []).map(award => ({
-      id: `award-${award.id}`, title: formatParentAward(award.award_type), date: award.created_at,
-      description: [award.awarded_for, `by ${(award.coach_user_id && development.data?.coachNames[award.coach_user_id]) || 'Coach'}`].filter(Boolean).join(' · '),
-    })),
-  ].sort((a, b) => (Date.parse(b.date ?? '') || 0) - (Date.parse(a.date ?? '') || 0))
+  const alerts = parentAlerts(matches.data ?? [], development.data)
   const childId = selectedChild?.id
   const count = alerts.length
   useEffect(() => {

@@ -26,15 +26,21 @@ const BAND_COLORS: Record<string, string> = Object.fromEntries(
 // look at, not how a child played.
 const FLAG_COLORS = { attention: '#fb923c', missed: '#facc15', improved: '#4ade80' } as const
 
+// A count not answered yet is "…", and one that failed is "—" (the banner
+// above says why). Only an answered read may print a number, zero included.
+const countText = (n: number | null, failed: boolean) => (n !== null ? n : failed ? '—' : '…')
+
 export default function CoachHomePage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [playerCount, setPlayerCount] = useState(0)
+  // null = not answered yet (TRAK-92). Starting these at 0 told a coach with a
+  // full season "0 players · 0 total · 0 sessions" until the reads came back.
+  const [playerCount, setPlayerCount] = useState<number | null>(null)
   const [assessments, setAssessments] = useState<any[]>([])
-  const [allAssessments, setAllAssessments] = useState<any[]>([])
+  const [allAssessments, setAllAssessments] = useState<any[] | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
-  const [sessionCount, setSessionCount] = useState(0)
+  const [sessionCount, setSessionCount] = useState<number | null>(null)
   const [coachDetails, setCoachDetails] = useState<any>(null)
   const [squadAnalytics, setSquadAnalytics] = useState<SquadAnalytics | null>(null)
   // Distinguishes "nothing to show" from "we could not find out". Without it
@@ -172,7 +178,7 @@ export default function CoachHomePage() {
 
   // Trend: last 5 assessments for mini-chart. An unrated assessment is dropped
   // rather than drawn at the midpoint — a bar the coach never earned.
-  const trendAssessments = allAssessments.filter(a => a.coach_rating != null).slice(0, 5).reverse()
+  const trendAssessments = (allAssessments ?? []).filter(a => a.coach_rating != null).slice(0, 5).reverse()
   const trendHeights = trendAssessments.map(a => {
     const r = Number(a.coach_rating)
     return Math.max(20, Math.min(100, ((r - 2) / 8) * 100))
@@ -293,7 +299,7 @@ export default function CoachHomePage() {
                   color: '#C8F25A',
                 }}
               >
-                {loadFailed && playerCount === 0 ? '—' : playerCount}
+                {countText(playerCount, loadFailed)}
               </p>
               <p
                 className="text-[9px] mt-1.5 tracking-[0.04em]"
@@ -334,7 +340,7 @@ export default function CoachHomePage() {
                 className="text-[13px] font-medium mt-1.5"
                 style={{ fontFamily: "'DM Sans', sans-serif", color: 'rgba(255,255,255,0.45)' }}
               >
-                {loadFailed && allAssessments.length === 0 ? 'Not available' : `${allAssessments.length} total`}
+                {allAssessments ? `${allAssessments.length} total` : loadFailed ? 'Not available' : 'Loading…'}
               </p>
             </div>
           </div>
@@ -366,7 +372,7 @@ export default function CoachHomePage() {
                   className="text-[10px]"
                   style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.25)' }}
                 >
-                  No assessments yet
+                  {squadAnalytics ? 'No assessments yet' : 'Loading…'}
                 </span>
               ) : (
                 squadBandChips.map(chip => (
@@ -405,7 +411,7 @@ export default function CoachHomePage() {
                 color: 'rgba(255,255,255,0.88)',
               }}
             >
-              {playerCount}
+              {countText(playerCount, loadFailed)}
             </p>
             <span
               className="text-[8px] font-medium tracking-[0.1em] uppercase mt-[5px] block"
@@ -430,7 +436,7 @@ export default function CoachHomePage() {
                 color: 'rgba(255,255,255,0.88)',
               }}
             >
-              {sessionCount}
+              {countText(sessionCount, loadFailed)}
             </p>
             <span
               className="text-[8px] font-medium tracking-[0.1em] uppercase mt-[5px] block"
@@ -457,7 +463,7 @@ export default function CoachHomePage() {
         )}
 
         {/* Full assessment entry */}
-        {playerCount > 0 && (
+        {playerCount !== null && playerCount > 0 && (
           <button
             onClick={() => navigate('/coach/assess')}
             className="w-full mt-3 relative overflow-hidden rounded-[14px] border p-4 text-left active:scale-[0.98] transition-transform"

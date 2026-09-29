@@ -1,0 +1,84 @@
+import { describe, it, expect, afterEach } from 'vitest'
+import { cleanup, screen, waitFor } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
+import { renderApp } from '../../../../tests/support/render-app'
+import { signInAs } from '../../../../tests/support/session'
+import { server } from '../../../../tests/msw/server'
+import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
+
+/**
+ * TRAK-92 (J4): coach Home still loading is not a coach with nothing.
+ *
+ * Every count started at 0, so until the reads answered, Home told a coach
+ * with 30 assessments and 8 sessions "0 total", "0 SESSIONS", "No assessments
+ * yet" and "Your squad is being prepared" (seen live on coach.u15, 29 Sep).
+ * Same class as #188's "No squad yet" while loading.
+ */
+const COACH = { id: 'coach-1' }
+const PLAYERS = [
+  { id: 'sp-1', coach_user_id: COACH.id, player_name: 'Ade Okafor', created_at: '2026-09-01T00:00:00Z' },
+  { id: 'sp-2', coach_user_id: COACH.id, player_name: 'Bo Lind', created_at: '2026-09-01T00:00:00Z' },
+]
+const ASSESSMENTS = [
+  { id: 'a-1', coach_user_id: COACH.id, squad_player_id: 'sp-1', coach_rating: 7, created_at: '2026-09-20T10:00:00Z', squad_players: { player_name: 'Ade Okafor' } },
+  { id: 'a-2', coach_user_id: COACH.id, squad_player_id: 'sp-2', coach_rating: 6, created_at: '2026-09-19T10:00:00Z', squad_players: { player_name: 'Bo Lind' } },
+]
+const SESSIONS = [{ id: 's-1' }, { id: 's-2' }, { id: 's-3' }]
+
+// The number printed just above the hero's "Players in squad" label.
+const heroCount = () => screen.getByText('Players in squad').previousElementSibling?.textContent?.trim()
+// The number on a quick-action tile. The bottom nav also says "Sessions", so
+// the tile is the button whose name is a value followed by the label.
+const tileCount = (label: string) =>
+  screen.getByRole('button', { name: new RegExp(`^\\S+\\s*${label}$`) }).querySelector('p')?.textContent?.trim()
+
+afterEach(() => cleanup())
+
+describe('TRAK-92 coach Home while loading', () => {
+  it('claims no zeros and no empty squad until the reads answer, then shows the real counts', async () => {
+    signInAs(COACH)
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    const asked = new Set<string>()
+    const hold = (name: string, answer: (url: URL) => Response) =>
+      http.get(`${SUPABASE_URL}/rest/v1/${name}`, async ({ request }) => {
+        asked.add(name)
+        await held
+        return answer(new URL(request.url))
+      })
+    server.use(
+      table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach Vasilis', invite_code: 'ABCD' }]),
+      table('coach_details', [{ user_id: COACH.id, team: 'U15s', coach_role: 'Head Coach' }]),
+      table('session_attendance', []),
+      rpc('coach_squad_player_consent_required', () => false),
+      hold('squad_players', () => HttpResponse.json(PLAYERS)),
+      hold('coach_assessments', () => HttpResponse.json(ASSESSMENTS)),
+      // The count read gets PostgREST's Content-Range; the last-training read
+      // (limit=1) finds none, so nobody is flagged as missing it.
+      hold('coach_sessions', url => url.searchParams.get('limit') === '1'
+        ? HttpResponse.json([])
+        : HttpResponse.json(SESSIONS, { headers: { 'Content-Range': `0-2/${SESSIONS.length}` } })),
+    )
+
+    renderApp('/coach/home')
+    await waitFor(() => expect([...asked].sort()).toEqual(['coach_assessments', 'coach_sessions', 'squad_players']), { timeout: 5000 })
+
+    // Still loading: nothing on screen may claim the squad is empty.
+    expect(heroCount()).not.toBe('0')
+    expect(tileCount('Players?')).not.toBe('0')
+    expect(tileCount('Sessions')).not.toBe('0')
+    expect(screen.queryByText(/^0 total$/)).toBeNull()
+    expect(screen.queryByText('No assessments yet')).toBeNull()
+    expect(screen.queryByText('Your squad is being prepared')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    release()
+
+    expect(await screen.findByText('2 total')).toBeInTheDocument()
+    await waitFor(() => expect(tileCount('Sessions')).toBe('3'))
+    expect(heroCount()).toBe('2')
+    expect(tileCount('Players')).toBe('2')
+    expect(screen.queryByText('Your squad is being prepared')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+})

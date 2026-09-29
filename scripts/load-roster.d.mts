@@ -38,9 +38,9 @@ export declare function planReinvite(
     child_email: string | null
     date_of_birth: string
     player_name: string
-    guardians: { invited_at: string | null; parent_user_id: string | null }[]
+    guardians: { email?: string; invited_at: string | null; parent_user_id: string | null }[]
   }[],
-): { toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[] }
+): { toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[]; synthetic: number[] }
 export declare function reinviteRows(
   toInvite: { line: number; rosterChildId: string }[],
   invite: (rosterChildId: string) => Promise<boolean>,

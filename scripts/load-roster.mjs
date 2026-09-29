@@ -210,13 +210,19 @@ export function planReinvite(rows, onRoster) {
   const toInvite = [];
   const upToDate = [];
   const notOnRoster = [];
+  const synthetic = [];
   for (const r of rows) {
     const child = r.child_email ? byEmail.get(r.child_email) : byPerson.get(person(r.child_name, r.date_of_birth));
     if (!child) notOnRoster.push(r.line);
-    else if (child.guardians.some(g => !g.invited_at && !g.parent_user_id)) toInvite.push({ line: r.line, rosterChildId: child.id });
-    else upToDate.push(r.line);
+    else if (!child.guardians.some(g => !g.invited_at && !g.parent_user_id)) upToDate.push(r.line);
+    // send-roster-invites emails every stored guardian who hasn't signed up,
+    // invited before or not. If one of them is on a reserved test domain, the
+    // line is refused: a file corrected since the load doesn't change who is
+    // stored (Imad, #202).
+    else if (child.guardians.some(g => !g.parent_user_id && isSyntheticAddress(g.email))) synthetic.push(r.line);
+    else toInvite.push({ line: r.line, rosterChildId: child.id });
   }
-  return { toInvite, upToDate, notOnRoster };
+  return { toInvite, upToDate, notOnRoster, synthetic };
 }
 
 // TRAK-91 follow-up: the lines holding a reserved test address (the J7 rule),
@@ -281,7 +287,7 @@ async function resolveCoaches(admin, emails) {
 async function reinvite(admin, args, rows, sendInvite) {
   const { data, error } = await admin
     .from('roster_children')
-    .select('id, child_email, date_of_birth, squad_players(player_name), roster_guardians(invited_at, parent_user_id)')
+    .select('id, child_email, date_of_birth, squad_players(player_name), roster_guardians(email, invited_at, parent_user_id)')
     .eq('organization_id', args.org);
   if (error) throw new Error(`Could not read the roster: ${error.message}`);
   const onRoster = (data ?? []).map(c => ({
@@ -291,7 +297,10 @@ async function reinvite(admin, args, rows, sendInvite) {
     player_name: c.squad_players?.player_name ?? '',
     guardians: c.roster_guardians ?? [],
   }));
-  const { toInvite, upToDate, notOnRoster } = planReinvite(rows, onRoster);
+  const { toInvite, upToDate, notOnRoster, synthetic } = planReinvite(rows, onRoster);
+  if (synthetic.length) {
+    console.log(`[load-roster] Line(s) ${synthetic.join(', ')}: a stored guardian address is a reserved test address (e.g. .test); not invited. Correct it on the roster first.`);
+  }
   if (notOnRoster.length) {
     console.log(`[load-roster] Line(s) ${notOnRoster.join(', ')} aren't on this academy's roster. --reinvite loads nothing: load them first.`);
   }

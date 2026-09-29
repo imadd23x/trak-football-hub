@@ -312,3 +312,37 @@ describe('load-roster never invites a reserved test address', () => {
     expect(out.stdout).toMatch(/Nobody will be emailed/)
   })
 })
+
+// Imad's P2 on #202: --reinvite posts only roster_child_id, and
+// send-roster-invites emails the guardians *stored* on the roster (every one
+// who hasn't signed up). A file corrected since the load passes the CSV guard,
+// so the stored addresses must be checked too.
+describe('load-roster --reinvite checks the stored guardian addresses', () => {
+  const { rows } = validateRoster(file('Real Kid,2012-01-10,U15,kid@gmail.com,parent@gmail.com,coach@club.com'), TODAY)
+  const child = (guardians: { email: string; invited_at: string | null; parent_user_id: string | null }[]) =>
+    [{ id: 'rc-1', child_email: 'kid@gmail.com', date_of_birth: '2012-01-10', player_name: 'Real Kid', guardians }]
+
+  it('refuses a line whose stored guardian is on a reserved test domain, though the file now has a real one', () => {
+    const plan = planReinvite(rows, child([{ email: 'parent@rehearsal.trak.test', invited_at: null, parent_user_id: null }]))
+    expect(plan.toInvite).toEqual([])
+    expect(plan.synthetic).toEqual([2])
+  })
+
+  it('refuses it too when that stored guardian was invited before: the function would email them again', () => {
+    const plan = planReinvite(rows, child([
+      { email: 'real@gmail.com', invited_at: null, parent_user_id: null },
+      { email: 'parent@rehearsal.trak.test', invited_at: '2026-09-28T16:13:00Z', parent_user_id: null },
+    ]))
+    expect(plan.toInvite).toEqual([])
+    expect(plan.synthetic).toEqual([2])
+  })
+
+  it('CONTROL a signed-up guardian on a reserved domain is not a recipient, so a real one still gets re-invited', () => {
+    const plan = planReinvite(rows, child([
+      { email: 'parent@rehearsal.trak.test', invited_at: null, parent_user_id: 'parent-1' },
+      { email: 'real@gmail.com', invited_at: null, parent_user_id: null },
+    ]))
+    expect(plan.toInvite).toEqual([{ line: 2, rosterChildId: 'rc-1' }])
+    expect(plan.synthetic).toEqual([])
+  })
+})

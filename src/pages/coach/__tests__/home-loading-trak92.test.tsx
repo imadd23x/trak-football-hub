@@ -81,4 +81,60 @@ describe('TRAK-92 coach Home while loading', () => {
     expect(screen.queryByText('Your squad is being prepared')).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
   })
+
+  // Imad's #203 review: one shared failure flag was cleared by the next read
+  // that succeeded, so a failed session count turned back into "…" for good
+  // and its banner went away.
+  it('a failed session count stays failed after the assessments arrive', async () => {
+    signInAs(COACH)
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    let assessAsked = false
+    server.use(
+      table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach Vasilis', invite_code: 'ABCD' }]),
+      table('coach_details', [{ user_id: COACH.id, team: 'U15s', coach_role: 'Head Coach' }]),
+      table('session_attendance', []),
+      rpc('coach_squad_player_consent_required', () => false),
+      table('squad_players', PLAYERS),
+      http.get(`${SUPABASE_URL}/rest/v1/coach_sessions`, () =>
+        HttpResponse.json({ message: 'upstream unavailable' }, { status: 500 })),
+      http.get(`${SUPABASE_URL}/rest/v1/coach_assessments`, async () => {
+        assessAsked = true
+        await held
+        return HttpResponse.json(ASSESSMENTS)
+      }),
+    )
+
+    renderApp('/coach/home')
+    expect(await screen.findByRole('alert', {}, { timeout: 5000 })).toBeInTheDocument()
+    await waitFor(() => expect(assessAsked).toBe(true))
+    expect(tileCount('Sessions')).toBe('—')
+
+    release()
+
+    expect(await screen.findByText('2 total')).toBeInTheDocument()
+    expect(tileCount('Sessions')).toBe('—')
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(heroCount()).toBe('2')
+  })
+
+  it('assessments say "Not available", not "Loading…", when the squad read failed', async () => {
+    // The all-assessments read only starts after the squad answers, so a
+    // failed squad read means it never runs: it must not wait forever.
+    signInAs(COACH)
+    server.use(
+      table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach Vasilis', invite_code: 'ABCD' }]),
+      table('coach_details', []),
+      table('coach_sessions', []),
+      http.get(`${SUPABASE_URL}/rest/v1/squad_players`, () =>
+        HttpResponse.json({ message: 'upstream unavailable' }, { status: 500 })),
+      table('coach_assessments', []),
+    )
+
+    renderApp('/coach/home')
+    expect(await screen.findByRole('alert', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByText('Not available')).toBeInTheDocument()
+    expect(screen.queryByText('Loading…')).toBeNull()
+    expect(heroCount()).toBe('—')
+  })
 })

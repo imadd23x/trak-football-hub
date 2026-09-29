@@ -5,7 +5,8 @@ export interface RosterRow {
   child_name: string
   date_of_birth: string
   age_group: string
-  child_email: string
+  /** null when the academy gave none (TRAK-84) */
+  child_email: string | null
   guardian_emails: string[]
   coach_email: string
 }
@@ -27,7 +28,7 @@ export declare function loadRows(
     invite: ((rosterChildId: string) => Promise<boolean>) | null
   },
   log: (message: string) => void,
-): Promise<{ loaded: number; invited: number; inviteFailed: number[]; stoppedAt?: number }>
+): Promise<{ loaded: number; invited: number; inviteFailed: number[]; alreadyOnRoster: number[]; stoppedAt?: number }>
 export declare function parseArgs(argv: string[]): {
   apply: boolean
   'send-invites': boolean

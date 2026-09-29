@@ -360,17 +360,15 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   await expect(page.getByText(alex.opponent, { exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Profile', exact: true }).click();
-  await expect(page.getByText(`Following ${zara.name} · 2 children linked`, { exact: true })).toBeVisible();
+  await expect(page.getByText('Parent account · 2 children linked', { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox')).toHaveValue(zaraId);
   await page.getByRole('combobox').selectOption(alexId);
-  await expect(page.getByText(`Following ${alex.name} · 2 children linked`, { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox')).toHaveValue(alexId);
   await page.getByRole('combobox').selectOption(zaraId);
-  // P6 owns the subtitle change; this journey follows the Settings entry in
-  // both independently reviewed branches, then verifies the actual children.
-  await page.getByRole('button', { name: /^SETTINGS / }).click();
+  // TRAK-73: the linked children are listed on the Profile itself.
   const connections = page.getByRole('list', { name: 'Linked children', exact: true });
   await expect(connections.getByText(alex.name, { exact: true })).toHaveCount(1);
   await expect(connections.getByText(zara.name, { exact: true })).toHaveCount(1);
-  await page.goBack();
   await page.getByRole('button', { name: 'Matches', exact: true }).click();
   await page.reload();
   await expect(page.getByRole('option')).toHaveCount(2);

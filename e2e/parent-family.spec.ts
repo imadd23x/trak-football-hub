@@ -82,8 +82,8 @@ await context.route('**/*',async route=>{
  await expect(page.getByText('Zara Opposition',{exact:true})).toBeVisible();
  await expect(page.getByText('Alex Opposition',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Profile',exact:true}).click();
- await expect(page.getByText('Following Zara Example · 2 children linked',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:/Account settings/}).click();
+ await expect(page.getByText('Parent account · 2 children linked',{exact:true})).toBeVisible();
+ await expect(page.getByRole('combobox')).toHaveValue(zara);
  await expect(page.getByRole('list',{name:'Linked children'})).toContainText('Alex Example');
  await expect(page.getByRole('list',{name:'Linked children'})).toContainText('Zara Example');
  await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});

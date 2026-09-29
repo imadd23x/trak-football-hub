@@ -59,7 +59,9 @@ describe('TRAK-72 coach Home', () => {
     signedInCoach()
     const writes = profileWrites()
     renderApp('/coach/home')
-    const tile = await screen.findByRole('button', { name: /^2\s*Players$/i })
+    // The file's first render loads coach Home cold; on a busy CI runner that
+    // took over the default 1 s (run 36394909944, Imad on TRAK-72).
+    const tile = await screen.findByRole('button', { name: /^2\s*Players$/i }, { timeout: 5000 })
     expect(tile).toBeInTheDocument()
     expect(screen.queryByText(/TRK-/)).toBeNull()
     expect(screen.queryByText(/tap to copy/i)).toBeNull()
@@ -72,7 +74,7 @@ describe('TRAK-72 coach Home', () => {
     signedInCoach()
     renderApp('/coach/home')
     // The tile, not the nav bar's Sessions tab: its name starts with the count.
-    await userEvent.click(await screen.findByRole('button', { name: /^\d+\s*Sessions$/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^\d+\s*Sessions$/i }, { timeout: 5000 }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/sessions/list'))
   })
 })

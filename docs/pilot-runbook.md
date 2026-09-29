@@ -186,7 +186,7 @@ TRAK_REHEARSAL_PASSWORD='<set a fresh one, do not commit it>' node seed-pilot-re
 ```
 
 Two squads, ~30 players, six weeks of fixtures, matches, assessments and awards under
-`@rehearsal.trak.dev` / "Rehearsal FC". Reset with `--purge`.
+`@rehearsal.trak.test` / "Rehearsal FC". Reset with `--purge`.
 
 The seed signs its staff in with the app key, so it can only use staff who already
 exist. Re-running it over the rehearsal academy works, including after `--purge`: the

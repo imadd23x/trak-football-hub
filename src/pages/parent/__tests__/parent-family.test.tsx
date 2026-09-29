@@ -105,7 +105,7 @@ beforeEach(() => { auth.parentId = 'parent-a'; installFamily() })
 afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear()); onlineManager.setOnline(true) })
 
 describe('parent family navigation', () => {
-  it('keeps the selected child across all parent views and lists both children in Settings', async () => {
+  it('keeps the selected child across all parent views and lists both children on Profile', async () => {
     const user = userEvent.setup()
     renderFamily()
     expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
@@ -128,12 +128,15 @@ describe('parent family navigation', () => {
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: 'Profile' }))
-    expect(await screen.findByText('Following Zara · 2 children linked')).toBeInTheDocument()
+    // TRAK-73: the header counts the linked children; the selector shows which one is followed.
+    expect(await screen.findByText('Parent account · 2 children linked')).toBeInTheDocument()
+    expect(screen.queryByText(/^Following Zara/)).not.toBeInTheDocument()
     expect(screen.getByRole('combobox')).toHaveValue('Zara')
-    await user.click(screen.getByRole('button', { name: /settings account settings/i }))
+    // TRAK-73: the linked children are on the Profile, one "Linked" row each.
     const connections = await screen.findByRole('list', { name: 'Linked children' })
     expect(within(connections).getByText('Alex')).toBeInTheDocument()
     expect(within(connections).getByText('Zara')).toBeInTheDocument()
+    expect(within(connections).getAllByText('Linked')).toHaveLength(2)
   })
 
   it('does not carry child names or match data into another parent account', async () => {
@@ -186,7 +189,8 @@ describe('parent family navigation', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Profile' }))
     expect(await screen.findByRole('option', { name: 'Zara' })).toBeInTheDocument()
     await userEvent.selectOptions(screen.getByRole('combobox'), 'Zara')
-    expect(screen.getByText('Following Zara · 2 children linked')).toBeInTheDocument()
+    expect(screen.getByRole('combobox')).toHaveValue('Zara')
+    expect(screen.getByText('Parent account · 2 children linked')).toBeInTheDocument()
   })
 })
 
@@ -338,6 +342,20 @@ describe('parent loading, empty and error states', () => {
     installFamily()
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
+  })
+
+  // TRAK-73 (Kostas's #182 review): Profile shows each family state once, not
+  // once for withdrawal and again for Connections.
+  it('shows the empty family and a links failure once on Profile', async () => {
+    server.use(http.get(endpoint('player_parent_links'), () => HttpResponse.json([])))
+    const empty = renderFamily('/parent/profile')
+    expect(await screen.findAllByText('No child linked yet')).toHaveLength(1)
+    empty.unmount()
+
+    server.use(http.get(endpoint('player_parent_links'), fail))
+    renderFamily('/parent/profile')
+    expect(await screen.findAllByRole('alert')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1)
   })
 
   it('reports an offline failure instead of leaving a paused loading screen forever', async () => {

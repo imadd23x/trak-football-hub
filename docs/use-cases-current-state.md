@@ -22,7 +22,7 @@ additionally exercised in a running app against the database, signed in as that 
 | C5 | View a player's assessment history | ✅ | `CoachPlayerProfilePage` |
 | C6 | Log a training/match session | ✅ | `coach_sessions`; RLS correct |
 | C7 | Log a match on behalf of a player | ✅ | `log_match_for_player` SECURITY DEFINER RPC, used by `CoachQuickMatchLog` and `CoachAddSession`. **This is now the only path a match enters the system** |
-| C8 | Share my TRK-XXXX code to connect a player | ✅ | **Verified live**: the coach profile shows a real code (e.g. `TRK-ALEX`) read from `profiles.invite_code` and formatted by `formatCoachCode`. Both a direct lookup and `get_coach_id_by_invite_code` resolve it to the coach's `user_id` |
+| C8 | Share my TRK-XXXX code to connect a player | ⬜ | **Removed by design** (TRAK-72, 26–28 Sep): players join through the academy roster (J1). Coach Home and Profile show no code, and `invite-codes.ts` and `InviteCodeDisplay` are deleted. The `invite_code` columns remain but aren't used for joining |
 | C9 | Recognise / award a player | ✅ | Verified live: renders the real squad with band pills and week/month/season tabs. Awards flow through to the player's passport |
 | C10 | Schedule | ✅ | Verified live: calendar renders, today highlighted, event-type legend, clear empty state, plus an AI "import from text or club website" entry point |
 | C11 | AI assistant | ✅ | Verified live and **context-aware**: knew the coach's team (U15s, City FC Academy), named real squad players in its answer, and rendered a `PitchDiagram` with movement arrows |

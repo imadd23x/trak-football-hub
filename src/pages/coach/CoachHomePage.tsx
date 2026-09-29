@@ -28,7 +28,9 @@ const FLAG_COLORS = { attention: '#fb923c', missed: '#facc15', improved: '#4ade8
 
 // A count not answered yet is "…", and one that failed is "—" (the banner
 // above says why). Only an answered read may print a number, zero included.
-const countText = (n: number | null, failed: boolean) => (n !== null ? n : failed ? '—' : '…')
+// The failure is checked first: after a refresh whose re-read failed, the
+// number kept from the earlier run is no longer an answer (Imad's #203 review).
+const countText = (n: number | null, failed: boolean) => (failed ? '—' : n !== null ? n : '…')
 
 const NO_FAILURES = { squad: false, assessments: false, recent: false, sessions: false }
 
@@ -353,7 +355,7 @@ export default function CoachHomePage() {
                 className="text-[13px] font-medium mt-1.5"
                 style={{ fontFamily: "'DM Sans', sans-serif", color: 'rgba(255,255,255,0.45)' }}
               >
-                {allAssessments ? `${allAssessments.length} total` : failed.assessments || failed.squad ? 'Not available' : 'Loading…'}
+                {analyticsFailed ? 'Not available' : allAssessments ? `${allAssessments.length} total` : 'Loading…'}
               </p>
             </div>
           </div>
@@ -460,8 +462,9 @@ export default function CoachHomePage() {
           </button>
         </div>
 
-        {/* Empty squad callout */}
-        {playerCount === 0 && (
+        {/* Empty squad callout. Not after a failed re-read: the 0 is from
+            the earlier run, and the squad may have changed since. */}
+        {playerCount === 0 && !failed.squad && (
           <div
             className="w-full mt-3 rounded-[14px] border p-4 text-left"
             style={{ background: '#101012', borderColor: 'rgba(255,255,255,0.07)' }}

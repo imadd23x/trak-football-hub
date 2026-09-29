@@ -1,10 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
 import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
+import { registerAuthUser } from '../../../../tests/msw/auth-sessions'
+import { supabase } from '@/integrations/supabase/client'
 
 /**
  * TRAK-92 (J4): coach Home still loading is not a coach with nothing.
@@ -116,6 +118,47 @@ describe('TRAK-92 coach Home while loading', () => {
     expect(tileCount('Sessions')).toBe('—')
     expect(screen.getByRole('alert')).toBeInTheDocument()
     expect(heroCount()).toBe('2')
+  })
+
+  // Imad's second #203 review: an empty first load, then a same-account token
+  // refresh whose re-reads fail. The 0s kept from the first run were printed
+  // ahead of the failure, so Home said "0" and "0 total" under the error.
+  it('a failed re-read after a refresh shows "—", not the 0 kept from the first load', async () => {
+    signInAs(COACH)
+    let fail = false
+    const failing = (name: string) =>
+      http.get(`${SUPABASE_URL}/rest/v1/${name}`, () => fail
+        ? HttpResponse.json({ message: 'upstream unavailable' }, { status: 500 })
+        : HttpResponse.json([], { headers: { 'Content-Range': '*/0' } }))
+    server.use(
+      table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach Vasilis', invite_code: 'ABCD' }]),
+      table('coach_details', [{ user_id: COACH.id, team: 'U15s', coach_role: 'Head Coach' }]),
+      table('coach_sessions', []),
+      failing('squad_players'),
+      failing('coach_assessments'),
+      http.post(`${SUPABASE_URL}/auth/v1/token`, () => {
+        const previous = JSON.parse(localStorage.getItem('sb-test-auth-token')!)
+        const user = structuredClone(previous.user)
+        return HttpResponse.json({ ...previous, user, access_token: registerAuthUser(user),
+          expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600 })
+      }),
+    )
+
+    renderApp('/coach/home')
+    // The first load answers: an empty squad with no assessments.
+    expect(await screen.findByText('0 total', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(heroCount()).toBe('0')
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    fail = true
+    await act(async () => { const { error } = await supabase.auth.refreshSession(); expect(error).toBeNull() })
+
+    expect(await screen.findByRole('alert', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByText('Not available')).toBeInTheDocument()
+    expect(screen.queryByText(/^0 total$/)).toBeNull()
+    expect(heroCount()).toBe('—')
+    expect(tileCount('Players?')).toBe('—')
+    expect(screen.queryByText('Your squad is being prepared')).toBeNull()
   })
 
   it('assessments say "Not available", not "Loading…", when the squad read failed', async () => {

@@ -50,7 +50,7 @@ $test$;
 INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
   (pg_temp.jid(1),  'alex.coach@j7academy.org',      now()),  -- pilot coach, busy
   (pg_temp.jid(2),  'zoe.coach@j7academy.org',       now()),  -- pilot coach, idle
-  (pg_temp.jid(3),  'coach.u15@rehearsal.trak.dev',  now()),  -- synthetic, in the pilot academy
+  (pg_temp.jid(3),  'coach.u15@rehearsal.trak.test', now()),  -- synthetic, in the pilot academy (TRAK-89)
   (pg_temp.jid(4),  'ben.coach@otheracademy.org',    now()),  -- real, other academy
   (pg_temp.jid(11), 'child.one@j7family.org',        now()),
   (pg_temp.jid(12), 'child.two@j7family.org',        now()),

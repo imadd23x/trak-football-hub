@@ -206,13 +206,60 @@ SELECT pg_temp.rc_refused($$INSERT INTO public.parental_consents (parent_user_id
   VALUES ('98800000-0000-0000-0000-000000000020', 'parent', 'email_confirmed', '{"coaching_records":true}', 'v', 't', 18, 13)$$,
   '23514', '6 J2 a consent row must name a child, by account or by roster place');
 
+-- ── 6b. A guardian who already has an account is added for another child ──
+-- Sign-up claimed guardian A's rows. A sibling the academy loads later must be
+-- claimable without a second account (J2), by the sign-up rule and no wider:
+-- a parent profile, a confirmed email, unclaimed rows with that exact email.
+INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
+  (pg_temp.rc(23), 'unconfirmed@roster-consent.test', NULL);
+INSERT INTO public.profiles (user_id, role, full_name) VALUES (pg_temp.rc(23), 'parent', 'Unconfirmed Guardian');
+INSERT INTO public.squad_players (id, coach_user_id, player_name, age_group) VALUES
+  (pg_temp.rc(64), pg_temp.rc(2), 'Eve Synthetic', 'U11');
+INSERT INTO public.roster_children (id, organization_id, squad_player_id, date_of_birth, child_email, loaded_by) VALUES
+  (pg_temp.rc(74), pg_temp.rc(50), pg_temp.rc(64), '2016-02-03', 'eve@roster-consent.test', 'fixture');
+INSERT INTO public.roster_guardians (roster_child_id, email, loaded_by) VALUES
+  (pg_temp.rc(74), 'guardian-a@roster-consent.test', 'fixture'),
+  (pg_temp.rc(74), 'coach@roster-consent.test', 'fixture'),
+  (pg_temp.rc(74), 'unconfirmed@roster-consent.test', 'fixture'),
+  -- A second guardian with an account, added later for Ana, who has one too.
+  (pg_temp.rc(70), 'unclaimed@roster-consent.test', 'fixture');
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.rc_as(pg_temp.rc(20));
+SELECT pg_temp.rc_check(NOT EXISTS (SELECT 1 FROM public.get_roster_children_awaiting_consent() WHERE roster_child_id = pg_temp.rc(74)),
+  '6b CONTROL before claiming, the newly loaded sibling is not listed for guardian A');
+SELECT pg_temp.rc_check((SELECT public.claim_my_roster_guardian_rows()) = 1,
+  '6b J2 an existing guardian claims the row added for their new child');
+SELECT pg_temp.rc_check(EXISTS (SELECT 1 FROM public.get_roster_children_awaiting_consent() WHERE roster_child_id = pg_temp.rc(74)),
+  '6b J2 then sees that child waiting for approval, without a second account');
+SELECT pg_temp.rc_check((SELECT public.claim_my_roster_guardian_rows()) = 0, '6b a second claim changes nothing');
+SELECT pg_temp.rc_as(pg_temp.rc(2));
+SELECT pg_temp.rc_check((SELECT public.claim_my_roster_guardian_rows()) = 0,
+  '6b G2 a coach whose address is on the roster as a guardian claims nothing');
+SELECT pg_temp.rc_as(pg_temp.rc(23));
+SELECT pg_temp.rc_check((SELECT public.claim_my_roster_guardian_rows()) = 0, '6b G5 an unconfirmed address claims nothing');
+SELECT pg_temp.rc_as(pg_temp.rc(21));
+SELECT pg_temp.rc_check((SELECT public.claim_my_roster_guardian_rows()) = 0, '6b G5 another guardian claims none of these rows');
+SELECT pg_temp.rc_as(pg_temp.rc(22));
+SELECT pg_temp.rc_check((SELECT public.claim_my_roster_guardian_rows()) = 1,
+  '6b J2 a guardian added later for a child who has an account claims that row');
+RESET ROLE;
+SELECT pg_temp.rc_check((
+  SELECT bool_and(CASE email WHEN 'guardian-a@roster-consent.test' THEN parent_user_id = pg_temp.rc(20) ELSE parent_user_id IS NULL END)
+  FROM public.roster_guardians WHERE roster_child_id = pg_temp.rc(74)),
+  '6b G5 only guardian A''s row is claimed; the coach''s and the unconfirmed address stay unclaimed');
+SELECT pg_temp.rc_check(EXISTS (SELECT 1 FROM public.player_parent_links
+    WHERE player_user_id = pg_temp.rc(10) AND parent_user_id = pg_temp.rc(22)),
+  '6b J2 claiming links the guardian to the child who already has an account');
+
 -- ── 7. Who can call what ───────────────────────────────────────────────────
 SELECT pg_temp.rc_check(
   NOT has_function_privilege('anon', 'public.record_roster_consent(uuid, text, jsonb, text, text)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.withdraw_roster_consent(uuid)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.get_roster_children_awaiting_consent()', 'EXECUTE')
-  AND has_function_privilege('authenticated', 'public.record_roster_consent(uuid, text, jsonb, text, text)', 'EXECUTE'),
-  '7 the three guardian functions are for signed-in accounts only');
+  AND has_function_privilege('authenticated', 'public.record_roster_consent(uuid, text, jsonb, text, text)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.claim_my_roster_guardian_rows()', 'EXECUTE')
+  AND has_function_privilege('authenticated', 'public.claim_my_roster_guardian_rows()', 'EXECUTE'),
+  '7 the guardian functions are for signed-in accounts only');
 
 SELECT set_config('request.jwt.claims', '', true);
 
@@ -221,8 +268,8 @@ DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.rc_results;
-  IF total <> 26 THEN
-    RAISE EXCEPTION 'Roster consent before account: % assertions ran; expected exactly 26', total;
+  IF total <> 36 THEN
+    RAISE EXCEPTION 'Roster consent before account: % assertions ran; expected exactly 36', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'Roster consent before account: % of % failed: %', failed, total,

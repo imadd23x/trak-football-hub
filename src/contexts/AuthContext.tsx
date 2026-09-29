@@ -33,6 +33,7 @@ interface PendingProfileData {
     academy_name: string;
   };
   parent_email?: string | null;
+  // Legacy (TRAK-72): not used for joining; the academy roster links players.
   coach_invite_code?: string | null;
 }
 

@@ -52,6 +52,7 @@
 //
 //   node scripts/load-roster.mjs ... --apply --send-invites
 
+import { isSyntheticAddress } from './synthetic-domain.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -218,6 +219,14 @@ export function planReinvite(rows, onRoster) {
   return { toInvite, upToDate, notOnRoster };
 }
 
+// TRAK-91 follow-up: the lines holding a reserved test address (the J7 rule),
+// child or guardian. Such an address can't receive mail, so inviting it is an
+// operator mistake (the synthetic TRAK-24 file with --send-invites, or
+// --reinvite on it). main() refuses before anything is loaded or sent.
+export function syntheticInviteLines(rows) {
+  return rows.filter(r => [r.child_email, ...r.guardian_emails].filter(Boolean).some(isSyntheticAddress)).map(r => r.line);
+}
+
 // Sends each re-invitation in turn. A failure is reported by line and the rest
 // still go; nothing is admitted or changed apart from the invitation itself.
 export async function reinviteRows(toInvite, invite, log) {
@@ -316,6 +325,14 @@ async function main() {
     console.log('[load-roster] Nothing loaded. Fix the file and run again; a file with a problem loads nothing.');
     process.exitCode = 1;
     return;
+  }
+  if (args['send-invites'] || args.reinvite) {
+    const synthetic = syntheticInviteLines(rows);
+    if (synthetic.length) {
+      console.log(`[load-roster] Line(s) ${synthetic.join(', ')} use a reserved test address (e.g. .test), which can't receive mail. Load them without --send-invites, and don't --reinvite them. Nothing loaded or sent.`);
+      process.exitCode = 1;
+      return;
+    }
   }
   console.log(args.reinvite
     ? '[load-roster] --reinvite: loads nothing; re-sends invitations only where a guardian was never invited and hasn\'t signed up.'

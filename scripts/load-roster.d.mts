@@ -29,6 +29,8 @@ export declare function loadRows(
   },
   log: (message: string) => void,
 ): Promise<{ loaded: number; invited: number; inviteFailed: number[]; alreadyOnRoster: number[]; stoppedAt?: number }>
+/** Lines holding a reserved test address (child or guardian); --send-invites and --reinvite refuse such a file. */
+export declare function syntheticInviteLines(rows: RosterRow[]): number[]
 export declare function planReinvite(
   rows: RosterRow[],
   onRoster: {

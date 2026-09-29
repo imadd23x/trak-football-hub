@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { loadRows, parseArgs, parseCsv, planLoad, planReinvite, reinviteRows, validateRoster } from '../../scripts/load-roster.mjs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { loadRows, parseArgs, parseCsv, planLoad, planReinvite, reinviteRows, syntheticInviteLines, validateRoster } from '../../scripts/load-roster.mjs'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
 // written. Synthetic addresses only.
@@ -252,5 +256,59 @@ describe('load-roster --reinvite', () => {
     expect(parseArgs(['--file', 'r.csv']).reinvite).toBe(false)
     expect(() => parseArgs([...base, '--send-invites'])).toThrow(/--reinvite/)
     expect(() => parseArgs([...base, '--no-invites'])).toThrow(/--reinvite/)
+  })
+})
+
+// TRAK-91 follow-up: a reserved test address (.test, example.com …, the J7
+// rule) can't receive mail. Inviting one is an operator mistake (loading the
+// synthetic TRAK-24 file with --send-invites, or --reinvite on it): 22
+// undeliverable sends just before the real invitations. The command refuses
+// before anything is loaded or sent, dry run included.
+describe('load-roster never invites a reserved test address', () => {
+  const LOADER = resolve(__dirname, '../../scripts/load-roster.mjs')
+  const ORG = 'fe06597a-e57f-448d-81ed-b0c4d12cf7a0'
+  const synthetic = file(
+    'Synthetic One,2012-01-10,U15,roster.01@rehearsal.trak.test,parent.roster.01@rehearsal.trak.test,coach.u15@rehearsal.trak.test',
+    'Synthetic Two,2012-02-10,U15,roster.02@rehearsal.trak.test,parent.roster.02@rehearsal.trak.test,coach.u15@rehearsal.trak.test',
+  )
+  const run = (csv: string, ...flags: string[]) => {
+    const dir = mkdtempSync(join(tmpdir(), 'trak-loader-'))
+    try {
+      const path = join(dir, 'roster.csv')
+      writeFileSync(path, csv)
+      return spawnSync(process.execPath, [LOADER, '--file', path, '--org', ORG, '--loaded-by', 'test', ...flags],
+        { encoding: 'utf8', env: { ...process.env, SUPABASE_URL: '', SUPABASE_SERVICE_ROLE_KEY: '' } })
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  }
+
+  it('finds every line that holds a reserved test address, child or guardian', () => {
+    const { rows } = validateRoster(file(
+      'Real Kid,2012-01-10,U15,kid@gmail.com,parent@gmail.com,coach@club.com',
+      'Test Guardian,2012-01-11,U15,kid2@gmail.com,parent@example.com,coach@club.com',
+      'Test Child,2012-01-12,U15,kid3@squad.test,parent3@gmail.com,coach@club.com',
+      'Mixed,2012-01-13,U15,kid4@gmail.com,parent4@gmail.com;other@x.invalid,coach@club.com',
+    ), TODAY)
+    expect(syntheticInviteLines(rows)).toEqual([3, 4, 5])
+  })
+
+  it('refuses --send-invites for a file with synthetic addresses, even in a dry run, and loads nothing', () => {
+    const out = run(synthetic, '--send-invites')
+    expect(out.status).toBe(1)
+    expect(out.stdout).toMatch(/Line\(s\) 2, 3 use a reserved test address/)
+    expect(out.stdout).toMatch(/Nothing loaded or sent/)
+    expect(out.stdout).not.toMatch(/Dry run\. Re-run with --apply/)
+  })
+
+  it('refuses --reinvite on it too, before it needs a key', () => {
+    const out = run(synthetic, '--reinvite')
+    expect(out.status).toBe(1)
+    expect(out.stdout).toMatch(/reserved test address/)
+    expect(out.stderr).not.toMatch(/SUPABASE_URL/)
+  })
+
+  it('CONTROL the same file loads (dry run) without invitations', () => {
+    const out = run(synthetic)
+    expect(out.status).toBe(0)
+    expect(out.stdout).toMatch(/Nobody will be emailed/)
   })
 })

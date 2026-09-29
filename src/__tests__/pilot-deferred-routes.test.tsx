@@ -20,6 +20,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 vi.mock('@/contexts/ParentChildrenContext', () => ({ ParentChildrenProvider: ({ children }: { children: ReactNode }) => children }))
 vi.mock('@/components/trak/DevSwitcher', () => ({ DevSwitcher: () => null }))
 vi.mock('@/components/player/PlayerConsentWatcher', () => ({ PlayerConsentWatcher: () => null }))
+vi.mock('@/components/parent/ParentConsentWatcher', () => ({ ParentConsentWatcher: () => null }))
 vi.mock('@/pages/LandingPage', () => ({ default: () => <h1>Sign in</h1> }))
 vi.mock('@/pages/player/PlayerHome', () => ({ default: () => <h1>Player home</h1> }))
 vi.mock('@/pages/coach/CoachAssessPage', () => ({ default: () => <h1>Manual assessment</h1> }))

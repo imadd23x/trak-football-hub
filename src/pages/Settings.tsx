@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
-import { ParentConnections } from '@/components/parent/ParentConnections'
 import { supabase } from '@/integrations/supabase/client'
 
 const nameSchema = z
@@ -247,13 +246,6 @@ function AccountSettings({ userId }: { userId: string }) {
             <p className="py-3" style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
               Your academy sets these. Ask them if something is wrong.
             </p>
-          </Section>
-        )}
-
-        {/* Connections — parent */}
-        {role === 'parent' && (
-          <Section label="Linked children">
-            <ParentConnections />
           </Section>
         )}
 

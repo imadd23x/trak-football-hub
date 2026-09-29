@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { ParentChildSelector, ParentFamilyContent } from '@/components/parent/ParentFamily'
 import { ParentConsentWithdrawal } from '@/components/parent/ParentConsentWithdrawal'
+import { ParentConnections } from '@/components/parent/ParentConnections'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { IconHowItWorks } from '@/components/icons/TrakIcons'
 
@@ -11,7 +12,7 @@ export default function ParentProfilePage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const { children, selectedChild } = useParentChildren()
+  const { children, loading } = useParentChildren()
 
   return (
     <MobileShell>
@@ -30,15 +31,18 @@ export default function ParentProfilePage() {
           <p className="text-[20px] font-semibold text-white/88 tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.02em' }}>
             {profile?.full_name || 'Parent'}
           </p>
-          <p className="text-sm text-muted-foreground mt-1">Parent account</p>
+          {/* TRAK-73: the account, and how many children it follows. The
+              selector below shows which child the tabs are about. */}
+          <p className="text-sm text-muted-foreground mt-1">
+            {loading || children.length === 0 ? 'Parent account'
+              : `Parent account · ${children.length} ${children.length === 1 ? 'child' : 'children'} linked`}
+          </p>
         </div>
 
         <ParentChildSelector />
         <ParentFamilyContent>
-          <p className="text-sm text-muted-foreground pb-3">
-            Following {selectedChild?.name} · {children.length} {children.length === 1 ? 'child' : 'children'} linked
-          </p>
           <ParentConsentWithdrawal />
+          <ParentConnections />
         </ParentFamilyContent>
 
         {/* Account info */}

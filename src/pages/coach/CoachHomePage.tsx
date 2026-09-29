@@ -47,11 +47,21 @@ export default function CoachHomePage() {
   // cleared by whichever read succeeded next, so a failed session count lost
   // its banner and sat on "…" for good.
   const [failed, setFailed] = useState(NO_FAILURES)
-  const markFailed = (read: keyof typeof NO_FAILURES) => setFailed(f => ({ ...f, [read]: true }))
   const loadFailed = Object.values(failed).some(Boolean)
   const [sessionCount, setSessionCount] = useState<number | null>(null)
   const [coachDetails, setCoachDetails] = useState<any>(null)
   const [squadAnalytics, setSquadAnalytics] = useState<SquadAnalytics | null>(null)
+  // A failed read's value from an earlier run is no longer an answer, so it
+  // goes with the failure. Otherwise the next run, which clears the flags,
+  // prints that old 0 again while its own reads are still out (Imad's third
+  // #203 review). The assessment read only runs after the squad answers, so a
+  // failed squad read leaves the analytics unanswered too.
+  const markFailed = (read: keyof typeof NO_FAILURES) => {
+    setFailed(f => ({ ...f, [read]: true }))
+    if (read === 'squad') setPlayerCount(null)
+    if (read === 'squad' || read === 'assessments') { setAllAssessments(null); setSquadAnalytics(null) }
+    if (read === 'sessions') setSessionCount(null)
+  }
   // Distinguishes "nothing to show" from "we could not find out". Without it
   // the band strip and the distribution chart render their empty state on a
   // failed read, which is a claim about the squad rather than about the network.

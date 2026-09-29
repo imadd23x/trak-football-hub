@@ -123,19 +123,28 @@ describe('TRAK-92 coach Home while loading', () => {
   // Imad's second #203 review: an empty first load, then a same-account token
   // refresh whose re-reads fail. The 0s kept from the first run were printed
   // ahead of the failure, so Home said "0" and "0 total" under the error.
-  it('a failed re-read after a refresh shows "—", not the 0 kept from the first load', async () => {
+  // Imad's third #203 review adds the next refresh: while its re-reads are
+  // still out, the failed run's 0s must not come back as answers.
+  it('a failed re-read after a refresh shows "—", not the 0 kept from the first load, and "…" while the next refresh loads', async () => {
     signInAs(COACH)
-    let fail = false
-    const failing = (name: string) =>
-      http.get(`${SUPABASE_URL}/rest/v1/${name}`, () => fail
-        ? HttpResponse.json({ message: 'upstream unavailable' }, { status: 500 })
-        : HttpResponse.json([], { headers: { 'Content-Range': '*/0' } }))
+    let mode = 'empty' as 'empty' | 'fail' | 'held'
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    const failing = (name: string, recovered: unknown[]) =>
+      http.get(`${SUPABASE_URL}/rest/v1/${name}`, async () => {
+        if (mode === 'fail') return HttpResponse.json({ message: 'upstream unavailable' }, { status: 500 })
+        if (mode === 'empty') return HttpResponse.json([], { headers: { 'Content-Range': '*/0' } })
+        await held
+        return HttpResponse.json(recovered)
+      })
     server.use(
       table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach Vasilis', invite_code: 'ABCD' }]),
       table('coach_details', [{ user_id: COACH.id, team: 'U15s', coach_role: 'Head Coach' }]),
       table('coach_sessions', []),
-      failing('squad_players'),
-      failing('coach_assessments'),
+      table('session_attendance', []),
+      rpc('coach_squad_player_consent_required', () => false),
+      failing('squad_players', PLAYERS.slice(0, 1)),
+      failing('coach_assessments', ASSESSMENTS.slice(0, 1)),
       http.post(`${SUPABASE_URL}/auth/v1/token`, () => {
         const previous = JSON.parse(localStorage.getItem('sb-test-auth-token')!)
         const user = structuredClone(previous.user)
@@ -150,7 +159,7 @@ describe('TRAK-92 coach Home while loading', () => {
     expect(heroCount()).toBe('0')
     expect(screen.queryByRole('alert')).toBeNull()
 
-    fail = true
+    mode = 'fail'
     await act(async () => { const { error } = await supabase.auth.refreshSession(); expect(error).toBeNull() })
 
     expect(await screen.findByRole('alert', {}, { timeout: 5000 })).toBeInTheDocument()
@@ -159,6 +168,22 @@ describe('TRAK-92 coach Home while loading', () => {
     expect(heroCount()).toBe('—')
     expect(tileCount('Players?')).toBe('—')
     expect(screen.queryByText('Your squad is being prepared')).toBeNull()
+
+    // Another refresh, its re-reads held: still unknown, so no 0s and no empty squad.
+    mode = 'held'
+    await act(async () => { const { error } = await supabase.auth.refreshSession(); expect(error).toBeNull() })
+    await waitFor(() => expect(screen.queryByText('Not available')).toBeNull())
+    expect(heroCount()).not.toBe('0')
+    expect(tileCount('Players?')).not.toBe('0')
+    expect(screen.queryByText(/^0 total$/)).toBeNull()
+    expect(screen.queryByText('No assessments yet')).toBeNull()
+    expect(screen.queryByText('Your squad is being prepared')).toBeNull()
+
+    release()
+
+    expect(await screen.findByText('1 total')).toBeInTheDocument()
+    expect(heroCount()).toBe('1')
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('assessments say "Not available", not "Loading…", when the squad read failed', async () => {

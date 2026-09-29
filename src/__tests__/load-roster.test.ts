@@ -94,6 +94,41 @@ describe('load-roster validation', () => {
 // invite that child's guardians. A skipped row is never invited, a failed send
 // never undoes or stops an admission, and --no-invites (invite = null) sends
 // nothing.
+// TRAK-84: a child without an email; the guardian creates their login later.
+describe('load-roster children without email', () => {
+  it('accepts a blank child email as none, still checking everything else', () => {
+    const { rows, errors } = validateRoster(file(
+      'Young One,2016-02-03,U11,,g1@roster.test,coach@roster.test',
+      'Young Two,2016-04-05,U11,  ,g1@roster.test,coach@roster.test',
+    ), TODAY)
+    expect(errors).toEqual([])
+    expect(rows.map(r => r.child_email)).toEqual([null, null])
+  })
+
+  it('refuses the same email-less child twice in one file (name and date of birth)', () => {
+    const { errors } = validateRoster(file(
+      'Young One,2016-02-03,U11,,g1@roster.test,coach@roster.test',
+      ' young one ,2016-02-03,U11,,g2@roster.test,coach@roster.test',
+    ), TODAY)
+    expect(errors).toEqual(['Line 3: same child (name and date of birth, no email) as line 2'])
+  })
+
+  it('always tries an email-less child, and a re-run skips one the academy already has', async () => {
+    const rows = validateRoster(file(
+      'Young One,2016-02-03,U11,,g1@roster.test,coach@roster.test',
+      'Young Two,2016-04-05,U11,,g2@roster.test,coach@roster.test',
+    ), TODAY).rows
+    const { toLoad } = planLoad(rows, [], 'org')
+    expect(toLoad).toHaveLength(2)
+    const admit = vi.fn()
+      .mockResolvedValueOnce({ data: null, error: { code: '23505', message: "This child is already on the academy's roster" } })
+      .mockResolvedValueOnce({ data: 'roster-3', error: null })
+    const out = await loadRows(toLoad, { admit, invite: null }, () => {})
+    expect(out).toMatchObject({ loaded: 1, alreadyOnRoster: [2] })
+    expect(out.stoppedAt).toBeUndefined()
+  })
+})
+
 describe('load-roster invitations', () => {
   const rows = validateRoster(file(
     'One Kid,2013-03-04,U13,kid1@roster.test,g1@roster.test,coach@roster.test',

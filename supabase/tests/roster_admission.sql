@@ -203,6 +203,31 @@ $$) = '23505', 'an already admitted child email is refused');
 SELECT pg_temp.assert_true(
   (SELECT count(*) FROM public.squad_players) = (SELECT n FROM squad_count_before),
   'a refused load leaves no squad row behind');
+
+-- TRAK-84: many children under ~12 have no email. The academy may leave it
+-- blank; the guardian creates the child's login after consenting.
+SELECT pg_temp.assert_true(
+  (SELECT public.admit_roster_child(
+     'a9100000-0000-0000-0000-000000000002', 'a9000000-0000-0000-0000-000000000006',
+     'No Email Child', 'U11', '2016-02-03', '  ', ARRAY['no-email-parent@roster.test'], 'kostas') IS NOT NULL),
+  'TRAK-84 a child with a blank email is admitted');
+SELECT pg_temp.assert_true(
+  (SELECT rc.child_email IS NULL AND sp.player_name = 'No Email Child'
+   FROM public.roster_children rc JOIN public.squad_players sp ON sp.id = rc.squad_player_id
+   WHERE sp.player_name = 'No Email Child'),
+  'TRAK-84 a blank email is stored as no email, not as an empty string');
+SELECT pg_temp.assert_true(
+  (SELECT public.admit_roster_child(
+     'a9100000-0000-0000-0000-000000000002', 'a9000000-0000-0000-0000-000000000006',
+     'Second No Email', 'U11', '2016-04-05', NULL, ARRAY['no-email-parent@roster.test'], 'kostas') IS NOT NULL),
+  'TRAK-84 two email-less siblings can share a guardian');
+SELECT pg_temp.assert_true(pg_temp.outcome($$
+  SELECT public.admit_roster_child('a9100000-0000-0000-0000-000000000002', 'a9000000-0000-0000-0000-000000000006',
+    ' no email child ', 'U11', '2016-02-03', NULL, ARRAY['no-email-parent@roster.test'], 'kostas')
+$$) = '23505', 'TRAK-84 the same email-less child (name and date of birth) cannot be admitted twice in one academy');
+SELECT pg_temp.assert_true(pg_temp.outcome($$
+  UPDATE public.roster_children SET child_email = '' WHERE child_email IS NULL
+$$) = '23514', 'TRAK-84 an empty string is never stored as an email');
 RESET ROLE;
 
 SET LOCAL ROLE authenticated;

@@ -8,7 +8,9 @@
 //
 //   child_name, date_of_birth, age_group, child_email, guardian_emails, coach_email
 //
-// date_of_birth is YYYY-MM-DD. guardian_emails holds every guardian the
+// date_of_birth is YYYY-MM-DD. child_email may be blank for a child who has
+// none (TRAK-84): their guardian creates the login after consenting.
+// guardian_emails holds every guardian the
 // academy supplied, separated by ";". Quote a field that contains a comma.
 //
 // Without --apply this is a dry run: it validates every row and reports what
@@ -98,6 +100,8 @@ export function validateRoster(text, { today = new Date().toISOString().slice(0,
 
   const rows = [];
   const childLine = new Map();
+  // Without an email, the name and date of birth identify a child in the file.
+  const noEmailLine = new Map();
   for (let i = 1; i < table.length; i++) {
     const line = i + 1;
     const cell = (c) => String(table[i][at[c]] ?? '').trim();
@@ -105,22 +109,25 @@ export function validateRoster(text, { today = new Date().toISOString().slice(0,
 
     const child_name = cell('child_name');
     const date_of_birth = cell('date_of_birth');
-    const child_email = normalizeEmail(cell('child_email'));
+    const child_email = normalizeEmail(cell('child_email')) || null;
     const coach_email = normalizeEmail(cell('coach_email'));
     const guardian_emails = [...new Set(cell('guardian_emails').split(';').map(normalizeEmail).filter(Boolean))];
 
     if (!child_name) problems.push('child_name is empty');
     if (!isRealDate(date_of_birth)) problems.push('date_of_birth is not a real YYYY-MM-DD date');
     else if (date_of_birth > today || date_of_birth <= '1990-01-01') problems.push('date_of_birth is out of range');
-    if (!EMAIL.test(child_email)) problems.push('child_email is not an email address');
+    if (child_email && !EMAIL.test(child_email)) problems.push('child_email is not an email address');
     if (!EMAIL.test(coach_email)) problems.push('coach_email is not an email address');
     if (guardian_emails.length === 0) problems.push('no guardian email');
     if (guardian_emails.some(g => !EMAIL.test(g))) problems.push('a guardian email is not an email address');
-    if (guardian_emails.includes(child_email)) problems.push('the child\'s email is also listed as a guardian\'s');
+    if (child_email && guardian_emails.includes(child_email)) problems.push('the child\'s email is also listed as a guardian\'s');
     if (child_email && childLine.has(child_email)) problems.push(`same child_email as line ${childLine.get(child_email)}`);
+    const person = `${child_name.toLowerCase()}|${date_of_birth}`;
+    if (!child_email && noEmailLine.has(person)) problems.push(`same child (name and date of birth, no email) as line ${noEmailLine.get(person)}`);
 
     if (problems.length) { errors.push(`Line ${line}: ${problems.join('; ')}`); continue; }
-    childLine.set(child_email, line);
+    if (child_email) childLine.set(child_email, line);
+    else noEmailLine.set(person, line);
     rows.push({ line, child_name, date_of_birth, age_group: cell('age_group'), child_email, guardian_emails, coach_email });
   }
 
@@ -143,6 +150,8 @@ export function planLoad(rows, admitted, org) {
   const skipped = [];
   const conflicts = [];
   for (const r of rows) {
+    // An email-less child is never in admitted, so it is always tried; the
+    // database refuses a second copy (TRAK-84).
     if (!academyOf.has(r.child_email)) toLoad.push(r);
     else if (academyOf.get(r.child_email) === org) skipped.push(r.line);
     else conflicts.push(r.line);
@@ -158,13 +167,16 @@ export async function loadRows(toLoad, { admit, invite }, log) {
   let loaded = 0;
   let invited = 0;
   const inviteFailed = [];
+  const alreadyOnRoster = [];
   for (const r of toLoad) {
     const { data: rosterChildId, error } = await admit(r);
+    // TRAK-84: a re-run meets an email-less child the academy already has.
+    if (error && !r.child_email && error.code === '23505') { alreadyOnRoster.push(r.line); continue; }
     if (error) {
       // Rows before this one are admitted, each whole. A re-run skips them.
       log(`[load-roster] Line ${r.line} refused (${error.code ?? 'error'}): ${error.message}`);
       log(`[load-roster] Stopped. ${loaded} child(ren) admitted before line ${r.line}. Fix that line and run the same file again; admitted children are skipped.`);
-      return { loaded, invited, inviteFailed, stoppedAt: r.line };
+      return { loaded, invited, inviteFailed, alreadyOnRoster, stoppedAt: r.line };
     }
     loaded++;
     if (!invite) continue;
@@ -174,7 +186,7 @@ export async function loadRows(toLoad, { admit, invite }, log) {
       log(`[load-roster] Line ${r.line} admitted, but its invitation didn't go. Re-invite that child once the cause is fixed.`);
     }
   }
-  return { loaded, invited, inviteFailed };
+  return { loaded, invited, inviteFailed, alreadyOnRoster };
 }
 
 export function parseArgs(argv) {
@@ -250,7 +262,7 @@ async function main() {
   const { data: admitted, error: admittedError } = await admin
     .from('roster_children')
     .select('child_email, organization_id')
-    .in('child_email', rows.map(r => r.child_email));
+    .in('child_email', rows.map(r => r.child_email).filter(Boolean));
   if (admittedError) throw new Error(`Could not check existing admissions: ${admittedError.message}`);
   const { toLoad, skipped, conflicts } = planLoad(rows, admitted, args.org);
   if (conflicts.length) {
@@ -282,10 +294,10 @@ async function main() {
     const body = await res.json().catch(() => ({}));
     return res.ok && body.failed === 0;
   };
-  const { loaded, invited, inviteFailed, stoppedAt } = await loadRows(toLoad, { admit, invite }, console.log);
+  const { loaded, invited, inviteFailed, alreadyOnRoster, stoppedAt } = await loadRows(toLoad, { admit, invite }, console.log);
   if (stoppedAt) { process.exitCode = 1; return; }
   if (invite) console.log(`[load-roster] Invitations went for ${invited} child(ren); ${inviteFailed.length ? `not for line(s) ${inviteFailed.join(', ')}` : 'none failed'}.`);
-  console.log(`[load-roster] Admitted ${loaded} child(ren) into ${args.org}; ${skipped.length} already admitted.`);
+  console.log(`[load-roster] Admitted ${loaded} child(ren) into ${args.org}; ${skipped.length + alreadyOnRoster.length} already admitted.`);
   if (inviteFailed.length) process.exitCode = 1;
 }
 

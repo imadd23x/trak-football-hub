@@ -41,6 +41,11 @@ serve(async (req) => {
       async sendMagicLink(email, redirectTo) {
         return await publicAuth.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });
       },
+      async confirmServiceKey(token) {
+        // Only a genuine service key may list users; a forged claim can't.
+        const { error } = await createClient(url, token, clientOptions).auth.admin.listUsers({ page: 1, perPage: 1 });
+        return !error;
+      },
     });
     // Counts only: no addresses or provider messages, which may contain them.
     const outcome = await response.clone().json();

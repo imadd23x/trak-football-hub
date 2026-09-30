@@ -28,6 +28,8 @@ export interface RosterInviteDependencies {
   markSent(rosterChildId: string, target: RosterInviteTarget): Promise<{ error: DeliveryError | null }>;
   sendInvite(email: string, redirectTo: string, data: Record<string, string | null>): Promise<{ error: DeliveryError | null }>;
   sendMagicLink(email: string, redirectTo: string): Promise<{ error: DeliveryError | null }>;
+  /** True only when Auth accepts this token as a service key (an admin call made with it). */
+  confirmServiceKey(token: string): Promise<boolean>;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,6 +40,28 @@ export function sameSecret(a: string, b: string): boolean {
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
+}
+
+/** The role a JWT-shaped token claims, unverified; null for anything else. */
+export function claimedRole(token: string): string | null {
+  const payload = token.split('.')[1];
+  if (!payload || token.split('.').length !== 3) return null;
+  try {
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '='));
+    const role = (JSON.parse(json) as { role?: unknown })?.role;
+    return typeof role === 'string' ? role : null;
+  } catch {
+    return null;
+  }
+}
+
+// TRAK-24 (30 Sep phone run): prod refused the operator's genuine legacy service key,
+// because the key the runtime injects was a different string (the project has
+// the new API keys). The exact key is still the fast path; otherwise a token
+// that claims service_role counts only once Auth itself accepts it as one.
+async function isOperator(token: string, deps: RosterInviteDependencies): Promise<boolean> {
+  if (sameSecret(token, deps.serviceRoleKey)) return true;
+  return claimedRole(token) === 'service_role' && await deps.confirmServiceKey(token);
 }
 
 const alreadyRegistered = (e: DeliveryError) => e.code === 'email_exists' || e.code === 'user_already_exists' ||
@@ -53,7 +77,7 @@ export async function handleRosterInviteRequest(req: Request, deps: RosterInvite
 
     // The operator holds the service key; anyone else must be a verified guardian.
     let guardianId: string | null = null;
-    if (!sameSecret(token, deps.serviceRoleKey)) {
+    if (!(await isOperator(token, deps))) {
       const { data: caller, error } = await deps.getCaller(token);
       if (error || !caller) return json({ sent: 0, error: 'Not authenticated' }, 401);
       if (!caller.email?.trim() || !caller.email_confirmed_at) {

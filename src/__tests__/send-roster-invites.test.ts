@@ -29,8 +29,18 @@ function dependencies(targets: RosterInviteTarget[] = [guardianTarget]) {
     markSent: vi.fn<RosterInviteDependencies['markSent']>().mockResolvedValue({ error: null }),
     sendInvite: vi.fn<RosterInviteDependencies['sendInvite']>().mockResolvedValue({ error: null }),
     sendMagicLink: vi.fn<RosterInviteDependencies['sendMagicLink']>().mockResolvedValue({ error: null }),
+    confirmServiceKey: vi.fn<RosterInviteDependencies['confirmServiceKey']>().mockResolvedValue(false),
   };
 }
+
+// A JWT-shaped token with the given claims (unsigned: the gateway verifies
+// signatures; the handler only reads the role before asking Auth to confirm).
+const b64url = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
+const jwt = (claims: object) => `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url(claims)}.signature`;
+const LEGACY_SERVICE_JWT = jwt({ iss: 'supabase', ref: 'xbykbqolvqyqmipikuae', role: 'service_role', iat: 1774368273, exp: 2089944273 });
+// What Auth answered on 30 Sep when the handler asked it for the "guardian"
+// behind a service key: 403, since the key has no user.
+const NO_USER = { data: null, error: { message: 'invalid claim: missing sub claim', status: 403 } };
 
 function request(body: unknown = { roster_child_id: rosterChildId }, token: string | null = 'guardian-session') {
   return new Request('https://edge.example.test/send-roster-invites', {
@@ -112,6 +122,49 @@ describe('send-roster-invites', () => {
     const res = await handleRosterInviteRequest(request(), dependencies([]));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ sent: 0, failed: 0, results: [], reason: 'nothing_to_send' });
+  });
+
+  // TRAK-24 (30 Sep phone run): prod refused the operator's genuine legacy service key
+  // (401 x3, nothing sent) because the key the runtime injects is a different
+  // string. The operator must not depend on which form of the key is injected.
+  describe('recognises the operator whichever form of the service key the runtime holds (TRAK-24, 30 Sep run)', () => {
+    it('invites for a genuine service_role key that is not the injected string', async () => {
+      const deps = { ...dependencies(), serviceRoleKey: 'sb_secret_a-different-form-of-the-key' };
+      deps.getCaller.mockResolvedValue(NO_USER);
+      deps.confirmServiceKey.mockResolvedValue(true);
+      const res = await handleRosterInviteRequest(request(undefined, LEGACY_SERVICE_JWT), deps);
+      expect(res.status).toBe(200);
+      expect(deps.confirmServiceKey).toHaveBeenCalledWith(LEGACY_SERVICE_JWT);
+      expect(deps.getCaller).not.toHaveBeenCalled();
+      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null);
+      expect(await res.json()).toMatchObject({ sent: 1, failed: 0 });
+    });
+
+    it('refuses a token that only claims service_role, and sends nothing', async () => {
+      const deps = dependencies();
+      deps.getCaller.mockResolvedValue(NO_USER);
+      const res = await handleRosterInviteRequest(request(undefined, jwt({ role: 'service_role' })), deps);
+      expect(res.status).toBe(401);
+      expect(deps.getTargets).not.toHaveBeenCalled();
+      expect(deps.sendInvite).not.toHaveBeenCalled();
+      expect(deps.markSent).not.toHaveBeenCalled();
+    });
+
+    it("never treats a confirmed check as the operator's unless the token claims service_role", async () => {
+      const deps = dependencies();
+      deps.confirmServiceKey.mockResolvedValue(true);
+      const res = await handleRosterInviteRequest(request(undefined, jwt({ role: 'authenticated', sub: guardianId })), deps);
+      expect(res.status).toBe(200);
+      expect(deps.confirmServiceKey).not.toHaveBeenCalled();
+      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, guardianId);
+    });
+
+    it('CONTROL the exact injected key still needs no extra check', async () => {
+      const deps = dependencies();
+      await handleRosterInviteRequest(request(undefined, SERVICE_KEY), deps);
+      expect(deps.confirmServiceKey).not.toHaveBeenCalled();
+      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null);
+    });
   });
 
   it('compares the service key in full', () => {

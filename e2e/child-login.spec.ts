@@ -9,7 +9,7 @@ const parentId = '98c00000-0000-4000-8000-000000000003'
 const childId = '98c00000-0000-4000-8000-000000000040'
 const rosterId = '98c00000-0000-4000-8000-000000000030'
 
-async function loginFixture(page: Page, context: BrowserContext, role: 'parent' | 'player' | 'public') {
+async function loginFixture(page: Page, context: BrowserContext, role: 'parent' | 'player' | 'public', readyLogin = false) {
   const id = role === 'parent' ? parentId : childId
   const user = {
     id, email: role === 'parent' ? 'parent@child-login.test' : 'striker7@child.trakfootball.com',
@@ -43,6 +43,9 @@ async function loginFixture(page: Page, context: BrowserContext, role: 'parent' 
         : request.headers().accept?.includes('vnd.pgrst.object') ? profile : [profile])
     }
     if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') return json([])
+    if (url.pathname === '/rest/v1/rpc/get_my_child_credentials') return json(readyLogin
+      ? [{ roster_child_id: rosterId, first_name: 'Ana', username: 'striker7' }] : [])
+    if (url.pathname === '/functions/v1/reset-child-password') return json({ state: 'password_updated' })
     if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json(approved ? [] : [{ roster_child_id: rosterId, first_name: 'Ana', age_years: 13 }])
     if (url.pathname === '/rest/v1/rpc/get_my_child_logins') return json(approved
       ? [{ roster_child_id: rosterId, first_name: 'Ana', username: created ? 'striker7' : null, ready: created }] : [])
@@ -77,6 +80,25 @@ test('parent approves and creates child credentials without an email request', a
   expect(fixture.writes.filter(r => r.path === '/functions/v1/create-child-login').map(r => r.body))
     .toEqual([{ roster_child_id: rosterId, username: 'striker7', password: 'Synthetic-Pass7!' }])
   expect(fixture.writes.some(r => /invite|recover/.test(r.path))).toBe(false)
+  expect(fixture.errors).toEqual([])
+  expect(fixture.unexpected).toEqual([])
+})
+
+test('Profile lets a guardian reset the ready child login before the first child sign-in', async ({ page, context }, testInfo) => {
+  const fixture = await loginFixture(page, context, 'parent', true)
+  await page.goto('/parent/profile')
+  await expect(page.getByRole('region', { name: "Ana's login" })).toBeVisible()
+  await page.getByRole('button', { name: 'Set a new password' }).click()
+  await page.getByLabel("Ana's new password", { exact: true }).fill('Synthetic-NewPass9!')
+  await page.getByLabel("Confirm Ana's password", { exact: true }).fill('Synthetic-NewPass9!')
+  await page.screenshot({ path: testInfo.outputPath('parent-child-recovery-local.png'), fullPage: true })
+  await page.getByRole('button', { name: 'Save new password' }).click()
+  await expect(page.getByRole('status')).toHaveText('Password set for Ana.')
+  await expect(page.getByLabel("Ana's new password", { exact: true })).toHaveCount(0)
+  await expect(page.locator('body')).not.toContainText('child.trakfootball.com')
+  expect(fixture.writes.filter(r => r.path === '/functions/v1/reset-child-password').map(r => r.body))
+    .toEqual([{ roster_child_id: rosterId, password: 'Synthetic-NewPass9!' }])
+  expect(fixture.writes.some(r => ['/auth/v1/recover', '/auth/v1/invite', '/auth/v1/otp', '/functions/v1/send-roster-invites'].includes(r.path))).toBe(false)
   expect(fixture.errors).toEqual([])
   expect(fixture.unexpected).toEqual([])
 })

@@ -12,6 +12,8 @@
 // none (TRAK-84): their guardian creates the login after consenting.
 // guardian_emails holds every guardian the
 // academy supplied, separated by ";". Quote a field that contains a comma.
+// A placeholder address (YOURNAME@…, you@…, <inbox>@…) is a problem on its
+// line (TRAK-93): it is a stranger's real inbox, never the family's.
 //
 // Without --apply this is a dry run: it validates every row and reports what
 // it would load, touching nothing. It never prints names, emails or dates of
@@ -52,7 +54,7 @@
 //
 //   node scripts/load-roster.mjs ... --apply --send-invites
 
-import { isSyntheticAddress } from './synthetic-domain.mjs';
+import { isPlaceholderAddress, isSyntheticAddress } from './synthetic-domain.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -129,6 +131,10 @@ export function validateRoster(text, { today = new Date().toISOString().slice(0,
     if (guardian_emails.length === 0) problems.push('no guardian email');
     if (guardian_emails.some(g => !EMAIL.test(g))) problems.push('a guardian email is not an email address');
     if (child_email && guardian_emails.includes(child_email)) problems.push('the child\'s email is also listed as a guardian\'s');
+    // TRAK-93: YOURNAME@gmail.com and the like belong to strangers at real providers.
+    if ([child_email, coach_email, ...guardian_emails].some(e => e && isPlaceholderAddress(e))) {
+      problems.push('an address is a placeholder (like YOURNAME@ or you@), not a real inbox');
+    }
     if (child_email && childLine.has(child_email)) problems.push(`same child_email as line ${childLine.get(child_email)}`);
     const person = `${child_name.toLowerCase()}|${date_of_birth}`;
     if (!child_email && noEmailLine.has(person)) problems.push(`same child (name and date of birth, no email) as line ${noEmailLine.get(person)}`);

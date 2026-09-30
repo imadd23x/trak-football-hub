@@ -26,7 +26,7 @@
 import { writeFile } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isSyntheticDomain } from '../synthetic-domain.mjs';
+import { isPlaceholderAddress, isSyntheticDomain } from '../synthetic-domain.mjs';
 
 // The repository root, from this file's own location: scripts/rehearsal/.
 // Not the current folder, which is wherever the script happens to be run
@@ -61,7 +61,9 @@ export function dob(today, years, monthsAgo) {
 }
 
 export function rows(inbox, today = new Date(), domain = SYNTHETIC_DOMAIN) {
-  if (!/^[^\s@+]+@[^\s@]+\.[^\s@]+$/.test(inbox)) throw new Error('--inbox must be a plain address like you@gmail.com (no +tag)');
+  if (!/^[^\s@+]+@[^\s@]+\.[^\s@]+$/.test(inbox)) throw new Error('--inbox must be a plain address with no +tag, the tester\'s own mailbox');
+  // TRAK-93: the usage line's example is not an inbox (29 Sep: YOURNAME@gmail.com).
+  if (isPlaceholderAddress(inbox)) throw new Error('--inbox is a placeholder (like YOURNAME@gmail.com or you@gmail.com); use the tester\'s real mailbox');
   if (!isSyntheticDomain(domain)) throw new Error(`--synthetic-domain must be a reserved test domain J7 counts as synthetic (e.g. ${SYNTHETIC_DOMAIN})`);
   const COACHES = coaches(domain);
   const out = [

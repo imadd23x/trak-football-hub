@@ -346,3 +346,76 @@ describe('load-roster --reinvite checks the stored guardian addresses', () => {
     expect(plan.synthetic).toEqual([])
   })
 })
+
+// TRAK-93: a template address copied from a usage line or a doc. On 29 Sep
+// the TRAK-24 phone file arrived with every address at YOURNAME+…@gmail.com
+// (make-roster had been run with --inbox YOURNAME@gmail.com). That inbox is a
+// stranger's real Gmail account: loaded with --send-invites, it would have
+// been emailed and stored as a guardian. Refused in every mode, by line only.
+describe('load-roster refuses placeholder addresses', () => {
+  const LOADER = resolve(__dirname, '../../scripts/load-roster.mjs')
+  const ORG = 'fe06597a-e57f-448d-81ed-b0c4d12cf7a0'
+  // The shape of the 29 Sep phone file: 2 siblings sharing guardian A, 1 withheld child with guardian B.
+  const phoneFile = file(
+    'Sib One,2012-01-10,U15,YOURNAME+sib1@gmail.com,YOURNAME+guardian-a@gmail.com,coach.u15@rehearsal.trak.test',
+    'Sib Two,2010-02-10,U17,YOURNAME+sib2@gmail.com,YOURNAME+guardian-a@gmail.com,coach.u17@rehearsal.trak.test',
+    'Withheld,2012-03-10,U15,YOURNAME+withheld@gmail.com,YOURNAME+guardian-b@gmail.com,coach.u15@rehearsal.trak.test',
+  )
+  const run = (csv: string, ...flags: string[]) => {
+    const dir = mkdtempSync(join(tmpdir(), 'trak-loader-'))
+    try {
+      const path = join(dir, 'roster.csv')
+      writeFileSync(path, csv)
+      return spawnSync(process.execPath, [LOADER, '--file', path, '--org', ORG, '--loaded-by', 'test', ...flags],
+        { encoding: 'utf8', env: { ...process.env, SUPABASE_URL: '', SUPABASE_SERVICE_ROLE_KEY: '' } })
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  }
+
+  it('refuses every line of the 29 Sep phone file, naming lines and never the addresses', () => {
+    const { rows, errors } = validateRoster(phoneFile, TODAY)
+    expect(rows).toEqual([])
+    expect(errors).toHaveLength(3)
+    errors.forEach((e, i) => expect(e).toMatch(new RegExp(`^Line ${i + 2}: .*placeholder`)))
+    // The message names the kind of mistake; none of the file's addresses.
+    expect(errors.join(' ')).not.toMatch(/\+(sib|guardian|withheld)|gmail\.com/i)
+  })
+
+  it.each([
+    ['a child address', 'Kid,2012-01-10,U15,you@gmail.com,parent@gmail.com,coach@club.com'],
+    ['a guardian address', 'Kid,2012-01-10,U15,kid@gmail.com,real.parent@gmail.com;Your.Name+x@outlook.com,coach@club.com'],
+    ['a name template', 'Kid,2012-01-10,U15,,firstname.lastname@gmail.com,coach@club.com'],
+    ['angle brackets', 'Kid,2012-01-10,U15,,<inbox>@gmail.com,coach@club.com'],
+    ['curly braces', 'Kid,2012-01-10,U15,,{email}@gmail.com,coach@club.com'],
+    ['the coach address', 'Kid,2012-01-10,U15,kid@gmail.com,parent@gmail.com,email@club.com'],
+  ])('refuses %s', (_what, line) => {
+    const { rows, errors } = validateRoster(file(line), TODAY)
+    expect(rows).toEqual([])
+    expect(errors[0]).toMatch(/^Line 2: .*placeholder/)
+  })
+
+  it('CONTROL keeps real addresses that only look similar', () => {
+    const { rows, errors } = validateRoster(file(
+      'Kid One,2012-01-10,U15,youssef@gmail.com,imaddxb99+trak51-20260929-01@gmail.com,coach@club.com',
+      'Kid Two,2012-01-11,U15,emily.name@gmail.com,yourname-fc@club.com;your@club.com.cy,coach@club.com',
+      'Kid Three,2012-01-12,U15,roster.01@rehearsal.trak.test,parent.roster.01@rehearsal.trak.test,coach.u15@rehearsal.trak.test',
+    ), TODAY)
+    expect(errors).toEqual([])
+    expect(rows).toHaveLength(3)
+  })
+
+  it('stops the dry run of the phone file before any invitation is planned, and loads nothing', () => {
+    const out = run(phoneFile, '--send-invites')
+    expect(out.status).toBe(1)
+    expect(out.stdout).toMatch(/0 valid row\(s\), 0 guardian address\(es\), 3 problem\(s\)/)
+    expect(out.stdout).toMatch(/Nothing loaded/)
+    expect(out.stdout).not.toMatch(/will email/)
+    expect(out.stdout + out.stderr).not.toMatch(/\+(sib|guardian|withheld)|gmail\.com/i)
+  })
+
+  it('refuses it for --reinvite as well, before it needs a key', () => {
+    const out = run(phoneFile, '--reinvite')
+    expect(out.status).toBe(1)
+    expect(out.stdout).toMatch(/placeholder/)
+    expect(out.stderr).not.toMatch(/SUPABASE_URL/)
+  })
+})

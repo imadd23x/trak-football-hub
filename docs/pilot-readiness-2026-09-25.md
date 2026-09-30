@@ -81,7 +81,7 @@ Before a real child signs up, require all of the following:
 - Verified account deletion for all roles, including a decision on consent evidence and avatars.
 - Restore rehearsal evidence and duration (Kostas S5), not merely an available backup.
 - Correct pilot org/cohort/date window and sane scorecard numbers; UI activity verifies telemetry independently of seeded records.
-- Named support owner and working parent-support inbox.
+- Named support path: the WhatsApp group with the academy (MVP gate 7); support@ stays live but unadvertised.
 
 Until those gates pass, use synthetic squads only. Real-academy names, cohort ages, dates, contacts and agreement decisions must be supplied/confirmed with the academies; do not invent them.
 

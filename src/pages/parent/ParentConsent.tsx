@@ -10,7 +10,10 @@ import {
   recordParentApproval,
   recordRosterApproval,
   requestChildInvitation,
+  fetchMyChildLogins,
 } from '@/lib/parent-consent'
+import { ChildLoginCard } from '@/components/parent/ChildLoginCard'
+import type { ChildLoginState } from '@/lib/child-login'
 import {
   CONSENT_PURPOSES,
   CONSENT_STATEMENT,
@@ -56,6 +59,8 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
   const navigate = useNavigate()
   const [children, setChildren] = useState<WaitingChild[]>([])
   const [invitation, setInvitation] = useState<ChildInvitation | null>(null)
+  const [logins, setLogins] = useState<ChildLoginState[]>([])
+  const [loginChild, setLoginChild] = useState<ChildLoginState | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -75,9 +80,10 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
     setLoading(true)
     setLoadError(null)
     try {
-      const [accounts, roster] = await Promise.all([
+      const [accounts, roster, childLogins] = await Promise.all([
         fetchAwaitingConsent(request.signal),
         fetchRosterAwaitingConsent(request.signal),
+        fetchMyChildLogins(request.signal),
       ])
       if (!mounted.current || reading.current !== request) return
       const pending: WaitingChild[] = [
@@ -85,9 +91,10 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
         ...roster.map(c => ({ key: c.roster_child_id, kind: 'roster' as const, id: c.roster_child_id, full_name: c.first_name, age_years: c.age_years })),
       ]
       setChildren(pending)
+      setLogins(childLogins)
       setLoading(false)
       // A successful refresh, not a stale pre-save count, determines completion.
-      if (finishAfterRefresh.current && pending.length === 0) {
+      if (finishAfterRefresh.current && pending.length === 0 && childLogins.length === 0) {
         finishAfterRefresh.current = false
         navigate('/parent/home', { replace: true })
       }
@@ -144,8 +151,12 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
       setSavedFor(child.full_name)
       setDraft(null)
       if (child.kind === 'roster') {
-        // Stay here: the guardian sees whether the child's email went.
-        void inviteChild(child.id, child.full_name)
+        // Re-read after approval. A failed check never falls through to mail.
+        const childLogins = await fetchMyChildLogins(request.signal)
+        if (!mounted.current || request.signal.aborted) return
+        const login = childLogins.find(item => item.roster_child_id === child.id)
+        if (login) setLoginChild(login)
+        else void inviteChild(child.id, child.full_name)
       } else {
         finishAfterRefresh.current = true
       }
@@ -163,6 +174,9 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
       if (mounted.current) setSubmitting(false)
     }
   }
+
+  if (loginChild) return <MobileShell><ChildLoginCard key={loginChild.roster_child_id} parentId={parentId} child={loginChild}
+    onContinue={() => { setLoginChild(null); navigate('/parent/home') }} /></MobileShell>
 
   if (invitation) {
     const { name, state } = invitation
@@ -206,6 +220,13 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
       </MobileShell>
     )
   }
+
+  if (logins.length > 0 && !child) return <MobileShell><div className="p-6 flex flex-col gap-4">
+    <h1 className="text-xl text-foreground">Your children's logins</h1>
+    {logins.map(item => <Button key={item.roster_child_id} onClick={() => setLoginChild(item)}>
+      {item.ready ? `View ${item.first_name}'s login` : `Create ${item.first_name}'s login`}
+    </Button>)}
+  </div></MobileShell>
 
   if (!child) {
     return (

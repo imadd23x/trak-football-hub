@@ -97,7 +97,7 @@ const OnboardingPage = () => {
   if (!loading && profile?.role === 'player' && role === 'player') return <Navigate to="/player/home" replace />;
   // TRAK-11 phase 4: a guardian arrives from the roster invitation. There is
   // no guardian signup form; anyone else here is sent to their invitation.
-  if (role === 'parent') return <GuardianOnboarding loading={loading} invited={invited} />;
+  if (role === 'parent') return <GuardianOnboarding loading={loading} invited={invited} accountId={user?.id} />;
   const validRole = role === 'player' ? role as Role : null;
 
   if (!validRole) return <div className="app-container p-6 text-foreground">Invalid role</div>;
@@ -115,7 +115,7 @@ const OnboardingPage = () => {
           not start typing into the signup form that is about to be replaced. */}
       {validRole === 'player' && (loading
         ? <div role="status" aria-label="Loading" className="h-40 rounded-xl bg-card/50 animate-pulse" />
-        : invited ? <InvitedPlayerSetup /> : <PlayerOnboarding />)}
+        : invited ? <InvitedPlayerSetup key={user?.id} /> : <PlayerOnboarding />)}
     </div>
   );
 };
@@ -148,7 +148,7 @@ const ExistingGuardianArrival = () => {
   );
 };
 
-const GuardianOnboarding = ({ loading, invited }: { loading: boolean; invited: boolean }) => (
+const GuardianOnboarding = ({ loading, invited, accountId }: { loading: boolean; invited: boolean; accountId?: string }) => (
   <div className="app-container px-6 py-8">
     <a href="/" className="text-sm text-muted-foreground hover:text-primary mb-6 inline-block">
       ← Back
@@ -158,7 +158,7 @@ const GuardianOnboarding = ({ loading, invited }: { loading: boolean; invited: b
     {loading
       ? <div role="status" aria-label="Loading" className="h-40 rounded-xl bg-card/50 animate-pulse" />
       : invited
-        ? <InvitedPlayerSetup role="parent" />
+        ? <InvitedPlayerSetup key={accountId} role="parent" />
         : <p className="text-sm text-muted-foreground">Open the invitation your academy emailed you to set up your account.</p>}
   </div>
 );

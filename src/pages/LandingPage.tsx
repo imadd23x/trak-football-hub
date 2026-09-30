@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { IconRolePlayer, IconRoleParent } from '@/components/icons/TrakIcons';
 import { Eye, EyeOff } from 'lucide-react';
 import { requireDevPassword } from '@/lib/dev-credentials';
+import { isGuardianCreatedChild, isTechnicalChildAddress } from '@/lib/child-login';
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -42,7 +43,7 @@ export default function LandingPage() {
       // used to point them straight at a child's dashboard. Players, coaches
       // and clubs all get a profile at signup, so the only way to be signed in
       // without one is an invitation that was not completed.
-      navigate(homeMap[profile?.role ?? ''] ?? '/parent-invite', { replace: true });
+      navigate(homeMap[profile?.role ?? ''] ?? (isGuardianCreatedChild(user) ? '/onboarding/player' : '/parent-invite'), { replace: true });
     }
   }, [loading, user, profile, navigate]);
 
@@ -140,7 +141,13 @@ function SignInForm({ onCreateAccount }: { onCreateAccount: () => void }) {
   };
 
   const handleForgot = async () => {
-    if (!email) { toast.error('Enter your email first'); return }
+    if (email && (!email.includes('@') || isTechnicalChildAddress(email))) {
+      toast.info('Ask your parent or guardian to set a new password from their Trak profile.'); return;
+    }
+    if (!email) {
+      toast.info('Forgot a child username? Ask your parent or guardian; they can see it in their Trak profile. For your own password, enter your email first.');
+      return;
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
@@ -153,11 +160,11 @@ function SignInForm({ onCreateAccount }: { onCreateAccount: () => void }) {
 
       {/* Email */}
       <PremiumInput
-        type="email"
-        label="Email"
+        type="text"
+        label="Email or username"
         value={email}
         onChange={setEmail}
-        autoComplete="email"
+        autoComplete="username"
       />
 
       {/* Password */}

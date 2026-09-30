@@ -28,3 +28,8 @@ verify_jwt = true
 # reads the roster only through roster_invite_targets().
 [functions.send-roster-invites]
 verify_jwt = true
+
+# TRAK-84: the caller's JWT reaches the SQL guardian/consent check. Admin
+# creation is confirmed and does not send an invitation or recovery email.
+[functions.create-child-login]
+verify_jwt = true

@@ -22,14 +22,13 @@ export interface RosterInviteTarget { kind: 'guardian' | 'child'; email: string;
 export interface RosterInviteCaller { id: string; email?: string; email_confirmed_at?: string }
 export interface RosterInviteDependencies {
   siteUrl: string;
-  serviceRoleKey: string;
+  /** Every value of SUPABASE_SECRET_KEYS: the operator's key is one of them. */
+  secretKeys: string[];
   getCaller(jwt: string): Promise<Result<RosterInviteCaller | null>>;
   getTargets(rosterChildId: string, guardianId: string | null): Promise<Result<RosterInviteTarget[] | null>>;
   markSent(rosterChildId: string, target: RosterInviteTarget): Promise<{ error: DeliveryError | null }>;
   sendInvite(email: string, redirectTo: string, data: Record<string, string | null>): Promise<{ error: DeliveryError | null }>;
   sendMagicLink(email: string, redirectTo: string): Promise<{ error: DeliveryError | null }>;
-  /** True only when Auth accepts this token as a service key (an admin call made with it). */
-  confirmServiceKey(token: string): Promise<boolean>;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -42,26 +41,15 @@ export function sameSecret(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** The role a JWT-shaped token claims, unverified; null for anything else. */
-export function claimedRole(token: string): string | null {
-  const payload = token.split('.')[1];
-  if (!payload || token.split('.').length !== 3) return null;
+/** The key values of SUPABASE_SECRET_KEYS / SUPABASE_PUBLISHABLE_KEYS, a JSON object keyed by name. */
+export function keyValues(raw: string | undefined): string[] {
   try {
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '='));
-    const role = (JSON.parse(json) as { role?: unknown })?.role;
-    return typeof role === 'string' ? role : null;
+    const keys: unknown = JSON.parse(raw ?? '');
+    if (!keys || typeof keys !== 'object' || Array.isArray(keys)) return [];
+    return Object.values(keys).filter((k): k is string => typeof k === 'string' && k.length > 0);
   } catch {
-    return null;
+    return [];
   }
-}
-
-// TRAK-24 (30 Sep phone run): prod refused the operator's genuine legacy service key,
-// because the key the runtime injects was a different string (the project has
-// the new API keys). The exact key is still the fast path; otherwise a token
-// that claims service_role counts only once Auth itself accepts it as one.
-async function isOperator(token: string, deps: RosterInviteDependencies): Promise<boolean> {
-  if (sameSecret(token, deps.serviceRoleKey)) return true;
-  return claimedRole(token) === 'service_role' && await deps.confirmServiceKey(token);
 }
 
 const alreadyRegistered = (e: DeliveryError) => e.code === 'email_exists' || e.code === 'user_already_exists' ||
@@ -72,12 +60,18 @@ export async function handleRosterInviteRequest(req: Request, deps: RosterInvite
   if (req.method !== 'POST') return json({ sent: 0, error: 'Use POST', reason: 'method_not_allowed' }, 405);
 
   try {
-    const token = req.headers.get('Authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
-    if (!token) return json({ sent: 0, error: 'Not authenticated' }, 401);
-
-    // The operator holds the service key; anyone else must be a verified guardian.
+    // TRAK-9 (30 Sep TRAK-24 run): the operator sends a secret key on the
+    // apikey header, the way Supabase's new keys are meant to be used; the
+    // byte match against the legacy SUPABASE_SERVICE_ROLE_KEY refused the real
+    // key and sent nothing. The gateway can't verify secret keys, so
+    // verify_jwt is off for this function and everyone else must bring a user
+    // session on Authorization, which Auth verifies in getCaller.
+    const apikey = req.headers.get('apikey')?.trim() ?? '';
+    const isOperator = apikey.length > 0 && deps.secretKeys.some(key => sameSecret(apikey, key));
     let guardianId: string | null = null;
-    if (!(await isOperator(token, deps))) {
+    if (!isOperator) {
+      const token = req.headers.get('Authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
+      if (!token) return json({ sent: 0, error: 'Not authenticated' }, 401);
       const { data: caller, error } = await deps.getCaller(token);
       if (error || !caller) return json({ sent: 0, error: 'Not authenticated' }, 401);
       if (!caller.email?.trim() || !caller.email_confirmed_at) {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { loadRows, parseArgs, parseCsv, planLoad, validateRoster } from '../../scripts/load-roster.mjs'
+import { describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, planLoad, validateRoster } from '../../scripts/load-roster.mjs'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
 // written. Synthetic addresses only.
@@ -182,5 +182,39 @@ describe('load-roster invitation switch', () => {
   })
   it('refuses both switches at once', () => {
     expect(() => parseArgs([...base, '--send-invites', '--no-invites'])).toThrow(/either/)
+  })
+})
+
+// TRAK-9 (30 Sep TRAK-24 run): the invitations were refused because the loader
+// sent the legacy service_role JWT on Authorization. It now uses a secret key
+// (sb_secret_…), sent on apikey only, and says why an invitation failed.
+describe('load-roster authenticates with a secret key', () => {
+  it('reads the secret key from SUPABASE_SECRET_KEY', () => {
+    expect(operatorKey({ SUPABASE_SECRET_KEY: ' sb_secret_abc ' })).toBe('sb_secret_abc')
+  })
+
+  it.each([
+    ['missing', {}],
+    ['the legacy service_role JWT', { SUPABASE_SECRET_KEY: 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.sig' }],
+    ['a publishable key', { SUPABASE_SECRET_KEY: 'sb_publishable_abc' }],
+    ['only the old variable', { SUPABASE_SERVICE_ROLE_KEY: 'eyJ.legacy.key' }],
+  ])('refuses a key that is %s, before anything is loaded', (_what, env) => {
+    expect(() => operatorKey(env as Record<string, string>)).toThrow(/SUPABASE_SECRET_KEY.*sb_secret_/)
+  })
+
+  it('sends the key on apikey only, never as a Bearer token', () => {
+    const { url, init } = inviteRequest('https://project.example.test/', 'sb_secret_abc', 'rc-1')
+    expect(url).toBe('https://project.example.test/functions/v1/send-roster-invites')
+    expect(init.method).toBe('POST')
+    expect(init.headers).toEqual({ apikey: 'sb_secret_abc', 'Content-Type': 'application/json' })
+    expect(JSON.parse(init.body)).toEqual({ roster_child_id: 'rc-1' })
+  })
+
+  it('says why an invitation failed, with the status and reason only', () => {
+    expect(describeInviteFailure(401, { sent: 0, error: 'Not authenticated' })).toBe('HTTP 401, Not authenticated')
+    expect(describeInviteFailure(403, { sent: 0, reason: 'consent_required' })).toBe('HTTP 403, consent_required')
+    expect(describeInviteFailure(502, { sent: 1, failed: 1, results: [{ kind: 'guardian', sent: false, reason: 'delivery_failed' }] }))
+      .toBe('HTTP 502, 1 delivery failed')
+    expect(describeInviteFailure(500, null)).toBe('HTTP 500')
   })
 })

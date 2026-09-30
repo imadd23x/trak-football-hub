@@ -18,7 +18,8 @@
 // birth, only row numbers and counts, so its output can be pasted into a
 // Linear issue without putting child data there.
 //
-// Applying needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, and
+// Applying needs SUPABASE_URL and SUPABASE_SECRET_KEY (a secret key,
+// sb_secret_…, from Settings → API Keys; not the legacy service_role JWT), and
 // TRAK_CONFIRM_HOST set to the host of SUPABASE_URL, so a key left in the
 // shell cannot load into the wrong project by accident. Each child is one
 // call to admit_roster_child(), which admits the child, the squad row and
@@ -40,8 +41,9 @@
 // Invitations stay opt-in until phase 4's landing pages exist: until then the
 // link lands on a page that can't finish signup. Never send for a practice,
 // rehearsal or synthetic load.
-// The key must be the project's legacy service_role JWT (the same value the
-// edge function sees as SUPABASE_SERVICE_ROLE_KEY).
+// The key goes to send-roster-invites on the apikey header only (TRAK-9): on
+// 30 Sep the legacy service_role JWT was refused and no invitation went. A
+// failed invitation prints its HTTP status and reason, never an address.
 //
 //   node scripts/load-roster.mjs ... --apply --send-invites
 
@@ -189,6 +191,33 @@ export async function loadRows(toLoad, { admit, invite }, log) {
   return { loaded, invited, inviteFailed, alreadyOnRoster };
 }
 
+/** The operator's secret key (TRAK-9). A legacy JWT or a missing key stops here, before anything loads. */
+export function operatorKey(env) {
+  const key = (env.SUPABASE_SECRET_KEY ?? '').trim();
+  if (!key.startsWith('sb_secret_')) {
+    throw new Error('SUPABASE_SECRET_KEY must be a secret key (sb_secret_…) from Settings → API Keys; the legacy service_role key no longer sends invitations');
+  }
+  return key;
+}
+
+/** One send-roster-invites call, with the secret key on apikey only (never Bearer). */
+export function inviteRequest(url, key, rosterChildId) {
+  return {
+    url: `${url.replace(/\/+$/, '')}/functions/v1/send-roster-invites`,
+    init: {
+      method: 'POST',
+      headers: { apikey: key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roster_child_id: rosterChildId }),
+    },
+  };
+}
+
+/** Why an invitation failed: the status and the function's reason, which never holds an address. */
+export function describeInviteFailure(status, body) {
+  const why = body?.reason ?? body?.error ?? (body?.failed ? `${body.failed} delivery failed` : null);
+  return why ? `HTTP ${status}, ${why}` : `HTTP ${status}`;
+}
+
 export function parseArgs(argv) {
   const out = { apply: false, 'send-invites': false };
   let noInvites = false;
@@ -242,8 +271,8 @@ async function main() {
   }
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required with --apply');
+  if (!url) throw new Error('SUPABASE_URL and SUPABASE_SECRET_KEY are required with --apply');
+  const key = operatorKey(process.env);
   const host = new URL(url).host;
   if (process.env.TRAK_CONFIRM_HOST !== host) {
     throw new Error(`Set TRAK_CONFIRM_HOST=${host} to confirm this is the project you mean to load into`);
@@ -286,13 +315,12 @@ async function main() {
     p_source_file: args.file.split('/').pop(),
   });
   const invite = !args['send-invites'] ? null : async (rosterChildId) => {
-    const res = await fetch(`${url.replace(/\/+$/, '')}/functions/v1/send-roster-invites`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roster_child_id: rosterChildId }),
-    });
+    const request = inviteRequest(url, key, rosterChildId);
+    const res = await fetch(request.url, request.init);
     const body = await res.json().catch(() => ({}));
-    return res.ok && body.failed === 0;
+    const sent = res.ok && body.failed === 0;
+    if (!sent) console.log(`[load-roster] An invitation was not sent: ${describeInviteFailure(res.status, body)}.`);
+    return sent;
   };
   const { loaded, invited, inviteFailed, alreadyOnRoster, stoppedAt } = await loadRows(toLoad, { admit, invite }, console.log);
   if (stoppedAt) { process.exitCode = 1; return; }

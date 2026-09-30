@@ -22,7 +22,8 @@ export interface RosterInviteTarget { kind: 'guardian' | 'child'; email: string;
 export interface RosterInviteCaller { id: string; email?: string; email_confirmed_at?: string }
 export interface RosterInviteDependencies {
   siteUrl: string;
-  serviceRoleKey: string;
+  /** Every value of SUPABASE_SECRET_KEYS: the operator's key is one of them. */
+  secretKeys: string[];
   getCaller(jwt: string): Promise<Result<RosterInviteCaller | null>>;
   getTargets(rosterChildId: string, guardianId: string | null): Promise<Result<RosterInviteTarget[] | null>>;
   markSent(rosterChildId: string, target: RosterInviteTarget): Promise<{ error: DeliveryError | null }>;
@@ -40,6 +41,17 @@ export function sameSecret(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/** The key values of SUPABASE_SECRET_KEYS / SUPABASE_PUBLISHABLE_KEYS, a JSON object keyed by name. */
+export function keyValues(raw: string | undefined): string[] {
+  try {
+    const keys: unknown = JSON.parse(raw ?? '');
+    if (!keys || typeof keys !== 'object' || Array.isArray(keys)) return [];
+    return Object.values(keys).filter((k): k is string => typeof k === 'string' && k.length > 0);
+  } catch {
+    return [];
+  }
+}
+
 const alreadyRegistered = (e: DeliveryError) => e.code === 'email_exists' || e.code === 'user_already_exists' ||
   /already.*registered|already.*exists|already been registered/i.test(e.message);
 
@@ -48,12 +60,18 @@ export async function handleRosterInviteRequest(req: Request, deps: RosterInvite
   if (req.method !== 'POST') return json({ sent: 0, error: 'Use POST', reason: 'method_not_allowed' }, 405);
 
   try {
-    const token = req.headers.get('Authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
-    if (!token) return json({ sent: 0, error: 'Not authenticated' }, 401);
-
-    // The operator holds the service key; anyone else must be a verified guardian.
+    // TRAK-9 (30 Sep TRAK-24 run): the operator sends a secret key on the
+    // apikey header, the way Supabase's new keys are meant to be used; the
+    // byte match against the legacy SUPABASE_SERVICE_ROLE_KEY refused the real
+    // key and sent nothing. The gateway can't verify secret keys, so
+    // verify_jwt is off for this function and everyone else must bring a user
+    // session on Authorization, which Auth verifies in getCaller.
+    const apikey = req.headers.get('apikey')?.trim() ?? '';
+    const isOperator = apikey.length > 0 && deps.secretKeys.some(key => sameSecret(apikey, key));
     let guardianId: string | null = null;
-    if (!sameSecret(token, deps.serviceRoleKey)) {
+    if (!isOperator) {
+      const token = req.headers.get('Authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
+      if (!token) return json({ sent: 0, error: 'Not authenticated' }, 401);
       const { data: caller, error } = await deps.getCaller(token);
       if (error || !caller) return json({ sent: 0, error: 'Not authenticated' }, 401);
       if (!caller.email?.trim() || !caller.email_confirmed_at) {

@@ -27,4 +27,7 @@ verify_jwt = true
 # key and a guardian with their session JWT; the handler tells them apart and
 # reads the roster only through roster_invite_targets().
 [functions.send-roster-invites]
-verify_jwt = true
+# TRAK-9: the operator calls with a new-style secret key on apikey, which the
+# gateway's JWT check can't read. The function authorises every call itself:
+# a secret key on apikey, or a user session Auth verifies (handler.ts).
+verify_jwt = false

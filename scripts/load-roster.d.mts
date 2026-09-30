@@ -29,6 +29,12 @@ export declare function loadRows(
   },
   log: (message: string) => void,
 ): Promise<{ loaded: number; invited: number; inviteFailed: number[]; alreadyOnRoster: number[]; stoppedAt?: number }>
+export declare function operatorKey(env: Record<string, string | undefined>): string
+export declare function inviteRequest(url: string, key: string, rosterChildId: string): {
+  url: string
+  init: { method: 'POST'; headers: Record<string, string>; body: string }
+}
+export declare function describeInviteFailure(status: number, body: unknown): string
 export declare function parseArgs(argv: string[]): {
   apply: boolean
   'send-invites': boolean

@@ -85,21 +85,26 @@ $$;
 CREATE FUNCTION public.bind_child_login_identity() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_login public.child_logins%ROWTYPE; v_child public.roster_children%ROWTYPE;
+  v_auth auth.users%ROWTYPE;
 BEGIN
-  IF lower(split_part(COALESCE(NEW.email,''),'@',2))<>'child.trakfootball.com' THEN RETURN NEW; END IF;
-  IF NEW.raw_app_meta_data->'trak_child_login' IS DISTINCT FROM 'true'::jsonb
-    OR COALESCE(NEW.raw_app_meta_data->>'child_login_reservation','')!~ '^[0-9a-f-]{36}$'
-    OR NEW.email_confirmed_at IS NULL THEN
+  -- Admin's INSERT precedes its metadata/confirmation UPDATEs. NEW contains
+  -- that initial snapshot even when deferred; read the final row at commit.
+  SELECT u.* INTO v_auth FROM auth.users u WHERE u.id=NEW.id FOR UPDATE;
+  IF NOT FOUND THEN RETURN NEW; END IF;
+  IF lower(split_part(COALESCE(v_auth.email,''),'@',2))<>'child.trakfootball.com' THEN RETURN NEW; END IF;
+  IF v_auth.raw_app_meta_data->'trak_child_login' IS DISTINCT FROM 'true'::jsonb
+    OR COALESCE(v_auth.raw_app_meta_data->>'child_login_reservation','')!~ '^[0-9a-f-]{36}$'
+    OR v_auth.email_confirmed_at IS NULL THEN
     RAISE EXCEPTION 'Use guardian-created login' USING ERRCODE='42501';
   END IF;
   SELECT cl.* INTO v_login FROM public.child_logins cl
-    WHERE cl.id=(NEW.raw_app_meta_data->>'child_login_reservation')::uuid;
+    WHERE cl.id=(v_auth.raw_app_meta_data->>'child_login_reservation')::uuid;
   IF NOT FOUND THEN RAISE EXCEPTION 'Login reservation unavailable' USING ERRCODE='42501'; END IF;
   SELECT rc.* INTO v_child FROM public.roster_children rc WHERE rc.id=v_login.roster_child_id FOR UPDATE;
   SELECT cl.* INTO v_login FROM public.child_logins cl WHERE cl.id=v_login.id FOR UPDATE;
   IF NOT FOUND OR v_login.auth_user_id IS NOT NULL OR v_child.child_email IS NOT NULL
-    OR v_child.player_user_id IS NOT NULL OR NEW.email<>v_login.username||'@child.trakfootball.com'
-    OR NEW.raw_app_meta_data->>'child_login_guardian' IS DISTINCT FROM v_login.created_by::text
+    OR v_child.player_user_id IS NOT NULL OR v_auth.email<>v_login.username||'@child.trakfootball.com'
+    OR v_auth.raw_app_meta_data->>'child_login_guardian' IS DISTINCT FROM v_login.created_by::text
     OR NOT EXISTS (SELECT 1 FROM public.roster_guardians rg JOIN public.profiles p ON p.user_id=rg.parent_user_id
       JOIN auth.users u ON u.id=p.user_id WHERE rg.roster_child_id=v_child.id AND rg.parent_user_id=v_login.created_by
       AND p.role='parent' AND u.email_confirmed_at IS NOT NULL) THEN
@@ -111,11 +116,12 @@ BEGIN
     AND c.parent_user_id=v_login.created_by AND c.withdrawn_at IS NULL AND c.superseded_by IS NULL
     AND c.purposes->'coaching_records'='true'::jsonb FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Guardian approval is required' USING ERRCODE='42501'; END IF;
-  UPDATE public.child_logins SET auth_user_id=NEW.id WHERE id=v_login.id;
-  UPDATE public.roster_children SET child_email=NEW.email WHERE id=v_child.id;
+  UPDATE public.child_logins SET auth_user_id=v_auth.id WHERE id=v_login.id;
+  UPDATE public.roster_children SET child_email=v_auth.email WHERE id=v_child.id;
   RETURN NEW;
 END $$;
-CREATE TRIGGER auth_bind_child_login AFTER INSERT ON auth.users
+CREATE CONSTRAINT TRIGGER auth_bind_child_login AFTER INSERT ON auth.users
+ DEFERRABLE INITIALLY DEFERRED
  FOR EACH ROW EXECUTE FUNCTION public.bind_child_login_identity();
 
 -- The old function remains private behind this filter. It still chooses ordinary

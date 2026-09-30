@@ -1,6 +1,7 @@
 -- @trak-suite mode=--child-login-review in-all=true
 -- TRAK-84 J3: actual SQL roles, synthetic identities, disposable database only.
 BEGIN;
+SET CONSTRAINTS ALL IMMEDIATE;
 DO $$ BEGIN
   IF current_setting('trak.test_database', true) IS DISTINCT FROM 'disposable' THEN
     RAISE EXCEPTION 'Disposable database required';
@@ -75,8 +76,17 @@ RESET ROLE;
 -- Auth insertion is one transaction with binding the exact owned reservation.
 SELECT pg_temp.cl_refuse($s$INSERT INTO auth.users(id,email,email_confirmed_at,raw_user_meta_data) VALUES
  ('98c00000-0000-4000-8000-000000000040','striker7@child.trakfootball.com',now(),'{"trak_child_login":true}')$s$,'42501');
-INSERT INTO auth.users(id,email,email_confirmed_at,raw_app_meta_data) SELECT pg_temp.cl(40),
- 'striker7@child.trakfootball.com',now(),jsonb_build_object('trak_child_login',true,'child_login_reservation',reservation_id,'child_login_guardian',pg_temp.cl(3)) FROM reservation;
+-- Supabase Admin creates the initial user, then updates trusted metadata and
+-- confirmation inside the same transaction. Validate the final persisted row.
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO auth.users(id,email,raw_app_meta_data) VALUES
+ (pg_temp.cl(40),'striker7@child.trakfootball.com','{"provider":"email","providers":["email"]}');
+UPDATE auth.users SET raw_app_meta_data=raw_app_meta_data ||
+ (SELECT jsonb_build_object('trak_child_login',true,'child_login_reservation',reservation_id,'child_login_guardian',pg_temp.cl(3)) FROM reservation)
+ WHERE id=pg_temp.cl(40);
+UPDATE auth.users SET email_confirmed_at=now() WHERE id=pg_temp.cl(40);
+SELECT pg_temp.cl_check((SELECT auth_user_id IS NULL FROM public.child_logins WHERE roster_child_id=pg_temp.cl(30)), 'binding waits for the completed Auth transaction');
+SET CONSTRAINTS ALL IMMEDIATE;
 SELECT pg_temp.cl_check((SELECT child_email='striker7@child.trakfootball.com' AND player_user_id IS NULL FROM public.roster_children WHERE id=pg_temp.cl(30)),'Auth creation binds email, first run still admits profile');
 SET LOCAL ROLE service_role;
 SELECT pg_temp.cl_check(NOT EXISTS(SELECT 1 FROM public.roster_invite_targets(pg_temp.cl(30),pg_temp.cl(3)) WHERE kind='child'),'technical child is never an invitation target');

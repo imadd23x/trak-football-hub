@@ -29,3 +29,6 @@ export function isPlaceholderAddress(email) {
   if (/[<>{}[\]]/.test(e)) return true;
   return PLACEHOLDER_LOCAL.has(e.split('@')[0].split('+')[0]);
 }
+
+/** Never email this: a reserved test address (no mailbox) or a placeholder (a stranger's). */
+export const isUnmailableAddress = (email) => isSyntheticAddress(email) || isPlaceholderAddress(email);

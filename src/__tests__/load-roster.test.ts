@@ -325,7 +325,7 @@ describe('load-roster --reinvite checks the stored guardian addresses', () => {
   it('refuses a line whose stored guardian is on a reserved test domain, though the file now has a real one', () => {
     const plan = planReinvite(rows, child([{ email: 'parent@rehearsal.trak.test', invited_at: null, parent_user_id: null }]))
     expect(plan.toInvite).toEqual([])
-    expect(plan.synthetic).toEqual([2])
+    expect(plan.unmailable).toEqual([2])
   })
 
   it('refuses it too when that stored guardian was invited before: the function would email them again', () => {
@@ -334,7 +334,14 @@ describe('load-roster --reinvite checks the stored guardian addresses', () => {
       { email: 'parent@rehearsal.trak.test', invited_at: '2026-09-28T16:13:00Z', parent_user_id: null },
     ]))
     expect(plan.toInvite).toEqual([])
-    expect(plan.synthetic).toEqual([2])
+    expect(plan.unmailable).toEqual([2])
+  })
+
+  // TRAK-93 (Imad's P2 on #204): the same stale-roster path for a placeholder.
+  it('refuses a line whose stored guardian is a placeholder, though the file now has a real one', () => {
+    const plan = planReinvite(rows, child([{ email: 'yourname+guardian-a@gmail.com', invited_at: null, parent_user_id: null }]))
+    expect(plan.toInvite).toEqual([])
+    expect(plan.unmailable).toEqual([2])
   })
 
   it('CONTROL a signed-up guardian on a reserved domain is not a recipient, so a real one still gets re-invited', () => {
@@ -343,7 +350,7 @@ describe('load-roster --reinvite checks the stored guardian addresses', () => {
       { email: 'real@gmail.com', invited_at: null, parent_user_id: null },
     ]))
     expect(plan.toInvite).toEqual([{ line: 2, rosterChildId: 'rc-1' }])
-    expect(plan.synthetic).toEqual([])
+    expect(plan.unmailable).toEqual([])
   })
 })
 
@@ -395,7 +402,7 @@ describe('load-roster refuses placeholder addresses', () => {
 
   it('CONTROL keeps real addresses that only look similar', () => {
     const { rows, errors } = validateRoster(file(
-      'Kid One,2012-01-10,U15,youssef@gmail.com,imaddxb99+trak51-20260929-01@gmail.com,coach@club.com',
+      'Kid One,2012-01-10,U15,youssef@gmail.com,tester-control+trak51@example.test,coach@club.com',
       'Kid Two,2012-01-11,U15,emily.name@gmail.com,yourname-fc@club.com;your@club.com.cy,coach@club.com',
       'Kid Three,2012-01-12,U15,roster.01@rehearsal.trak.test,parent.roster.01@rehearsal.trak.test,coach.u15@rehearsal.trak.test',
     ), TODAY)

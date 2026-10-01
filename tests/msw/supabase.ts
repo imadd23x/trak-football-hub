@@ -70,6 +70,7 @@ export function authHandlers(): HttpHandler[] {
     // Default empty child-login state for unrelated journey fixtures. Tests
     // exercising TRAK-84 register explicit replies, including failure cases.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_logins`, () => HttpResponse.json([])),
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_credentials`, () => HttpResponse.json([])),
     http.get(`${SUPABASE_URL}/auth/v1/user`, ({ request }) => {
       const token = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
       const user = authUserForToken(token)

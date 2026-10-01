@@ -5,6 +5,7 @@ import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { ParentChildSelector, ParentFamilyContent } from '@/components/parent/ParentFamily'
 import { ParentConsentWithdrawal } from '@/components/parent/ParentConsentWithdrawal'
 import { ParentConnections } from '@/components/parent/ParentConnections'
+import { ParentChildCredentials } from '@/components/parent/ParentChildCredentials'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { IconHowItWorks } from '@/components/icons/TrakIcons'
 
@@ -44,6 +45,9 @@ export default function ParentProfilePage() {
           <ParentConsentWithdrawal />
           <ParentConnections />
         </ParentFamilyContent>
+
+        {/* Also available for a created login whose first run is unfinished. */}
+        <ParentChildCredentials key={user?.id ?? 'signed-out'} />
 
         {/* Account info */}
         <Section label="ACCOUNT">

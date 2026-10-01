@@ -25,6 +25,8 @@ function signedInCoachWithSquad() {
     // session dropdown (TRAK-68), and coach_details on the destination home
     // screen; mock both up front so every test here can reach the form.
     table('coach_sessions', [{ id: 'session-1', coach_user_id: COACH.id, title: 'vs Synthetic FC', session_date: '2026-09-20' }]),
+    // TRAK-100: the dropdown lists only sessions the player was marked present at.
+    table('session_attendance', [{ session_id: 'session-1', squad_player_id: 'squad-1', status: 'present' }]),
     table('coach_details', []),
   )
 }

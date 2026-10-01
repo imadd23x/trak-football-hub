@@ -64,6 +64,8 @@ beforeEach(() => {
       { id: 'player-b', player_name: 'Bella Synthetic' },
     ])),
     http.get(endpoint('coach_sessions'), () => HttpResponse.json([{ id: 'session-1', title: 'vs Synthetic FC', session_date: '2026-09-20' }])),
+    // TRAK-100: the session picker lists only sessions the player was marked present at.
+    http.get(endpoint('session_attendance'), () => HttpResponse.json(['session-1'].map(session_id => ({ session_id })))),
     http.get(endpoint('coach_assessments'), ({ request }) => {
       const player = new URL(request.url).searchParams.get('squad_player_id')?.replace('eq.', '')
       return HttpResponse.json(player === 'player-a' ? [existing] : [])

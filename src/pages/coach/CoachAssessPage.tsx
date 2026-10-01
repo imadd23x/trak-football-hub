@@ -110,8 +110,19 @@ function CoachAssessmentForm() {
   const [noteExists, setNoteExists] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
   const byId = opened !== null && opened.playerId === playerId && opened.sessionId === sessionId
-  const sessionOptions = useMemo(() => opened?.session && !sessions.some(s => s.id === opened.session.id)
-    ? [...sessions, opened.session] : sessions, [sessions, opened])
+  /* TRAK-100: only sessions this player was marked present at. In the TRAK-24
+     rerun the coach picked a same-name session from earlier that day with no
+     attendance, and the child's history showed the assessment against it.
+     Keyed by player, so a late read for the previous player is never used. */
+  const [attendance, setAttendance] = useState<{ playerId: string; sessionIds: Set<string> } | null>(null)
+  const [attendanceError, setAttendanceError] = useState(false)
+  const attendanceReady = attendance !== null && attendance.playerId === playerId
+  const sessionOptions = useMemo(() => {
+    const attended = attendanceReady ? sessions.filter(s => attendance.sessionIds.has(s.id)) : []
+    // An opened saved assessment keeps its own session, attended or not, so it still opens and saves in place.
+    return opened?.session && opened.playerId === playerId && !attended.some(s => s.id === opened.session.id)
+      ? [...attended, opened.session] : attended
+  }, [sessions, opened, playerId, attendance, attendanceReady])
   const scope = JSON.stringify([userId, playerId, sessionId, byId ? opened?.id : null])
   const currentScope = useRef(scope)
   currentScope.current = scope
@@ -258,6 +269,29 @@ function CoachAssessmentForm() {
     return () => { cancelled = true; controller.abort() }
   }, [userId, loadAttempt])
 
+  /* TRAK-100: the chosen player's attendance. A failed read offers no
+     sessions (and a Retry), never every session as a fallback. */
+  useEffect(() => {
+    setAttendanceError(false)
+    if (!userId || !playerId) return
+    let cancelled = false
+    const controller = new AbortController()
+    void (async () => {
+      const { data, error } = await supabase.from('session_attendance').select('session_id')
+        .eq('squad_player_id', playerId).eq('status', 'present').abortSignal(controller.signal)
+      if (cancelled) return
+      if (error) { console.error('Attendance read failed:', error); setAttendanceError(true); return }
+      setAttendance({ playerId, sessionIds: new Set((data ?? []).map(row => row.session_id as string)) })
+    })()
+    return () => { cancelled = true; controller.abort() }
+  }, [userId, playerId, loadAttempt])
+
+  // A session chosen for the previous player stays only if this player attended it too.
+  // Not while the sessions reload (Retry empties them first): that is not a "no".
+  useEffect(() => {
+    if (attendanceReady && !choicesLoading && !choicesError && sessionId && !sessionOptions.some(s => s.id === sessionId)) setSessionId('')
+  }, [attendanceReady, choicesLoading, choicesError, sessionId, sessionOptions])
+
   /* --- computed --- */
   const avg = (workRate + tactical + attitude + technical + physical + coachability) / 6
   const band = scoreToBand(avg)
@@ -269,7 +303,10 @@ function CoachAssessmentForm() {
   )
   const firstName: string = selectedPlayer?.player_name?.trim().split(/\s+/)[0] || 'the player'
   const selectedSession = sessionOptions.find(s => s.id === sessionId)
-  const sessionLabel = (s: any) => `${s.title || 'Session'}${s.session_date ? ` · ${s.session_date}` : ''}`
+  // TRAK-100: the time it was logged tells two same-day, same-title sessions apart.
+  const loggedAt = (s: any) => s.created_at
+    ? ` · logged ${new Date(s.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : ''
+  const sessionLabel = (s: any) => `${s.title || 'Session'}${s.session_date ? ` · ${s.session_date}` : ''}${loggedAt(s)}`
   const message = shared.trim()
   // True only while the box holds exactly what the family can already read.
   const liveUnchanged = sharedPublished && publishedBody !== null && message === publishedBody.trim()
@@ -587,21 +624,31 @@ function CoachAssessmentForm() {
                 : "We couldn't open that assessment. Check your connection and try again."}
             </p>
           ) : null}
-          {!choicesLoading && !choicesError && sessionOptions.length === 0 ? (
+          {!choicesLoading && !choicesError && sessions.length === 0 && !(opened?.session && opened.playerId === playerId) ? (
             <p role="status" className="text-[12px] text-white/55">
               No past sessions yet. Log the session first, then assess it.{' '}
+              <Link to="/coach/sessions" className="underline text-[#C8F25A]">Log a session</Link>
+            </p>
+          ) : playerId && attendanceError ? (
+            <div role="alert" className="text-[12px] text-amber-300">
+              Couldn't load which sessions {firstName} was at.
+              <button type="button" onClick={() => setLoadAttempt(value => value + 1)} className="ml-2 underline">Retry</button>
+            </div>
+          ) : !choicesLoading && !choicesError && attendanceReady && sessionOptions.length === 0 ? (
+            <p role="status" className="text-[12px] text-white/55">
+              {firstName} isn't marked present at any past session. Log the session with them present, then assess it.{' '}
               <Link to="/coach/sessions" className="underline text-[#C8F25A]">Log a session</Link>
             </p>
           ) : (
             <div className="relative">
               <select
                 aria-label="Session"
-                disabled={saving || choicesLoading}
+                disabled={saving || choicesLoading || !playerId}
                 value={sessionId}
                 onChange={e => setSessionId(e.target.value)}
                 className="w-full px-4 py-3 pr-10 rounded-[10px] bg-[#0d0d0f] border border-white/[0.07] text-sm text-white/88 outline-none appearance-none"
               >
-                <option value="" disabled>Select session...</option>
+                <option value="" disabled>{playerId ? 'Select session...' : 'Choose a player first'}</option>
                 {sessionOptions.map(s => (
                   <option key={s.id} value={s.id}>{sessionLabel(s)}</option>
                 ))}

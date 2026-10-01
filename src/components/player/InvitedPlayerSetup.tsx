@@ -7,6 +7,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/integrations/supabase/client'
 import { POSITIONS } from '@/lib/constants'
 import { validatePassword, PASSWORD_HINT } from '@/lib/password'
+import { isGuardianCreatedChild } from '@/lib/child-login'
+import { createOnboardingSession } from '@/lib/onboarding-session'
 
 /* TRAK-11 phase 4, player side: a rostered child follows the invitation the
    academy's roster sent and arrives here already signed in, with no password
@@ -28,8 +30,9 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
   const meta = (user?.user_metadata ?? {}) as { child_first_name?: unknown; academy_name?: unknown }
   const firstName = typeof meta.child_first_name === 'string' ? meta.child_first_name.trim() : ''
   const academy = typeof meta.academy_name === 'string' ? meta.academy_name.trim() : ''
+  const guardianCreated = !guardian && isGuardianCreatedChild(user)
 
-  const [step, setStep] = useState<'password' | 'profile'>('password')
+  const [step, setStep] = useState<'password' | 'profile'>(guardianCreated ? 'profile' : 'password')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   // The invitation names the child; a guardian types their own name.
@@ -56,20 +59,33 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
     if (!name.trim()) { setProblem('Please enter your name'); return }
     setBusy(true)
     setProblem(null)
-    const { error } = await supabase.rpc('provision_my_profile' as never, {
-      p: guardian
-        ? { role: 'parent', full_name: name.trim() }
-        : { role: 'player', full_name: name.trim(), player_details: position ? { position } : {} },
-    } as never)
-    if (error) {
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !sessionData.session || sessionData.session.user.id !== user?.id) {
+        throw new Error('Account changed')
+      }
+      const account = await createOnboardingSession(sessionData.session)
+      const { error } = await account.client.rpc('provision_my_profile' as never, {
+        p: guardian
+          ? { role: 'parent', full_name: name.trim() }
+          : { role: 'player', full_name: name.trim(), player_details: position ? { position } : {} },
+      } as never)
+      if (error) {
+        setBusy(false)
+        // 42501 carries the academy's own reason (not on the roster, or waiting
+        // for a guardian's approval); anything else is a fault, not a rule.
+        setProblem(error.code === '42501' ? error.message : "Couldn't finish setting up your account. Please try again.")
+        return
+      }
+      await refreshProfile()
+      const { data: current, error: currentError } = await supabase.auth.getSession()
+      if (currentError) throw currentError
+      if (current.session?.user.id !== account.user.id) return
+      navigate(guardian ? '/parent/home' : '/player/home', { replace: true })
+    } catch {
       setBusy(false)
-      // 42501 carries the academy's own reason (not on the roster, or waiting
-      // for a guardian's approval); anything else is a fault, not a rule.
-      setProblem(error.code === '42501' ? error.message : "Couldn't finish setting up your account. Please try again.")
-      return
+      setProblem("Couldn't finish setting up your account. Sign in again and retry.")
     }
-    await refreshProfile()
-    navigate(guardian ? '/parent/home' : '/player/home', { replace: true })
   }
 
   return (

@@ -73,6 +73,7 @@ async function consentFixture(page: Page, context: BrowserContext, replies: Repl
       && url.searchParams.get('parent_user_id') === `eq.${parentId}` && url.searchParams.get('select') === 'player_user_id') return json([])
     // TRAK-11 phase 4: the consent screen also lists account-less roster children; none here.
     if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent' && observed.method === 'POST') return json([])
+    if (url.pathname === '/rest/v1/rpc/get_my_child_logins' && observed.method === 'POST') return json([])
     if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent' && observed.method === 'POST') {
       pending.push(observed)
       expect(observed.body).toEqual({})

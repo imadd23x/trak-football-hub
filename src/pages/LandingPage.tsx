@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { IconRolePlayer, IconRoleParent } from '@/components/icons/TrakIcons';
 import { Eye, EyeOff } from 'lucide-react';
 import { requireDevPassword } from '@/lib/dev-credentials';
+import { isGuardianCreatedChild, isTechnicalChildAddress } from '@/lib/child-login';
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -40,11 +41,12 @@ export default function LandingPage() {
       // A missing role must never fall through to the player home. The only way
       // to be signed in without a profile is an invitation that was not
       // completed. A roster invitation (TRAK-11) marks its role in invited_as:
-      // send that child or guardian back to their own setup. Anyone else is a
-      // parent invited by a player, so they go to the parent invitation page.
+      // send that child or guardian back to their own setup. A child whose
+      // guardian made their login (TRAK-84) finishes as a player too. Anyone
+      // else is a parent invited by a player: the parent invitation page.
       const invitedAs = user.user_metadata?.invited_as;
       const setup = !profile && (invitedAs === 'player' || invitedAs === 'parent') ? `/onboarding/${invitedAs}` : null;
-      navigate(setup ?? homeMap[profile?.role ?? ''] ?? '/parent-invite', { replace: true });
+      navigate(setup ?? homeMap[profile?.role ?? ''] ?? (isGuardianCreatedChild(user) ? '/onboarding/player' : '/parent-invite'), { replace: true });
     }
   }, [loading, user, profile, navigate]);
 
@@ -142,7 +144,13 @@ function SignInForm({ onCreateAccount }: { onCreateAccount: () => void }) {
   };
 
   const handleForgot = async () => {
-    if (!email) { toast.error('Enter your email first'); return }
+    if (email && (!email.includes('@') || isTechnicalChildAddress(email))) {
+      toast.info('Ask your parent or guardian to set a new password from their Trak profile.'); return;
+    }
+    if (!email) {
+      toast.info('Forgot a child username? Ask your parent or guardian; they can see it in their Trak profile. For your own password, enter your email first.');
+      return;
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
@@ -155,11 +163,11 @@ function SignInForm({ onCreateAccount }: { onCreateAccount: () => void }) {
 
       {/* Email */}
       <PremiumInput
-        type="email"
-        label="Email"
+        type="text"
+        label="Email or username"
         value={email}
         onChange={setEmail}
-        autoComplete="email"
+        autoComplete="username"
       />
 
       {/* Password */}

@@ -25,7 +25,8 @@ export interface RosterInviteDependencies {
   /** Every value of SUPABASE_SECRET_KEYS: the operator's key is one of them. */
   secretKeys: string[];
   getCaller(jwt: string): Promise<Result<RosterInviteCaller | null>>;
-  getTargets(rosterChildId: string, guardianId: string | null): Promise<Result<RosterInviteTarget[] | null>>;
+  /** onlyUninvited (operator only, TRAK-91): leave out targets already invited. */
+  getTargets(rosterChildId: string, guardianId: string | null, onlyUninvited: boolean): Promise<Result<RosterInviteTarget[] | null>>;
   markSent(rosterChildId: string, target: RosterInviteTarget): Promise<{ error: DeliveryError | null }>;
   sendInvite(email: string, redirectTo: string, data: Record<string, string | null>): Promise<{ error: DeliveryError | null }>;
   sendMagicLink(email: string, redirectTo: string): Promise<{ error: DeliveryError | null }>;
@@ -80,18 +81,25 @@ export async function handleRosterInviteRequest(req: Request, deps: RosterInvite
       guardianId = caller.id;
     }
 
+    // TRAK-91: the operator may add only_uninvited: true (load-roster
+    // --reinvite), so a guardian who already has an invitation isn't sent
+    // another. A guardian's own call stays { roster_child_id } only.
     let rosterChildId: string;
+    let onlyUninvited = false;
     try {
       const body: unknown = JSON.parse(await req.text());
       const keys = body && typeof body === 'object' && !Array.isArray(body) ? Object.keys(body) : [];
-      const id = (body as { roster_child_id?: unknown })?.roster_child_id;
-      if (keys.length !== 1 || typeof id !== 'string' || !UUID.test(id)) throw new Error('Invalid body');
+      const { roster_child_id: id, only_uninvited: only } = (body ?? {}) as { roster_child_id?: unknown; only_uninvited?: unknown };
+      const allowed = isOperator ? ['roster_child_id', 'only_uninvited'] : ['roster_child_id'];
+      if (!keys.includes('roster_child_id') || keys.some(k => !allowed.includes(k))
+        || typeof id !== 'string' || !UUID.test(id) || (only !== undefined && typeof only !== 'boolean')) throw new Error('Invalid body');
       rosterChildId = id;
+      onlyUninvited = only === true;
     } catch {
       return json({ sent: 0, error: 'Send { roster_child_id } only', reason: 'invalid_request' }, 400);
     }
 
-    const { data: targets, error: targetError } = await deps.getTargets(rosterChildId, guardianId);
+    const { data: targets, error: targetError } = await deps.getTargets(rosterChildId, guardianId, onlyUninvited);
     if (targetError) {
       if (targetError.code === '42501') return json({ sent: 0, reason: targetError.message }, 403);
       if (targetError.code === 'P0002') return json({ sent: 0, reason: 'no_roster_child' }, 404);

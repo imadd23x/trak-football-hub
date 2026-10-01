@@ -56,7 +56,7 @@ describe('send-roster-invites', () => {
     const res = await handleRosterInviteRequest(operator(), deps);
     expect(res.status).toBe(200);
     expect(deps.getCaller).not.toHaveBeenCalled();
-    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null);
+    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null, false);
     expect(deps.sendInvite).toHaveBeenCalledWith('g@example.test', 'https://trakfootball.test/onboarding/parent',
       { invited_as: 'parent', child_first_name: 'Ana', academy_name: 'Invite FC' });
     expect(deps.markSent).toHaveBeenCalledWith(rosterChildId, guardianTarget);
@@ -67,7 +67,7 @@ describe('send-roster-invites', () => {
     const deps = dependencies([childTarget]);
     const res = await handleRosterInviteRequest(request(), deps);
     expect(res.status).toBe(200);
-    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, guardianId);
+    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, guardianId, false);
     expect(deps.sendInvite).toHaveBeenCalledWith('ana@example.test', 'https://trakfootball.test/onboarding/player',
       { invited_as: 'player', child_first_name: 'Ana', academy_name: 'Invite FC' });
   });
@@ -134,14 +134,14 @@ describe('send-roster-invites', () => {
       const res = await handleRosterInviteRequest(operator(), deps);
       expect(res.status).toBe(200);
       expect(deps.getCaller).not.toHaveBeenCalled();
-      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null);
+      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null, false);
     });
 
     it('accepts any of the named secret keys', async () => {
       const deps = dependencies();
       const res = await handleRosterInviteRequest(request(undefined, null, OTHER_SECRET_KEY), deps);
       expect(res.status).toBe(200);
-      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null);
+      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null, false);
     });
 
     it.each([
@@ -164,7 +164,7 @@ describe('send-roster-invites', () => {
       const res = await handleRosterInviteRequest(request(), deps);
       expect(res.status).toBe(200);
       expect(deps.getCaller).toHaveBeenCalledWith('guardian-session');
-      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, guardianId);
+      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, guardianId, false);
     });
 
     it('reads the secret keys out of the JSON the runtime provides, and nothing else', () => {
@@ -181,5 +181,42 @@ describe('send-roster-invites', () => {
     expect(sameSecret('abc', 'abd')).toBe(false);
     expect(sameSecret('abc', 'abcd')).toBe(false);
     expect(sameSecret('', 'abc')).toBe(false);
+  });
+});
+
+// TRAK-91 (Imad, 1 Oct): "never re-send" is opt-in on the server. The loader's
+// --reinvite sends only_uninvited: true so a guardian who already has an
+// invitation isn't emailed again; only the operator may ask for it.
+describe('only_uninvited (TRAK-91)', () => {
+  it('passes the operator\'s only_uninvited to SQL', async () => {
+    const deps = dependencies();
+    const res = await handleRosterInviteRequest(operator({ roster_child_id: rosterChildId, only_uninvited: true }), deps);
+    expect(res.status).toBe(200);
+    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null, true);
+  });
+
+  it('CONTROL without it the operator call is unchanged: every unsigned guardian', async () => {
+    const deps = dependencies();
+    await handleRosterInviteRequest(operator({ roster_child_id: rosterChildId }), deps);
+    await handleRosterInviteRequest(operator({ roster_child_id: rosterChildId, only_uninvited: false }), deps);
+    expect(deps.getTargets.mock.calls).toEqual([[rosterChildId, null, false], [rosterChildId, null, false]]);
+  });
+
+  it('refuses it from a guardian session, before asking SQL', async () => {
+    const deps = dependencies();
+    const res = await handleRosterInviteRequest(request({ roster_child_id: rosterChildId, only_uninvited: true }), deps);
+    expect(res.status).toBe(400);
+    expect(deps.getTargets).not.toHaveBeenCalled();
+    expect(deps.sendInvite).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a non-boolean value', { roster_child_id: rosterChildId, only_uninvited: 'yes' }],
+    ['an unknown key', { roster_child_id: rosterChildId, only_uninvited: true, resend: true }],
+    ['no roster child', { only_uninvited: true }],
+  ])('refuses %s from the operator', async (_what, body) => {
+    const deps = dependencies();
+    expect((await handleRosterInviteRequest(operator(body), deps)).status).toBe(400);
+    expect(deps.getTargets).not.toHaveBeenCalled();
   });
 });

@@ -36,3 +36,7 @@ verify_jwt = false
 # creation is confirmed and does not send an invitation or recovery email.
 [functions.create-child-login]
 verify_jwt = true
+
+# Guardian-authorized direct password change, never a child email recovery.
+[functions.reset-child-password]
+verify_jwt = true

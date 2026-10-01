@@ -82,6 +82,7 @@ beforeEach(() => {
     http.get(endpoint('player_details'), () => HttpResponse.json([])),
     http.get(endpoint('squad_players'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_roster_children_awaiting_consent'), () => HttpResponse.json([])),
+    http.post(endpoint('rpc/get_my_child_logins'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_children_awaiting_consent'), () => HttpResponse.json([])),
     http.post(endpoint('telemetry_events'), () => new HttpResponse(null, { status: 201 })),
     http.all('*', ({ request }) => { unexpected.push(`${request.method} ${request.url}`); return new HttpResponse(null, { status: 500 }) }),

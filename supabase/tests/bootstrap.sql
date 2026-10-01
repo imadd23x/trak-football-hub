@@ -11,6 +11,7 @@ CREATE TABLE auth.users (
   id uuid PRIMARY KEY,
   email text,
   email_confirmed_at timestamptz,
+  raw_app_meta_data jsonb DEFAULT '{}',
   raw_user_meta_data jsonb DEFAULT '{}'
 );
 CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$

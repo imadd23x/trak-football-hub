@@ -27,4 +27,12 @@ verify_jwt = true
 # key and a guardian with their session JWT; the handler tells them apart and
 # reads the roster only through roster_invite_targets().
 [functions.send-roster-invites]
+# TRAK-9: the operator calls with a new-style secret key on apikey, which the
+# gateway's JWT check can't read. The function authorises every call itself:
+# a secret key on apikey, or a user session Auth verifies (handler.ts).
+verify_jwt = false
+
+# TRAK-84: the caller's JWT reaches the SQL guardian/consent check. Admin
+# creation is confirmed and does not send an invitation or recovery email.
+[functions.create-child-login]
 verify_jwt = true

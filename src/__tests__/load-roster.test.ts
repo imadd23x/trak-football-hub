@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { loadRows, parseArgs, parseCsv, planLoad, planReinvite, reinviteRows, validateRoster } from '../../scripts/load-roster.mjs'
+import { describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, planLoad, planReinvite, reinviteRows, validateRoster } from '../../scripts/load-roster.mjs'
+import { handleRosterInviteRequest } from '../../supabase/functions/send-roster-invites/handler'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
 // written. Synthetic addresses only.
@@ -252,5 +253,91 @@ describe('load-roster --reinvite', () => {
     expect(parseArgs(['--file', 'r.csv']).reinvite).toBe(false)
     expect(() => parseArgs([...base, '--send-invites'])).toThrow(/--reinvite/)
     expect(() => parseArgs([...base, '--no-invites'])).toThrow(/--reinvite/)
+  })
+})
+
+// TRAK-9 (30 Sep TRAK-24 run): the invitations were refused because the loader
+// sent the legacy service_role JWT on Authorization. It now uses a secret key
+// (sb_secret_…), sent on apikey only, and says why an invitation failed.
+describe('load-roster authenticates with a secret key', () => {
+  it('reads the secret key from SUPABASE_SECRET_KEY', () => {
+    expect(operatorKey({ SUPABASE_SECRET_KEY: ' sb_secret_abc ' })).toBe('sb_secret_abc')
+  })
+
+  it.each([
+    ['missing', {}],
+    ['the legacy service_role JWT', { SUPABASE_SECRET_KEY: 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.sig' }],
+    ['a publishable key', { SUPABASE_SECRET_KEY: 'sb_publishable_abc' }],
+    ['only the old variable', { SUPABASE_SERVICE_ROLE_KEY: 'eyJ.legacy.key' }],
+  ])('refuses a key that is %s, before anything is loaded', (_what, env) => {
+    expect(() => operatorKey(env as Record<string, string>)).toThrow(/SUPABASE_SECRET_KEY.*sb_secret_/)
+  })
+
+  it('sends the key on apikey only, never as a Bearer token', () => {
+    const { url, init } = inviteRequest('https://project.example.test/', 'sb_secret_abc', 'rc-1')
+    expect(url).toBe('https://project.example.test/functions/v1/send-roster-invites')
+    expect(init.method).toBe('POST')
+    expect(init.headers).toEqual({ apikey: 'sb_secret_abc', 'Content-Type': 'application/json' })
+    expect(JSON.parse(init.body)).toEqual({ roster_child_id: 'rc-1' })
+  })
+
+  it('says why an invitation failed, with the status and reason only', () => {
+    expect(describeInviteFailure(401, { sent: 0, error: 'Not authenticated' })).toBe('HTTP 401, Not authenticated')
+    expect(describeInviteFailure(403, { sent: 0, reason: 'consent_required' })).toBe('HTTP 403, consent_required')
+    expect(describeInviteFailure(502, { sent: 1, failed: 1, results: [{ kind: 'guardian', sent: false, reason: 'delivery_failed' }] }))
+      .toBe('HTTP 502, 1 delivery failed')
+    expect(describeInviteFailure(500, null)).toBe('HTTP 500')
+  })
+})
+
+// TRAK-91 (Imad, 30 Sep / 1 Oct): a family with one invited and one never-
+// invited guardian. Before the fix, --reinvite picked the child and the
+// function emailed BOTH unsigned guardians. Planner → request → real handler,
+// with targets that follow roster_invite_targets()'s SQL predicate.
+describe('load-roster --reinvite end to end (mixed family)', () => {
+  const guardians = [
+    { email: 'g2@roster.test', invited_at: '2026-09-28T10:00:00Z', parent_user_id: null },
+    { email: 'g2b@roster.test', invited_at: null, parent_user_id: null },
+  ]
+  const rows = validateRoster(file('Two Kid,2013-05-06,U13,kid2@roster.test,g2@roster.test;g2b@roster.test,coach@roster.test'), TODAY).rows
+  const onRoster = [{ id: '98a00000-0000-0000-0000-000000000073', child_email: 'kid2@roster.test', date_of_birth: '2013-05-06', player_name: 'Two Kid', guardians }]
+
+  async function run(onlyUninvited: boolean) {
+    const delivered: string[] = []
+    const deps = {
+      siteUrl: 'https://trakfootball.test', secretKeys: ['sb_secret_op'],
+      getCaller: vi.fn(),
+      // The SQL: every guardian not signed up; with only_uninvited, never invited too.
+      getTargets: vi.fn(async (_id: string, _guardian: string | null, only: boolean) => ({ error: null,
+        data: guardians.filter(g => !g.parent_user_id && (!only || !g.invited_at))
+          .map(g => ({ kind: 'guardian' as const, email: g.email, first_name: 'Two', academy: 'Roster FC' })) })),
+      markSent: vi.fn(async () => ({ error: null })),
+      sendInvite: vi.fn(async (email: string) => { delivered.push(email); return { error: null } }),
+      sendMagicLink: vi.fn(async () => ({ error: null })),
+    }
+    const plan = planReinvite(rows, onRoster)
+    const out = await reinviteRows(plan.toInvite, async (rosterChildId: string) => {
+      const { url, init } = inviteRequest('https://p.example.test', 'sb_secret_op', rosterChildId, { onlyUninvited })
+      const res = await handleRosterInviteRequest(new Request(url, init), deps)
+      return res.ok && (await res.json()).failed === 0
+    }, vi.fn())
+    return { plan, out, delivered }
+  }
+
+  it('re-sends only to the guardian who was never invited', async () => {
+    const { plan, out, delivered } = await run(true)
+    expect(plan.toInvite).toHaveLength(1)
+    expect(out).toEqual({ invited: 1, failed: [] })
+    expect(delivered).toEqual(['g2b@roster.test'])
+  })
+
+  it('CONTROL without only_uninvited the same call emails both (the bug)', async () => {
+    expect((await run(false)).delivered).toEqual(['g2@roster.test', 'g2b@roster.test'])
+  })
+
+  it('the request carries only_uninvited only when asked', () => {
+    expect(JSON.parse(inviteRequest('https://p.example.test', 'sb_secret_op', 'rc-1', { onlyUninvited: true }).init.body))
+      .toEqual({ roster_child_id: 'rc-1', only_uninvited: true })
+    expect(JSON.parse(inviteRequest('https://p.example.test', 'sb_secret_op', 'rc-1').init.body)).toEqual({ roster_child_id: 'rc-1' })
   })
 })

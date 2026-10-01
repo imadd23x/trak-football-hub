@@ -4,7 +4,7 @@ import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { ParentAssessmentBands, ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
 import { ParentAlertsBell } from '@/components/parent/ParentAlertsBell'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
-import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches, useRosterChildrenAwaitingConsent } from '@/hooks/useParentData'
+import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches, useRosterChildrenAwaitingConsent, useChildLogins } from '@/hooks/useParentData'
 import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
 import { trackEvent } from '@/lib/telemetry'
 
@@ -16,6 +16,7 @@ export default function ParentHome() {
   const developmentQuery = useParentDevelopment()
   const consentQuery = useChildrenAwaitingConsent()
   const rosterConsentQuery = useRosterChildrenAwaitingConsent()
+  const loginQuery = useChildLogins()
   // Children waiting on this guardian: with an account, and rostered ones who
   // have none yet (TRAK-11 phase 4; first names only).
   const waitingNames = [...(consentQuery.data ?? []).map(child => child.full_name),
@@ -56,6 +57,12 @@ export default function ParentHome() {
           </button>
         )}
         <ParentChildSelector />
+        {loginQuery.isError ? <ParentLoadError message="Couldn't check your children's logins." onRetry={() => {void loginQuery.refetch()}} />
+          : (loginQuery.data?.length??0)>0 && <button onClick={()=>navigate('/parent/consent')}
+            className="w-full text-left rounded-xl border border-primary/30 bg-primary/10 p-4 mb-4">
+            <p className="text-sm text-foreground">Finish your child's login setup</p>
+            <p className="text-xs text-muted-foreground">Create or view the username they need to sign in.</p>
+          </button>}
         <ParentFamilyContent>
           {hasError ? <ParentLoadError onRetry={() => { void matchQuery.refetch(); void developmentQuery.refetch() }} />
             : loading ? <ParentLoading /> : (

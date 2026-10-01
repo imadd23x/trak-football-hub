@@ -224,6 +224,15 @@ GROUP BY 1, 2 ORDER BY 1;
 
 In development the console logs `[telemetry] "<event>" failed:` on any write error.
 
+## A guardian resets a child's password
+
+A guardian can set a new password for a child who signs in with a username:
+Profile → the child's login card (e.g. "Sam's login") → *Set a new password*
+(TRAK-84). The new password does **not** sign the child out of devices that
+are already signed in; those sessions keep working. If the reason is a lost
+or shared phone, tell the founders the same day. Signing the child out
+everywhere on a reset isn't built yet (follow-up on TRAK-84).
+
 ## Duplicate roster rows
 
 Player signup now adopts the coach's own roster entry instead of inserting a second one.

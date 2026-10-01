@@ -236,3 +236,29 @@ SELECT * FROM squad_duplicate_candidates;
 ```
 
 Merging is a human decision — assessments and awards may hang off either row.
+
+## Wrong address
+
+When the academy gave a wrong child or guardian email (TRAK-16, G5), the
+operator corrects it with `scripts/correct-roster-email.mjs`. The database
+records who corrected it, when and why in `roster_email_corrections`, which
+holds hashes of both addresses, never the addresses themselves. Needs
+`SUPABASE_URL`, `SUPABASE_SECRET_KEY` and `TRAK_CONFIRM_HOST`, like the loader.
+
+```bash
+# 1. Dry run: reads the roster, changes nothing
+node scripts/correct-roster-email.mjs --roster-child <roster child id> --kind guardian \
+  --old <wrong address> --new <right address> --by "<your name>" --reason "<why>"
+# 2. The same command with --apply writes it
+```
+
+- **Refused, "already claimed":** someone has already signed up with the
+  wrong address. Don't work around it. It's an incident: tell the founders the
+  same day, because a wrong adult may be linked to the child.
+- **"An invitation had already gone to the old address":** record a G5
+  near-miss on TRAK-16 (roster child id and time; no addresses). After the
+  correction, that address can no longer claim the child.
+- **Then re-invite** that roster child. The script sends nothing; the
+  correction cleared `invited_at` so the new address gets the invitation.
+- The addresses go only on the command line on the operator's own machine,
+  never into Slack or Linear.

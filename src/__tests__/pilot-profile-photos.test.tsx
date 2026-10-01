@@ -1,5 +1,6 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PlayerProfile from '@/pages/player/PlayerProfilePage'
 import CoachProfile from '@/pages/coach/CoachProfilePage'
@@ -38,7 +39,7 @@ describe('G7 profile photos', () => {
   it.each([['player', PlayerProfile], ['coach', CoachProfile], ['parent', ParentProfile], ['club', ClubProfile]] as const)(
     '%s never renders or signs a stored photo', async (_role, Profile) => {
       let container!: HTMLElement
-      await act(async () => { ({ container } = render(<MemoryRouter><Profile /></MemoryRouter>)) })
+      await act(async () => { ({ container } = render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><Profile /></MemoryRouter></QueryClientProvider>)) })
       expect(container.querySelector('img')).toBeNull()
       expect(mocks.avatar).not.toHaveBeenCalled()
       expect(container.textContent).toContain('Synthetic Profile')

@@ -77,7 +77,7 @@ export async function fetchAwaitingConsent(signal: AbortSignal): Promise<Awaitin
 }
 
 /** Keep every write on the account that clicked, even on a shared phone. */
-async function verifiedParentClient(expectedParentId: string, signal: AbortSignal) {
+export async function verifiedParentClient(expectedParentId: string, signal: AbortSignal) {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
   if (sessionError) throw sessionError
   if (!sessionData.session || sessionData.session.user.id !== expectedParentId) {

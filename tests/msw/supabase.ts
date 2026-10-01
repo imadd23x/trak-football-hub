@@ -73,6 +73,7 @@ export function authHandlers(): HttpHandler[] {
     // TRAK-99: a player the consent gate refuses defaults to "no parent yet".
     // Asked only after that gate said no; tests of the reason register their own.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_player_wait_reason`, () => HttpResponse.json('parent')),
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_credentials`, () => HttpResponse.json([])),
     http.get(`${SUPABASE_URL}/auth/v1/user`, ({ request }) => {
       const token = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
       const user = authUserForToken(token)

@@ -38,12 +38,15 @@ export default function LandingPage() {
         club: '/club/home',
       };
 
-      // A missing role must never fall through to the player home. An invited
-      // parent whose profile was never provisioned has no role, and this line
-      // used to point them straight at a child's dashboard. Players, coaches
-      // and clubs all get a profile at signup, so the only way to be signed in
-      // without one is an invitation that was not completed.
-      navigate(homeMap[profile?.role ?? ''] ?? (isGuardianCreatedChild(user) ? '/onboarding/player' : '/parent-invite'), { replace: true });
+      // A missing role must never fall through to the player home. The only way
+      // to be signed in without a profile is an invitation that was not
+      // completed. A roster invitation (TRAK-11) marks its role in invited_as:
+      // send that child or guardian back to their own setup. A child whose
+      // guardian made their login (TRAK-84) finishes as a player too. Anyone
+      // else is a parent invited by a player: the parent invitation page.
+      const invitedAs = user.user_metadata?.invited_as;
+      const setup = !profile && (invitedAs === 'player' || invitedAs === 'parent') ? `/onboarding/${invitedAs}` : null;
+      navigate(setup ?? homeMap[profile?.role ?? ''] ?? (isGuardianCreatedChild(user) ? '/onboarding/player' : '/parent-invite'), { replace: true });
     }
   }, [loading, user, profile, navigate]);
 

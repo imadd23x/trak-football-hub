@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { fetchAwaitingConsent, fetchParentDevelopment, fetchParentMatches } from '@/lib/parent-data'
-import { fetchRosterAwaitingConsent, fetchMyChildLogins } from '@/lib/parent-consent'
+import { fetchRosterAwaitingConsent, fetchMyChildLogins, fetchApprovedAwaitingSignup } from '@/lib/parent-consent'
 
 export function useParentMatches() {
   const { parentId, selectedChild } = useParentChildren()
@@ -52,4 +52,16 @@ export function useChildLogins() {
   const {parentId}=useParentChildren()
   return useQuery({queryKey:['parent',parentId,'child-logins'],queryFn:({signal})=>fetchMyChildLogins(signal),
     enabled:!!parentId,staleTime:0,networkMode:'always'})
+}
+
+/** TRAK-98: children this guardian approved who haven't signed up yet. */
+export function useApprovedAwaitingSignup() {
+  const { parentId } = useParentChildren()
+  return useQuery({
+    queryKey: ['parent', parentId, 'approved-awaiting'],
+    queryFn: ({ signal }) => fetchApprovedAwaitingSignup(signal),
+    enabled: !!parentId,
+    staleTime: 0,
+    networkMode: 'always',
+  })
 }

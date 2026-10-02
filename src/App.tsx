@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ParentChildrenProvider } from "@/contexts/ParentChildrenContext";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PlayerConsentWatcher } from "@/components/player/PlayerConsentWatcher";
+import { PlayerSessionWatcher } from "@/components/player/PlayerSessionWatcher";
 import { ParentConsentWatcher } from "@/components/parent/ParentConsentWatcher";
 import { ErrorBoundary } from "@/components/trak/ErrorBoundary";
 import { ParkedScreen } from "@/components/trak/ParkedScreen";
@@ -98,6 +99,8 @@ const App = () => (
           <ParentChildrenProvider>
           {/* G6: an open player or guardian session drops coach content on withdrawal (TRAK-13, TRAK-88). */}
           <PlayerConsentWatcher />
+          {/* TRAK-104: signs out an open app whose session a password reset ended. */}
+          <PlayerSessionWatcher />
           <ParentConsentWatcher />
           {DevSwitcher && <DevSwitcher />}
           <Suspense fallback={<RouteFallback />}>

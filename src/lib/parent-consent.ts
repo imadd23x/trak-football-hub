@@ -61,6 +61,39 @@ export function parseRosterAwaitingConsent(data: unknown): RosterAwaitingChild[]
   })
 }
 
+/** TRAK-98: a rostered child this guardian has approved who has no account yet. First name only. */
+export interface ApprovedAwaitingChild {
+  roster_child_id: string
+  first_name: string
+  approved_at: string
+}
+
+/** Same rules as parseRosterAwaitingConsent, for get_my_approved_children_awaiting_signup(). */
+export function parseApprovedAwaitingSignup(data: unknown): ApprovedAwaitingChild[] {
+  if (!Array.isArray(data)) throw new Error('Invalid approved children response')
+  const ids = new Set<string>()
+  return data.map((value: unknown) => {
+    const row = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
+    if (typeof row.roster_child_id !== 'string' || !uuid.test(row.roster_child_id)
+      || typeof row.first_name !== 'string' || !row.first_name.trim()
+      || typeof row.approved_at !== 'string' || Number.isNaN(Date.parse(row.approved_at))) {
+      throw new Error('Invalid approved children response')
+    }
+    const id = row.roster_child_id.toLowerCase()
+    if (ids.has(id)) throw new Error('Duplicate approved children response')
+    ids.add(id)
+    return { roster_child_id: id, first_name: row.first_name.trim(), approved_at: row.approved_at }
+  })
+}
+
+export async function fetchApprovedAwaitingSignup(signal: AbortSignal): Promise<ApprovedAwaitingChild[]> {
+  // `as never`: the generated types predate this migration (TRAK-98).
+  const { data, error } = await supabase.rpc('get_my_approved_children_awaiting_signup' as never)
+    .abortSignal(signal).retry(false)
+  if (error) throw error
+  return parseApprovedAwaitingSignup(data)
+}
+
 export async function fetchRosterAwaitingConsent(signal: AbortSignal): Promise<RosterAwaitingChild[]> {
   // `as never`: the generated types predate the phase 1 migration.
   const { data, error } = await supabase.rpc('get_roster_children_awaiting_consent' as never)

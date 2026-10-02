@@ -26,7 +26,7 @@ const parked: [string, string, RegExp][] = [
 ]
 // Reads that travel as POST, and the app's own page-view telemetry.
 const READ_POSTS = ['/rest/v1/telemetry_events', ...['get_children_awaiting_consent', 'get_roster_children_awaiting_consent', 'get_player_invites_for_current_user',
-  'my_consent_status', 'coach_squad_player_consent_required'].map(name => `/rest/v1/rpc/${name}`)]
+  'my_consent_status', 'my_session_is_live', 'coach_squad_player_consent_required'].map(name => `/rest/v1/rpc/${name}`)]
 let sent: string[]
 beforeEach(() => {
   vi.stubEnv('DEV', false)

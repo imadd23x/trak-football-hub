@@ -292,5 +292,15 @@ node scripts/correct-roster-email.mjs --roster-child <roster child id> --kind gu
   correction, that address can no longer claim the child.
 - **Then re-invite** that roster child. The script sends nothing; the
   correction cleared `invited_at` so the new address gets the invitation.
+- **A guardian with more than one child: correct every roster child that
+  has the wrong address.** The address is stored once per child, so it sits
+  on one roster row per sibling. Run the correction once for each of them,
+  or the other child's invitation still goes to the wrong address. Find them
+  first (read-only, in the SQL editor):
+
+  ```sql
+  SELECT roster_child_id FROM roster_guardians
+  WHERE lower(btrim(email)) = lower(btrim('<wrong address>'));
+  ```
 - The addresses go only on the command line on the operator's own machine,
   never into Slack or Linear.

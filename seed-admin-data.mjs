@@ -6,9 +6,10 @@
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = 'https://xbykbqolvqyqmipikuae.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhieWticW9sdnF5cW1pcGlrdWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjgyNzMsImV4cCI6MjA4OTk0NDI3M30.fsBzOaVqYPt18z_73Fti_30xB3SEO6Hc4SjPq8X-P1c'
+// TRAK-96: the publishable key (public by design), not the legacy anon JWT.
+const SUPABASE_PUBLISHABLE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_vhCCK1tFnndJ6UBLm81YKQ_yLDZSRxt'
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
 
 const now = Date.now()
 const daysAgo = (d) => new Date(now - d * 86400000).toISOString()

@@ -4,14 +4,15 @@ import type { Database } from './types';
 import { createPasswordRecovery } from '@/lib/password-recovery';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://xbykbqolvqyqmipikuae.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhieWticW9sdnF5cW1pcGlrdWFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjgyNzMsImV4cCI6MjA4OTk0NDI3M30.fsBzOaVqYPt18z_73Fti_30xB3SEO6Hc4SjPq8X-P1c';
+// TRAK-96: the new publishable key ("production"), not the legacy anon JWT,
+// which stops working at the end of 2026. It is public by design, like the old one.
+export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_vhCCK1tFnndJ6UBLm81YKQ_yLDZSRxt';
 
 // Resolved values (with hardcoded fallbacks) for use anywhere that needs the
 // raw URL/key — e.g. streaming edge-function fetches that can't use the client.
 // Always import these instead of reading import.meta.env directly, so a build
 // without the VITE_ vars injected still works.
 export const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
-export const SUPABASE_ANON_KEY = SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

@@ -23,7 +23,7 @@ npm ci
 
 # 3. Configure environment
 cp .env.example .env
-# Edit .env and fill in your Supabase URL and anon key
+# Edit .env and fill in your Supabase URL and publishable key (sb_publishable_…)
 
 # 4. Apply database migrations
 # Open your Supabase project → SQL Editor
@@ -101,7 +101,7 @@ to `connect-src` or it is blocked in production.
 | Variable | Description |
 |---|---|
 | `VITE_SUPABASE_URL` | Your Supabase project URL |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon (public) key |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key, `sb_publishable_…` (public; the legacy anon JWT stops working at the end of 2026, TRAK-96) |
 | `VITE_SENTRY_DSN` | (Optional) Sentry DSN — only active in `PROD` |
 
 See `.env.example` for the template.

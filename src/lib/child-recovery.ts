@@ -23,14 +23,17 @@ export async function fetchChildCredentials(parentId: string, signal: AbortSigna
   if (error) throw new Error('Could not load child logins')
   return parseChildCredentials(data)
 }
-export async function resetChildPassword(parentId: string, childId: string, password: string, signal: AbortSignal): Promise<void> {
+/** TRAK-104: 'signed_out' when every device was signed out too; 'signout_failed' when only the password changed. */
+export type ChildPasswordResult = 'signed_out' | 'signout_failed'
+export async function resetChildPassword(parentId: string, childId: string, password: string, signal: AbortSignal): Promise<ChildPasswordResult> {
   const client = await verifiedParentClient(parentId, signal)
   const { data, error } = await client.functions.invoke('reset-child-password', {
     body: { roster_child_id: childId, password }, signal,
   })
   if (signal.aborted) throw new DOMException('Password update cancelled', 'AbortError')
   const response: unknown = data
-  if (error || !response || typeof response !== 'object' || !('state' in response) || response.state !== 'password_updated') {
-    throw new Error('Could not set the password. Please try again.')
-  }
+  const state = !error && response && typeof response === 'object' && 'state' in response ? response.state : null
+  if (state === 'password_updated') return 'signed_out'
+  if (state === 'password_updated_signout_failed') return 'signout_failed'
+  throw new Error('Could not set the password. Please try again.')
 }

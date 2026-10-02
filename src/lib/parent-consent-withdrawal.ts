@@ -12,7 +12,10 @@ type WithdrawalDatabase = Database & { public: {
     Update: never
     Relationships: []
   } }
-  Functions: { withdraw_parental_consent: { Args: { p_player_user_id: string }; Returns: number } }
+  Functions: {
+    withdraw_parental_consent: { Args: { p_player_user_id: string }; Returns: number }
+    withdraw_roster_consent: { Args: { p_roster_child_id: string }; Returns: number }
+  }
 } }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -49,6 +52,16 @@ export async function hasOwnConsent(parentId: string, childId: string, signal: A
 export async function withdrawOwnConsent(parentId: string, childId: string, signal: AbortSignal): Promise<void> {
   const client = await parentAccount(parentId, signal)
   const { data, error } = await client.rpc('withdraw_parental_consent', { p_player_user_id: childId })
+    .abortSignal(signal).retry(false)
+  if (error) throw error
+  // Zero is a confirmed idempotent completion; null or a string is not.
+  if (typeof data !== 'number' || !Number.isSafeInteger(data) || data < 0) throw new Error('Unconfirmed withdrawal')
+}
+
+/** TRAK-98: withdraw for a rostered child who has no account yet. Own approval only. */
+export async function withdrawRosterConsent(parentId: string, rosterChildId: string, signal: AbortSignal): Promise<void> {
+  const client = await parentAccount(parentId, signal)
+  const { data, error } = await client.rpc('withdraw_roster_consent', { p_roster_child_id: rosterChildId })
     .abortSignal(signal).retry(false)
   if (error) throw error
   // Zero is a confirmed idempotent completion; null or a string is not.

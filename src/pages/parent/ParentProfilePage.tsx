@@ -4,7 +4,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { ParentChildSelector, ParentFamilyContent } from '@/components/parent/ParentFamily'
 import { ParentConsentWithdrawal } from '@/components/parent/ParentConsentWithdrawal'
+import { RosterConsentWithdrawals } from '@/components/parent/ApprovedAwaitingSignup'
 import { ParentConnections } from '@/components/parent/ParentConnections'
+import { ParentChildCredentials } from '@/components/parent/ParentChildCredentials'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { IconHowItWorks } from '@/components/icons/TrakIcons'
 
@@ -44,6 +46,13 @@ export default function ParentProfilePage() {
           <ParentConsentWithdrawal />
           <ParentConnections />
         </ParentFamilyContent>
+
+        {/* TRAK-98: withdrawal for an approved child who has no account yet, outside
+            the family list, which only holds signed-up children. */}
+        <RosterConsentWithdrawals />
+
+        {/* Also available for a created login whose first run is unfinished. */}
+        <ParentChildCredentials key={user?.id ?? 'signed-out'} />
 
         {/* Account info */}
         <Section label="ACCOUNT">

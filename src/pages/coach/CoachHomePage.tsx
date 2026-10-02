@@ -26,21 +26,46 @@ const BAND_COLORS: Record<string, string> = Object.fromEntries(
 // look at, not how a child played.
 const FLAG_COLORS = { attention: '#fb923c', missed: '#facc15', improved: '#4ade80' } as const
 
+// A count not answered yet is "…", and one that failed is "—" (the banner
+// above says why). Only an answered read may print a number, zero included.
+// The failure is checked first: after a refresh whose re-read failed, the
+// number kept from the earlier run is no longer an answer (Imad's #203 review).
+const countText = (n: number | null, failed: boolean) => (failed ? '—' : n !== null ? n : '…')
+
+const NO_FAILURES = { squad: false, assessments: false, recent: false, sessions: false }
+
 export default function CoachHomePage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [playerCount, setPlayerCount] = useState(0)
+  // null = not answered yet (TRAK-92). Starting these at 0 told a coach with a
+  // full season "0 players · 0 total · 0 sessions" until the reads came back.
+  const [playerCount, setPlayerCount] = useState<number | null>(null)
   const [assessments, setAssessments] = useState<any[]>([])
-  const [allAssessments, setAllAssessments] = useState<any[]>([])
-  const [loadFailed, setLoadFailed] = useState(false)
-  const [sessionCount, setSessionCount] = useState(0)
+  const [allAssessments, setAllAssessments] = useState<any[] | null>(null)
+  // One flag per read (TRAK-92, Imad's #203 review). A single shared flag was
+  // cleared by whichever read succeeded next, so a failed session count lost
+  // its banner and sat on "…" for good.
+  const [failed, setFailed] = useState(NO_FAILURES)
+  const loadFailed = Object.values(failed).some(Boolean)
+  const [sessionCount, setSessionCount] = useState<number | null>(null)
   const [coachDetails, setCoachDetails] = useState<any>(null)
   const [squadAnalytics, setSquadAnalytics] = useState<SquadAnalytics | null>(null)
+  // A failed read's value from an earlier run is no longer an answer, so it
+  // goes with the failure. Otherwise the next run, which clears the flags,
+  // prints that old 0 again while its own reads are still out (Imad's third
+  // #203 review). The assessment read only runs after the squad answers, so a
+  // failed squad read leaves the analytics unanswered too.
+  const markFailed = (read: keyof typeof NO_FAILURES) => {
+    setFailed(f => ({ ...f, [read]: true }))
+    if (read === 'squad') setPlayerCount(null)
+    if (read === 'squad' || read === 'assessments') { setAllAssessments(null); setSquadAnalytics(null) }
+    if (read === 'sessions') setSessionCount(null)
+  }
   // Distinguishes "nothing to show" from "we could not find out". Without it
   // the band strip and the distribution chart render their empty state on a
   // failed read, which is a claim about the squad rather than about the network.
-  const [analyticsFailed, setAnalyticsFailed] = useState(false)
+  const analyticsFailed = failed.squad || failed.assessments
   // Who missed the last training (TRAK-72 item 4). A failed check is shown as
   // such, never as "everyone was there".
   const [missed, setMissed] = useState<{ playerId: string; name: string }[]>([])
@@ -51,6 +76,8 @@ export default function CoachHomePage() {
     // A response from a previous run must not overwrite the current one's
     // state on an Auth refresh for the same account.
     let cancelled = false
+    // A new run asks every read again, so an earlier run's failures no longer hold.
+    setFailed(NO_FAILURES)
     /* Union of two fixes that arrived on this file from opposite directions,
        and I caused the overlap: #44 (this PR) already tracked a failed roster
        and analytics read via analyticsFailed, and #79 then added loadFailed
@@ -101,8 +128,7 @@ export default function CoachHomePage() {
         // and that nothing needs attention. Both statements would be false.
         if (error) {
           console.error('Squad read failed:', error)
-          setAnalyticsFailed(true)
-          setLoadFailed(true)
+          markFailed('squad')
           return
         }
         const players = data || []
@@ -116,14 +142,11 @@ export default function CoachHomePage() {
             if (cancelled) return
             if (assessError) {
               console.error('Assessment read failed:', assessError)
-              setAnalyticsFailed(true)
-              setLoadFailed(true)
+              markFailed('assessments')
               return
             }
             const allAssess = allData || []
             setAllAssessments(allAssess)
-            setAnalyticsFailed(false)
-            setLoadFailed(false)
             const analytics = calculateSquadAnalytics(players, allAssess)
             setSquadAnalytics(analytics)
             trackEvent('squad_analytics_viewed', {})
@@ -133,9 +156,17 @@ export default function CoachHomePage() {
       .eq('coach_user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5)
-      .then(({ data, error }) => { if (error) { setLoadFailed(true); return } setAssessments(data || []) })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) { markFailed('recent'); return }
+        setAssessments(data || [])
+      })
     supabase.from('coach_sessions').select('id', { count: 'exact' }).eq('coach_user_id', user.id)
-      .then(({ count, error }) => { if (error) { setLoadFailed(true); return } setSessionCount(count || 0) })
+      .then(({ count, error }) => {
+        if (cancelled) return
+        if (error) { markFailed('sessions'); return }
+        setSessionCount(count || 0)
+      })
     supabase.from('coach_details').select('team, coach_role').eq('user_id', user.id).maybeSingle()
       .then(({ data }) => setCoachDetails(data))
     // No coach invite code here any more (TRAK-72 item 1): players join through
@@ -172,7 +203,7 @@ export default function CoachHomePage() {
 
   // Trend: last 5 assessments for mini-chart. An unrated assessment is dropped
   // rather than drawn at the midpoint — a bar the coach never earned.
-  const trendAssessments = allAssessments.filter(a => a.coach_rating != null).slice(0, 5).reverse()
+  const trendAssessments = (allAssessments ?? []).filter(a => a.coach_rating != null).slice(0, 5).reverse()
   const trendHeights = trendAssessments.map(a => {
     const r = Number(a.coach_rating)
     return Math.max(20, Math.min(100, ((r - 2) / 8) * 100))
@@ -293,7 +324,7 @@ export default function CoachHomePage() {
                   color: '#C8F25A',
                 }}
               >
-                {loadFailed && playerCount === 0 ? '—' : playerCount}
+                {countText(playerCount, failed.squad)}
               </p>
               <p
                 className="text-[9px] mt-1.5 tracking-[0.04em]"
@@ -334,7 +365,7 @@ export default function CoachHomePage() {
                 className="text-[13px] font-medium mt-1.5"
                 style={{ fontFamily: "'DM Sans', sans-serif", color: 'rgba(255,255,255,0.45)' }}
               >
-                {loadFailed && allAssessments.length === 0 ? 'Not available' : `${allAssessments.length} total`}
+                {analyticsFailed ? 'Not available' : allAssessments ? `${allAssessments.length} total` : 'Loading…'}
               </p>
             </div>
           </div>
@@ -366,7 +397,7 @@ export default function CoachHomePage() {
                   className="text-[10px]"
                   style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.25)' }}
                 >
-                  No assessments yet
+                  {squadAnalytics ? 'No assessments yet' : 'Loading…'}
                 </span>
               ) : (
                 squadBandChips.map(chip => (
@@ -405,7 +436,7 @@ export default function CoachHomePage() {
                 color: 'rgba(255,255,255,0.88)',
               }}
             >
-              {playerCount}
+              {countText(playerCount, failed.squad)}
             </p>
             <span
               className="text-[8px] font-medium tracking-[0.1em] uppercase mt-[5px] block"
@@ -430,7 +461,7 @@ export default function CoachHomePage() {
                 color: 'rgba(255,255,255,0.88)',
               }}
             >
-              {sessionCount}
+              {countText(sessionCount, failed.sessions)}
             </p>
             <span
               className="text-[8px] font-medium tracking-[0.1em] uppercase mt-[5px] block"
@@ -441,8 +472,9 @@ export default function CoachHomePage() {
           </button>
         </div>
 
-        {/* Empty squad callout */}
-        {playerCount === 0 && (
+        {/* Empty squad callout. Not after a failed re-read: the 0 is from
+            the earlier run, and the squad may have changed since. */}
+        {playerCount === 0 && !failed.squad && (
           <div
             className="w-full mt-3 rounded-[14px] border p-4 text-left"
             style={{ background: '#101012', borderColor: 'rgba(255,255,255,0.07)' }}
@@ -457,7 +489,7 @@ export default function CoachHomePage() {
         )}
 
         {/* Full assessment entry */}
-        {playerCount > 0 && (
+        {playerCount !== null && playerCount > 0 && (
           <button
             onClick={() => navigate('/coach/assess')}
             className="w-full mt-3 relative overflow-hidden rounded-[14px] border p-4 text-left active:scale-[0.98] transition-transform"

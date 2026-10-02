@@ -3,7 +3,8 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { loadRows, parseArgs, parseCsv, planLoad, planReinvite, reinviteRows, syntheticInviteLines, validateRoster } from '../../scripts/load-roster.mjs'
+import { reinviteExitCode, describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, pendingGuardianNote, planLoad, planReinvite, reinviteRows, syntheticInviteLines, validateRoster } from '../../scripts/load-roster.mjs'
+import { handleRosterInviteRequest } from '../../supabase/functions/send-roster-invites/handler'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
 // written. Synthetic addresses only.
@@ -424,5 +425,128 @@ describe('load-roster refuses placeholder addresses', () => {
     expect(out.status).toBe(1)
     expect(out.stdout).toMatch(/placeholder/)
     expect(out.stderr).not.toMatch(/SUPABASE_URL/)
+  })
+})
+
+// TRAK-9 (30 Sep TRAK-24 run): the invitations were refused because the loader
+// sent the legacy service_role JWT on Authorization. It now uses a secret key
+// (sb_secret_…), sent on apikey only, and says why an invitation failed.
+describe('load-roster authenticates with a secret key', () => {
+  it('reads the secret key from SUPABASE_SECRET_KEY', () => {
+    expect(operatorKey({ SUPABASE_SECRET_KEY: ' sb_secret_abc ' })).toBe('sb_secret_abc')
+  })
+
+  it.each([
+    ['missing', {}],
+    ['the legacy service_role JWT', { SUPABASE_SECRET_KEY: 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.sig' }],
+    ['a publishable key', { SUPABASE_SECRET_KEY: 'sb_publishable_abc' }],
+    ['only the old variable', { SUPABASE_SERVICE_ROLE_KEY: 'eyJ.legacy.key' }],
+  ])('refuses a key that is %s, before anything is loaded', (_what, env) => {
+    expect(() => operatorKey(env as Record<string, string>)).toThrow(/SUPABASE_SECRET_KEY.*sb_secret_/)
+  })
+
+  it('sends the key on apikey only, never as a Bearer token', () => {
+    const { url, init } = inviteRequest('https://project.example.test/', 'sb_secret_abc', 'rc-1')
+    expect(url).toBe('https://project.example.test/functions/v1/send-roster-invites')
+    expect(init.method).toBe('POST')
+    expect(init.headers).toEqual({ apikey: 'sb_secret_abc', 'Content-Type': 'application/json' })
+    expect(JSON.parse(init.body)).toEqual({ roster_child_id: 'rc-1' })
+  })
+
+  it('says why an invitation failed, with the status and reason only', () => {
+    expect(describeInviteFailure(401, { sent: 0, error: 'Not authenticated' })).toBe('HTTP 401, Not authenticated')
+    expect(describeInviteFailure(403, { sent: 0, reason: 'consent_required' })).toBe('HTTP 403, consent_required')
+    expect(describeInviteFailure(502, { sent: 1, failed: 1, results: [{ kind: 'guardian', sent: false, reason: 'delivery_failed' }] }))
+      .toBe('HTTP 502, 1 delivery failed')
+    expect(describeInviteFailure(500, null)).toBe('HTTP 500')
+  })
+})
+
+// TRAK-91 (Imad, 30 Sep / 1 Oct): a family with one invited and one never-
+// invited guardian. Before the fix, --reinvite picked the child and the
+// function emailed BOTH unsigned guardians. Planner → request → real handler,
+// with targets that follow roster_invite_targets()'s SQL predicate.
+describe('load-roster --reinvite end to end (mixed family)', () => {
+  // Not .test addresses: --reinvite refuses a stored reserved address (#202).
+  const guardians = [
+    { email: 'g2@club.com', invited_at: '2026-09-28T10:00:00Z', parent_user_id: null },
+    { email: 'g2b@club.com', invited_at: null, parent_user_id: null },
+  ]
+  const rows = validateRoster(file('Two Kid,2013-05-06,U13,kid2@club.com,g2@club.com;g2b@club.com,coach@club.com'), TODAY).rows
+  const onRoster = [{ id: '98a00000-0000-0000-0000-000000000073', child_email: 'kid2@club.com', date_of_birth: '2013-05-06', player_name: 'Two Kid', guardians }]
+
+  async function run(onlyUninvited: boolean) {
+    const delivered: string[] = []
+    const deps = {
+      siteUrl: 'https://trakfootball.test', secretKeys: ['sb_secret_op'],
+      getCaller: vi.fn(),
+      // The SQL: every guardian not signed up; with only_uninvited, never invited too.
+      getTargets: vi.fn(async (_id: string, _guardian: string | null, only: boolean) => ({ error: null,
+        data: guardians.filter(g => !g.parent_user_id && (!only || !g.invited_at))
+          .map(g => ({ kind: 'guardian' as const, email: g.email, first_name: 'Two', academy: 'Roster FC' })) })),
+      markSent: vi.fn(async () => ({ error: null })),
+      sendInvite: vi.fn(async (email: string) => { delivered.push(email); return { error: null } }),
+      sendMagicLink: vi.fn(async () => ({ error: null })),
+      // TRAK-97: these two guardians have different addresses, so neither has a sibling's fresh invitation.
+      recentGuardianInvite: vi.fn(async () => ({ data: false, error: null })),
+    }
+    const plan = planReinvite(rows, onRoster)
+    const out = await reinviteRows(plan.toInvite, async (rosterChildId: string) => {
+      const { url, init } = inviteRequest('https://p.example.test', 'sb_secret_op', rosterChildId, { onlyUninvited })
+      const res = await handleRosterInviteRequest(new Request(url, init), deps)
+      return res.ok && (await res.json()).failed === 0
+    }, vi.fn())
+    return { plan, out, delivered }
+  }
+
+  it('re-sends only to the guardian who was never invited', async () => {
+    const { plan, out, delivered } = await run(true)
+    expect(plan.toInvite).toHaveLength(1)
+    expect(out).toEqual({ invited: 1, failed: [] })
+    expect(delivered).toEqual(['g2b@club.com'])
+  })
+
+  it('CONTROL without only_uninvited the same call emails both (the bug)', async () => {
+    expect((await run(false)).delivered).toEqual(['g2@club.com', 'g2b@club.com'])
+  })
+
+  it('the request carries only_uninvited only when asked', () => {
+    expect(JSON.parse(inviteRequest('https://p.example.test', 'sb_secret_op', 'rc-1', { onlyUninvited: true }).init.body))
+      .toEqual({ roster_child_id: 'rc-1', only_uninvited: true })
+    expect(JSON.parse(inviteRequest('https://p.example.test', 'sb_secret_op', 'rc-1').init.body)).toEqual({ roster_child_id: 'rc-1' })
+  })
+})
+
+// TRAK-97: a sibling's invitation that went to the guardian already isn't sent
+// again; the operator is told so instead of seeing it counted silently.
+describe('load-roster says when a guardian already had a fresh invitation (TRAK-97)', () => {
+  it('names the case and needs no action', () => {
+    expect(pendingGuardianNote({ sent: 0, failed: 0, results: [{ kind: 'guardian', sent: false, reason: 'guardian_invite_pending' }] }))
+      .toBe("A guardian already had a fresh invitation for another child, so no second email went; their consent screen lists every child.")
+  })
+  it.each([
+    ['an ordinary send', { sent: 1, failed: 0, results: [{ kind: 'guardian', sent: true, via: 'invite' }] }],
+    ['a failure', { sent: 0, failed: 1, results: [{ kind: 'guardian', sent: false, reason: 'delivery_failed' }] }],
+    ['no body', null],
+  ])('says nothing for %s', (_what, body) => {
+    expect(pendingGuardianNote(body)).toBeNull()
+  })
+})
+
+// TRAK-91 (Imad's ship check of #202, 2 Oct): --reinvite printed a refused line
+// but exited 0, so a wrapper script couldn't tell the run needed attention.
+// A line it couldn't act on (a stored reserved address, or not on the roster)
+// or a failed send now exits 1; "already invited" is not a problem.
+describe('load-roster --reinvite exits non-zero when a line needs the operator (TRAK-91)', () => {
+  const plan = (over: Partial<{ toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[]; unmailable: number[] }>) =>
+    ({ toInvite: [], upToDate: [], notOnRoster: [], unmailable: [], ...over })
+  it.each([
+    ['a stored reserved or placeholder address was refused', plan({ unmailable: [3] }), 0, 1],
+    ['a line is not on the roster', plan({ notOnRoster: [2] }), 0, 1],
+    ['a re-invitation failed', plan({ toInvite: [{ line: 2, rosterChildId: 'rc-1' }] }), 1, 1],
+    ['CONTROL every guardian already invited', plan({ upToDate: [2, 3] }), 0, 0],
+    ['CONTROL everything re-sent', plan({ toInvite: [{ line: 2, rosterChildId: 'rc-1' }] }), 0, 0],
+  ] as const)('%s', (_what, p, failedCount, expected) => {
+    expect(reinviteExitCode(p, failedCount)).toBe(expected)
   })
 })

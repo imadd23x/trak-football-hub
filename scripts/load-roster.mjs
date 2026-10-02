@@ -20,7 +20,8 @@
 // birth, only row numbers and counts, so its output can be pasted into a
 // Linear issue without putting child data there.
 //
-// Applying needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, and
+// Applying needs SUPABASE_URL and SUPABASE_SECRET_KEY (a secret key,
+// sb_secret_…, from Settings → API Keys; not the legacy service_role JWT), and
 // TRAK_CONFIRM_HOST set to the host of SUPABASE_URL, so a key left in the
 // shell cannot load into the wrong project by accident. Each child is one
 // call to admit_roster_child(), which admits the child, the squad row and
@@ -49,8 +50,9 @@
 // Invitations stay opt-in until phase 4's landing pages exist: until then the
 // link lands on a page that can't finish signup. Never send for a practice,
 // rehearsal or synthetic load.
-// The key must be the project's legacy service_role JWT (the same value the
-// edge function sees as SUPABASE_SERVICE_ROLE_KEY).
+// The key goes to send-roster-invites on the apikey header only (TRAK-9): on
+// 30 Sep the legacy service_role JWT was refused and no invitation went. A
+// failed invitation prints its HTTP status and reason, never an address.
 //
 //   node scripts/load-roster.mjs ... --apply --send-invites
 
@@ -254,6 +256,43 @@ export async function reinviteRows(toInvite, invite, log) {
   return { invited, failed };
 }
 
+/** The operator's secret key (TRAK-9). A legacy JWT or a missing key stops here, before anything loads. */
+export function operatorKey(env) {
+  const key = (env.SUPABASE_SECRET_KEY ?? '').trim();
+  if (!key.startsWith('sb_secret_')) {
+    throw new Error('SUPABASE_SECRET_KEY must be a secret key (sb_secret_…) from Settings → API Keys; the legacy service_role key no longer sends invitations');
+  }
+  return key;
+}
+
+/** One send-roster-invites call, with the secret key on apikey only (never Bearer).
+ *  onlyUninvited (TRAK-91, --reinvite): the function skips every guardian who
+ *  was already invited, so a delivered invitation is never sent twice. */
+export function inviteRequest(url, key, rosterChildId, { onlyUninvited = false } = {}) {
+  return {
+    url: `${url.replace(/\/+$/, '')}/functions/v1/send-roster-invites`,
+    init: {
+      method: 'POST',
+      headers: { apikey: key, 'Content-Type': 'application/json' },
+      body: JSON.stringify(onlyUninvited
+        ? { roster_child_id: rosterChildId, only_uninvited: true }
+        : { roster_child_id: rosterChildId }),
+    },
+  };
+}
+
+/** TRAK-97: the function held back a second email because the guardian already had a fresh one. */
+export function pendingGuardianNote(body) {
+  const pending = Array.isArray(body?.results) && body.results.some(r => r?.reason === 'guardian_invite_pending');
+  return pending ? 'A guardian already had a fresh invitation for another child, so no second email went; their consent screen lists every child.' : null;
+}
+
+/** Why an invitation failed: the status and the function's reason, which never holds an address. */
+export function describeInviteFailure(status, body) {
+  const why = body?.reason ?? body?.error ?? (body?.failed ? `${body.failed} delivery failed` : null);
+  return why ? `HTTP ${status}, ${why}` : `HTTP ${status}`;
+}
+
 export function parseArgs(argv) {
   const out = { apply: false, 'send-invites': false, reinvite: false };
   let noInvites = false;
@@ -288,6 +327,11 @@ async function resolveCoaches(admin, emails) {
   return found;
 }
 
+/** TRAK-91: 1 when a line needs the operator (refused, not on the roster) or a send failed. */
+export function reinviteExitCode(plan, failedCount) {
+  return plan.unmailable.length || plan.notOnRoster.length || failedCount ? 1 : 0;
+}
+
 // TRAK-91: the recovery for invitations that never went. Reads this academy's
 // roster, then (with --apply) re-sends only what planReinvite picks.
 async function reinvite(admin, args, rows, sendInvite) {
@@ -303,7 +347,10 @@ async function reinvite(admin, args, rows, sendInvite) {
     player_name: c.squad_players?.player_name ?? '',
     guardians: c.roster_guardians ?? [],
   }));
-  const { toInvite, upToDate, notOnRoster, unmailable } = planReinvite(rows, onRoster);
+  const plan = planReinvite(rows, onRoster);
+  const { toInvite, upToDate, notOnRoster, unmailable } = plan;
+  // Imad's ship check (2 Oct): a refused line printed its reason but exited 0.
+  process.exitCode = reinviteExitCode(plan, 0) || process.exitCode;
   if (unmailable.length) {
     console.log(`[load-roster] Line(s) ${unmailable.join(', ')}: a stored guardian address is a reserved test address (e.g. .test) or a placeholder (like YOURNAME@); not invited. Correct it on the roster first.`);
   }
@@ -324,7 +371,7 @@ async function reinvite(admin, args, rows, sendInvite) {
   }
   const { invited, failed } = await reinviteRows(toInvite, sendInvite, console.log);
   console.log(`[load-roster] Re-invitations went for ${invited} child(ren); ${failed.length ? `not for line(s) ${failed.join(', ')}` : 'none failed'}.`);
-  if (failed.length) process.exitCode = 1;
+  process.exitCode = reinviteExitCode(plan, failed.length) || process.exitCode;
 }
 
 async function main() {
@@ -361,8 +408,8 @@ async function main() {
   }
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required with --apply or --reinvite');
+  if (!url) throw new Error('SUPABASE_URL and SUPABASE_SECRET_KEY are required with --apply or --reinvite');
+  const key = operatorKey(process.env);
   const host = new URL(url).host;
   if (process.env.TRAK_CONFIRM_HOST !== host) {
     throw new Error(`Set TRAK_CONFIRM_HOST=${host} to confirm this is the project you mean to load into`);
@@ -370,17 +417,18 @@ async function main() {
 
   const { createClient } = await import('@supabase/supabase-js');
   const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const sendInvite = async (rosterChildId) => {
-    const res = await fetch(`${url.replace(/\/+$/, '')}/functions/v1/send-roster-invites`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roster_child_id: rosterChildId }),
-    });
+  const sendInvite = async (rosterChildId, options) => {
+    const request = inviteRequest(url, key, rosterChildId, options);
+    const res = await fetch(request.url, request.init);
     const body = await res.json().catch(() => ({}));
-    return res.ok && body.failed === 0;
+    const sent = res.ok && body.failed === 0;
+    if (!sent) console.log(`[load-roster] An invitation was not sent: ${describeInviteFailure(res.status, body)}.`);
+    const note = sent ? pendingGuardianNote(body) : null;
+    if (note) console.log(`[load-roster] ${note}`);
+    return sent;
   };
   if (args.reinvite) {
-    await reinvite(admin, args, rows, sendInvite);
+    await reinvite(admin, args, rows, (rosterChildId) => sendInvite(rosterChildId, { onlyUninvited: true }));
     return;
   }
 

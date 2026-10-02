@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
 import { supabase } from '@/integrations/supabase/client'
+import { isTechnicalChildAddress, childUsername } from '@/lib/child-login'
 
 const nameSchema = z
   .string()
@@ -27,6 +28,7 @@ function AccountSettings({ userId }: { userId: string }) {
   const navigate = useNavigate()
   const { user, profile, signOut, refreshProfile } = useAuth()
   const role = profile?.role
+  const childLogin = isTechnicalChildAddress(user?.email)
   const mounted = useRef(false)
   useLayoutEffect(() => {
     mounted.current = true
@@ -111,9 +113,11 @@ function AccountSettings({ userId }: { userId: string }) {
   }
 
   const changePassword = async () => {
+    if (childLogin) {toast.info('Ask your parent or guardian to set a new password from their Trak profile.');return}
     if (!user?.email || !begin('password')) return
     try {
       const account = await getSettingsAccount(userId, isCurrent)
+      if (isTechnicalChildAddress(account.user.email)) return
       const { error } = await supabase.auth.resetPasswordForEmail(account.user.email!, {
         redirectTo: `${window.location.origin}/reset-password`,
       })
@@ -220,12 +224,12 @@ function AccountSettings({ userId }: { userId: string }) {
               )
             }
           />
-          <Row label="Email" right={<Value>{user?.email || '—'}</Value>} />
+          <Row label={childLogin ? 'Username' : 'Email'} right={<Value>{childLogin ? childUsername(user?.email) : user?.email || '—'}</Value>} />
           <Row
             label="Password"
             right={
               <button onClick={changePassword} disabled={!!pending} style={{ fontSize: 13, color: '#C8F25A' }}>
-                Send reset email
+                {childLogin ? 'Ask your guardian' : 'Send reset email'}
               </button>
             }
           />
@@ -352,4 +356,3 @@ function Row({ label, right, stack = false }: { label: string; right: React.Reac
 function Value({ children }: { children: React.ReactNode }) {
   return <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>{children}</span>
 }
-

@@ -11,7 +11,15 @@ CREATE TABLE auth.users (
   id uuid PRIMARY KEY,
   email text,
   email_confirmed_at timestamptz,
+  raw_app_meta_data jsonb DEFAULT '{}',
   raw_user_meta_data jsonb DEFAULT '{}'
+);
+-- Auth's sessions (TRAK-104): one row per signed-in device; a JWT's session_id
+-- claim names its row. Only the columns the app's functions use.
+CREATE TABLE auth.sessions (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now()
 );
 CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$
   SELECT coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb

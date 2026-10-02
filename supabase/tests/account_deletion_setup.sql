@@ -56,15 +56,16 @@ INSERT INTO public.squad_players (id, coach_user_id, player_name, linked_player_
 INSERT INTO public.coach_sessions (id, coach_user_id, title)
 SELECT pg_temp.account_id(500 + n), pg_temp.account_id(coach), 'Synthetic deletion session ' || n
 FROM (VALUES (1,6), (2,3), (3,4), (4,5)) f(n,coach);
+-- Attendance first: an assessment needs the player present at its session (TRAK-100).
+INSERT INTO public.session_attendance (id, session_id, squad_player_id, status)
+SELECT pg_temp.account_id(700 + n), pg_temp.account_id(500 + n), pg_temp.account_id(200 + n), 'present'
+FROM generate_series(1,4) n;
 INSERT INTO public.coach_assessments (id, coach_user_id, squad_player_id, session_id)
 SELECT pg_temp.account_id(300 + n), pg_temp.account_id(coach), pg_temp.account_id(200 + n), pg_temp.account_id(500 + n)
 FROM (VALUES (1,6), (2,3), (3,4), (4,5)) f(n,coach);
 INSERT INTO public.recognition_awards (id, coach_user_id, squad_player_id, award_type)
 SELECT pg_temp.account_id(400 + n), pg_temp.account_id(coach), pg_temp.account_id(200 + n), 'player_of_week'
 FROM (VALUES (1,6), (2,3), (3,4), (4,5)) f(n,coach);
-INSERT INTO public.session_attendance (id, session_id, squad_player_id, status)
-SELECT pg_temp.account_id(700 + n), pg_temp.account_id(500 + n), pg_temp.account_id(200 + n), 'present'
-FROM generate_series(1,4) n;
 INSERT INTO public.coach_assessment_notes (id, assessment_id, coach_user_id, note)
 SELECT pg_temp.account_id(800 + n), pg_temp.account_id(300 + n), pg_temp.account_id(coach), 'Synthetic private note ' || n
 FROM (VALUES (1,6), (2,3), (3,4), (4,5)) f(n,coach);

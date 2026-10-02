@@ -189,6 +189,8 @@ SELECT pg_temp.p47denied(format('SELECT public.remove_coach_from_org(%L)',pg_tem
 
 -- P0 controls: these methods are shared with retained J4/J5 and account rights.
 SELECT pg_temp.p47probe(format('INSERT INTO public.coach_sessions(id,coach_user_id,title) VALUES(%L,%L,%L)',pg_temp.p47id(700),pg_temp.p47id(10),'Retained J4 session'),'J4 session INSERT allowed',1);
+-- TRAK-100: an assessment needs the player marked present at its session.
+SELECT pg_temp.p47probe(format('INSERT INTO public.session_attendance(session_id,squad_player_id,status) VALUES(%L,%L,%L)',pg_temp.p47id(700),pg_temp.p47id(200),'present'),'J4 attendance INSERT allowed',1);
 SELECT pg_temp.p47probe(format('INSERT INTO public.coach_assessments(id,coach_user_id,squad_player_id,session_id) VALUES(%L,%L,%L,%L)',pg_temp.p47id(701),pg_temp.p47id(10),pg_temp.p47id(200),pg_temp.p47id(700)),'J5 assessment INSERT allowed',1);
 SELECT pg_temp.p47probe(format('UPDATE public.coach_assessments SET work_rate=7 WHERE id=%L',pg_temp.p47id(701)),'J5 assessment UPDATE allowed',1);
 SELECT pg_temp.p47probe(format('INSERT INTO public.coach_assessment_notes(assessment_id,coach_user_id,note) VALUES(%L,%L,%L)',pg_temp.p47id(701),pg_temp.p47id(10),'Private J5 note'),'J5 private note INSERT allowed',1);

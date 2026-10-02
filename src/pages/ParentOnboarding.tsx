@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { PASSWORD_HINT } from '@/lib/password';
+import { isTechnicalChildAddress } from '@/lib/child-login';
 import { completeParentInvitation, loadParentInvitations, type ParentInvitation, type ParentInvitationState } from '@/lib/parent-invites';
 
 const messageOf = (error: unknown) => error instanceof Error ? error.message
@@ -133,12 +134,12 @@ export default function ParentOnboarding() {
     </div> : !state ? <p role="status">Loading...</p>
       : state.kind === 'wrong-role' ? <div role="alert" className="space-y-4">
         <p>This account is not a parent account. Sign in with the email address that received the invitation.</p>
-        <p className="text-sm text-muted-foreground">Signed in as {state.email}</p>{switchAccount}
+        <p className="text-sm text-muted-foreground">Signed in as {isTechnicalChildAddress(state.email) ? 'a child account' : state.email}</p>{switchAccount}
       </div> : state.kind === 'verify-email' ? <div className="space-y-4">
         <p>Verify your email before continuing. Open the verification or sign-in link in your inbox, then retry.</p>
         {retryButton}{switchAccount}
       </div> : <>
-        <p className="text-sm text-muted-foreground mb-4">Signed in as {state.account.user.email}</p>
+        <p className="text-sm text-muted-foreground mb-4">Signed in as {isTechnicalChildAddress(state.account.user.email) ? 'a child account' : state.account.user.email}</p>
         {state.tokenUnavailable && <div className="mb-4 space-y-3">
           <p role="status" className="text-sm text-muted-foreground">This link is no longer active or is not available for this account. Any other active invitations for your email are listed below.</p>
           {state.invites.length > 0 && switchAccount}

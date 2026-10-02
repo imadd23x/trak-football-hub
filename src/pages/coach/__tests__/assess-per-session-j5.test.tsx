@@ -43,6 +43,8 @@ beforeEach(() => {
       const upTo = new URL(request.url).searchParams.get('session_date')?.replace(/^lte\./, '')
       return HttpResponse.json(sessions.filter(s => !upTo || s.session_date <= upTo))
     }),
+    // TRAK-100: the session picker lists only sessions the player was marked present at.
+    http.get(endpoint('session_attendance'), () => HttpResponse.json(sessions.map(s => s.id).map(session_id => ({ session_id })))),
     // A small assessments table: filters by player, session and created_at like PostgREST.
     http.get(endpoint('coach_assessments'), ({ request }) => {
       const p = new URL(request.url).searchParams

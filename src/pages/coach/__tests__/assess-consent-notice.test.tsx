@@ -35,6 +35,8 @@ function setup({ consentRequired, insertRefused = false }: { consentRequired: bo
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach', nationality: 'AE', invite_code: 'ABCD' }]),
     table('squad_players', [{ id: 'squad-1', coach_user_id: COACH.id, player_name: 'Omar Synthetic', position: 'Midfielder', linked_player_id: 'player-1' }]),
     table('coach_sessions', [{ id: 'session-1', title: 'vs Synthetic FC', session_date: '2026-09-20' }]), table('coach_details', []), table('coach_assessments', []),
+    // TRAK-100: the session picker lists only sessions the player was marked present at.
+    table('session_attendance', [{ session_id: 'session-1', squad_player_id: 'squad-1', status: 'present' }]),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_player_consent_required`, async ({ request }) => {
       calls.consentChecks.push(await request.json())
       if (consentRequired === 'error') return HttpResponse.json({ message: 'synthetic failure' }, { status: 500 })

@@ -40,7 +40,7 @@ export declare function planReinvite(
     player_name: string
     guardians: { email?: string; invited_at: string | null; parent_user_id: string | null }[]
   }[],
-): { toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[]; synthetic: number[] }
+): { toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[]; unmailable: number[] }
 export declare function reinviteRows(
   toInvite: { line: number; rosterChildId: string }[],
   invite: (rosterChildId: string) => Promise<boolean>,
@@ -52,7 +52,7 @@ export declare function inviteRequest(url: string, key: string, rosterChildId: s
   init: { method: 'POST'; headers: Record<string, string>; body: string }
 }
 export declare function reinviteExitCode(
-  plan: { toInvite: unknown[]; upToDate: number[]; notOnRoster: number[]; synthetic: number[] }, failedCount: number,
+  plan: { toInvite: unknown[]; upToDate: number[]; notOnRoster: number[]; unmailable: number[] }, failedCount: number,
 ): 0 | 1
 export declare function pendingGuardianNote(body: unknown): string | null
 export declare function describeInviteFailure(status: number, body: unknown): string

@@ -70,6 +70,9 @@ export function authHandlers(): HttpHandler[] {
     // Default empty child-login state for unrelated journey fixtures. Tests
     // exercising TRAK-84 register explicit replies, including failure cases.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_logins`, () => HttpResponse.json([])),
+    // TRAK-99: a player the consent gate refuses defaults to "no parent yet".
+    // Asked only after that gate said no; tests of the reason register their own.
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_player_wait_reason`, () => HttpResponse.json('parent')),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_credentials`, () => HttpResponse.json([])),
     // TRAK-104: a signed-in player's session is live unless a test says otherwise.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/my_session_is_live`, () => HttpResponse.json(true)),

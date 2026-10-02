@@ -5,18 +5,32 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, BandPill } from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
 import { Users, WifiOff } from 'lucide-react'
+import { fetchWaitReason } from '@/lib/wait-reason'
 
 const POSITIONS = ['All', 'Goalkeeper', 'Defender', 'Midfielder', 'Attacker'] as const
 
-/* J5: the squad marks each player "Ready to assess" or "Waiting for parent".
-   'unknown' when the check itself failed: the screen never claims a player is
-   ready on a guess. The database still refuses the write either way. */
-type ConsentStatus = 'ready' | 'waiting' | 'unknown'
+/* J5: the squad marks each player "Ready to assess" or why they aren't yet:
+   no parent approval ('waiting'), or approved but not signed up ('signup',
+   TRAK-99). 'notReady' when the gate says no but the reason couldn't be read;
+   'unknown' when the gate check itself failed. The screen never claims a
+   player is ready on a guess. The database still refuses the write either way. */
+type ConsentStatus = 'ready' | 'waiting' | 'signup' | 'notReady' | 'unknown'
 
 const CONSENT_CHIP: Record<ConsentStatus, { label: string; color: string; bg: string }> = {
-  ready:   { label: 'Ready to assess',    color: '#C8F25A',             bg: 'rgba(200,242,90,0.10)' },
-  waiting: { label: 'Waiting for parent', color: 'rgb(251,191,36)',     bg: 'rgba(251,191,36,0.10)' },
-  unknown: { label: 'Status unknown',     color: 'rgba(255,255,255,0.45)', bg: 'rgba(255,255,255,0.06)' },
+  ready:    { label: 'Ready to assess',               color: '#C8F25A',             bg: 'rgba(200,242,90,0.10)' },
+  waiting:  { label: 'Waiting for parent',            color: 'rgb(251,191,36)',     bg: 'rgba(251,191,36,0.10)' },
+  signup:   { label: 'Waiting for player to sign up', color: 'rgb(251,191,36)',     bg: 'rgba(251,191,36,0.10)' },
+  notReady: { label: 'Not ready to assess',           color: 'rgb(251,191,36)',     bg: 'rgba(251,191,36,0.10)' },
+  unknown:  { label: 'Status unknown',                color: 'rgba(255,255,255,0.45)', bg: 'rgba(255,255,255,0.06)' },
+}
+
+/** The gate first, the same predicate the RLS policy evaluates; the reason only for a player it refuses. */
+async function squadStatus(squadPlayerId: string): Promise<ConsentStatus> {
+  const { data: required, error } = await supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: squadPlayerId } as never)
+  if (error || typeof required !== 'boolean') return 'unknown'
+  if (!required) return 'ready'
+  const reason = await fetchWaitReason(squadPlayerId)
+  return reason === 'parent' ? 'waiting' : reason === 'signup' ? 'signup' : 'notReady'
 }
 
 export default function CoachSquadPage() {
@@ -77,9 +91,7 @@ export default function CoachSquadPage() {
         // One check per player, the same predicate the RLS policy evaluates. A
         // pilot squad is about 25 players, so this stays a handful of requests.
         void Promise.all((data || []).map(p =>
-          supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: p.id } as never)
-            .then(({ data: required, error: checkError }): [string, ConsentStatus] =>
-              [p.id, checkError || typeof required !== 'boolean' ? 'unknown' : required ? 'waiting' : 'ready']),
+          squadStatus(p.id).then((status): [string, ConsentStatus] => [p.id, status]),
         )).then(entries => { if (!cancelled) setConsent(Object.fromEntries(entries)) })
       })
 

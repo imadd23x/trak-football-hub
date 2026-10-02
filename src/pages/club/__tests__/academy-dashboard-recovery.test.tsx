@@ -269,7 +269,7 @@ describe('academy dashboard correctness and recovery', () => {
       })
       await screen.findByRole('heading', { name: 'Next Academy' })
       await screen.findByText(route === '/club/home'
-        ? 'No coaches connected yet. Share your academy code with coaches to get started.' : 'No players found.')
+        ? "No coaches connected yet. Trak sets up your coaches' accounts." : 'No players found.')
       const callsAfterNextLoad = [...downstreamAccounts]
       expect(callsAfterNextLoad).toEqual(route === '/club/home' ? [nextAdmin] : [nextAdmin, nextAdmin])
 
@@ -343,7 +343,7 @@ it('routed home ignores a late assessment response after switching academy even 
       expect(result.error).toBeNull()
     })
     await screen.findByRole('heading', { name: 'Next Academy' })
-    await screen.findByText('No coaches connected yet. Share your academy code with coaches to get started.')
+    await screen.findByText("No coaches connected yet. Trak sets up your coaches' accounts.")
     expect(oldHeading.isConnected).toBe(false)
     await act(async () => { release(); await held })
     await waitFor(() => { expect(completed).toBe(true); expect(consumed).toBe(true); expect(intercepted).toBe(1) })

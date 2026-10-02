@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, planLoad, planReinvite, reinviteRows, syntheticInviteLines, validateRoster } from '../../scripts/load-roster.mjs'
+import { describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, pendingGuardianNote, planLoad, planReinvite, reinviteRows, syntheticInviteLines, validateRoster } from '../../scripts/load-roster.mjs'
 import { handleRosterInviteRequest } from '../../supabase/functions/send-roster-invites/handler'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
@@ -407,6 +407,8 @@ describe('load-roster --reinvite end to end (mixed family)', () => {
       markSent: vi.fn(async () => ({ error: null })),
       sendInvite: vi.fn(async (email: string) => { delivered.push(email); return { error: null } }),
       sendMagicLink: vi.fn(async () => ({ error: null })),
+      // TRAK-97: these two guardians have different addresses, so neither has a sibling's fresh invitation.
+      recentGuardianInvite: vi.fn(async () => ({ data: false, error: null })),
     }
     const plan = planReinvite(rows, onRoster)
     const out = await reinviteRows(plan.toInvite, async (rosterChildId: string) => {
@@ -432,5 +434,21 @@ describe('load-roster --reinvite end to end (mixed family)', () => {
     expect(JSON.parse(inviteRequest('https://p.example.test', 'sb_secret_op', 'rc-1', { onlyUninvited: true }).init.body))
       .toEqual({ roster_child_id: 'rc-1', only_uninvited: true })
     expect(JSON.parse(inviteRequest('https://p.example.test', 'sb_secret_op', 'rc-1').init.body)).toEqual({ roster_child_id: 'rc-1' })
+  })
+})
+
+// TRAK-97: a sibling's invitation that went to the guardian already isn't sent
+// again; the operator is told so instead of seeing it counted silently.
+describe('load-roster says when a guardian already had a fresh invitation (TRAK-97)', () => {
+  it('names the case and needs no action', () => {
+    expect(pendingGuardianNote({ sent: 0, failed: 0, results: [{ kind: 'guardian', sent: false, reason: 'guardian_invite_pending' }] }))
+      .toBe("A guardian already had a fresh invitation for another child, so no second email went; their consent screen lists every child.")
+  })
+  it.each([
+    ['an ordinary send', { sent: 1, failed: 0, results: [{ kind: 'guardian', sent: true, via: 'invite' }] }],
+    ['a failure', { sent: 0, failed: 1, results: [{ kind: 'guardian', sent: false, reason: 'delivery_failed' }] }],
+    ['no body', null],
+  ])('says nothing for %s', (_what, body) => {
+    expect(pendingGuardianNote(body)).toBeNull()
   })
 })

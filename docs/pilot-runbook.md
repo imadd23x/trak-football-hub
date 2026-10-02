@@ -258,8 +258,14 @@ SUPABASE_URL=… SUPABASE_SECRET_KEY=sb_secret_… TRAK_CONFIRM_HOST=<project ho
 - A failure is reported by line (no addresses). Fix the cause, then run `--reinvite`
   again. It only ever picks up what is still missing.
 - It loads nothing and refuses `--send-invites` / `--no-invites`.
-- **An invitation that went but doesn't work** (expired link, or the older of two links;
-  see TRAK-97/TRAK-101) is not this case. `--reinvite` won't resend it, on purpose, and
+- **Siblings (TRAK-97):** a guardian of several children gets **one** email. The function
+  holds back the second one while their invitation for another child is under an hour
+  old (Supabase's default link lifetime), marks that row invited anyway, and the loader
+  prints "A guardian already had a fresh invitation for another child…". That's expected:
+  their consent screen lists every child. A second `/invite` would have killed the first
+  link (1 Oct: 403 `One-time token not found`).
+- **An invitation that went but doesn't work** (an expired link; see TRAK-101) is not
+  this case. `--reinvite` won't resend it, on purpose, and
   there is no tested resend path for it yet. Don't improvise one: raise it in the
   founders' channel with the roster child id (no address).
 

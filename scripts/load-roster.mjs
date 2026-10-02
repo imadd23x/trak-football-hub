@@ -275,6 +275,12 @@ export function inviteRequest(url, key, rosterChildId, { onlyUninvited = false }
   };
 }
 
+/** TRAK-97: the function held back a second email because the guardian already had a fresh one. */
+export function pendingGuardianNote(body) {
+  const pending = Array.isArray(body?.results) && body.results.some(r => r?.reason === 'guardian_invite_pending');
+  return pending ? 'A guardian already had a fresh invitation for another child, so no second email went; their consent screen lists every child.' : null;
+}
+
 /** Why an invitation failed: the status and the function's reason, which never holds an address. */
 export function describeInviteFailure(status, body) {
   const why = body?.reason ?? body?.error ?? (body?.failed ? `${body.failed} delivery failed` : null);
@@ -403,6 +409,8 @@ async function main() {
     const body = await res.json().catch(() => ({}));
     const sent = res.ok && body.failed === 0;
     if (!sent) console.log(`[load-roster] An invitation was not sent: ${describeInviteFailure(res.status, body)}.`);
+    const note = sent ? pendingGuardianNote(body) : null;
+    if (note) console.log(`[load-roster] ${note}`);
     return sent;
   };
   if (args.reinvite) {

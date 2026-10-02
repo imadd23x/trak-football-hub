@@ -321,6 +321,11 @@ async function resolveCoaches(admin, emails) {
   return found;
 }
 
+/** TRAK-91: 1 when a line needs the operator (refused, not on the roster) or a send failed. */
+export function reinviteExitCode(plan, failedCount) {
+  return plan.synthetic.length || plan.notOnRoster.length || failedCount ? 1 : 0;
+}
+
 // TRAK-91: the recovery for invitations that never went. Reads this academy's
 // roster, then (with --apply) re-sends only what planReinvite picks.
 async function reinvite(admin, args, rows, sendInvite) {
@@ -336,7 +341,10 @@ async function reinvite(admin, args, rows, sendInvite) {
     player_name: c.squad_players?.player_name ?? '',
     guardians: c.roster_guardians ?? [],
   }));
-  const { toInvite, upToDate, notOnRoster, synthetic } = planReinvite(rows, onRoster);
+  const plan = planReinvite(rows, onRoster);
+  const { toInvite, upToDate, notOnRoster, synthetic } = plan;
+  // Imad's ship check (2 Oct): a refused line printed its reason but exited 0.
+  process.exitCode = reinviteExitCode(plan, 0) || process.exitCode;
   if (synthetic.length) {
     console.log(`[load-roster] Line(s) ${synthetic.join(', ')}: a stored guardian address is a reserved test address (e.g. .test); not invited. Correct it on the roster first.`);
   }
@@ -357,7 +365,7 @@ async function reinvite(admin, args, rows, sendInvite) {
   }
   const { invited, failed } = await reinviteRows(toInvite, sendInvite, console.log);
   console.log(`[load-roster] Re-invitations went for ${invited} child(ren); ${failed.length ? `not for line(s) ${failed.join(', ')}` : 'none failed'}.`);
-  if (failed.length) process.exitCode = 1;
+  process.exitCode = reinviteExitCode(plan, failed.length) || process.exitCode;
 }
 
 async function main() {

@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, pendingGuardianNote, planLoad, planReinvite, reinviteRows, syntheticInviteLines, validateRoster } from '../../scripts/load-roster.mjs'
+import { reinviteExitCode, describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, pendingGuardianNote, planLoad, planReinvite, reinviteRows, syntheticInviteLines, validateRoster } from '../../scripts/load-roster.mjs'
 import { handleRosterInviteRequest } from '../../supabase/functions/send-roster-invites/handler'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
@@ -450,5 +450,23 @@ describe('load-roster says when a guardian already had a fresh invitation (TRAK-
     ['no body', null],
   ])('says nothing for %s', (_what, body) => {
     expect(pendingGuardianNote(body)).toBeNull()
+  })
+})
+
+// TRAK-91 (Imad's ship check of #202, 2 Oct): --reinvite printed a refused line
+// but exited 0, so a wrapper script couldn't tell the run needed attention.
+// A line it couldn't act on (a stored reserved address, or not on the roster)
+// or a failed send now exits 1; "already invited" is not a problem.
+describe('load-roster --reinvite exits non-zero when a line needs the operator (TRAK-91)', () => {
+  const plan = (over: Partial<{ toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[]; synthetic: number[] }>) =>
+    ({ toInvite: [], upToDate: [], notOnRoster: [], synthetic: [], ...over })
+  it.each([
+    ['a stored reserved address was refused', plan({ synthetic: [3] }), 0, 1],
+    ['a line is not on the roster', plan({ notOnRoster: [2] }), 0, 1],
+    ['a re-invitation failed', plan({ toInvite: [{ line: 2, rosterChildId: 'rc-1' }] }), 1, 1],
+    ['CONTROL every guardian already invited', plan({ upToDate: [2, 3] }), 0, 0],
+    ['CONTROL everything re-sent', plan({ toInvite: [{ line: 2, rosterChildId: 'rc-1' }] }), 0, 0],
+  ] as const)('%s', (_what, p, failedCount, expected) => {
+    expect(reinviteExitCode(p, failedCount)).toBe(expected)
   })
 })

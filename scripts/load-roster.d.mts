@@ -29,6 +29,8 @@ export declare function loadRows(
   },
   log: (message: string) => void,
 ): Promise<{ loaded: number; invited: number; inviteFailed: number[]; alreadyOnRoster: number[]; stoppedAt?: number }>
+/** Lines holding a reserved test address (child or guardian); --send-invites and --reinvite refuse such a file. */
+export declare function syntheticInviteLines(rows: RosterRow[]): number[]
 export declare function planReinvite(
   rows: RosterRow[],
   onRoster: {
@@ -36,9 +38,9 @@ export declare function planReinvite(
     child_email: string | null
     date_of_birth: string
     player_name: string
-    guardians: { invited_at: string | null; parent_user_id: string | null }[]
+    guardians: { email?: string; invited_at: string | null; parent_user_id: string | null }[]
   }[],
-): { toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[] }
+): { toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[]; synthetic: number[] }
 export declare function reinviteRows(
   toInvite: { line: number; rosterChildId: string }[],
   invite: (rosterChildId: string) => Promise<boolean>,

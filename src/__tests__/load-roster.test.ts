@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { describeInviteFailure, pendingGuardianNote, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, planLoad, planReinvite, reinviteRows, validateRoster } from '../../scripts/load-roster.mjs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, pendingGuardianNote, planLoad, planReinvite, reinviteRows, syntheticInviteLines, validateRoster } from '../../scripts/load-roster.mjs'
 import { handleRosterInviteRequest } from '../../supabase/functions/send-roster-invites/handler'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
@@ -256,6 +260,94 @@ describe('load-roster --reinvite', () => {
   })
 })
 
+// TRAK-91 follow-up: a reserved test address (.test, example.com …, the J7
+// rule) can't receive mail. Inviting one is an operator mistake (loading the
+// synthetic TRAK-24 file with --send-invites, or --reinvite on it): 22
+// undeliverable sends just before the real invitations. The command refuses
+// before anything is loaded or sent, dry run included.
+describe('load-roster never invites a reserved test address', () => {
+  const LOADER = resolve(__dirname, '../../scripts/load-roster.mjs')
+  const ORG = 'fe06597a-e57f-448d-81ed-b0c4d12cf7a0'
+  const synthetic = file(
+    'Synthetic One,2012-01-10,U15,roster.01@rehearsal.trak.test,parent.roster.01@rehearsal.trak.test,coach.u15@rehearsal.trak.test',
+    'Synthetic Two,2012-02-10,U15,roster.02@rehearsal.trak.test,parent.roster.02@rehearsal.trak.test,coach.u15@rehearsal.trak.test',
+  )
+  const run = (csv: string, ...flags: string[]) => {
+    const dir = mkdtempSync(join(tmpdir(), 'trak-loader-'))
+    try {
+      const path = join(dir, 'roster.csv')
+      writeFileSync(path, csv)
+      return spawnSync(process.execPath, [LOADER, '--file', path, '--org', ORG, '--loaded-by', 'test', ...flags],
+        { encoding: 'utf8', env: { ...process.env, SUPABASE_URL: '', SUPABASE_SERVICE_ROLE_KEY: '' } })
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  }
+
+  it('finds every line that holds a reserved test address, child or guardian', () => {
+    const { rows } = validateRoster(file(
+      'Real Kid,2012-01-10,U15,kid@gmail.com,parent@gmail.com,coach@club.com',
+      'Test Guardian,2012-01-11,U15,kid2@gmail.com,parent@example.com,coach@club.com',
+      'Test Child,2012-01-12,U15,kid3@squad.test,parent3@gmail.com,coach@club.com',
+      'Mixed,2012-01-13,U15,kid4@gmail.com,parent4@gmail.com;other@x.invalid,coach@club.com',
+    ), TODAY)
+    expect(syntheticInviteLines(rows)).toEqual([3, 4, 5])
+  })
+
+  it('refuses --send-invites for a file with synthetic addresses, even in a dry run, and loads nothing', () => {
+    const out = run(synthetic, '--send-invites')
+    expect(out.status).toBe(1)
+    expect(out.stdout).toMatch(/Line\(s\) 2, 3 use a reserved test address/)
+    expect(out.stdout).toMatch(/Nothing loaded or sent/)
+    expect(out.stdout).not.toMatch(/Dry run\. Re-run with --apply/)
+  })
+
+  it('refuses --reinvite on it too, before it needs a key', () => {
+    const out = run(synthetic, '--reinvite')
+    expect(out.status).toBe(1)
+    expect(out.stdout).toMatch(/reserved test address/)
+    expect(out.stderr).not.toMatch(/SUPABASE_URL/)
+  })
+
+  it('CONTROL the same file loads (dry run) without invitations', () => {
+    const out = run(synthetic)
+    expect(out.status).toBe(0)
+    expect(out.stdout).toMatch(/Nobody will be emailed/)
+  })
+})
+
+// Imad's P2 on #202: --reinvite posts only roster_child_id, and
+// send-roster-invites emails the guardians *stored* on the roster (every one
+// who hasn't signed up). A file corrected since the load passes the CSV guard,
+// so the stored addresses must be checked too.
+describe('load-roster --reinvite checks the stored guardian addresses', () => {
+  const { rows } = validateRoster(file('Real Kid,2012-01-10,U15,kid@gmail.com,parent@gmail.com,coach@club.com'), TODAY)
+  const child = (guardians: { email: string; invited_at: string | null; parent_user_id: string | null }[]) =>
+    [{ id: 'rc-1', child_email: 'kid@gmail.com', date_of_birth: '2012-01-10', player_name: 'Real Kid', guardians }]
+
+  it('refuses a line whose stored guardian is on a reserved test domain, though the file now has a real one', () => {
+    const plan = planReinvite(rows, child([{ email: 'parent@rehearsal.trak.test', invited_at: null, parent_user_id: null }]))
+    expect(plan.toInvite).toEqual([])
+    expect(plan.synthetic).toEqual([2])
+  })
+
+  it('refuses it too when that stored guardian was invited before: the function would email them again', () => {
+    const plan = planReinvite(rows, child([
+      { email: 'real@gmail.com', invited_at: null, parent_user_id: null },
+      { email: 'parent@rehearsal.trak.test', invited_at: '2026-09-28T16:13:00Z', parent_user_id: null },
+    ]))
+    expect(plan.toInvite).toEqual([])
+    expect(plan.synthetic).toEqual([2])
+  })
+
+  it('CONTROL a signed-up guardian on a reserved domain is not a recipient, so a real one still gets re-invited', () => {
+    const plan = planReinvite(rows, child([
+      { email: 'parent@rehearsal.trak.test', invited_at: null, parent_user_id: 'parent-1' },
+      { email: 'real@gmail.com', invited_at: null, parent_user_id: null },
+    ]))
+    expect(plan.toInvite).toEqual([{ line: 2, rosterChildId: 'rc-1' }])
+    expect(plan.synthetic).toEqual([])
+  })
+})
+
 // TRAK-9 (30 Sep TRAK-24 run): the invitations were refused because the loader
 // sent the legacy service_role JWT on Authorization. It now uses a secret key
 // (sb_secret_…), sent on apikey only, and says why an invitation failed.
@@ -295,12 +387,13 @@ describe('load-roster authenticates with a secret key', () => {
 // function emailed BOTH unsigned guardians. Planner → request → real handler,
 // with targets that follow roster_invite_targets()'s SQL predicate.
 describe('load-roster --reinvite end to end (mixed family)', () => {
+  // Not .test addresses: --reinvite refuses a stored reserved address (#202).
   const guardians = [
-    { email: 'g2@roster.test', invited_at: '2026-09-28T10:00:00Z', parent_user_id: null },
-    { email: 'g2b@roster.test', invited_at: null, parent_user_id: null },
+    { email: 'g2@club.com', invited_at: '2026-09-28T10:00:00Z', parent_user_id: null },
+    { email: 'g2b@club.com', invited_at: null, parent_user_id: null },
   ]
-  const rows = validateRoster(file('Two Kid,2013-05-06,U13,kid2@roster.test,g2@roster.test;g2b@roster.test,coach@roster.test'), TODAY).rows
-  const onRoster = [{ id: '98a00000-0000-0000-0000-000000000073', child_email: 'kid2@roster.test', date_of_birth: '2013-05-06', player_name: 'Two Kid', guardians }]
+  const rows = validateRoster(file('Two Kid,2013-05-06,U13,kid2@club.com,g2@club.com;g2b@club.com,coach@club.com'), TODAY).rows
+  const onRoster = [{ id: '98a00000-0000-0000-0000-000000000073', child_email: 'kid2@club.com', date_of_birth: '2013-05-06', player_name: 'Two Kid', guardians }]
 
   async function run(onlyUninvited: boolean) {
     const delivered: string[] = []
@@ -330,11 +423,11 @@ describe('load-roster --reinvite end to end (mixed family)', () => {
     const { plan, out, delivered } = await run(true)
     expect(plan.toInvite).toHaveLength(1)
     expect(out).toEqual({ invited: 1, failed: [] })
-    expect(delivered).toEqual(['g2b@roster.test'])
+    expect(delivered).toEqual(['g2b@club.com'])
   })
 
   it('CONTROL without only_uninvited the same call emails both (the bug)', async () => {
-    expect((await run(false)).delivered).toEqual(['g2@roster.test', 'g2b@roster.test'])
+    expect((await run(false)).delivered).toEqual(['g2@club.com', 'g2b@club.com'])
   })
 
   it('the request carries only_uninvited only when asked', () => {

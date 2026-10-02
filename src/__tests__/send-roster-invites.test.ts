@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  GUARDIAN_INVITE_WINDOW_MS,
   handleRosterInviteRequest,
+  invitedElsewhereWithin,
   keyValues,
   sameSecret,
   type RosterInviteDependencies,
@@ -35,6 +37,7 @@ function dependencies(targets: RosterInviteTarget[] = [guardianTarget]) {
     markSent: vi.fn<RosterInviteDependencies['markSent']>().mockResolvedValue({ error: null }),
     sendInvite: vi.fn<RosterInviteDependencies['sendInvite']>().mockResolvedValue({ error: null }),
     sendMagicLink: vi.fn<RosterInviteDependencies['sendMagicLink']>().mockResolvedValue({ error: null }),
+    recentGuardianInvite: vi.fn<RosterInviteDependencies['recentGuardianInvite']>().mockResolvedValue({ data: false, error: null }),
   };
 }
 
@@ -56,7 +59,7 @@ describe('send-roster-invites', () => {
     const res = await handleRosterInviteRequest(operator(), deps);
     expect(res.status).toBe(200);
     expect(deps.getCaller).not.toHaveBeenCalled();
-    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null);
+    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null, false);
     expect(deps.sendInvite).toHaveBeenCalledWith('g@example.test', 'https://trakfootball.test/onboarding/parent',
       { invited_as: 'parent', child_first_name: 'Ana', academy_name: 'Invite FC' });
     expect(deps.markSent).toHaveBeenCalledWith(rosterChildId, guardianTarget);
@@ -67,7 +70,7 @@ describe('send-roster-invites', () => {
     const deps = dependencies([childTarget]);
     const res = await handleRosterInviteRequest(request(), deps);
     expect(res.status).toBe(200);
-    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, guardianId);
+    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, guardianId, false);
     expect(deps.sendInvite).toHaveBeenCalledWith('ana@example.test', 'https://trakfootball.test/onboarding/player',
       { invited_as: 'player', child_first_name: 'Ana', academy_name: 'Invite FC' });
   });
@@ -134,14 +137,14 @@ describe('send-roster-invites', () => {
       const res = await handleRosterInviteRequest(operator(), deps);
       expect(res.status).toBe(200);
       expect(deps.getCaller).not.toHaveBeenCalled();
-      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null);
+      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null, false);
     });
 
     it('accepts any of the named secret keys', async () => {
       const deps = dependencies();
       const res = await handleRosterInviteRequest(request(undefined, null, OTHER_SECRET_KEY), deps);
       expect(res.status).toBe(200);
-      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null);
+      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null, false);
     });
 
     it.each([
@@ -164,7 +167,7 @@ describe('send-roster-invites', () => {
       const res = await handleRosterInviteRequest(request(), deps);
       expect(res.status).toBe(200);
       expect(deps.getCaller).toHaveBeenCalledWith('guardian-session');
-      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, guardianId);
+      expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, guardianId, false);
     });
 
     it('reads the secret keys out of the JSON the runtime provides, and nothing else', () => {
@@ -181,5 +184,130 @@ describe('send-roster-invites', () => {
     expect(sameSecret('abc', 'abd')).toBe(false);
     expect(sameSecret('abc', 'abcd')).toBe(false);
     expect(sameSecret('', 'abc')).toBe(false);
+  });
+});
+
+// TRAK-91 (Imad, 1 Oct): "never re-send" is opt-in on the server. The loader's
+// --reinvite sends only_uninvited: true so a guardian who already has an
+// invitation isn't emailed again; only the operator may ask for it.
+describe('only_uninvited (TRAK-91)', () => {
+  it('passes the operator\'s only_uninvited to SQL', async () => {
+    const deps = dependencies();
+    const res = await handleRosterInviteRequest(operator({ roster_child_id: rosterChildId, only_uninvited: true }), deps);
+    expect(res.status).toBe(200);
+    expect(deps.getTargets).toHaveBeenCalledWith(rosterChildId, null, true);
+  });
+
+  it('CONTROL without it the operator call is unchanged: every unsigned guardian', async () => {
+    const deps = dependencies();
+    await handleRosterInviteRequest(operator({ roster_child_id: rosterChildId }), deps);
+    await handleRosterInviteRequest(operator({ roster_child_id: rosterChildId, only_uninvited: false }), deps);
+    expect(deps.getTargets.mock.calls).toEqual([[rosterChildId, null, false], [rosterChildId, null, false]]);
+  });
+
+  it('refuses it from a guardian session, before asking SQL', async () => {
+    const deps = dependencies();
+    const res = await handleRosterInviteRequest(request({ roster_child_id: rosterChildId, only_uninvited: true }), deps);
+    expect(res.status).toBe(400);
+    expect(deps.getTargets).not.toHaveBeenCalled();
+    expect(deps.sendInvite).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a non-boolean value', { roster_child_id: rosterChildId, only_uninvited: 'yes' }],
+    ['an unknown key', { roster_child_id: rosterChildId, only_uninvited: true, resend: true }],
+    ['no roster child', { only_uninvited: true }],
+  ])('refuses %s from the operator', async (_what, body) => {
+    const deps = dependencies();
+    expect((await handleRosterInviteRequest(operator(body), deps)).status).toBe(400);
+    expect(deps.getTargets).not.toHaveBeenCalled();
+  });
+});
+
+// TRAK-97 (1 Oct TRAK-24 run): Supabase keeps one pending token per user, so a
+// second /invite for the same guardian (one per sibling) killed the first
+// email's link: 403 "One-time token not found", 6 attempts. One working
+// invitation per guardian: if another of their roster rows was invited within
+// the link's lifetime, this child's row is marked invited and no email goes.
+describe('one working invitation per guardian with several children (TRAK-97)', () => {
+  const SIBLING = '98a00000-0000-0000-0000-000000000071';
+  const NOW = Date.parse('2026-10-01T12:32:27Z');
+
+  describe('invitedElsewhereWithin', () => {
+    it.each([
+      ['a sibling row invited 3 s ago', [{ roster_child_id: SIBLING, invited_at: '2026-10-01T12:32:24Z' }], true],
+      ['a sibling row invited 2 h ago (its link has expired)', [{ roster_child_id: SIBLING, invited_at: '2026-10-01T10:32:27Z' }], false],
+      ['only this child\'s own row', [{ roster_child_id: rosterChildId, invited_at: '2026-10-01T12:32:24Z' }], false],
+      ['a sibling row never invited', [{ roster_child_id: SIBLING, invited_at: null }], false],
+      ['a sibling row with an unreadable time', [{ roster_child_id: SIBLING, invited_at: 'not a date' }], false],
+    ])('%s', (_what, rows, expected) => {
+      expect(invitedElsewhereWithin(rows, rosterChildId, NOW, GUARDIAN_INVITE_WINDOW_MS)).toBe(expected);
+    });
+
+    it('uses a one-hour window, Supabase\'s default link lifetime', () => {
+      expect(GUARDIAN_INVITE_WINDOW_MS).toBe(60 * 60 * 1000);
+    });
+  });
+
+  it('marks the row invited and sends no second email when the guardian has a fresh invitation', async () => {
+    const deps = dependencies();
+    deps.recentGuardianInvite.mockResolvedValue({ data: true, error: null });
+    const res = await handleRosterInviteRequest(operator(), deps);
+    expect(res.status).toBe(200);
+    expect(deps.recentGuardianInvite).toHaveBeenCalledWith(rosterChildId, 'g@example.test');
+    expect(deps.sendInvite).not.toHaveBeenCalled();
+    expect(deps.sendMagicLink).not.toHaveBeenCalled();
+    expect(deps.markSent).toHaveBeenCalledWith(rosterChildId, guardianTarget);
+    expect(await res.json()).toEqual({ sent: 0, failed: 0, results: [{ kind: 'guardian', sent: false, reason: 'guardian_invite_pending' }] });
+  });
+
+  it('sends nothing and says it failed when it cannot tell whether an invitation is pending', async () => {
+    const deps = dependencies();
+    deps.recentGuardianInvite.mockResolvedValue({ data: false, error: { message: 'synthetic outage' } });
+    const res = await handleRosterInviteRequest(operator(), deps);
+    expect(res.status).toBe(502);
+    expect(deps.sendInvite).not.toHaveBeenCalled();
+    expect(deps.markSent).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ sent: 0, failed: 1, results: [{ kind: 'guardian', sent: false, reason: 'delivery_failed' }] });
+  });
+
+  it('never holds back a child\'s invitation (the guardian path)', async () => {
+    const deps = dependencies([childTarget]);
+    deps.recentGuardianInvite.mockResolvedValue({ data: true, error: null });
+    const res = await handleRosterInviteRequest(request(), deps);
+    expect(res.status).toBe(200);
+    expect(deps.recentGuardianInvite).not.toHaveBeenCalled();
+    expect(deps.sendInvite).toHaveBeenCalledTimes(1);
+  });
+
+  // The 1 Oct sequence against a fake roster: the loader calls once per
+  // sibling, seconds apart, and markSent stamps each row as Postgres would.
+  it('replays 1 Oct: two siblings, one guardian, one email; a deliberate resend hours later still goes', async () => {
+    let now = NOW;
+    const rows: { roster_child_id: string; email: string; invited_at: string | null }[] = [
+      { roster_child_id: rosterChildId, email: 'g@example.test', invited_at: null },
+      { roster_child_id: SIBLING, email: 'g@example.test', invited_at: null },
+    ];
+    const deps = dependencies();
+    deps.recentGuardianInvite.mockImplementation(async (childId, email) => ({
+      data: invitedElsewhereWithin(rows.filter(r => r.email === email), childId, now, GUARDIAN_INVITE_WINDOW_MS), error: null }));
+    deps.markSent.mockImplementation(async (childId, target) => {
+      rows.filter(r => r.roster_child_id === childId && r.email === target.email).forEach(r => { r.invited_at = new Date(now).toISOString(); });
+      return { error: null };
+    });
+    const send = (childId: string) => handleRosterInviteRequest(operator({ roster_child_id: childId }), deps);
+
+    expect((await (await send(rosterChildId)).json()).sent).toBe(1);
+    now += 3_000;
+    expect(await (await send(SIBLING)).json()).toMatchObject({ sent: 0, failed: 0, results: [{ reason: 'guardian_invite_pending' }] });
+    expect(deps.sendInvite).toHaveBeenCalledTimes(1);
+    expect(rows.every(r => r.invited_at !== null)).toBe(true);
+
+    // Two hours later the links have expired; the operator resends both on purpose.
+    now += 2 * 60 * 60 * 1000;
+    expect((await (await send(rosterChildId)).json()).sent).toBe(1);
+    now += 3_000;
+    expect((await (await send(SIBLING)).json()).results).toEqual([{ kind: 'guardian', sent: false, reason: 'guardian_invite_pending' }]);
+    expect(deps.sendInvite).toHaveBeenCalledTimes(2);
   });
 });

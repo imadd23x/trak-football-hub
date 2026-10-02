@@ -26,6 +26,7 @@ await context.route('**/*',async route=>{
  if(u.pathname==='/rest/v1/rpc/get_children_awaiting_consent') return json([]);
  if(u.pathname==='/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
  if(u.pathname==='/rest/v1/rpc/get_my_child_logins') return json([]);
+ if(u.pathname==='/rest/v1/rpc/get_my_approved_children_awaiting_signup') return json([]);
  if(u.pathname==='/rest/v1/rpc/get_my_child_credentials') return json([]);
  // TRAK-77: Matches also lists the selected child's training (a read, over POST).
  if(u.pathname==='/rest/v1/rpc/family_training_history') return json([]);
@@ -91,5 +92,5 @@ await context.route('**/*',async route=>{
  await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});
  expect(errors).toEqual([]);
  expect(unexpected).toEqual([]);
- expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/family_training_history', '/auth/v1/logout'].includes(write.path))).toBe(true);
+ expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/get_my_approved_children_awaiting_signup', '/rest/v1/rpc/family_training_history', '/auth/v1/logout'].includes(write.path))).toBe(true);
 });

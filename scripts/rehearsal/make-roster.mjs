@@ -26,6 +26,7 @@
 import { writeFile } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isSyntheticDomain } from '../synthetic-domain.mjs';
 
 // The repository root, from this file's own location: scripts/rehearsal/.
 // Not the current folder, which is wherever the script happens to be run
@@ -41,14 +42,8 @@ export function insideRepo(file, root = repoRoot()) {
 
 export const SYNTHETIC_DOMAIN = 'rehearsal.trak.test';
 
-/** A domain J7's pilot_synthetic_user_ids() counts as synthetic (reserved
-    test domains, RFC 2606/6761), so rehearsal accounts never enter the pilot
-    numbers. trak.dev is deliberately not accepted (TRAK-89). */
-export function isSyntheticDomain(domain) {
-  const d = String(domain).trim().toLowerCase();
-  return ['example.com', 'example.org', 'example.net'].includes(d)
-    || /^[a-z0-9-]+(\.[a-z0-9-]+)*\.(example|test|invalid|localhost)$/.test(d);
-}
+// The J7 rule, shared with the loader (scripts/synthetic-domain.mjs).
+export { isSyntheticDomain };
 
 const coaches = (domain) => ({ U15: `coach.u15@${domain}`, U17: `coach.u17@${domain}` });
 export const COACHES = coaches(SYNTHETIC_DOMAIN);

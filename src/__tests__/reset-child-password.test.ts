@@ -8,7 +8,8 @@ const request = (value: unknown = body, token = 'guardian-jwt') => new Request('
   method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(value),
 })
 function dependencies(): ChildPasswordDependencies {
-  return { authorize: vi.fn().mockResolvedValue(authId), reset: vi.fn().mockResolvedValue(undefined) }
+  return { authorize: vi.fn().mockResolvedValue(authId), reset: vi.fn().mockResolvedValue(undefined),
+    endSessions: vi.fn().mockResolvedValue(2) }
 }
 describe('guardian password recovery', () => {
   it('takes the Auth target only from caller-authorized SQL and returns no user/password/address', async () => {
@@ -53,5 +54,46 @@ describe('guardian password recovery', () => {
     const d = dependencies()
     expect((await handleResetChildPassword(request(body, ''), d)).status).toBe(401)
     expect(d.authorize).not.toHaveBeenCalled()
+  })
+})
+
+// TRAK-104: Auth's admin password update leaves the child's existing sessions
+// alive, so a lost or shared phone stayed signed in. The reset now ends every
+// session of the child login, and says so plainly when that part fails.
+describe('a password reset signs the child out of every device (TRAK-104)', () => {
+  it('ends the child login\'s sessions after the password is changed, and only then reports success', async () => {
+    const d = dependencies()
+    const calls: string[] = []
+    vi.mocked(d.reset).mockImplementation(async () => { calls.push('reset') })
+    vi.mocked(d.endSessions).mockImplementation(async () => { calls.push('end'); return 2 })
+    const response = await handleResetChildPassword(request(), d)
+    expect(d.endSessions).toHaveBeenCalledWith(authId)
+    expect(calls).toEqual(['reset', 'end'])
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ state: 'password_updated' })
+  })
+
+  it('says the password changed but the sign-out failed, never a plain success', async () => {
+    const d = dependencies()
+    vi.mocked(d.endSessions).mockRejectedValue(new Error('striker7@child.trakfootball.com private detail'))
+    const response = await handleResetChildPassword(request(), d)
+    expect(response.status).toBe(200)
+    const text = await response.text()
+    expect(JSON.parse(text)).toEqual({ state: 'password_updated_signout_failed' })
+    expect(text).not.toContain('private')
+  })
+
+  it('ends no session when the password itself could not be changed', async () => {
+    const d = dependencies()
+    vi.mocked(d.reset).mockRejectedValue(new Error('Auth unavailable'))
+    expect((await handleResetChildPassword(request(), d)).status).toBe(503)
+    expect(d.endSessions).not.toHaveBeenCalled()
+  })
+
+  it('ends no session for a refused guardian', async () => {
+    const d = dependencies()
+    vi.mocked(d.authorize).mockRejectedValue(new Error('withdrawn'))
+    expect((await handleResetChildPassword(request(), d)).status).toBe(403)
+    expect(d.endSessions).not.toHaveBeenCalled()
   })
 })

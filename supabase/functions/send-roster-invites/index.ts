@@ -4,7 +4,7 @@
 // roster_invite_targets(), after the handler has identified the caller.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { corsHeaders, handleRosterInviteRequest, json, keyValues } from './handler.ts';
+import { corsHeaders, GUARDIAN_INVITE_WINDOW_MS, handleRosterInviteRequest, invitedElsewhereWithin, json, keyValues } from './handler.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -35,14 +35,22 @@ serve(async (req) => {
         const { data, error } = await admin.auth.getUser(jwt);
         return { data: data.user, error };
       },
-      async getTargets(rosterChildId, guardianId) {
-        return await admin.rpc('roster_invite_targets', { p_roster_child_id: rosterChildId, p_guardian_user_id: guardianId });
+      async getTargets(rosterChildId, guardianId, onlyUninvited) {
+        return await admin.rpc('roster_invite_targets', {
+          p_roster_child_id: rosterChildId, p_guardian_user_id: guardianId, p_only_uninvited: onlyUninvited });
       },
       async markSent(rosterChildId, target) {
         return await admin.rpc('mark_roster_invite_sent', { p_roster_child_id: rosterChildId, p_kind: target.kind, p_email: target.email });
       },
       async sendInvite(email, redirectTo, data) {
         return await admin.auth.admin.inviteUserByEmail(email, { redirectTo, data });
+      },
+      async recentGuardianInvite(rosterChildId, email) {
+        // The service key reads the roster directly; no address leaves this function.
+        const { data, error } = await admin.from('roster_guardians')
+          .select('roster_child_id, invited_at').eq('email', email).is('parent_user_id', null).not('invited_at', 'is', null);
+        if (error) return { data: false, error };
+        return { data: invitedElsewhereWithin(data ?? [], rosterChildId, Date.now(), GUARDIAN_INVITE_WINDOW_MS), error: null };
       },
       async sendMagicLink(email, redirectTo) {
         return await publicAuth.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });

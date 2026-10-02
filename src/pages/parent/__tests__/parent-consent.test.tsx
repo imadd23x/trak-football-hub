@@ -147,6 +147,7 @@ beforeEach(() => {
       return new HttpResponse(null, { status: 201 })
     }),
     http.post(endpoint('rpc/get_roster_children_awaiting_consent'), () => HttpResponse.json([])),
+    http.post(endpoint('rpc/get_my_child_logins'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_children_awaiting_consent'), async ({ request }) => {
       const account = assertAuthenticated(request)
       const body: unknown = await request.json()

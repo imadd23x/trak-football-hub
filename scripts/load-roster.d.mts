@@ -46,6 +46,12 @@ export declare function reinviteRows(
   invite: (rosterChildId: string) => Promise<boolean>,
   log: (message: string) => void,
 ): Promise<{ invited: number; failed: number[] }>
+export declare function operatorKey(env: Record<string, string | undefined>): string
+export declare function inviteRequest(url: string, key: string, rosterChildId: string, options?: { onlyUninvited?: boolean }): {
+  url: string
+  init: { method: 'POST'; headers: Record<string, string>; body: string }
+}
+export declare function describeInviteFailure(status: number, body: unknown): string
 export declare function parseArgs(argv: string[]): {
   apply: boolean
   'send-invites': boolean

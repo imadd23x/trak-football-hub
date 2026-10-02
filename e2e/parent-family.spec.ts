@@ -25,6 +25,8 @@ await context.route('**/*',async route=>{
  if(u.pathname==='/rest/v1/telemetry_events') return json(null,201);
  if(u.pathname==='/rest/v1/rpc/get_children_awaiting_consent') return json([]);
  if(u.pathname==='/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
+ if(u.pathname==='/rest/v1/rpc/get_my_child_logins') return json([]);
+ if(u.pathname==='/rest/v1/rpc/get_my_child_credentials') return json([]);
  // TRAK-77: Matches also lists the selected child's training (a read, over POST).
  if(u.pathname==='/rest/v1/rpc/family_training_history') return json([]);
  if(u.pathname==='/rest/v1/player_parent_links') return failLinks?json({message:'Synthetic network error'},503):json([{player_user_id:alex},{player_user_id:zara}]);
@@ -70,14 +72,14 @@ await context.route('**/*',async route=>{
  await page.getByRole('button',{name:'Retry',exact:true}).click();
  await expect(page.getByText('Alex Opposition',{exact:true})).toBeVisible();
  await page.getByRole('combobox').selectOption(zara);
- await page.getByRole('button',{name:'Alerts',exact:true}).click();
- // TRAK-85: Alerts is its real screen, parked, and shows only the selected child's activity.
- await expect(page.getByRole('note',{name:'This screen is coming soon'})).toContainText('Coming soon');
- await expect(page.getByRole('heading',{name:'Alerts'})).toBeVisible();
- await expect(page.getByRole('combobox')).toHaveValue(zara);
- await expect(page.getByText(/vs Zara Opposition/).first()).toBeVisible();
- await expect(page.getByText(/vs Alex Opposition/)).toHaveCount(0);
+ // TRAK-74: alerts are a bell on Home and show only the selected child's activity.
  await page.getByRole('button',{name:'Home',exact:true}).click();
+ await page.getByRole('button',{name:/^Alerts/}).click();
+ const alertsSheet=page.getByRole('dialog',{name:'Alerts'});
+ await expect(alertsSheet.getByText(/vs Zara Opposition/).first()).toBeVisible();
+ await expect(alertsSheet.getByText(/vs Alex Opposition/)).toHaveCount(0);
+ await page.keyboard.press('Escape');
+ await expect(alertsSheet).toHaveCount(0);
  await expect(page.getByRole('combobox')).toHaveValue(zara);
  await expect(page.getByText('Zara Opposition',{exact:true})).toBeVisible();
  await expect(page.getByText('Alex Opposition',{exact:true})).toHaveCount(0);
@@ -89,5 +91,5 @@ await context.route('**/*',async route=>{
  await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});
  expect(errors).toEqual([]);
  expect(unexpected).toEqual([]);
- expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/family_training_history', '/auth/v1/logout'].includes(write.path))).toBe(true);
+ expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/family_training_history', '/auth/v1/logout'].includes(write.path))).toBe(true);
 });

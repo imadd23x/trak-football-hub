@@ -103,6 +103,8 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
         // TRAK-77: Matches lists the selected child's training (a read, over POST).
         if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
+        if (url.pathname === '/rest/v1/rpc/get_my_child_logins') return json([]);
+        if (url.pathname === '/rest/v1/rpc/get_my_child_credentials') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') {
           return json(claims.length ? [{ player_user_id: zaraId, full_name: 'Zara Example', age_years: 14 }] : []);
         }
@@ -236,6 +238,8 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
       if (url.pathname === '/rest/v1/telemetry_events') return json(null, 201);
       if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') return json([]);
       if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
+      if (url.pathname === '/rest/v1/rpc/get_my_child_logins') return json([]);
+      if (url.pathname === '/rest/v1/rpc/get_my_child_credentials') return json([]);
       // TRAK-77: Matches lists the selected child's training (a read, over POST).
       if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
       if (url.pathname === '/rest/v1/rpc/get_my_pending_parent_invites') return json(linked.has(zaraId) ? [] : [{
@@ -347,13 +351,14 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   await expect(page.getByText(zara.opponent, { exact: true })).toHaveCount(0);
   await page.getByRole('combobox').selectOption(zaraId);
 
-  await page.getByRole('button', { name: 'Alerts', exact: true }).click();
-  // TRAK-85: Alerts is its real screen, parked, and shows only the selected child's activity.
-  await expect(page.getByRole('note', { name: 'This screen is coming soon' })).toContainText('Coming soon');
-  await expect(page.getByRole('combobox')).toHaveValue(zaraId);
-  await expect(page.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
-  await expect(page.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  // TRAK-74: alerts are a bell on Home and show only the selected child's activity.
   await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await page.getByRole('button', { name: /^Alerts/ }).click();
+  const alertsSheet = page.getByRole('dialog', { name: 'Alerts' });
+  await expect(alertsSheet.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
+  await expect(alertsSheet.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(alertsSheet).toHaveCount(0);
   await expect(page.getByRole('combobox')).toHaveValue(zaraId);
   await expect(page.getByText(zara.opponent, { exact: true })).toBeVisible();
   await expect(page.getByText(alex.opponent, { exact: true })).toHaveCount(0);
@@ -381,7 +386,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
     authorization: `Bearer ${observed.parent.access_token}`, body: { p_invite_id: zaraInvite },
   }]);
   const allowedPosts = new Set([
-    '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent',
+    '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials',
     '/rest/v1/rpc/get_my_pending_parent_invites', '/rest/v1/rpc/get_parent_invite_by_token',
     '/rest/v1/rpc/accept_parent_invite', '/rest/v1/rpc/family_training_history',
   ]);

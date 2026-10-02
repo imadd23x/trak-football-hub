@@ -47,6 +47,7 @@ async function loginFixture(page: Page, context: BrowserContext, role: 'parent' 
       ? [{ roster_child_id: rosterId, first_name: 'Ana', username: 'striker7' }] : [])
     if (url.pathname === '/functions/v1/reset-child-password') return json({ state: 'password_updated' })
     if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json(approved ? [] : [{ roster_child_id: rosterId, first_name: 'Ana', age_years: 13 }])
+    if (url.pathname === '/rest/v1/rpc/get_my_approved_children_awaiting_signup') return json([])
     if (url.pathname === '/rest/v1/rpc/get_my_child_logins') return json(approved
       ? [{ roster_child_id: rosterId, first_name: 'Ana', username: created ? 'striker7' : null, ready: created }] : [])
     if (url.pathname === '/rest/v1/rpc/record_roster_consent') { approved = true; return json('98c00000-0000-4000-8000-000000000050') }

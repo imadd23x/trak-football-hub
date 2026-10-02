@@ -398,30 +398,17 @@ test('existing parent accepts a second child, recovers a failed family refresh a
 
 
 // Coach and club signup forms are gone: Trak sets up staff (TRAK-12, staff-set-up-by-trak.test.tsx).
-for (const role of ['player']) {
-  test(`${role} signup reveals passwords independently without sending a request`, async ({ page, context }, testInfo) => {
-    const observed = await invitationsFixture(page, context);
-    await page.goto(`/onboarding/${role}`);
-    const password = page.getByLabel('New password', { exact: true });
-    const confirmation = page.getByLabel('Confirm password', { exact: true });
-    await password.fill('SyntheticOnly1!');
-    await confirmation.fill('SyntheticOnly1!');
-    const toggle = page.getByRole('button', { name: 'Show new password', exact: true });
-    await toggle.focus();
-    await page.keyboard.press('Enter');
-    await expect(password).toHaveAttribute('type', 'text');
-    await expect(password).toHaveValue('SyntheticOnly1!');
-    await expect(confirmation).toHaveAttribute('type', 'password');
-    await page.getByRole('button', { name: 'Show confirm password', exact: true }).click();
-    await expect(confirmation).toHaveAttribute('type', 'text');
-    await page.getByRole('button', { name: 'Hide new password', exact: true }).click();
-    await expect(password).toHaveAttribute('type', 'password');
-    await expect(confirmation).toHaveValue('SyntheticOnly1!');
-    await confirmation.clear();
-    await expect(confirmation).toHaveAttribute('type', 'password');
-    await page.screenshot({ path: testInfo.outputPath(`${role}-password-toggle.png`), fullPage: true });
-    expect(observed.requests).toEqual([]);
-    expect(observed.unexpected).toEqual([]);
-    expect(observed.errors).toEqual([]);
-  });
-}
+// TRAK-101: the public player signup is gone too. A child joins from the
+// academy's invitation; password show/hide on that setup is covered in
+// OnboardingPasswordVisibility.test.tsx.
+test('a signed-out visitor to player signup gets no form and sends nothing', async ({ page, context }, testInfo) => {
+  const observed = await invitationsFixture(page, context);
+  await page.goto('/onboarding/player');
+  await expect(page.getByText(/Open the invitation your academy emailed you/)).toBeVisible();
+  await expect(page.locator('input')).toHaveCount(0);
+  await expect(page.getByLabel('New password', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('player-signup-no-form.png'), fullPage: true });
+  expect(observed.requests).toEqual([]);
+  expect(observed.unexpected).toEqual([]);
+  expect(observed.errors).toEqual([]);
+});

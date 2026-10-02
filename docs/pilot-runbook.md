@@ -251,6 +251,38 @@ SELECT * FROM squad_duplicate_candidates;
 
 Merging is a human decision — assessments and awards may hang off either row.
 
+## Invitations that didn't go
+
+When the loader reports `Invitations went for N child(ren); not for line(s) …`, or a
+run stopped part-way, those families were admitted but some guardians never got an
+email. A plain re-run won't fix it: it skips children who are already admitted.
+`--reinvite` (TRAK-91) is the recovery. Run it with the **same file**:
+
+```bash
+# 1. Dry run: reads the roster, admits nothing, says which lines it would re-send
+SUPABASE_URL=… SUPABASE_SECRET_KEY=sb_secret_… TRAK_CONFIRM_HOST=<project host> \
+  node scripts/load-roster.mjs --file <roster.csv> --org <academy id> --loaded-by "<your name>" --reinvite
+# 2. The same command with --apply sends them
+```
+
+- It picks a child only if one of their guardians was **never invited** and hasn't
+  signed up. It asks the function for `only_uninvited`, so in a family where one
+  guardian was invited and another wasn't, only the second gets an email. A guardian
+  who already has an invitation is **never** sent a second one this way.
+- A failure is reported by line (no addresses). Fix the cause, then run `--reinvite`
+  again. It only ever picks up what is still missing.
+- It loads nothing and refuses `--send-invites` / `--no-invites`.
+- **Siblings (TRAK-97):** a guardian of several children gets **one** email. The function
+  holds back the second one while their invitation for another child is under an hour
+  old (Supabase's default link lifetime), marks that row invited anyway, and the loader
+  prints "A guardian already had a fresh invitation for another child…". That's expected:
+  their consent screen lists every child. A second `/invite` would have killed the first
+  link (1 Oct: 403 `One-time token not found`).
+- **An invitation that went but doesn't work** (an expired link; see TRAK-101) is not
+  this case. `--reinvite` won't resend it, on purpose, and
+  there is no tested resend path for it yet. Don't improvise one: raise it in the
+  founders' channel with the roster child id (no address).
+
 ## Wrong address
 
 When the academy gave a wrong child or guardian email (TRAK-16, G5), the
@@ -274,5 +306,15 @@ node scripts/correct-roster-email.mjs --roster-child <roster child id> --kind gu
   correction, that address can no longer claim the child.
 - **Then re-invite** that roster child. The script sends nothing; the
   correction cleared `invited_at` so the new address gets the invitation.
+- **A guardian with more than one child: correct every roster child that
+  has the wrong address.** The address is stored once per child, so it sits
+  on one roster row per sibling. Run the correction once for each of them,
+  or the other child's invitation still goes to the wrong address. Find them
+  first (read-only, in the SQL editor):
+
+  ```sql
+  SELECT roster_child_id FROM roster_guardians
+  WHERE lower(btrim(email)) = lower(btrim('<wrong address>'));
+  ```
 - The addresses go only on the command line on the operator's own machine,
   never into Slack or Linear.

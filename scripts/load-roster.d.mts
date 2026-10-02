@@ -29,15 +29,37 @@ export declare function loadRows(
   },
   log: (message: string) => void,
 ): Promise<{ loaded: number; invited: number; inviteFailed: number[]; alreadyOnRoster: number[]; stoppedAt?: number }>
+/** Lines holding a reserved test address (child or guardian); --send-invites and --reinvite refuse such a file. */
+export declare function syntheticInviteLines(rows: RosterRow[]): number[]
+export declare function planReinvite(
+  rows: RosterRow[],
+  onRoster: {
+    id: string
+    child_email: string | null
+    date_of_birth: string
+    player_name: string
+    guardians: { email?: string; invited_at: string | null; parent_user_id: string | null }[]
+  }[],
+): { toInvite: { line: number; rosterChildId: string }[]; upToDate: number[]; notOnRoster: number[]; synthetic: number[] }
+export declare function reinviteRows(
+  toInvite: { line: number; rosterChildId: string }[],
+  invite: (rosterChildId: string) => Promise<boolean>,
+  log: (message: string) => void,
+): Promise<{ invited: number; failed: number[] }>
 export declare function operatorKey(env: Record<string, string | undefined>): string
-export declare function inviteRequest(url: string, key: string, rosterChildId: string): {
+export declare function inviteRequest(url: string, key: string, rosterChildId: string, options?: { onlyUninvited?: boolean }): {
   url: string
   init: { method: 'POST'; headers: Record<string, string>; body: string }
 }
+export declare function reinviteExitCode(
+  plan: { toInvite: unknown[]; upToDate: number[]; notOnRoster: number[]; synthetic: number[] }, failedCount: number,
+): 0 | 1
+export declare function pendingGuardianNote(body: unknown): string | null
 export declare function describeInviteFailure(status: number, body: unknown): string
 export declare function parseArgs(argv: string[]): {
   apply: boolean
   'send-invites': boolean
+  reinvite: boolean
   file?: string
   org?: string
   'loaded-by'?: string

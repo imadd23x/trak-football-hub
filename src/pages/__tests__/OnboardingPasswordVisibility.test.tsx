@@ -3,21 +3,24 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import OnboardingPage from '../OnboardingPage'
-import { PASSWORD_HINT } from '@/lib/password'
 
-const auth = vi.hoisted(() => ({ signUp: vi.fn() }))
+// TRAK-101: the only password form left on /onboarding/player is the invited
+// child's setup (InvitedPlayerSetup); the public signup form is gone.
+const auth = vi.hoisted(() => ({
+  user: { id: 'invited-child', user_metadata: { invited_as: 'player', child_first_name: 'Ana' } },
+  profile: null, loading: false, refreshProfile: vi.fn(),
+}))
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => auth }))
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
-describe('signup password visibility', () => {
-  // Coach and club signup forms are gone: Trak sets up staff (TRAK-12, staff-set-up-by-trak.test.tsx).
-  it.each(['player'])('lets %s reveal each password independently without advancing or submitting', async role => {
+describe('invited setup password visibility', () => {
+  it('lets the invited child reveal each password independently without submitting', async () => {
     const user = userEvent.setup()
-    render(<MemoryRouter initialEntries={[`/onboarding/${role}`]}><Routes>
+    render(<MemoryRouter initialEntries={['/onboarding/player']}><Routes>
       <Route path="/onboarding/:role" element={<OnboardingPage />} />
     </Routes></MemoryRouter>)
-    const password = screen.getByPlaceholderText(PASSWORD_HINT)
-    const confirmation = screen.getByPlaceholderText('Confirm password')
+    const password = screen.getByLabelText('New password')
+    const confirmation = screen.getByLabelText('Confirm password')
     await user.type(password, 'SyntheticOnly1!')
     await user.type(confirmation, 'SyntheticOnly1!')
     expect(password).toHaveAttribute('type', 'password')
@@ -35,8 +38,5 @@ describe('signup password visibility', () => {
     expect(password).toHaveAttribute('type', 'password')
     expect(password).toHaveValue('SyntheticOnly1!')
     expect(confirmation).toHaveValue('SyntheticOnly1!')
-    await user.clear(confirmation)
-    expect(confirmation).toHaveAttribute('type', 'password')
-    expect(auth.signUp).not.toHaveBeenCalled()
   })
 })

@@ -45,8 +45,10 @@ export function ParentFamilyContent({ children }: { children: ReactNode }) {
   if (family.error) return <ParentLoadError message="Couldn't load your linked children." onRetry={family.retry} />
   if (!family.selectedChild) return (
     <div className="py-8 text-center">
-      <p className="text-foreground">No child linked yet</p>
-      <p className="text-sm text-muted-foreground mt-2">Open the parent invite sent to your email to link your child.</p>
+      {/* TRAK-98: roster guardians approve before the child has an account, so
+          "open the parent invite" was the wrong instruction. */}
+      <p className="text-foreground">No child has signed up yet</p>
+      <p className="text-sm text-muted-foreground mt-2">Children you approve appear here once they've set up their Trak account.</p>
     </div>
   )
   return <>{children}</>

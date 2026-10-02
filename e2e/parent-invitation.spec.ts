@@ -88,6 +88,8 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
     if (account === player && request.method() === 'POST' && url.pathname === '/rest/v1/rpc/my_consent_status') {
       return json({ required: false, granted: true, invited_parent: null });
     }
+    // TRAK-104: an open player session checks it hasn't been ended (a read, over POST).
+    if (account === player && request.method() === 'POST' && url.pathname === '/rest/v1/rpc/my_session_is_live') return json(true);
     if (account === parent) {
       if (url.pathname === '/rest/v1/player_parent_links' && request.method() === 'GET') return json([]);
       if (request.method() === 'POST') {
@@ -104,6 +106,7 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
         if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_my_child_logins') return json([]);
+        if (url.pathname === '/rest/v1/rpc/get_my_approved_children_awaiting_signup') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_my_child_credentials') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') {
           return json(claims.length ? [{ player_user_id: zaraId, full_name: 'Zara Example', age_years: 14 }] : []);
@@ -239,6 +242,7 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
       if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') return json([]);
       if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
       if (url.pathname === '/rest/v1/rpc/get_my_child_logins') return json([]);
+      if (url.pathname === '/rest/v1/rpc/get_my_approved_children_awaiting_signup') return json([]);
       if (url.pathname === '/rest/v1/rpc/get_my_child_credentials') return json([]);
       // TRAK-77: Matches lists the selected child's training (a read, over POST).
       if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
@@ -329,7 +333,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   const failure = page.getByRole('alert').filter({ hasText: "Couldn't load your linked children." });
   await expect(failure).toBeVisible({ timeout: 15_000 });
   expect(observed.memberships.slice(beforeClaim).some(read => read.failed && read.ids.includes(zaraId))).toBe(true);
-  await expect(page.getByText('No child linked yet', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('No child has signed up yet', { exact: true })).toHaveCount(0);
   await expect(page.getByText(alex.opponent, { exact: true })).toHaveCount(0);
   await expect(page.getByText(zara.opponent, { exact: true })).toHaveCount(0);
   await expect(page.getByRole('combobox')).toHaveCount(0);
@@ -386,7 +390,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
     authorization: `Bearer ${observed.parent.access_token}`, body: { p_invite_id: zaraInvite },
   }]);
   const allowedPosts = new Set([
-    '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials',
+    '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/get_my_approved_children_awaiting_signup',
     '/rest/v1/rpc/get_my_pending_parent_invites', '/rest/v1/rpc/get_parent_invite_by_token',
     '/rest/v1/rpc/accept_parent_invite', '/rest/v1/rpc/family_training_history',
   ]);
@@ -398,30 +402,17 @@ test('existing parent accepts a second child, recovers a failed family refresh a
 
 
 // Coach and club signup forms are gone: Trak sets up staff (TRAK-12, staff-set-up-by-trak.test.tsx).
-for (const role of ['player']) {
-  test(`${role} signup reveals passwords independently without sending a request`, async ({ page, context }, testInfo) => {
-    const observed = await invitationsFixture(page, context);
-    await page.goto(`/onboarding/${role}`);
-    const password = page.getByLabel('New password', { exact: true });
-    const confirmation = page.getByLabel('Confirm password', { exact: true });
-    await password.fill('SyntheticOnly1!');
-    await confirmation.fill('SyntheticOnly1!');
-    const toggle = page.getByRole('button', { name: 'Show new password', exact: true });
-    await toggle.focus();
-    await page.keyboard.press('Enter');
-    await expect(password).toHaveAttribute('type', 'text');
-    await expect(password).toHaveValue('SyntheticOnly1!');
-    await expect(confirmation).toHaveAttribute('type', 'password');
-    await page.getByRole('button', { name: 'Show confirm password', exact: true }).click();
-    await expect(confirmation).toHaveAttribute('type', 'text');
-    await page.getByRole('button', { name: 'Hide new password', exact: true }).click();
-    await expect(password).toHaveAttribute('type', 'password');
-    await expect(confirmation).toHaveValue('SyntheticOnly1!');
-    await confirmation.clear();
-    await expect(confirmation).toHaveAttribute('type', 'password');
-    await page.screenshot({ path: testInfo.outputPath(`${role}-password-toggle.png`), fullPage: true });
-    expect(observed.requests).toEqual([]);
-    expect(observed.unexpected).toEqual([]);
-    expect(observed.errors).toEqual([]);
-  });
-}
+// TRAK-101: the public player signup is gone too. A child joins from the
+// academy's invitation; password show/hide on that setup is covered in
+// OnboardingPasswordVisibility.test.tsx.
+test('a signed-out visitor to player signup gets no form and sends nothing', async ({ page, context }, testInfo) => {
+  const observed = await invitationsFixture(page, context);
+  await page.goto('/onboarding/player');
+  await expect(page.getByText(/Open the invitation your academy emailed you/)).toBeVisible();
+  await expect(page.locator('input')).toHaveCount(0);
+  await expect(page.getByLabel('New password', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('player-signup-no-form.png'), fullPage: true });
+  expect(observed.requests).toEqual([]);
+  expect(observed.unexpected).toEqual([]);
+  expect(observed.errors).toEqual([]);
+});

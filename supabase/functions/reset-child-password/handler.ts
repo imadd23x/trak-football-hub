@@ -2,6 +2,8 @@ export interface ChildPasswordDependencies {
   /** Executes SQL with the caller's captured guardian JWT, never service role. */
   authorize(jwt: string, rosterChildId: string): Promise<string>;
   reset(authUserId: string, password: string): Promise<void>;
+  /** TRAK-104: end every session of this child login (end_child_login_sessions, server key). */
+  endSessions(authUserId: string): Promise<number>;
 }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const cors = {
@@ -32,6 +34,12 @@ export async function handleResetChildPassword(req: Request, deps: ChildPassword
   } catch { return reply(403, { error: 'Use your linked guardian account with current approval' }); }
   try {
     await deps.reset(authUserId, body.password);
-    return reply(200, { state: 'password_updated' });
   } catch { return reply(503, { error: 'Could not set the password. Please try again.' }); }
+  // TRAK-104: Auth's password update leaves existing sessions alive, so a lost
+  // or shared phone stayed signed in. End them all; if that fails, the reply
+  // says so (the new password stands either way, and a retry ends them).
+  try {
+    await deps.endSessions(authUserId);
+    return reply(200, { state: 'password_updated' });
+  } catch { return reply(200, { state: 'password_updated_signout_failed' }); }
 }

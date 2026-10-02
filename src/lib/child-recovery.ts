@@ -1,4 +1,4 @@
-import { parseChildLogins } from './child-login'
+import { ChildPasswordError, childPasswordFailure, parseChildLogins } from './child-login'
 import { verifiedParentClient } from './parent-consent'
 
 export interface ChildCredential {
@@ -31,9 +31,10 @@ export async function resetChildPassword(parentId: string, childId: string, pass
     body: { roster_child_id: childId, password }, signal,
   })
   if (signal.aborted) throw new DOMException('Password update cancelled', 'AbortError')
+  if (error) throw new ChildPasswordError(await childPasswordFailure(error))
   const response: unknown = data
   const state = !error && response && typeof response === 'object' && 'state' in response ? response.state : null
   if (state === 'password_updated') return 'signed_out'
   if (state === 'password_updated_signout_failed') return 'signout_failed'
-  throw new Error('Could not set the password. Please try again.')
+  throw new ChildPasswordError('failed')
 }

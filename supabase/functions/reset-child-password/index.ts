@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { handleResetChildPassword } from './handler.ts';
+import { handleResetChildPassword, isWeakPassword, WeakPasswordError } from './handler.ts';
 
 const url = Deno.env.get('SUPABASE_URL')!;
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
@@ -16,7 +16,7 @@ serve(req => handleResetChildPassword(req, {
   },
   async reset(authUserId, password) {
     const { error } = await admin.auth.admin.updateUserById(authUserId, { password });
-    if (error) throw new Error('Auth password update failed');
+    if (error) throw isWeakPassword(error) ? new WeakPasswordError() : new Error('Auth password update failed');
   },
   async endSessions(authUserId) {
     const { data, error } = await admin.rpc('end_child_login_sessions', { p_auth_user_id: authUserId });

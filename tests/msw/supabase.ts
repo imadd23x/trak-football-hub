@@ -71,6 +71,8 @@ export function authHandlers(): HttpHandler[] {
     // exercising TRAK-84 register explicit replies, including failure cases.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_logins`, () => HttpResponse.json([])),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_credentials`, () => HttpResponse.json([])),
+    // TRAK-104: a signed-in player's session is live unless a test says otherwise.
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/my_session_is_live`, () => HttpResponse.json(true)),
     http.get(`${SUPABASE_URL}/auth/v1/user`, ({ request }) => {
       const token = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
       const user = authUserForToken(token)

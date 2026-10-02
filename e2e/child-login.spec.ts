@@ -53,6 +53,7 @@ async function loginFixture(page: Page, context: BrowserContext, role: 'parent' 
     if (url.pathname === '/functions/v1/create-child-login') { created = true; return json({ username: 'striker7', state: 'created' }) }
     if (url.pathname === '/rest/v1/rpc/provision_my_profile') { provisioned = true; return json({ warnings: [] }) }
     if (url.pathname === '/rest/v1/rpc/my_consent_status') return json({ required: false, granted: true, invited_parent: null })
+    if (url.pathname === '/rest/v1/rpc/my_session_is_live') return json(true)
     if (url.pathname === '/rest/v1/rpc/get_player_invites_for_current_user') return json([])
     if (url.pathname === '/rest/v1/telemetry_events') return json(null, 201)
     if (request.method() === 'GET' && url.pathname.startsWith('/rest/v1/')) return json([])
@@ -93,7 +94,7 @@ test('Profile lets a guardian reset the ready child login before the first child
   await page.getByLabel("Confirm Ana's password", { exact: true }).fill('Synthetic-NewPass9!')
   await page.screenshot({ path: testInfo.outputPath('parent-child-recovery-local.png'), fullPage: true })
   await page.getByRole('button', { name: 'Save new password' }).click()
-  await expect(page.getByRole('status')).toHaveText('Password set for Ana.')
+  await expect(page.getByRole('status')).toHaveText('Password set for Ana. Ana is now signed out on every device.')
   await expect(page.getByLabel("Ana's new password", { exact: true })).toHaveCount(0)
   await expect(page.locator('body')).not.toContainText('child.trakfootball.com')
   expect(fixture.writes.filter(r => r.path === '/functions/v1/reset-child-password').map(r => r.body))

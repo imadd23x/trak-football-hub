@@ -9,7 +9,7 @@ import { server } from '../../../../tests/msw/server'
 import { SUPABASE_URL } from '../../../../tests/msw/supabase'
 
 const rosterId = '98c00000-0000-4000-8000-000000000030'
-let sequence = 200, session: Session, failure: boolean, resetFailure: boolean
+let sequence = 200, session: Session, failure: boolean, resetFailure: boolean, signOutFailed = false
 let resets: { token: string | null; body: unknown }[], recoveries: unknown[]
 function parentSession(): Session {
   const id = `98c00000-0000-4000-8000-${String(++sequence).padStart(12, '0')}`
@@ -21,7 +21,7 @@ function parentSession(): Session {
       email_confirmed_at: '2026-09-30T00:00:00Z', app_metadata: {}, user_metadata: {}, created_at: '2026-09-30T00:00:00Z' } }
 }
 beforeEach(() => {
-  session = parentSession(); failure = false; resetFailure = false; resets = []; recoveries = []
+  session = parentSession(); failure = false; resetFailure = false; signOutFailed = false; resets = []; recoveries = []
   vi.stubEnv('DEV', false)
   server.use(
     http.get(`${SUPABASE_URL}/auth/v1/user`, () => HttpResponse.json(session.user)),
@@ -35,7 +35,7 @@ beforeEach(() => {
     http.post(`${SUPABASE_URL}/functions/v1/reset-child-password`, async ({ request }) => {
       resets.push({ token: request.headers.get('authorization'), body: await request.json() })
       return resetFailure ? HttpResponse.json({ error: 'striker7@child.trakfootball.com private detail' }, { status: 503 })
-        : HttpResponse.json({ state: 'password_updated' })
+        : HttpResponse.json({ state: signOutFailed ? 'password_updated_signout_failed' : 'password_updated' })
     }),
     http.post(`${SUPABASE_URL}/auth/v1/recover`, async ({ request }) => { recoveries.push(await request.json()); return HttpResponse.json({}) }),
   )
@@ -61,6 +61,20 @@ it('Profile shows a username and resets that child using only the captured guard
   expect(screen.queryByLabelText("Ana's new password")).toBeNull()
   expect(recoveries).toEqual([])
   expect(document.body.textContent).not.toContain('child.trakfootball.com')
+})
+// TRAK-104: the reset also signs the child out of every device; the guardian
+// is told when that half failed instead of seeing a plain success.
+it('says the child is signed out everywhere after a reset', async () => {
+  await open(); await fillPassword()
+  await userEvent.click(screen.getByRole('button', { name: 'Save new password' }))
+  expect(await screen.findByRole('status')).toHaveTextContent('Password set for Ana. Ana is now signed out on every device.')
+})
+it('warns when the password changed but the sign-out did not, and never shows a plain success', async () => {
+  signOutFailed = true; await open(); await fillPassword()
+  await userEvent.click(screen.getByRole('button', { name: 'Save new password' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    "Ana's password changed, but we couldn't sign Ana out of other devices. Set the password again to retry.")
+  expect(screen.queryByText(/Password set for Ana/)).toBeNull()
 })
 it('failed credential reads remain retryable errors and do not look like an empty list', async () => {
   failure = true; await open()

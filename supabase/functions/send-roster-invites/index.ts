@@ -35,8 +35,9 @@ serve(async (req) => {
         const { data, error } = await admin.auth.getUser(jwt);
         return { data: data.user, error };
       },
-      async getTargets(rosterChildId, guardianId) {
-        return await admin.rpc('roster_invite_targets', { p_roster_child_id: rosterChildId, p_guardian_user_id: guardianId });
+      async getTargets(rosterChildId, guardianId, onlyUninvited) {
+        return await admin.rpc('roster_invite_targets', {
+          p_roster_child_id: rosterChildId, p_guardian_user_id: guardianId, p_only_uninvited: onlyUninvited });
       },
       async markSent(rosterChildId, target) {
         return await admin.rpc('mark_roster_invite_sent', { p_roster_child_id: rosterChildId, p_kind: target.kind, p_email: target.email });

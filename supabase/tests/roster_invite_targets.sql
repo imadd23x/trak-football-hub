@@ -148,23 +148,45 @@ SELECT pg_temp.ri_check(
    FROM public.roster_invite_targets(pg_temp.ri(74), NULL)),
   '4b J2 the operator still invites the guardian of an email-less adult, and never the child');
 
+-- ── 4c. TRAK-91: only_uninvited, for load-roster --reinvite ────────────────
+-- 75 Gus (13): two unsigned guardians, g6 already invited, g7 never.
+INSERT INTO public.squad_players (id, coach_user_id, player_name, age_group) VALUES
+  (pg_temp.ri(65), pg_temp.ri(2), 'Gus Synthetic', 'U14');
+INSERT INTO public.roster_children (id, organization_id, squad_player_id, date_of_birth, child_email, loaded_by) VALUES
+  (pg_temp.ri(75), pg_temp.ri(50), pg_temp.ri(65), '2013-09-10', 'gus@roster-invite.test', 'fixture');
+INSERT INTO public.roster_guardians (roster_child_id, email, parent_user_id, invited_at, invite_count, loaded_by) VALUES
+  (pg_temp.ri(75), 'g6@roster-invite.test', NULL, now(), 1, 'fixture'),
+  (pg_temp.ri(75), 'g7@roster-invite.test', NULL, NULL,  0, 'fixture');
+SELECT pg_temp.ri_check(
+  (SELECT string_agg(email, ' ' ORDER BY email) FROM public.roster_invite_targets(pg_temp.ri(75), NULL, true)) = 'g7@roster-invite.test',
+  '4c TRAK-91 with only_uninvited, a mixed family re-sends only to the guardian never invited');
+SELECT pg_temp.ri_check(
+  (SELECT string_agg(email, ' ' ORDER BY email) FROM public.roster_invite_targets(pg_temp.ri(75), NULL)) = 'g6@roster-invite.test g7@roster-invite.test',
+  '4c CONTROL the default call is unchanged: every guardian who has not signed up, so an expired link can still be resent');
+SELECT pg_temp.ri_check(
+  (SELECT count(*) FROM public.roster_invite_targets(pg_temp.ri(71), NULL, true)) = 0
+  AND pg_temp.ri_targets(pg_temp.ri(71), NULL) = 'child:cleo@roster-invite.test:Cleo:Invite FC',
+  '4c TRAK-91 an adult child already invited is left out with only_uninvited, and still offered by default');
+
 -- ── 5. Only the edge function's service role can call either ───────────────
 SELECT pg_temp.ri_check(
-  NOT has_function_privilege('authenticated', 'public.roster_invite_targets(uuid, uuid)', 'EXECUTE')
-  AND NOT has_function_privilege('anon', 'public.roster_invite_targets(uuid, uuid)', 'EXECUTE')
+  NOT has_function_privilege('authenticated', 'public.roster_invite_targets(uuid, uuid, boolean)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.roster_invite_targets(uuid, uuid, boolean)', 'EXECUTE')
   AND NOT has_function_privilege('authenticated', 'public.mark_roster_invite_sent(uuid, text, text)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.mark_roster_invite_sent(uuid, text, text)', 'EXECUTE')
-  AND has_function_privilege('service_role', 'public.roster_invite_targets(uuid, uuid)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.roster_invite_targets(uuid, uuid, boolean)', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.mark_roster_invite_sent(uuid, text, text)', 'EXECUTE'),
   '5 no app account can read roster addresses or change delivery counts');
+SELECT pg_temp.ri_check(to_regprocedure('public.roster_invite_targets(uuid, uuid)') IS NULL,
+  '5 TRAK-91 the old two-argument version is gone, so no caller can skip the new grants');
 
 -- ── Report ─────────────────────────────────────────────────────────────────
 DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.ri_results;
-  IF total <> 12 THEN
-    RAISE EXCEPTION 'Roster invite targets: % assertions ran; expected exactly 12', total;
+  IF total <> 16 THEN
+    RAISE EXCEPTION 'Roster invite targets: % assertions ran; expected exactly 16', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'Roster invite targets: % of % failed: %', failed, total,

@@ -224,6 +224,20 @@ GROUP BY 1, 2 ORDER BY 1;
 
 In development the console logs `[telemetry] "<event>" failed:` on any write error.
 
+## A guardian resets a child's password
+
+A guardian can set a new password for a child who signs in with a username:
+Profile → the child's login card (e.g. "Sam's login") → *Set a new password*
+(TRAK-84). The reset also signs the child out of every device (TRAK-104): an
+open app signs out within 30 seconds, or as soon as its tab is opened again,
+and the card says the child "is now signed out on every device".
+
+- **"…couldn't sign … out of other devices":** the new password is set, but
+  the sign-out didn't happen. Set the password again; that retries it.
+- **A copied access token** keeps working until it expires, at most one hour
+  on this project. For a lost or shared phone, still tell the founders the
+  same day.
+
 ## Duplicate roster rows
 
 Player signup now adopts the coach's own roster entry instead of inserting a second one.

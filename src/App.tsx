@@ -49,6 +49,7 @@ const CoachAssessPage = lazy(() => import("./pages/coach/CoachAssessPage"));
 const CoachSessionsPage = lazy(() => import("./pages/coach/CoachSessionsPage"));
 const CoachAddSession = lazy(() => import("./pages/coach/CoachAddSession"));
 const CoachSessionsChooser = lazy(() => import("./pages/coach/CoachSessionsChooser"));
+const CoachSessionEdit = lazy(() => import("./pages/coach/CoachSessionEdit"));
 const CoachProfilePage = lazy(() => import("./pages/coach/CoachProfilePage"));
 const CoachManual = lazy(() => import("./pages/coach/CoachManual"));
 const CoachPlayerProfilePage = lazy(() => import("./pages/coach/CoachPlayerProfilePage"));
@@ -141,6 +142,8 @@ const App = () => (
                  matters. CoachQuickMatchLog.tsx is left in the repo, unrouted. */}
             <Route path="/coach/sessions/quick" element={<RouteGuard allowedRole="coach"><CoachAddSession /></RouteGuard>} />
             <Route path="/coach/sessions/add" element={<RouteGuard allowedRole="coach"><CoachAddSession /></RouteGuard>} />
+            {/* TRAK-102: a history row opens its session; training and other are editable. */}
+            <Route path="/coach/sessions/:id" element={<RouteGuard allowedRole="coach"><CoachSessionEdit /></RouteGuard>} />
             <Route path="/coach/profile" element={<RouteGuard allowedRole="coach"><CoachProfilePage /></RouteGuard>} />
             <Route path="/coach/manual" element={<CoachManual />} />
             <Route path="/coach/quick-assess" element={<RouteGuard allowedRole="coach"><Navigate to="/coach/assess" replace /></RouteGuard>} />

@@ -11,6 +11,8 @@ import { trackEvent } from '@/lib/telemetry'
 import { validateMatchInput, teamGoalsViolation, MATCH_LIMITS } from '@/lib/match-input-rules'
 import { localTodayISO } from '@/lib/event-time'
 import { TRAINING_FOCUS, trainingTypeFrom } from '@/lib/training-focus'
+import { trainingNotes, trainingTitle } from '@/lib/session-form'
+import { SessionChip as Chip } from '@/components/coach/SessionChip'
 
 type SquadPlayer = {
   id: string
@@ -291,10 +293,7 @@ export default function CoachAddSession() {
     const sessionTitle = isMatch
       ? `vs ${opponent.trim()}`
       : type === 'training'
-        ? (() => {
-            const focusLabel = [...trainingFocus].join(' / ')
-            return title.trim() ? `${focusLabel} — ${title.trim()}` : `${focusLabel} Training`
-          })()
+        ? trainingTitle(trainingFocus, title)
         : title.trim()
 
     // On a retry the session already exists; inserting again would give the
@@ -311,16 +310,9 @@ export default function CoachAddSession() {
         // Only the fixed labels; the coach's theme stays in the title.
         training_type: type === 'training' ? trainingTypeFrom(trainingFocus) : null,
         session_date:  date,
-        notes: (() => {
-          if (type === 'training') {
-            const meta = [
-              `${trainingDuration} min`,
-              trainingIntensity ? `${trainingIntensity} intensity` : null,
-            ].filter(Boolean).join(' · ')
-            return [meta, notes].filter(Boolean).join('\n') || null
-          }
-          return notes || null
-        })(),
+        notes: type === 'training'
+          ? trainingNotes(trainingDuration, trainingIntensity, notes)
+          : notes || null,
         // coach_sessions has no `opponent` column — sending one made PostgREST
         // reject the whole insert, so every match save failed with "Could not
         // save session". The opponent already lives in the title ("vs X") and
@@ -1113,20 +1105,5 @@ export default function CoachAddSession() {
         </button>
       </div>
     </MobileShell>
-  )
-}
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick}
-      className="px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors"
-      style={{
-        background: active ? 'rgba(200,242,90,0.12)' : '#202024',
-        color: active ? '#C8F25A' : 'rgba(255,255,255,0.45)',
-        border: `1px solid ${active ? 'rgba(200,242,90,0.3)' : 'rgba(255,255,255,0.07)'}`,
-        fontFamily: "'DM Sans', sans-serif",
-      }}>
-      {children}
-    </button>
   )
 }

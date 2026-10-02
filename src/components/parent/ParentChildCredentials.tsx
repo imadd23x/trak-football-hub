@@ -34,6 +34,8 @@ function ChildPasswordCard({ parentId, child }: { parentId: string; child: Child
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  // TRAK-104: the password changed but other devices may still be signed in.
+  const [signOutFailed, setSignOutFailed] = useState(false)
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => { request.current?.abort() }, [])
   const clearForm = () => { setPassword(''); setConfirm(''); setOpen(false) }
@@ -42,10 +44,12 @@ function ChildPasswordCard({ parentId, child }: { parentId: string; child: Child
     const problem = validatePassword(password) || (password !== confirm ? 'Passwords do not match' : null)
     if (problem) { setError(problem); return }
     const controller = new AbortController(); request.current = controller
-    setBusy(true); setError(null); setSaved(false)
+    setBusy(true); setError(null); setSaved(false); setSignOutFailed(false)
     try {
-      await resetChildPassword(parentId, child.roster_child_id, password, controller.signal)
-      if (!controller.signal.aborted) { clearForm(); setSaved(true) }
+      const result = await resetChildPassword(parentId, child.roster_child_id, password, controller.signal)
+      if (!controller.signal.aborted) {
+        if (result === 'signed_out') { clearForm(); setSaved(true) } else setSignOutFailed(true)
+      }
     } catch {
       if (!controller.signal.aborted) setError('Could not set the password. Check your guardian link and approval, then try again.')
     } finally {
@@ -55,7 +59,8 @@ function ChildPasswordCard({ parentId, child }: { parentId: string; child: Child
   return <section aria-label={`${child.first_name}'s login`} className="rounded-xl border border-border p-4 space-y-3">
     <h2 className="text-base text-foreground">{child.first_name}'s login</h2>
     <p className="text-sm text-muted-foreground">Username: <strong className="text-foreground">{child.username}</strong></p>
-    {saved && <p role="status" className="text-sm text-foreground">Password set for {child.first_name}.</p>}
+    {saved && <p role="status" className="text-sm text-foreground">Password set for {child.first_name}. {child.first_name} is now signed out on every device.</p>}
+    {signOutFailed && <p role="alert" className="text-sm text-destructive">{child.first_name}'s password changed, but we couldn't sign {child.first_name} out of other devices. Set the password again to retry.</p>}
     {open ? <>
       <PasswordInput label={`${child.first_name}'s new password`} autoComplete="new-password" placeholder={PASSWORD_HINT}
         value={password} disabled={busy} onChange={e => setPassword(e.target.value)} />
@@ -64,6 +69,6 @@ function ChildPasswordCard({ parentId, child }: { parentId: string; child: Child
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <Button disabled={busy} onClick={() => { void save() }}>{busy ? 'Saving…' : 'Save new password'}</Button>
       <Button variant="ghost" disabled={busy} onClick={clearForm}>Cancel</Button>
-    </> : <Button variant="outline" onClick={() => { setOpen(true); setError(null); setSaved(false) }}>Set a new password</Button>}
+    </> : <Button variant="outline" onClick={() => { setOpen(true); setError(null); setSaved(false); setSignOutFailed(false) }}>Set a new password</Button>}
   </section>
 }

@@ -31,32 +31,19 @@ test.describe('Landing page', () => {
 })
 
 test.describe('Player onboarding', () => {
-  test('registration form renders all required fields', async ({ page }) => {
+  // TRAK-101: no public player signup. A child joins from their academy's
+  // invitation; a signed-out visitor is pointed there instead of given a form.
+  test('a signed-out visitor gets no signup form, only a pointer to their invitation', async ({ page }) => {
     await page.goto(`${BASE}/onboarding/player`)
-    // Step 1 fields should be visible
-    await expect(page.getByPlaceholder(/full name/i)).toBeVisible()
-    await expect(page.getByPlaceholder(/email/i)).toBeVisible()
-    // Password field with 8-char minimum
-    const pwInput = page.locator('input[type="password"]').first()
-    await expect(pwInput).toBeVisible()
+    await expect(page.getByText(/Open the invitation your academy emailed you/)).toBeVisible()
+    await expect(page.getByPlaceholder(/full name/i)).toHaveCount(0)
+    await expect(page.getByPlaceholder(/email/i)).toHaveCount(0)
   })
 
-  test('password shorter than 8 characters shows an error', async ({ page }) => {
-    await page.goto(`${BASE}/onboarding/player`)
-    // Fill all required step-1 fields so we reach the password length check
-    await page.getByPlaceholder(/full name/i).fill('Test Player')
-    const selects = page.locator('select')
-    await selects.nth(0).selectOption({ index: 1 })  // DOB day
-    await selects.nth(1).selectOption({ index: 1 })  // DOB month
-    await selects.nth(2).selectOption({ index: 1 })  // DOB year
-    await selects.nth(3).selectOption({ index: 1 })  // nationality
-    await page.getByPlaceholder(/email/i).fill('player@test.com')
-    const pwInputs = page.locator('input[type="password"]')
-    await pwInputs.nth(0).fill('short')
-    await pwInputs.nth(1).fill('short')
-    const continueBtn = page.getByRole('button', { name: /continue|next/i }).first()
-    await continueBtn.click()
-    await expect(page.getByText(/8 characters/i)).toBeVisible({ timeout: 3000 })
+  test('a used or expired invitation link says so and offers Sign in', async ({ page }) => {
+    await page.goto(`${BASE}/onboarding/player#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`)
+    await expect(page.getByRole('heading', { name: 'This link has already been used or has expired' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
   })
 })
 

@@ -54,6 +54,7 @@
 //
 //   node scripts/load-roster.mjs ... --apply --send-invites
 
+import { isSyntheticAddress } from './synthetic-domain.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -211,13 +212,27 @@ export function planReinvite(rows, onRoster) {
   const toInvite = [];
   const upToDate = [];
   const notOnRoster = [];
+  const synthetic = [];
   for (const r of rows) {
     const child = r.child_email ? byEmail.get(r.child_email) : byPerson.get(person(r.child_name, r.date_of_birth));
     if (!child) notOnRoster.push(r.line);
-    else if (child.guardians.some(g => !g.invited_at && !g.parent_user_id)) toInvite.push({ line: r.line, rosterChildId: child.id });
-    else upToDate.push(r.line);
+    else if (!child.guardians.some(g => !g.invited_at && !g.parent_user_id)) upToDate.push(r.line);
+    // send-roster-invites emails every stored guardian who hasn't signed up,
+    // invited before or not. If one of them is on a reserved test domain, the
+    // line is refused: a file corrected since the load doesn't change who is
+    // stored (Imad, #202).
+    else if (child.guardians.some(g => !g.parent_user_id && isSyntheticAddress(g.email))) synthetic.push(r.line);
+    else toInvite.push({ line: r.line, rosterChildId: child.id });
   }
-  return { toInvite, upToDate, notOnRoster };
+  return { toInvite, upToDate, notOnRoster, synthetic };
+}
+
+// TRAK-91 follow-up: the lines holding a reserved test address (the J7 rule),
+// child or guardian. Such an address can't receive mail, so inviting it is an
+// operator mistake (the synthetic TRAK-24 file with --send-invites, or
+// --reinvite on it). main() refuses before anything is loaded or sent.
+export function syntheticInviteLines(rows) {
+  return rows.filter(r => [r.child_email, ...r.guardian_emails].filter(Boolean).some(isSyntheticAddress)).map(r => r.line);
 }
 
 // Sends each re-invitation in turn. A failure is reported by line and the rest
@@ -258,6 +273,12 @@ export function inviteRequest(url, key, rosterChildId, { onlyUninvited = false }
         : { roster_child_id: rosterChildId }),
     },
   };
+}
+
+/** TRAK-97: the function held back a second email because the guardian already had a fresh one. */
+export function pendingGuardianNote(body) {
+  const pending = Array.isArray(body?.results) && body.results.some(r => r?.reason === 'guardian_invite_pending');
+  return pending ? 'A guardian already had a fresh invitation for another child, so no second email went; their consent screen lists every child.' : null;
 }
 
 /** Why an invitation failed: the status and the function's reason, which never holds an address. */
@@ -305,7 +326,7 @@ async function resolveCoaches(admin, emails) {
 async function reinvite(admin, args, rows, sendInvite) {
   const { data, error } = await admin
     .from('roster_children')
-    .select('id, child_email, date_of_birth, squad_players(player_name), roster_guardians(invited_at, parent_user_id)')
+    .select('id, child_email, date_of_birth, squad_players(player_name), roster_guardians(email, invited_at, parent_user_id)')
     .eq('organization_id', args.org);
   if (error) throw new Error(`Could not read the roster: ${error.message}`);
   const onRoster = (data ?? []).map(c => ({
@@ -315,7 +336,10 @@ async function reinvite(admin, args, rows, sendInvite) {
     player_name: c.squad_players?.player_name ?? '',
     guardians: c.roster_guardians ?? [],
   }));
-  const { toInvite, upToDate, notOnRoster } = planReinvite(rows, onRoster);
+  const { toInvite, upToDate, notOnRoster, synthetic } = planReinvite(rows, onRoster);
+  if (synthetic.length) {
+    console.log(`[load-roster] Line(s) ${synthetic.join(', ')}: a stored guardian address is a reserved test address (e.g. .test); not invited. Correct it on the roster first.`);
+  }
   if (notOnRoster.length) {
     console.log(`[load-roster] Line(s) ${notOnRoster.join(', ')} aren't on this academy's roster. --reinvite loads nothing: load them first.`);
   }
@@ -350,6 +374,14 @@ async function main() {
     process.exitCode = 1;
     return;
   }
+  if (args['send-invites'] || args.reinvite) {
+    const synthetic = syntheticInviteLines(rows);
+    if (synthetic.length) {
+      console.log(`[load-roster] Line(s) ${synthetic.join(', ')} use a reserved test address (e.g. .test), which can't receive mail. Load them without --send-invites, and don't --reinvite them. Nothing loaded or sent.`);
+      process.exitCode = 1;
+      return;
+    }
+  }
   console.log(args.reinvite
     ? '[load-roster] --reinvite: loads nothing; re-sends invitations only where a guardian was never invited and hasn\'t signed up.'
     : !args['send-invites']
@@ -377,6 +409,8 @@ async function main() {
     const body = await res.json().catch(() => ({}));
     const sent = res.ok && body.failed === 0;
     if (!sent) console.log(`[load-roster] An invitation was not sent: ${describeInviteFailure(res.status, body)}.`);
+    const note = sent ? pendingGuardianNote(body) : null;
+    if (note) console.log(`[load-roster] ${note}`);
     return sent;
   };
   if (args.reinvite) {

@@ -258,8 +258,14 @@ SUPABASE_URL=… SUPABASE_SECRET_KEY=sb_secret_… TRAK_CONFIRM_HOST=<project ho
 - A failure is reported by line (no addresses). Fix the cause, then run `--reinvite`
   again. It only ever picks up what is still missing.
 - It loads nothing and refuses `--send-invites` / `--no-invites`.
-- **An invitation that went but doesn't work** (expired link, or the older of two links;
-  see TRAK-97/TRAK-101) is not this case. `--reinvite` won't resend it, on purpose, and
+- **Siblings (TRAK-97):** a guardian of several children gets **one** email. The function
+  holds back the second one while their invitation for another child is under an hour
+  old (Supabase's default link lifetime), marks that row invited anyway, and the loader
+  prints "A guardian already had a fresh invitation for another child…". That's expected:
+  their consent screen lists every child. A second `/invite` would have killed the first
+  link (1 Oct: 403 `One-time token not found`).
+- **An invitation that went but doesn't work** (an expired link; see TRAK-101) is not
+  this case. `--reinvite` won't resend it, on purpose, and
   there is no tested resend path for it yet. Don't improvise one: raise it in the
   founders' channel with the roster child id (no address).
 
@@ -286,5 +292,15 @@ node scripts/correct-roster-email.mjs --roster-child <roster child id> --kind gu
   correction, that address can no longer claim the child.
 - **Then re-invite** that roster child. The script sends nothing; the
   correction cleared `invited_at` so the new address gets the invitation.
+- **A guardian with more than one child: correct every roster child that
+  has the wrong address.** The address is stored once per child, so it sits
+  on one roster row per sibling. Run the correction once for each of them,
+  or the other child's invitation still goes to the wrong address. Find them
+  first (read-only, in the SQL editor):
+
+  ```sql
+  SELECT roster_child_id FROM roster_guardians
+  WHERE lower(btrim(email)) = lower(btrim('<wrong address>'));
+  ```
 - The addresses go only on the command line on the operator's own machine,
   never into Slack or Linear.

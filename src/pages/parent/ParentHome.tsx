@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { ParentAssessmentBands, ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
 import { ParentAlertsBell } from '@/components/parent/ParentAlertsBell'
+import { ApprovedAwaitingList } from '@/components/parent/ApprovedAwaitingSignup'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches, useRosterChildrenAwaitingConsent, useChildLogins } from '@/hooks/useParentData'
 import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
@@ -56,6 +57,8 @@ export default function ParentHome() {
             <p className="text-xs text-muted-foreground mt-1">Review your children's pending approvals.</p>
           </button>
         )}
+        {/* TRAK-98: approved children who haven't signed up aren't in the family list yet. */}
+        <ApprovedAwaitingList />
         <ParentChildSelector />
         {loginQuery.isError ? <ParentLoadError message="Couldn't check your children's logins." onRetry={() => {void loginQuery.refetch()}} />
           : (loginQuery.data?.length??0)>0 && <button onClick={()=>navigate('/parent/consent')}

@@ -51,6 +51,9 @@ export declare function inviteRequest(url: string, key: string, rosterChildId: s
   url: string
   init: { method: 'POST'; headers: Record<string, string>; body: string }
 }
+export declare function reinviteExitCode(
+  plan: { toInvite: unknown[]; upToDate: number[]; notOnRoster: number[]; synthetic: number[] }, failedCount: number,
+): 0 | 1
 export declare function pendingGuardianNote(body: unknown): string | null
 export declare function describeInviteFailure(status: number, body: unknown): string
 export declare function parseArgs(argv: string[]): {

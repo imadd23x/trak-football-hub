@@ -1,0 +1,16 @@
+# TRAK-105 (Imad, 2 Oct; the 28 Sep rule): code needs a non-author founder's
+# approval, docs don't. Branch protection requires a code-owner review with 0
+# required approvals, so a PR that touches only unowned files needs no review.
+# The last matching line wins.
+
+*                       @imadd23x @kostasanastasioubusiness-lang @t-bones29
+
+# Docs: no owner, no review.
+*.md
+/docs/
+
+# Docs that still need a founder: uc:check reads the use cases, the release
+# docs are the merge rules, and MVP Requirements is the pilot's scope.
+/docs/use-cases/        @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/docs/release/          @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/MVP\ Requirements      @imadd23x @kostasanastasioubusiness-lang @t-bones29

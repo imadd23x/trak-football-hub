@@ -106,10 +106,13 @@ describe('an invited child finishes signing up (TRAK-11 phase 4)', () => {
     expect(window.location.pathname).toBe('/onboarding/player')
   })
 
-  it('CONTROL someone who is not signed in still gets the signup form', async () => {
+  // TRAK-101: there is no public player signup; a signed-out visitor is
+  // pointed to their invitation instead of being given a form.
+  it('CONTROL someone who is not signed in gets no signup form, only a pointer to their invitation', async () => {
     localStorage.clear()
     renderApp('/onboarding/player')
-    expect(await screen.findByPlaceholderText('Email')).toBeInTheDocument()
+    expect(await screen.findByText(/Open the invitation your academy emailed you/)).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Email')).toBeNull()
     expect(screen.queryByRole('heading', { name: /Welcome/ })).toBeNull()
   })
 })

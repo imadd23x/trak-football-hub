@@ -111,6 +111,25 @@ describe('TRAK-24 rehearsal roster', () => {
     expect(() => rows('tester+x@example.com', TODAY)).toThrow(/plain address/)
   })
 
+  // TRAK-93: on 29 Sep the phone file was made with --inbox YOURNAME@gmail.com,
+  // a stranger's real Gmail account, and every phone family went to it.
+  it.each(['YOURNAME@gmail.com', 'you@gmail.com', 'your.name@outlook.com', '<inbox>@gmail.com'])(
+    'refuses the placeholder inbox %s', (inbox) => {
+      expect(() => rows(inbox, TODAY)).toThrow(/placeholder/)
+    })
+
+  it('refuses a placeholder --inbox on the command line and writes no file', () => {
+    const out = resolve(REPO_ROOT, '..', `trak24-placeholder-${process.pid}.csv`)
+    const phone = resolve(REPO_ROOT, '..', `trak24-placeholder-phone-${process.pid}.csv`)
+    try {
+      const run = spawnSync(process.execPath, ['scripts/rehearsal/make-roster.mjs', '--inbox', 'YOURNAME@gmail.com',
+        '--out', out, '--phone-out', phone], { cwd: REPO_ROOT, encoding: 'utf8' })
+      expect(run.status).toBe(1)
+      expect(run.stderr).toMatch(/placeholder/)
+      expect(existsSync(out) || existsSync(phone)).toBe(false)
+    } finally { rmSync(out, { force: true }); rmSync(phone, { force: true }) }
+  })
+
   // Kostas's #169 review: the guard compared against the folder the script
   // was run from, so `cd scripts && … --out ../x.csv` wrote real inboxes into
   // the public repository.

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
+import { fetchWaitReason, WAIT_TITLE, waitText, type WaitReason } from '@/lib/wait-reason'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
 import { MobileShell, BandPill, NavBar } from '@/components/trak'
@@ -326,6 +327,15 @@ function CoachAssessmentForm() {
       .then(({ data, error }) => { if (!cancelled && !error) setConsentWait(data === true) })
     return () => { cancelled = true }
   }, [playerId])
+  // TRAK-99: say which of the two waits it is. null until read, or if it can't be.
+  const [waitReason, setWaitReason] = useState<WaitReason | null>(null)
+  useEffect(() => {
+    setWaitReason(null)
+    if (!playerId || !consentWait) return
+    let cancelled = false
+    void fetchWaitReason(playerId).then(reason => { if (!cancelled) setWaitReason(reason) })
+    return () => { cancelled = true }
+  }, [playerId, consentWait])
 
   /* --- save ---
      TRAK-64 (Imad, 25 Sep): one button. Saving stores the sliders and the
@@ -578,9 +588,9 @@ function CoachAssessmentForm() {
 
         {selectedPlayer && consentWait ? (
           <div role="status" className="p-3 rounded-[12px] border border-[rgba(255,196,0,0.25)] bg-[rgba(255,196,0,0.06)]">
-            <p className="text-[13px] font-medium text-white/85">Waiting for a parent</p>
+            <p className="text-[13px] font-medium text-white/85">{WAIT_TITLE[waitReason ?? 'unknown']}</p>
             <p className="text-[12px] text-white/55 leading-relaxed mt-0.5">
-              You can assess {selectedPlayer.player_name} once a parent has approved their account.
+              {waitText(waitReason, selectedPlayer.player_name)}{' '}
               The form stays locked until then, and nothing about them is recorded.
             </p>
           </div>

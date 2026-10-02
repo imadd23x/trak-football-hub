@@ -74,6 +74,8 @@ export function authHandlers(): HttpHandler[] {
     // Asked only after that gate said no; tests of the reason register their own.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_player_wait_reason`, () => HttpResponse.json('parent')),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_credentials`, () => HttpResponse.json([])),
+    // TRAK-98: no approved child waiting to sign up, unless a test says so.
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_approved_children_awaiting_signup`, () => HttpResponse.json([])),
     // TRAK-104: a signed-in player's session is live unless a test says otherwise.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/my_session_is_live`, () => HttpResponse.json(true)),
     http.get(`${SUPABASE_URL}/auth/v1/user`, ({ request }) => {

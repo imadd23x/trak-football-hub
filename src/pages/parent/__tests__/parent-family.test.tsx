@@ -297,9 +297,9 @@ describe('parent loading, empty and error states', () => {
     server.use(http.get(endpoint('player_parent_links'), async () => { await pending; return HttpResponse.json([]) }))
     renderFamily('/parent/matches')
     expect(screen.getByRole('status')).toHaveTextContent('Loading')
-    expect(screen.queryByText('No child linked yet')).not.toBeInTheDocument()
+    expect(screen.queryByText('No child has signed up yet')).not.toBeInTheDocument()
     await act(async () => { release(); await pending })
-    expect(await screen.findByText('No child linked yet')).toBeInTheDocument()
+    expect(await screen.findByText('No child has signed up yet')).toBeInTheDocument()
     expect(screen.queryByText('No matches yet.')).not.toBeInTheDocument()
   })
 
@@ -307,7 +307,7 @@ describe('parent loading, empty and error states', () => {
     server.use(http.get(endpoint('player_parent_links'), fail))
     renderFamily('/parent/matches')
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load your linked children")
-    expect(screen.queryByText('No child linked yet')).not.toBeInTheDocument()
+    expect(screen.queryByText('No child has signed up yet')).not.toBeInTheDocument()
     installFamily()
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
@@ -349,7 +349,7 @@ describe('parent loading, empty and error states', () => {
   it('shows the empty family and a links failure once on Profile', async () => {
     server.use(http.get(endpoint('player_parent_links'), () => HttpResponse.json([])))
     const empty = renderFamily('/parent/profile')
-    expect(await screen.findAllByText('No child linked yet')).toHaveLength(1)
+    expect(await screen.findAllByText('No child has signed up yet')).toHaveLength(1)
     empty.unmount()
 
     server.use(http.get(endpoint('player_parent_links'), fail))

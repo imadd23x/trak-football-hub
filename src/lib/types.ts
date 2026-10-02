@@ -122,6 +122,8 @@ export interface Player {
   club: string | null
   age_group: string | null
   shirt_number: number | null
+  // Legacy (TRAK-72): nobody joins by code any more; the academy roster links
+  // players (J1) and guardians (J2). Kept only because the columns still exist.
   coach_invite_code: string | null
   parent_invite_code: string | null
   created_at: string

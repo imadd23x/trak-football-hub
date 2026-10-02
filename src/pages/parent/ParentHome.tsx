@@ -1,11 +1,12 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
-import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
+import { ParentAssessmentBands, ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
+import { ParentAlertsBell } from '@/components/parent/ParentAlertsBell'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
-import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches } from '@/hooks/useParentData'
+import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches, useRosterChildrenAwaitingConsent, useChildLogins } from '@/hooks/useParentData'
 import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
-import { BANDS } from '@/lib/types'
-import { scoreToBand } from '@/lib/rating-engine'
+import { trackEvent } from '@/lib/telemetry'
 
 export default function ParentHome() {
   const navigate = useNavigate()
@@ -14,6 +15,12 @@ export default function ParentHome() {
   const matchQuery = useParentMatches()
   const developmentQuery = useParentDevelopment()
   const consentQuery = useChildrenAwaitingConsent()
+  const rosterConsentQuery = useRosterChildrenAwaitingConsent()
+  const loginQuery = useChildLogins()
+  // Children waiting on this guardian: with an account, and rostered ones who
+  // have none yet (TRAK-11 phase 4; first names only).
+  const waitingNames = [...(consentQuery.data ?? []).map(child => child.full_name),
+    ...(rosterConsentQuery.data ?? []).map(child => child.first_name)]
   const matches = matchQuery.data ?? []
   const development = developmentQuery.data
   const assessment = development?.assessments[0]
@@ -22,22 +29,40 @@ export default function ParentHome() {
   const hasError = matchQuery.isError || developmentQuery.isError
   const loading = matchQuery.isPending || developmentQuery.isPending
 
+  // J7 (TRAK-10): parents never see the coach's message (TRAK-63), so a parent
+  // open is the child's latest assessment reaching this screen. The pilot view
+  // counts each parent and assessment once and checks the parent's link.
+  const shownAssessmentId = selectedChild && !loading && !hasError ? assessment?.id : undefined
+  useEffect(() => {
+    if (shownAssessmentId) void trackEvent('assessment_viewed', { assessment_id: shownAssessmentId })
+  }, [shownAssessmentId])
+
   return (
     <MobileShell>
       <div className="pt-3 pb-4">
-        <h1 className="text-xl text-foreground mb-5">Home</h1>
-        {consentQuery.isError ? (
-          <ParentLoadError message="Couldn't check pending approvals." onRetry={() => { void consentQuery.refetch() }} />
-        ) : (consentQuery.data?.length ?? 0) > 0 && (
+        {/* TRAK-74: alerts are a bell here, not a tab. */}
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="text-xl text-foreground">Home</h1>
+          <ParentAlertsBell />
+        </div>
+        {consentQuery.isError || rosterConsentQuery.isError ? (
+          <ParentLoadError message="Couldn't check pending approvals." onRetry={() => { void consentQuery.refetch(); void rosterConsentQuery.refetch() }} />
+        ) : waitingNames.length > 0 && (
           <button onClick={() => navigate('/parent/consent')}
             className="w-full text-left rounded-xl border border-primary/30 bg-primary/10 p-4 mb-4">
             <p className="text-sm text-foreground">
-              {consentQuery.data!.map(child => child.full_name).join(', ')} {consentQuery.data!.length === 1 ? 'is' : 'are'} waiting on your approval
+              {waitingNames.join(', ')} {waitingNames.length === 1 ? 'is' : 'are'} waiting on your approval
             </p>
             <p className="text-xs text-muted-foreground mt-1">Review your children's pending approvals.</p>
           </button>
         )}
         <ParentChildSelector />
+        {loginQuery.isError ? <ParentLoadError message="Couldn't check your children's logins." onRetry={() => {void loginQuery.refetch()}} />
+          : (loginQuery.data?.length??0)>0 && <button onClick={()=>navigate('/parent/consent')}
+            className="w-full text-left rounded-xl border border-primary/30 bg-primary/10 p-4 mb-4">
+            <p className="text-sm text-foreground">Finish your child's login setup</p>
+            <p className="text-xs text-muted-foreground">Create or view the username they need to sign in.</p>
+          </button>}
         <ParentFamilyContent>
           {hasError ? <ParentLoadError onRetry={() => { void matchQuery.refetch(); void developmentQuery.refetch() }} />
             : loading ? <ParentLoading /> : (
@@ -75,26 +100,7 @@ export default function ParentHome() {
                         </div>
                         <ParentRating rating={assessment.coach_rating} missing="Not assessed" />
                       </div>
-                      <div className="space-y-3">
-                        {[
-                          { label: 'Work Rate', score: assessment.work_rate },
-                          { label: 'Tactical', score: assessment.tactical },
-                          { label: 'Attitude', score: assessment.attitude },
-                          { label: 'Technical', score: assessment.technical },
-                          { label: 'Physical', score: assessment.physical },
-                          { label: 'Coachability', score: assessment.coachability },
-                        ].map(category => {
-                          const rated = category.score != null && Number.isFinite(category.score)
-                          const band = rated ? BANDS.find(item => item.word.toLowerCase() === scoreToBand(category.score)) : null
-                          return <div key={category.label} className="flex items-center gap-3">
-                            <span className="w-24 text-xs text-muted-foreground">{category.label}</span>
-                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden" aria-hidden="true">
-                              {rated && <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(10, category.score)) * 10}%`, backgroundColor: band?.color }} />}
-                            </div>
-                            <span className="text-xs w-20 text-right text-muted-foreground" style={band ? { color: band.color } : undefined}>{band?.word ?? 'Not assessed'}</span>
-                          </div>
-                        })}
-                      </div>
+                      <ParentAssessmentBands assessment={assessment} />
                     </div>
                   ) : <p className="py-4 text-sm text-muted-foreground">No coach assessments yet.</p>}
                 </section>
@@ -110,7 +116,7 @@ export default function ParentHome() {
                 <section className="mt-5" aria-label="Recent matches">
                   <MetadataLabel text="RECENT MATCHES" />
                   {matches.length ? <div className="rounded-xl mt-2 bg-card border border-border divide-y divide-border">
-                    {matches.slice(0, 5).map(match => <div key={match.id} className="flex items-center gap-3 p-4">
+                    {matches.slice(0, 5).map(match => <Link key={match.id} to={`/parent/match/${match.id}`} className="flex items-center gap-3 p-4">
                       <span className="w-5 text-xs text-muted-foreground">{matchResult(match) ?? '—'}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground truncate">{match.opponent || match.competition || 'Match'}</p>
@@ -119,7 +125,7 @@ export default function ParentHome() {
                         </p>
                       </div>
                       <ParentRating rating={match.computed_rating} />
-                    </div>)}
+                    </Link>)}
                   </div> : <p className="py-4 text-sm text-muted-foreground">No matches yet. Matches recorded by the coach will appear here.</p>}
                 </section>
               </>

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client'
+import { scoreToBand } from '@/lib/rating-engine'
 import type { Tables } from '@/integrations/supabase/types'
 
 export interface ParentChild {
@@ -31,6 +32,7 @@ export interface ParentDevelopment {
   assessments: ParentAssessment[]
   awards: ParentAward[]
   coachNames: Record<string, string>
+  // No coach message: parents see the bands only (TRAK-63, 25 Sep).
 }
 
 export { fetchAwaitingConsent, type AwaitingConsentChild } from './parent-consent'
@@ -117,4 +119,37 @@ export function formatParentDate(value: string | null): string {
 
 export function formatParentAward(type: string): string {
   return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}
+
+export interface ParentAlert {
+  id: string
+  kind: 'match' | 'assessment' | 'award'
+  targetId: string
+  title: string
+  description: string
+  date: string | null
+}
+
+/** Newest first. Awards are left out on Home's bell while awards are parked (TRAK-31). */
+export function parentAlerts(matches: ParentMatch[], development: ParentDevelopment | undefined,
+  { awards = true }: { awards?: boolean } = {}): ParentAlert[] {
+  const coach = (id: string | null) => (id && development?.coachNames[id]) || 'Coach'
+  return [
+    // Activity is ordered by when it was recorded, including backfilled games.
+    // Copy first: the shared query cache remains in match-date order.
+    ...[...matches]
+      .sort((a, b) => (Date.parse(b.created_at ?? '') || 0) - (Date.parse(a.created_at ?? '') || 0))
+      .slice(0, 20).map((match): ParentAlert => ({
+        id: `match-${match.id}`, kind: 'match', targetId: match.id, title: 'Match logged', date: match.created_at,
+        description: `vs ${match.opponent || match.competition || 'Unknown'}${match.team_score != null && match.opponent_score != null ? ` · ${match.team_score}–${match.opponent_score}` : ''}`,
+      })),
+    ...(development?.assessments ?? []).map((assessment): ParentAlert => ({
+      id: `assessment-${assessment.id}`, kind: 'assessment', targetId: assessment.id, title: 'New coach assessment', date: assessment.created_at,
+      description: `by ${coach(assessment.coach_user_id)} · ${assessment.coach_rating == null ? 'Not assessed' : scoreToBand(assessment.coach_rating)}`,
+    })),
+    ...(awards ? development?.awards ?? [] : []).map((award): ParentAlert => ({
+      id: `award-${award.id}`, kind: 'award', targetId: award.id, title: formatParentAward(award.award_type), date: award.created_at,
+      description: [award.awarded_for, `by ${coach(award.coach_user_id)}`].filter(Boolean).join(' · '),
+    })),
+  ].sort((a, b) => (Date.parse(b.date ?? '') || 0) - (Date.parse(a.date ?? '') || 0))
 }

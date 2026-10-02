@@ -4,13 +4,39 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell } from '@/components/trak'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { fetchAwaitingConsent, recordParentApproval, type AwaitingConsentChild } from '@/lib/parent-consent'
+import {
+  fetchAwaitingConsent,
+  fetchRosterAwaitingConsent,
+  recordParentApproval,
+  recordRosterApproval,
+  requestChildInvitation,
+  fetchMyChildLogins,
+} from '@/lib/parent-consent'
+import { ChildLoginCard } from '@/components/parent/ChildLoginCard'
+import type { ChildLoginState } from '@/lib/child-login'
 import {
   CONSENT_PURPOSES,
   CONSENT_STATEMENT,
   CONSENT_THRESHOLD_AGE,
   type ConsentPurposeKey,
 } from '@/lib/consent'
+
+/* One list for both kinds of waiting child. 'roster' is a child the academy
+   rostered who has no account yet (TRAK-11 phase 1): the name is a first name,
+   and approving also asks Trak to email them their invitation (phase 3). */
+interface WaitingChild {
+  key: string
+  kind: 'account' | 'roster'
+  id: string
+  full_name: string
+  age_years: number
+}
+
+interface ChildInvitation {
+  rosterChildId: string
+  name: string
+  state: 'sending' | 'sent' | 'failed'
+}
 
 interface ApprovalDraft {
   childId: string
@@ -31,12 +57,16 @@ interface ApprovalDraft {
  */
 function ParentConsentAccount({ parentId }: { parentId: string }) {
   const navigate = useNavigate()
-  const [children, setChildren] = useState<AwaitingConsentChild[]>([])
+  const [children, setChildren] = useState<WaitingChild[]>([])
+  const [invitation, setInvitation] = useState<ChildInvitation | null>(null)
+  const [logins, setLogins] = useState<ChildLoginState[]>([])
+  const [loginChild, setLoginChild] = useState<ChildLoginState | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [savedFor, setSavedFor] = useState<string | null>(null)
   const [draft, setDraft] = useState<ApprovalDraft | null>(null)
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
   const mounted = useRef(false)
   const reading = useRef<AbortController | null>(null)
   const writing = useRef<AbortController | null>(null)
@@ -50,12 +80,21 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
     setLoading(true)
     setLoadError(null)
     try {
-      const pending = await fetchAwaitingConsent(request.signal)
+      const [accounts, roster, childLogins] = await Promise.all([
+        fetchAwaitingConsent(request.signal),
+        fetchRosterAwaitingConsent(request.signal),
+        fetchMyChildLogins(request.signal),
+      ])
       if (!mounted.current || reading.current !== request) return
+      const pending: WaitingChild[] = [
+        ...accounts.map(c => ({ key: c.player_user_id, kind: 'account' as const, id: c.player_user_id, full_name: c.full_name, age_years: c.age_years })),
+        ...roster.map(c => ({ key: c.roster_child_id, kind: 'roster' as const, id: c.roster_child_id, full_name: c.first_name, age_years: c.age_years })),
+      ]
       setChildren(pending)
+      setLogins(childLogins)
       setLoading(false)
       // A successful refresh, not a stale pre-save count, determines completion.
-      if (finishAfterRefresh.current && pending.length === 0) {
+      if (finishAfterRefresh.current && pending.length === 0 && childLogins.length === 0) {
         finishAfterRefresh.current = false
         navigate('/parent/home', { replace: true })
       }
@@ -76,13 +115,19 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
     }
   }, [load])
 
-  const child = children[0] ?? null
-  const currentDraft: ApprovalDraft = draft?.childId === child?.player_user_id && draft
+  const child = children.find(item => item.key === selectedChildId) ?? children[0] ?? null
+  const currentDraft: ApprovalDraft = draft?.childId === child?.key && draft
     ? draft
-    : { childId: child?.player_user_id ?? '', relationship: 'parent', optional: {}, confirmed: false }
+    : { childId: child?.key ?? '', relationship: 'parent', optional: {}, confirmed: false }
   const { relationship, optional, confirmed } = currentDraft
   const updateDraft = (change: Partial<Omit<ApprovalDraft, 'childId'>>) => {
     setDraft({ ...currentDraft, ...change })
+  }
+
+  const inviteChild = async (rosterChildId: string, name: string) => {
+    setInvitation({ rosterChildId, name, state: 'sending' })
+    const sent = await requestChildInvitation(parentId, rosterChildId, new AbortController().signal).catch(() => false)
+    if (mounted.current) setInvitation({ rosterChildId, name, state: sent ? 'sent' : 'failed' })
   }
 
   const handleSubmit = async () => {
@@ -97,11 +142,24 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
         acc[purpose.key] = purpose.required || Boolean(optional[purpose.key])
         return acc
       }, {} as Record<ConsentPurposeKey, boolean>)
-      await recordParentApproval(parentId, { playerUserId: child.player_user_id, relationship, purposes }, request.signal)
+      if (child.kind === 'account') {
+        await recordParentApproval(parentId, { playerUserId: child.id, relationship, purposes }, request.signal)
+      } else {
+        await recordRosterApproval(parentId, { rosterChildId: child.id, relationship, purposes }, request.signal)
+      }
       if (!mounted.current || request.signal.aborted) return
       setSavedFor(child.full_name)
       setDraft(null)
-      finishAfterRefresh.current = true
+      if (child.kind === 'roster') {
+        // Re-read after approval. A failed check never falls through to mail.
+        const childLogins = await fetchMyChildLogins(request.signal)
+        if (!mounted.current || request.signal.aborted) return
+        const login = childLogins.find(item => item.roster_child_id === child.id)
+        if (login) setLoginChild(login)
+        else void inviteChild(child.id, child.full_name)
+      } else {
+        finishAfterRefresh.current = true
+      }
       await load()
     } catch {
       if (!mounted.current || request.signal.aborted) return
@@ -115,6 +173,32 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
       if (writing.current === request) writing.current = null
       if (mounted.current) setSubmitting(false)
     }
+  }
+
+  if (loginChild) return <MobileShell><ChildLoginCard key={loginChild.roster_child_id} parentId={parentId} child={loginChild}
+    onContinue={() => { setLoginChild(null); navigate('/parent/home') }} /></MobileShell>
+
+  if (invitation) {
+    const { name, state } = invitation
+    return (
+      <MobileShell>
+        <div className="p-6 flex flex-col gap-3">
+          <p role="status" className="text-sm text-foreground">
+            {state === 'sent' ? `We've emailed ${name} an invitation to join.`
+              : state === 'sending' ? `Emailing ${name}…`
+              : `We couldn't email ${name} yet.`}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Your approval is saved. {name} creates their own account from that email; the link only works for the address the academy gave us.
+          </p>
+          <Button variant="outline" disabled={state === 'sending'}
+            onClick={() => { void inviteChild(invitation.rosterChildId, name) }}>Send again</Button>
+          <Button onClick={() => { if (children.length) setInvitation(null); else navigate('/parent/home') }}>
+            {children.length ? 'Approve the next child' : 'Go to home'}
+          </Button>
+        </div>
+      </MobileShell>
+    )
   }
 
   if (loading) {
@@ -137,6 +221,13 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
     )
   }
 
+  if (logins.length > 0 && !child) return <MobileShell><div className="p-6 flex flex-col gap-4">
+    <h1 className="text-xl text-foreground">Your children's logins</h1>
+    {logins.map(item => <Button key={item.roster_child_id} onClick={() => setLoginChild(item)}>
+      {item.ready ? `View ${item.first_name}'s login` : `Create ${item.first_name}'s login`}
+    </Button>)}
+  </div></MobileShell>
+
   if (!child) {
     return (
       <MobileShell>
@@ -157,8 +248,25 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
     <MobileShell>
       <div className="px-6 py-8 flex flex-col gap-5">
         {savedFor && <p role="status" className="text-sm text-muted-foreground">Approval saved for {savedFor}.</p>}
+        {children.length > 1 && (
+          <div>
+            <label htmlFor="approval-child" className="block text-sm text-muted-foreground mb-2">Child to approve</label>
+            <select id="approval-child" value={child.key} disabled={submitting}
+              onChange={event => {
+                if (submittingNow.current) return
+                setSelectedChildId(event.target.value)
+                setDraft(null)
+                setSavedFor(null)
+              }}
+              className="w-full min-h-11 rounded-xl border border-border bg-card px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-primary">
+              {children.map(item => (
+                <option key={item.key} value={item.key}>{item.full_name} · Age {item.age_years}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
-          <h1 className="text-2xl text-foreground mb-1">Approve {firstName}'s account</h1>
+          <h1 className="text-2xl text-foreground mb-1 break-words">Approve {child.full_name}'s account</h1>
           <p className="text-sm text-muted-foreground">
             {firstName} is {child.age_years}. Under {CONSENT_THRESHOLD_AGE}, a parent or guardian
             has to approve before their coach can record anything about them.
@@ -230,8 +338,8 @@ function ParentConsentAccount({ parentId }: { parentId: string }) {
           </div>
         </div>
 
-        <Button onClick={handleSubmit} disabled={submitting || !confirmed} className="w-full">
-          {submitting ? 'Saving…' : `Approve ${firstName}'s account`}
+        <Button onClick={handleSubmit} disabled={submitting || !confirmed} className="w-full min-h-11 h-auto py-2 whitespace-normal break-words">
+          {submitting ? 'Saving…' : `Approve ${child.full_name}'s account`}
         </Button>
       </div>
     </MobileShell>

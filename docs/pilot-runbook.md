@@ -1,7 +1,7 @@
 # Trak Academy Pilot — operational reference
 
-The full runbook lives in `docs/pilot-runbook.html` (published as an artifact) and the scope in
-`docs/pilot-scope.html`. This file carries only the parts you run, so the narrative lives in one
+The full runbook lives in `docs/pilot-runbook.html` (published as an artifact) and the pilot scope in
+`MVP Requirements`. This file carries only the parts you run, so the narrative lives in one
 place and cannot drift.
 
 ---
@@ -59,6 +59,48 @@ academy/window and observed values. Permission alone does not prove that numbers
 are correct. The legacy checker skips these reports; it cannot attest to their
 contents or migration state using an application key.
 
+### J7 — the one-minute answer (TRAK-10)
+
+"How many assessments did each coach make this week, and how many player and
+parent opens were there?" Same operator workflow as above:
+
+```sql
+BEGIN READ ONLY;
+SET LOCAL ROLE service_role;
+SELECT * FROM public.pilot_j7_this_week;
+ROLLBACK;
+```
+
+One row per pilot coach (`metric = 'assessments'`, 0 if they assessed nobody),
+plus `player_opens` and `parent_opens`. `week` is the current pilot week.
+
+What counts, and what does not:
+
+| Number | Counts | Never counts |
+|---|---|---|
+| Assessments | Distinct assessments a coach saved from the assessment screen this week (`assessment_submitted`), where the row exists and is theirs. An edit counts as that week's work; `created` in the drill-down tells new from edited. | Seeded rows (no UI event), the same assessment saved twice, an event naming someone else's or a missing row |
+| Player opens | Distinct (child, assessment) pairs where the child's home showed the coach's **published** message (`feedback_opened`) | Repeat views, unpublished messages, another child's message |
+| Parent opens | Distinct (parent, assessment) pairs where parent home showed the child's latest assessment, i.e. the bands (`assessment_viewed`). Parents never see the message (TRAK-63). | Repeat views, a parent not linked to that child |
+
+Everyone counted is in the pilot academy (`pilot_config.org_id`) and not a
+synthetic account (`@trak.dev`, `@*.trak.dev`, `example.*`, `*.test`,
+`*.invalid`, `*.example`, `*.localhost`).
+
+Another week, or the detail behind a number:
+
+```sql
+SELECT week, coach_user_id, count(*) AS assessments FROM pilot_j7_assessments GROUP BY 1, 2 ORDER BY 1, 2;
+SELECT week, role, count(*) AS opens, count(DISTINCT user_id) AS people FROM pilot_j7_opens GROUP BY 1, 2 ORDER BY 1, 2;
+```
+
+**Rehearsal only:** `UPDATE pilot_config SET count_synthetic = true;` makes the
+Rehearsal FC accounts count, so TRAK-24 can see the numbers move. Set it back
+to `false` before the pilot. With it `false`, the report on today's database
+correctly shows nothing, because every account on it is synthetic.
+
+Assessment events from before 26 Sep carry no `assessment_id` and are not
+counted; they were all synthetic.
+
 ### Drill-downs
 
 Run these reports and the H4 query below through the same authorized workflow.
@@ -88,6 +130,55 @@ ORDER BY avg_bias;
 Negative `avg_bias` means the engine bands **lower** than the coach. A consistent negative for
 `gk`/`def` beside a positive for `att` is the systematic bias the scope predicts.
 
+## Staff accounts — Trak sets them up
+
+Nobody signs up as a coach or academy admin, and a coach cannot choose or change
+their academy (TRAK-12, `20260926100000_staff_set_up_by_trak.sql`). The app
+refuses all of it. The operator creates staff, one person at a time:
+
+1. **Create the login.** Supabase dashboard → Authentication → Users: create the
+   user directly (not an email invitation) with their email, a long random password
+   that you neither keep nor send, and the email auto-confirmed. The app's handling
+   of Supabase invitation links has no tests; the password reset in step 4 does.
+2. **Admit them** in the dashboard SQL editor, which runs as `postgres`. Don't switch
+   to an app role: the call refuses `authenticated` and `anon`. Do the admin first,
+   because it creates the academy, then each coach into it:
+
+   ```sql
+   -- Academy admin: returns the academy id, creating the academy if they have none.
+   SELECT public.admit_staff_member(
+     (SELECT id FROM auth.users WHERE email = lower('<admin email>')),
+     'club', '<Full Name>', NULL, '<Academy name>');
+   -- Coach: into an existing academy.
+   SELECT public.admit_staff_member(
+     (SELECT id FROM auth.users WHERE email = lower('<coach email>')),
+     'coach', '<Full Name>', (SELECT id FROM public.organizations WHERE name = '<Academy name>'));
+   ```
+
+   It refuses a missing account, an empty name, a coach with no existing academy,
+   and an account that already has a different role.
+3. **Check** before telling them:
+
+   ```sql
+   SELECT p.role, p.full_name, p.invite_code, o.name AS academy
+   FROM public.profiles p
+   LEFT JOIN public.coach_details cd ON cd.user_id = p.user_id
+   LEFT JOIN public.organizations o
+     ON o.id = cd.organization_id OR o.admin_user_id = p.user_id
+   WHERE p.user_id = (SELECT id FROM auth.users WHERE email = lower('<email>'));
+   ```
+
+4. **Tell them** to open trakfootball.com, tap *Forgot password?* with that email,
+   and set their own password from the email. Their profile is already there when
+   they first sign in. A coach's `invite_code` is what their players type to link.
+
+**Moving a coach** to another academy: run the coach call again with the new
+academy. **Removing** one: run
+`UPDATE public.coach_details SET organization_id = NULL WHERE user_id = …` in the
+same editor. The academy screens are "Coming soon" for the pilot (TRAK-43), so an
+admin can't do it in the app. Never hand out service credentials to do any of this
+from a client.
+
 ## Rehearsal data
 
 ```bash
@@ -95,7 +186,14 @@ TRAK_REHEARSAL_PASSWORD='<set a fresh one, do not commit it>' node seed-pilot-re
 ```
 
 Two squads, ~30 players, six weeks of fixtures, matches, assessments and awards under
-`@rehearsal.trak.dev` / "Rehearsal FC". Reset with `--purge`.
+`@rehearsal.trak.test` / "Rehearsal FC". Reset with `--purge`.
+
+The seed signs its staff in with the app key, so it can only use staff who already
+exist. Re-running it over the rehearsal academy works, including after `--purge`: the
+academy and its coaches survive a purge. A rebuild in an empty project needs the staff
+admitted first, with the steps above: `director@` as `club` with academy name
+"Rehearsal FC", then `coach.u15@`, `coach.u17@` and `coach.gk@` into it. Then run
+the seed.
 
 `telemetry_events` stays **empty** after seeding — it is written by the app, not the script. That
 is deliberate: metrics 4, 6 and 7 stay blank until you click through the smoke test below.
@@ -103,12 +201,12 @@ is deliberate: metrics 4, 6 and 7 stay blank until you click through the smoke t
 ## Smoke test — the gate on week 0
 
 `trackEvent` fails silently for the user, so a missing table looks exactly like a working one.
-Nine event types must appear before the pilot starts; a missing event cannot be backfilled.
+Ten event types must appear before the pilot starts; a missing event cannot be backfilled.
 
 | Do this | Event |
 |---|---|
 | Open the app | `app_opened` |
-| One full assessment | `assessment_submitted` (non-null `duration_ms`) |
+| One full assessment | `assessment_submitted` (non-null `duration_ms` and `assessment_id`) |
 | Quick-assess 3 players | `quick_assess_completed` (`players: 3`) |
 | Build a roster | `roster_built` |
 | Log a match | `match_logged` (`actor: 'coach'`) |
@@ -116,6 +214,7 @@ Nine event types must appear before the pilot starts; a missing event cannot be 
 | Ask the assistant | `assistant_used` |
 | As player, open feedback | `feedback_opened` |
 | As parent, open alerts | `alert_opened` |
+| As parent, open home with an assessed child | `assessment_viewed` (`assessment_id`) |
 
 ```sql
 SELECT event_type, role, count(*), max(created_at)
@@ -137,3 +236,55 @@ SELECT * FROM squad_duplicate_candidates;
 ```
 
 Merging is a human decision — assessments and awards may hang off either row.
+
+## Invitations that didn't go
+
+When the loader reports `Invitations went for N child(ren); not for line(s) …`, or a
+run stopped part-way, those families were admitted but some guardians never got an
+email. A plain re-run won't fix it: it skips children who are already admitted.
+`--reinvite` (TRAK-91) is the recovery. Run it with the **same file**:
+
+```bash
+# 1. Dry run: reads the roster, admits nothing, says which lines it would re-send
+SUPABASE_URL=… SUPABASE_SECRET_KEY=sb_secret_… TRAK_CONFIRM_HOST=<project host> \
+  node scripts/load-roster.mjs --file <roster.csv> --org <academy id> --loaded-by "<your name>" --reinvite
+# 2. The same command with --apply sends them
+```
+
+- It picks a child only if one of their guardians was **never invited** and hasn't
+  signed up. It asks the function for `only_uninvited`, so in a family where one
+  guardian was invited and another wasn't, only the second gets an email. A guardian
+  who already has an invitation is **never** sent a second one this way.
+- A failure is reported by line (no addresses). Fix the cause, then run `--reinvite`
+  again. It only ever picks up what is still missing.
+- It loads nothing and refuses `--send-invites` / `--no-invites`.
+- **An invitation that went but doesn't work** (expired link, or the older of two links;
+  see TRAK-97/TRAK-101) is not this case. `--reinvite` won't resend it, on purpose, and
+  there is no tested resend path for it yet. Don't improvise one: raise it in the
+  founders' channel with the roster child id (no address).
+
+## Wrong address
+
+When the academy gave a wrong child or guardian email (TRAK-16, G5), the
+operator corrects it with `scripts/correct-roster-email.mjs`. The database
+records who corrected it, when and why in `roster_email_corrections`, which
+holds hashes of both addresses, never the addresses themselves. Needs
+`SUPABASE_URL`, `SUPABASE_SECRET_KEY` and `TRAK_CONFIRM_HOST`, like the loader.
+
+```bash
+# 1. Dry run: reads the roster, changes nothing
+node scripts/correct-roster-email.mjs --roster-child <roster child id> --kind guardian \
+  --old <wrong address> --new <right address> --by "<your name>" --reason "<why>"
+# 2. The same command with --apply writes it
+```
+
+- **Refused, "already claimed":** someone has already signed up with the
+  wrong address. Don't work around it. It's an incident: tell the founders the
+  same day, because a wrong adult may be linked to the child.
+- **"An invitation had already gone to the old address":** record a G5
+  near-miss on TRAK-16 (roster child id and time; no addresses). After the
+  correction, that address can no longer claim the child.
+- **Then re-invite** that roster child. The script sends nothing; the
+  correction cleared `invited_at` so the new address gets the invitation.
+- The addresses go only on the command line on the operator's own machine,
+  never into Slack or Linear.

@@ -15,14 +15,14 @@ additionally exercised in a running app against the database, signed in as that 
 
 | | Use case | Status | Evidence |
 |---|---|---|---|
-| C1 | Sign up, onboard, pick club/team/role | ✅ | **Verified live on a fresh account**: `provision_my_profile` wrote `profiles` + `coach_details` (club, team, role) and auto-generated a unique `invite_code` in one atomic call |
+| C1 | Sign up, onboard, pick club/team/role | ⬜ | Removed for the pilot (TRAK-12, 26 Sep): Trak creates coaches with `admit_staff_member`, which also generates their `invite_code`. See `docs/pilot-runbook.md` |
 | C2 | Add a player to my squad manually | ✅ | `CoachAddPlayer` inserts `squad_players`; RLS correct |
 | C3 | View my squad | ✅ | `CoachSquadPage` |
 | C4 | Assess a player on 6 sliders → band | ✅ | `CoachAssess`; `coach_rating` is a generated column; RLS correct. **Quick Assess** walks the whole squad and, since `a282d34`, starts each slider at that player's previous assessment rather than the midpoint — the coach moves only what changed instead of ~108 drags per squad |
 | C5 | View a player's assessment history | ✅ | `CoachPlayerProfilePage` |
 | C6 | Log a training/match session | ✅ | `coach_sessions`; RLS correct |
 | C7 | Log a match on behalf of a player | ✅ | `log_match_for_player` SECURITY DEFINER RPC, used by `CoachQuickMatchLog` and `CoachAddSession`. **This is now the only path a match enters the system** |
-| C8 | Share my TRK-XXXX code to connect a player | ✅ | **Verified live**: the coach profile shows a real code (e.g. `TRK-ALEX`) read from `profiles.invite_code` and formatted by `formatCoachCode`. Both a direct lookup and `get_coach_id_by_invite_code` resolve it to the coach's `user_id` |
+| C8 | Share my TRK-XXXX code to connect a player | ⬜ | **Removed by design** (TRAK-72, 26–28 Sep): players join through the academy roster (J1). Coach Home and Profile show no code, and `invite-codes.ts` and `InviteCodeDisplay` are deleted. The `invite_code` columns remain but aren't used for joining |
 | C9 | Recognise / award a player | ✅ | Verified live: renders the real squad with band pills and week/month/season tabs. Awards flow through to the player's passport |
 | C10 | Schedule | ✅ | Verified live: calendar renders, today highlighted, event-type legend, clear empty state, plus an AI "import from text or club website" entry point |
 | C11 | AI assistant | ✅ | Verified live and **context-aware**: knew the coach's team (U15s, City FC Academy), named real squad players in its answer, and rendered a `PitchDiagram` with movement arrows |
@@ -86,8 +86,8 @@ additionally exercised in a running app against the database, signed in as that 
 
 | | Use case | Status | Evidence |
 |---|---|---|---|
-| K1 | Sign up, create the organization | ✅ | `organizations` table with unique `join_code`, created via `provision_my_profile` |
-| K2 | Coaches join via academy code | ✅ | `join_organization()` / `get_org_id_by_join_code()` RPCs; `coach_details.organization_id` |
+| K1 | Sign up, create the organization | ⬜ | Removed for the pilot (TRAK-12, 26 Sep): Trak creates the admin and their academy with `admit_staff_member`. See `docs/pilot-runbook.md` |
+| K2 | Coaches join via academy code | ⬜ | Removed for the pilot (TRAK-12, 26 Sep): app roles can no longer execute either RPC, and only the operator sets `coach_details.organization_id` |
 | K3 | View coaches in the organization | ✅ | `ClubCoaches`, org-scoped RLS |
 | K4 | View squads across the org | ✅ | `ClubSquads` |
 | K5 | Org dashboard, band distribution | ✅ | `ClubHome`. **Bug found and fixed** (`3bd1507`): the headline read "TOTAL PLAYERS 1" above squads summing to 29 — it counted linked accounts while the squads counted roster rows |

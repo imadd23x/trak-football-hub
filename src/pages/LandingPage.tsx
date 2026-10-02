@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { IconRolePlayer, IconRoleCoach, IconRoleParent, IconRoleClub } from '@/components/icons/TrakIcons';
+import { IconRolePlayer, IconRoleParent } from '@/components/icons/TrakIcons';
 import { Eye, EyeOff } from 'lucide-react';
 import { requireDevPassword } from '@/lib/dev-credentials';
+import { isGuardianCreatedChild, isTechnicalChildAddress } from '@/lib/child-login';
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -37,12 +38,15 @@ export default function LandingPage() {
         club: '/club/home',
       };
 
-      // A missing role must never fall through to the player home. An invited
-      // parent whose profile was never provisioned has no role, and this line
-      // used to point them straight at a child's dashboard. Players, coaches
-      // and clubs all get a profile at signup, so the only way to be signed in
-      // without one is an invitation that was not completed.
-      navigate(homeMap[profile?.role ?? ''] ?? '/parent-invite', { replace: true });
+      // A missing role must never fall through to the player home. The only way
+      // to be signed in without a profile is an invitation that was not
+      // completed. A roster invitation (TRAK-11) marks its role in invited_as:
+      // send that child or guardian back to their own setup. A child whose
+      // guardian made their login (TRAK-84) finishes as a player too. Anyone
+      // else is a parent invited by a player: the parent invitation page.
+      const invitedAs = user.user_metadata?.invited_as;
+      const setup = !profile && (invitedAs === 'player' || invitedAs === 'parent') ? `/onboarding/${invitedAs}` : null;
+      navigate(setup ?? homeMap[profile?.role ?? ''] ?? (isGuardianCreatedChild(user) ? '/onboarding/player' : '/parent-invite'), { replace: true });
     }
   }, [loading, user, profile, navigate]);
 
@@ -140,7 +144,13 @@ function SignInForm({ onCreateAccount }: { onCreateAccount: () => void }) {
   };
 
   const handleForgot = async () => {
-    if (!email) { toast.error('Enter your email first'); return }
+    if (email && (!email.includes('@') || isTechnicalChildAddress(email))) {
+      toast.info('Ask your parent or guardian to set a new password from their Trak profile.'); return;
+    }
+    if (!email) {
+      toast.info('Forgot a child username? Ask your parent or guardian; they can see it in their Trak profile. For your own password, enter your email first.');
+      return;
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
@@ -153,11 +163,11 @@ function SignInForm({ onCreateAccount }: { onCreateAccount: () => void }) {
 
       {/* Email */}
       <PremiumInput
-        type="email"
-        label="Email"
+        type="text"
+        label="Email or username"
         value={email}
         onChange={setEmail}
-        autoComplete="email"
+        autoComplete="username"
       />
 
       {/* Password */}
@@ -310,28 +320,12 @@ function RegisterView({
       border: 'rgba(200,242,90,0.18)',
     },
     {
-      role: 'coach',
-      icon: <IconRoleCoach size={24} />,
-      name: 'Coach',
-      desc: 'Manage your squad, assess players and log sessions',
-      bg: 'rgba(96,165,250,0.08)',
-      border: 'rgba(96,165,250,0.18)',
-    },
-    {
       role: 'parent',
       icon: <IconRoleParent size={24} />,
       name: 'Parent',
       desc: "Follow your child's development and progress",
       bg: 'rgba(74,222,128,0.08)',
       border: 'rgba(74,222,128,0.18)',
-    },
-    {
-      role: 'club',
-      icon: <IconRoleClub size={24} />,
-      name: 'Administrator',
-      desc: 'Academy overview across all coaches and squads',
-      bg: 'rgba(255,255,255,0.04)',
-      border: 'rgba(255,255,255,0.10)',
     },
   ];
 
@@ -379,6 +373,14 @@ function RegisterView({
           </button>
         ))}
       </div>
+      {/* TRAK-12: staff are set up by Trak; the database refuses a self-made
+          coach or academy admin (#151), so the screen does not offer one. */}
+      <p
+        className="text-white/45 text-[12px] mt-4 text-center leading-snug"
+        style={{ fontFamily: "'DM Sans', sans-serif" }}
+      >
+        Coach or academy staff? Trak sets up coach and academy accounts. Ask your academy.
+      </p>
 
       <button
         onClick={onBack}

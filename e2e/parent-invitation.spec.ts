@@ -84,6 +84,10 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
       };
       return json(request.headers().accept?.includes('vnd.pgrst.object') ? profile : [profile]);
     }
+    // TRAK-13 (G6): an open player session re-checks consent (a read, over POST).
+    if (account === player && request.method() === 'POST' && url.pathname === '/rest/v1/rpc/my_consent_status') {
+      return json({ required: false, granted: true, invited_parent: null });
+    }
     if (account === parent) {
       if (url.pathname === '/rest/v1/player_parent_links' && request.method() === 'GET') return json([]);
       if (request.method() === 'POST') {
@@ -96,6 +100,11 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
           const id = (observed.body as { p_invite_id?: string }).p_invite_id;
           return json(id === zaraInvite ? zaraId : alexId);
         }
+        // TRAK-77: Matches lists the selected child's training (a read, over POST).
+        if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
+        if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
+        if (url.pathname === '/rest/v1/rpc/get_my_child_logins') return json([]);
+        if (url.pathname === '/rest/v1/rpc/get_my_child_credentials') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') {
           return json(claims.length ? [{ player_user_id: zaraId, full_name: 'Zara Example', age_years: 14 }] : []);
         }
@@ -157,7 +166,7 @@ test('shared phone switches from player to existing parent on the invitation and
 
   await page.getByRole('button', { name: 'Link Zara Example', exact: true }).click();
   await expect(page).toHaveURL(appOrigin + '/parent/consent');
-  await expect(page.getByRole('heading', { name: "Approve Zara's account", exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "Approve Zara Example's account", exact: true })).toBeVisible();
   expect(observed.claims).toEqual([{
     path: '/rest/v1/rpc/accept_parent_invite', method: 'POST',
     authorization: `Bearer ${observed.parent.access_token}`, body: { p_invite_id: zaraInvite },
@@ -228,6 +237,11 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
     if (request.method() === 'POST') {
       if (url.pathname === '/rest/v1/telemetry_events') return json(null, 201);
       if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent') return json([]);
+      if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
+      if (url.pathname === '/rest/v1/rpc/get_my_child_logins') return json([]);
+      if (url.pathname === '/rest/v1/rpc/get_my_child_credentials') return json([]);
+      // TRAK-77: Matches lists the selected child's training (a read, over POST).
+      if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
       if (url.pathname === '/rest/v1/rpc/get_my_pending_parent_invites') return json(linked.has(zaraId) ? [] : [{
         invite_id: zaraInvite, player_user_id: zaraId, player_name: children[1].name,
         parent_email: parentEmail, expires_at: new Date(Date.now() + 86_400_000).toISOString(),
@@ -248,6 +262,12 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
     // No password/profile writes, provisioning, consent, logout or email calls
     // are permitted. An unexpected request must fail, not silently succeed.
     if (request.method() !== 'GET') return reject();
+    if (url.pathname === '/rest/v1/parental_consents') {
+      if (url.searchParams.get('parent_user_id') !== `eq.${parentId}`
+        || !linked.has((url.searchParams.get('player_user_id') ?? '').slice(3))
+        || url.searchParams.get('withdrawn_at') !== 'is.null') return reject();
+      return json([]);
+    }
     if (url.pathname === '/rest/v1/player_parent_links') {
       if (url.searchParams.get('parent_user_id') !== `eq.${parentId}`) return reject();
       memberships.push({ ids: [...linked], failed: failMembership });
@@ -331,26 +351,28 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   await expect(page.getByText(zara.opponent, { exact: true })).toHaveCount(0);
   await page.getByRole('combobox').selectOption(zaraId);
 
-  await page.getByRole('button', { name: 'Alerts', exact: true }).click();
-  await expect(page.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
-  await expect(page.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
-  await page.getByRole('combobox').selectOption(alexId);
-  await expect(page.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toBeVisible();
-  await expect(page.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toHaveCount(0);
-  await page.getByRole('combobox').selectOption(zaraId);
+  // TRAK-74: alerts are a bell on Home and show only the selected child's activity.
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await page.getByRole('button', { name: /^Alerts/ }).click();
+  const alertsSheet = page.getByRole('dialog', { name: 'Alerts' });
+  await expect(alertsSheet.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
+  await expect(alertsSheet.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(alertsSheet).toHaveCount(0);
+  await expect(page.getByRole('combobox')).toHaveValue(zaraId);
+  await expect(page.getByText(zara.opponent, { exact: true })).toBeVisible();
+  await expect(page.getByText(alex.opponent, { exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Profile', exact: true }).click();
-  await expect(page.getByText(`Following ${zara.name} · 2 children linked`, { exact: true })).toBeVisible();
+  await expect(page.getByText('Parent account · 2 children linked', { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox')).toHaveValue(zaraId);
   await page.getByRole('combobox').selectOption(alexId);
-  await expect(page.getByText(`Following ${alex.name} · 2 children linked`, { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox')).toHaveValue(alexId);
   await page.getByRole('combobox').selectOption(zaraId);
-  // P6 owns the subtitle change; this journey follows the Settings entry in
-  // both independently reviewed branches, then verifies the actual children.
-  await page.getByRole('button', { name: /^SETTINGS / }).click();
+  // TRAK-73: the linked children are listed on the Profile itself.
   const connections = page.getByRole('list', { name: 'Linked children', exact: true });
   await expect(connections.getByText(alex.name, { exact: true })).toHaveCount(1);
   await expect(connections.getByText(zara.name, { exact: true })).toHaveCount(1);
-  await page.goBack();
   await page.getByRole('button', { name: 'Matches', exact: true }).click();
   await page.reload();
   await expect(page.getByRole('option')).toHaveCount(2);
@@ -364,9 +386,9 @@ test('existing parent accepts a second child, recovers a failed family refresh a
     authorization: `Bearer ${observed.parent.access_token}`, body: { p_invite_id: zaraInvite },
   }]);
   const allowedPosts = new Set([
-    '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent',
+    '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials',
     '/rest/v1/rpc/get_my_pending_parent_invites', '/rest/v1/rpc/get_parent_invite_by_token',
-    '/rest/v1/rpc/accept_parent_invite',
+    '/rest/v1/rpc/accept_parent_invite', '/rest/v1/rpc/family_training_history',
   ]);
   expect(observed.requests.filter(request => request.method !== 'GET')
     .every(request => request.method === 'POST' && allowedPosts.has(request.path))).toBe(true);
@@ -375,7 +397,8 @@ test('existing parent accepts a second child, recovers a failed family refresh a
 });
 
 
-for (const role of ['player', 'coach', 'club']) {
+// Coach and club signup forms are gone: Trak sets up staff (TRAK-12, staff-set-up-by-trak.test.tsx).
+for (const role of ['player']) {
   test(`${role} signup reveals passwords independently without sending a request`, async ({ page, context }, testInfo) => {
     const observed = await invitationsFixture(page, context);
     await page.goto(`/onboarding/${role}`);

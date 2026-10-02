@@ -8,16 +8,23 @@ import { registerAuthUser } from '../msw/auth-sessions'
  */
 const STORAGE_KEY = 'sb-test-auth-token'
 
-export function signInAs(user: { id: string; email?: string }): void {
+export function signInAs(user: { id: string; email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }): void {
   const now = Math.floor(Date.now() / 1000)
+  // A test may fake Date (vi.useFakeTimers({ toFake: ['Date'] })); performance
+  // stays real. Expire an hour after the later of the two clocks, so the session
+  // is never stale on either: a stale one gets refreshed, the harness refuses
+  // every refresh, and the failure wipes whatever session is stored by then.
+  const realNow = Math.floor((performance.timeOrigin + performance.now()) / 1000)
+  const expiresAt = Math.max(now, realNow) + 3600
   const authUser = {
     id: user.id,
     aud: 'authenticated',
     role: 'authenticated',
     email: user.email ?? `${user.id}@example.test`,
     email_confirmed_at: new Date(now * 1000).toISOString(),
-    app_metadata: {},
-    user_metadata: {},
+    app_metadata: user.app_metadata ?? {},
+    // An invited account carries what the invitation set (TRAK-11).
+    user_metadata: user.user_metadata ?? {},
     created_at: new Date(now * 1000).toISOString(),
   }
   localStorage.setItem(
@@ -27,7 +34,7 @@ export function signInAs(user: { id: string; email?: string }): void {
       refresh_token: 'test-refresh-token',
       token_type: 'bearer',
       expires_in: 3600,
-      expires_at: now + 3600,
+      expires_at: expiresAt,
       user: authUser,
     }),
   )

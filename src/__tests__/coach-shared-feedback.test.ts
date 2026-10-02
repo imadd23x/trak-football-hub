@@ -50,7 +50,9 @@ describe('K9 UI: the coach writes shared feedback separately', () => {
     ).toBe(false)
   })
 
-  it('publishes only when the coach asked and there is something to publish', () => {
+  // TRAK-64 (Imad, 25 Sep): Save and Publish are one action, so saving sends a
+  // non-empty message. This used to require a separate publish control.
+  it('publishes when there is something to publish, and an emptied box retracts', () => {
     const src = code()
     // Anchor on the write, not the first mention — the read above it carries a
     // `published_at: string | null` type annotation that matches just as well.
@@ -61,9 +63,8 @@ describe('K9 UI: the coach writes shared feedback separately', () => {
     expect(m, 'the upsert does not set published_at at all').toBeTruthy()
     const expr = m![1]
     expect(
-      expr.includes('sharedPublished'),
-      `published_at is set to "${expr}" without consulting the publish control, so saving an ` +
-        `assessment would publish a draft the coach had not released.`,
+      /\bmessage\b/.test(expr),
+      `published_at is set to "${expr}" without consulting the message, so an empty box could be published.`,
     ).toBe(true)
     expect(
       /:\s*null/.test(expr),

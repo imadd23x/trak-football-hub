@@ -1,28 +1,76 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
-import { MobileShell, BandPill, MetadataLabel, NavBar } from '@/components/trak'
+import { useAuth } from '@/contexts/AuthContext'
+import { MobileShell, BandPill, MetadataLabel, NavBar, LoadError } from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
 import { ChevronLeft } from 'lucide-react'
 
-export default function PlayerMatchDetail() {
+/* Also the parent's match detail (TRAK-73): `role` picks the nav and the way
+   back, and `limitedFor` says whether a child's match shows only what the
+   parent already saw on their list (score, opponent, competition, venue, band). */
+export default function PlayerMatchDetail({ role = 'player', limitedFor }: {
+  role?: 'player' | 'parent'
+  limitedFor?: (childId: string) => boolean
+}) {
+  const matchesPath = `/${role}/matches`
   const { id } = useParams()
   const navigate = useNavigate()
-  const [match, setMatch] = useState<any>(null)
+  const { user } = useAuth()
+  const [reloadKey, setReloadKey] = useState(0)
+  const [result, setResult] = useState<{
+    id: string
+    user: typeof user
+    reloadKey: number
+    match: any
+    failed: boolean
+  } | null>(null)
 
   useEffect(() => {
-    if (!id) return
-    supabase.from('matches').select('*').eq('id', id).single().then(({ data }) => setMatch(data))
-  }, [id])
+    let cancelled = false
+    setResult(null)
+    if (!id || !user) return
+    supabase.from('matches').select('*').eq('id', id).maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        setResult({ id, user, reloadKey, match: data, failed: Boolean(error) })
+      })
+    return () => { cancelled = true }
+  }, [id, user, reloadKey])
 
-  if (!match) return (
+  // Bind the displayed result to its request as well as cancelling old writes.
+  // A new route or Auth refresh must hide the prior match before its effect runs.
+  const currentResult = result && result.id === id && result.user === user && result.reloadKey === reloadKey
+    ? result : null
+
+  if (!currentResult) return (
     <MobileShell>
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="w-6 h-6 border-2 border-[#C8F25A] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-[60vh]" role="status" aria-label="Loading match">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     </MobileShell>
   )
 
+  const match = currentResult.match
+  if (currentResult.failed || !match) return (
+    <MobileShell>
+      <div className="pt-12 pb-4 space-y-4">
+        {currentResult.failed ? (
+          <LoadError what="this match" onRetry={() => setReloadKey(k => k + 1)} />
+        ) : (
+          <p className="text-center text-[13px] text-white/70" role="status">This match is unavailable.</p>
+        )}
+        <button onClick={() => navigate(matchesPath)}
+          className="flex items-center gap-2 mx-auto px-4 py-2 rounded-[10px] text-[12px] text-white/70 border border-white/[0.07]">
+          <ChevronLeft size={14} />
+          Back to matches
+        </button>
+      </div>
+      <NavBar role={role} activeTab={matchesPath} onNavigate={navigate} />
+    </MobileShell>
+  )
+
+  const limited = limitedFor?.(match.user_id) ?? false
   const band = scoreToBand(match.computed_rating || 6.5)
   const resultLabel = match.team_score > match.opponent_score ? 'W'
     : match.team_score < match.opponent_score ? 'L' : 'D'
@@ -74,9 +122,11 @@ export default function PlayerMatchDetail() {
           {[
             { label: 'Competition', value: match.competition },
             { label: 'Venue', value: match.venue },
-            { label: 'Position', value: match.position },
-            { label: 'Age Group', value: match.age_group },
-            { label: 'Minutes', value: `${match.minutes_played}'` },
+            ...(limited ? [] : [
+              { label: 'Position', value: match.position },
+              { label: 'Age Group', value: match.age_group },
+              { label: 'Minutes', value: `${match.minutes_played}'` },
+            ]),
           ].map(row => (
             <div key={row.label} className="flex items-center justify-between">
               <span className="text-[11px] text-white/35" style={{ fontFamily: "'DM Mono', monospace" }}>
@@ -88,7 +138,7 @@ export default function PlayerMatchDetail() {
         </div>
 
         {/* Goal contributions */}
-        <div className="grid grid-cols-2 gap-2">
+        {!limited && <div className="grid grid-cols-2 gap-2">
           {[
             { label: 'Goals', value: match.goals ?? 0 },
             { label: 'Assists', value: match.assists ?? 0 },
@@ -101,10 +151,10 @@ export default function PlayerMatchDetail() {
                 style={{ fontFamily: "'DM Mono', monospace" }}>{stat.label}</span>
             </div>
           ))}
-        </div>
+        </div>}
 
       </div>
-      <NavBar role="player" activeTab="/player/matches" onNavigate={navigate} />
+      <NavBar role={role} activeTab={matchesPath} onNavigate={navigate} />
     </MobileShell>
   )
 }

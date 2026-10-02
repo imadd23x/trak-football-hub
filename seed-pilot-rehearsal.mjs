@@ -10,7 +10,7 @@
  * Run:   node seed-pilot-rehearsal.mjs
  * Reset: node seed-pilot-rehearsal.mjs --purge
  *
- * Everything it creates lives under the @rehearsal.trak.dev domain and the
+ * Everything it creates lives under the @rehearsal.trak.test domain and the
  * organisation named "Rehearsal FC", so it is unambiguous what is throwaway.
  *
  * PREREQUISITE: migrations 20260901000001-3 must be applied. The script checks
@@ -43,7 +43,7 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   process.exit(1)
 }
 
-const DOMAIN = 'rehearsal.trak.dev'
+const DOMAIN = 'rehearsal.trak.test'
 // Never commit this. The repository is public, and these accounts are created
 // in whatever project VITE_SUPABASE_URL points at — which the runbook points at
 // the pilot project. A literal here is a working credential for a live account
@@ -191,28 +191,23 @@ async function preflight() {
 
 async function purge() {
   console.log(`\nPurging the rehearsal academy.\n`)
-  const admin = await signInOrUp(`director@${DOMAIN}`)
-  if (!admin) { console.error('Could not sign in as the rehearsal director.'); return }
 
-  const { data: org } = await supabase
-    .from('organizations').select('id').eq('admin_user_id', admin.id).maybeSingle()
-
+  // Only the squads can be cleared with the app key. Since #134 (TRAK-47) an
+  // app role cannot delete calendar events, awards or an academy, and the
+  // old calls here failed without saying so while this printed that they had
+  // worked. Awards go with their squad rows (ON DELETE CASCADE).
   for (const s of SQUADS) {
     const coach = await signInOrUp(s.coachEmail)
     if (!coach) continue
-    await supabase.from('coach_calendar_events').delete().eq('coach_user_id', coach.id)
-    await supabase.from('recognition_awards').delete().eq('coach_user_id', coach.id)
-    await supabase.from('squad_players').delete().eq('coach_user_id', coach.id)
-    log(`cleared ${s.coachName}'s squad, fixtures and awards`)
+    const { error } = await supabase.from('squad_players').delete().eq('coach_user_id', coach.id)
+    if (error) log(`${s.coachName}'s squad: ${error.message}`)
+    else log(`cleared ${s.coachName}'s squad, with its assessments, attendance and awards`)
   }
 
-  if (org) {
-    await signInOrUp(`director@${DOMAIN}`)
-    await supabase.from('organizations').delete().eq('id', org.id)
-    log('removed the organisation')
-  }
-
-  console.log('\nDone. Auth users remain — delete them from the Supabase dashboard')
+  // Keeping the academy is also what a reset needs: pilot_config.org_id
+  // points at it, and its coaches stay in it, so the next seed run reuses it.
+  console.log(`\n${ORG_NAME} and its fixture list are kept: the app key cannot remove them.`)
+  console.log('Auth users remain too — delete them from the Supabase dashboard')
   console.log(`if you want the ${DOMAIN} accounts gone entirely.\n`)
 }
 
@@ -281,7 +276,8 @@ async function seed() {
     for (const { i, name } of names) {
       if (i % 2 === 0) {
         const slug = name.toLowerCase().replace(/[^a-z]+/g, '.')
-        // link_player_to_coach is itself idempotent, so re-running is safe.
+        // Since TRAK-48 slice 4 a player joins a squad only through the roster
+        // loader; the rehearsal players are already linked, so re-running is safe.
         const playerUser = await signInOrUp(`${slug}@${DOMAIN}`)
         if (!playerUser) continue
         await provision({
@@ -293,7 +289,6 @@ async function seed() {
             age_group: squad.ageGroup,
             date_of_birth: `${2026 - (squad.ageGroup === 'U15' ? 15 : 17)}-05-12`,
           },
-          coach_invite_code: coachCode,
         })
         created.linked++
       } else {
@@ -310,7 +305,8 @@ async function seed() {
           age_group: squad.ageGroup,
           status: 'active',
         })
-        if (error) log(`roster row "${name}": ${error.message}`)
+        // Since TRAK-48 slice 4 only the roster loader creates squad rows.
+        if (error) log(`roster row "${name}": ${error.message} (load new players with scripts/load-roster.mjs)`)
         else created.unlinked++
       }
     }
@@ -470,6 +466,35 @@ async function seed() {
       }
     }
     log(`matches: ${created.matches}, assessments: ${created.assessments}`)
+
+    /* Latest-assessment notes, backfilled. The loop above is skipped once the
+       coach has any assessment, so the lastF note only lands on a FRESH seed.
+       The live rehearsal academy already had 78 assessments on 21 Sep with a
+       note on the latest one for 0 of 28 players (read-only count), so without
+       this the "player sees coach feedback" step shows nothing to anyone.
+       PlayerHome shows feedback for the latest assessment only; give each
+       claimed player's latest one a note if it has none. Runs on every pass,
+       before publishing, so these notes are published below too. */
+    for (let n = 0; n < claimed.length; n++) {
+      const r = claimed[n]
+      const { data: latest, error: latestErr } = await supabase
+        .from('coach_assessments').select('id')
+        .eq('coach_user_id', coach.id).eq('squad_player_id', r.id)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (latestErr) { log(`latest assessment for ${r.player_name}: ${latestErr.message}`); continue }
+      if (!latest) continue
+      const { data: hasNote, error: hasNoteErr } = await supabase
+        .from('coach_assessment_notes').select('assessment_id').eq('assessment_id', latest.id).maybeSingle()
+      if (hasNoteErr) { log(`note lookup for ${r.player_name}: ${hasNoteErr.message}`); continue }
+      if (hasNote) continue
+      const { error: nErr } = await supabase.from('coach_assessment_notes').insert({
+        assessment_id: latest.id,
+        coach_user_id: coach.id,
+        note: pick(COACH_NOTES, n),
+      })
+      if (nErr) log(`latest note for ${r.player_name}: ${nErr.message}`)
+      else created.notes++
+    }
 
     /* Shared feedback. K9 (#44) made coach_assessment_notes coach-private, so
        the player and parent screens now read coach_shared_feedback. Publish

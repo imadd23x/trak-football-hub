@@ -1,31 +1,42 @@
 project_id = "xbykbqolvqyqmipikuae"
 
-# All four functions are declared explicitly. `supabase functions deploy` applies
+# All five functions are declared explicitly. `supabase functions deploy` applies
 # what is written here, so anything left out silently falls back to the CLI
 # default (verify_jwt = true) and a deploy can flip a setting that was changed in
 # the dashboard. Declaring every function keeps this file the source of truth.
 
-# Both AI functions now reject before spending anything: getUser() must return
-# a real user, that user's profile role must be 'coach', and claim_ai_call()
-# must allow the call against a per-user daily cap.
-#
-# The platform gate stays on as well, but it is NOT what protects these. The
-# publishable anon key is a validly-signed JWT and ships in the client bundle
-# of a public repo, so verify_jwt accepts it and proves nothing about who is
-# calling. Only getUser() establishes a session. Do not weaken the body checks
-# on the strength of this flag being true.
+# G7: all three AI handlers unconditionally return PILOT_FEATURE_DISABLED (403)
+# before reading bodies, credentials, database state, quotas or provider secrets.
+# OPTIONS only returns CORS headers. The platform JWT gate remains enabled as
+# an additional boundary; no caller role or configuration switch enables AI.
 [functions.parse-schedule]
 verify_jwt = true
 
 [functions.coach-assistant]
 verify_jwt = true
 
-# getUser() plus an explicit 401 in the body, with the platform gate on too.
-# This one was already doing the right thing when the other two were not.
 [functions.player-feedback]
 verify_jwt = true
 
 # Invoked via supabase.functions.invoke(), which forwards the caller's session
 # JWT; the body then re-reads it and uses the service role for the invite itself.
 [functions.send-parent-invite]
+verify_jwt = true
+
+# TRAK-11 phase 3. The operator (the roster loader) calls it with the service
+# key and a guardian with their session JWT; the handler tells them apart and
+# reads the roster only through roster_invite_targets().
+[functions.send-roster-invites]
+# TRAK-9: the operator calls with a new-style secret key on apikey, which the
+# gateway's JWT check can't read. The function authorises every call itself:
+# a secret key on apikey, or a user session Auth verifies (handler.ts).
+verify_jwt = false
+
+# TRAK-84: the caller's JWT reaches the SQL guardian/consent check. Admin
+# creation is confirmed and does not send an invitation or recovery email.
+[functions.create-child-login]
+verify_jwt = true
+
+# Guardian-authorized direct password change, never a child email recovery.
+[functions.reset-child-password]
 verify_jwt = true

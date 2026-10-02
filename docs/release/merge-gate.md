@@ -2,7 +2,7 @@
 
 Imad coordinates releases. Every PR needs one approval from someone who did not author it (see *What approval means*); Imad merges after approval, in the agreed order, one at a time. Every task has its own branch. No direct pushes to main.
 
-Friday 25 September is measured against `docs/pilot-readiness-2026-09-25.md` — the pilot, not a demo. The demo is completed on the way to the pilot. No other checklist is a gate.
+Friday 25 September is a synthetic demo. Real children join only when the launch gate in [MVP Requirements](../../MVP%20Requirements) passes and a founder majority agrees. No configured date waives it.
 
 ## What approval means
 
@@ -14,7 +14,7 @@ A PR is approved when a reviewer who did not author it posts a review that:
 2. names every finding, each with a fix or an explicit *accept as-is*;
 3. ends with one verdict: **MERGE**, **MERGE AFTER \<fix\>**, or **DO NOT MERGE**.
 
-The verdict is the approval. Until branch protection is enabled on `main`, the reviewer's human clicks *Approve* on GitHub when they can; when they cannot, the verdict posted in #coding-agent-reviews stands and Imad merges as coordinator. **Once protection is enabled that fallback ends:** GitHub checks only for an *Approve* click, from someone other than the author, made after the last push — so the human must click, every time, and a Slack verdict alone merges nothing. Merging `main` into a PR counts as a push and dismisses the earlier approval, so re-merge before asking for the click, not after. An author's self-review, or an agent reviewing its own human's PR, is not an approval.
+The verdict is the approval. Until branch protection is enabled on `main`, the reviewer's human clicks *Approve* on GitHub when they can; when they cannot, the verdict posted in #coding-agents-at-work stands and Imad merges as coordinator. **Once protection is enabled that fallback ends:** GitHub checks only for an *Approve* click, from someone other than the author, made after the last push — so the human must click, every time, and a Slack verdict alone merges nothing. Merging `main` into a PR counts as a push and dismisses the earlier approval, so re-merge before asking for the click, not after. An author's self-review, or an agent reviewing its own human's PR, is not an approval.
 
 Before a PR opens, author and reviewer agree what success looks like — which suites must pass and what the change must demonstrably do — and it goes in the PR description. Every behavioural change ships with a test that fails without it; a test that has never been seen red is not evidence.
 
@@ -35,7 +35,7 @@ gh api repos/kostasanastasioubusiness-lang/trak-football-hub/branches/main/prote
 
 ## Before merge
 
-1. Announce migration table/RPC changes and shared-file reservations in #coding-agent-reviews before editing. Never rewrite a historical migration.
+1. Announce migration table/RPC changes and shared-file reservations in #coding-agents-at-work before editing. Never rewrite a historical migration.
 2. Rebase or merge current main; identify dependent PRs and backward compatibility of SQL, callers and generated types.
 3. Run `npm test`, `npm run test:harness`, `npm run typecheck`, `npm run build`, `npm run lint` and `npm run uc:check`. Run the executable SQL tests for a migration. Pending use-case failures are debt, not proof of correctness: explicitly record them and require the changed journey to pass.
 4. Obtain a verified review with a verdict from someone who did not author the PR, as defined above. A self-review is not an approval.
@@ -50,7 +50,8 @@ Verify both deployment jobs and the routed journey on trakfootball.com using des
 
 Stop the merge queue. Identify which migrations/functions actually applied; do not assume a red job rolled back prior steps. Use reviewed forward migrations to repair schema/permissions. A previous compatible frontend may be restored while retaining security fixes. Never erase migration history or restore an older access-control vulnerability as a rollback shortcut.
 
-The second academy provides isolation test fixtures; it is not a staging environment or backup. Real-child admission additionally requires all gates in the current pilot-readiness document.
+The second academy provides isolation test fixtures; it is not a staging environment or backup. Real-child admission additionally requires the launch gate in [MVP Requirements](../../MVP%20Requirements).
+
 # Fork-first development
 
 All Imad/Codex changes are committed and tested in `imadd23x/trak-football-hub`.

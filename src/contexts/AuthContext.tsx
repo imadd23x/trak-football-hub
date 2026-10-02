@@ -5,6 +5,10 @@ import type { Session, User } from '@supabase/supabase-js';
 import { setTelemetryRole, trackSessionOpen } from '@/lib/telemetry';
 import { createOnboardingSession, type OnboardingSession } from '@/lib/onboarding-session';
 import { useQueryClient } from '@tanstack/react-query';
+import { signInAddress, isTechnicalChildAddress } from '@/lib/child-login';
+
+// provision_my_profile's refusal for an email the academy roster does not name.
+const ACADEMY_HAS_NOT_ADDED = "Your academy hasn't added this email yet";
 
 type UserRole = 'player' | 'coach' | 'parent' | 'club';
 const PENDING_PROFILE_KEY = 'trak_pending_profile';
@@ -16,7 +20,7 @@ interface PendingProfileData {
   player_details?: {
     date_of_birth: string;
     position: string;
-    current_club: string;
+    current_club?: string; // a rostered player's comes from the academy (TRAK-54)
     age_group: string;
     shirt_number: number | null;
   };
@@ -30,6 +34,7 @@ interface PendingProfileData {
     academy_name: string;
   };
   parent_email?: string | null;
+  // Legacy (TRAK-72): not used for joining; the academy roster links players.
   coach_invite_code?: string | null;
 }
 
@@ -227,9 +232,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (err) {
         if (!isCurrent()) return;
-        console.error('Failed to load account profile:', err);
+        if (!isTechnicalChildAddress(session.user.email)) console.error('Failed to load account profile:', err);
         const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
-        toast.error(`Account setup hit a problem: ${message || 'unknown error'}. Pull to refresh or sign in again to retry.`);
+        // TRAK-48 slice 3: the roster does not name this email. Retrying cannot
+        // help until the academy adds it, so say what will.
+        if ((err as { code?: string })?.code === '42501' && message === ACADEMY_HAS_NOT_ADDED) {
+          toast.error(`${message}. Ask your academy to add it, then sign in again.`);
+        } else {
+          toast.error(isTechnicalChildAddress(session.user.email)
+            ? 'Account setup hit a problem. Sign in again to retry, or ask your guardian for help.'
+            : `Account setup hit a problem: ${message || 'unknown error'}. Pull to refresh or sign in again to retry.`);
+        }
       } finally {
         if (isCurrent()) {
           setLoading(false);
@@ -276,8 +289,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // On the reset password page, suppress all auth redirects so the
       // form stays visible. ResetPassword.tsx handles its own auth events.
       if (window.location.pathname === '/reset-password') {
-        if (event === 'PASSWORD_RECOVERY') return;
-        if (event === 'SIGNED_IN') return;
+        acceptSession(session);
+        if (event === 'SIGNED_OUT') {
+          queryClient.clear();
+          discardLegacyPendingProfile();
+        }
+        return;
       }
 
       // Same on the confirmation page. It verifies, then signs out on purpose,
@@ -305,12 +322,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (disposed || receivedAuthEvent || generation.current !== initialGeneration) return;
-      // If we're on the reset password page, don't auto-redirect — let
-      // the ResetPassword component handle the PASSWORD_RECOVERY event.
-      if (window.location.pathname === '/reset-password') {
-        setLoading(false);
-        return;
-      }
       if (window.location.pathname === '/auth/confirm') {
         setLoading(false);
         return;
@@ -338,6 +349,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user?.id, profile?.role]);
 
   const signUp = (email: string, password: string, pendingProfile?: PendingProfileData) => runAuthTransition(async () => {
+    if (isTechnicalChildAddress(email)) return { user: null, error: new Error('Ask your guardian to create your login.') };
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -355,8 +367,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const signIn = (email: string, password: string) => runAuthTransition(async () => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error as Error | null };
+    const address = signInAddress(email);
+    if (!address) return { error: new Error('Enter your email or the username your guardian gave you.') };
+    const { error } = await supabase.auth.signInWithPassword({ email: address, password });
+    return { error: error ? new Error('Could not sign in. Check your email or username and password.') : null };
   });
 
   const signOut = (expectedUserId?: string) => runAuthTransition(async () => {

@@ -75,7 +75,7 @@ export function PostMatchPrompt({
       </div>
 
       <button
-        onClick={() => navigate('/coach/quick-assess')}
+        onClick={() => navigate('/coach/assess')}
         style={{
           fontFamily: "'DM Mono', monospace",
           fontSize: 9,

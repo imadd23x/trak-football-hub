@@ -24,11 +24,22 @@ await context.route('**/*',async route=>{
  if(u.pathname==='/auth/v1/logout') return logoutFails?json({msg:'Synthetic logout failure'},500):route.fulfill({status:204});
  if(u.pathname==='/rest/v1/telemetry_events') return json(null,201);
  if(u.pathname==='/rest/v1/rpc/get_children_awaiting_consent') return json([]);
+ if(u.pathname==='/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
+ if(u.pathname==='/rest/v1/rpc/get_my_child_logins') return json([]);
+ if(u.pathname==='/rest/v1/rpc/get_my_child_credentials') return json([]);
+ // TRAK-77: Matches also lists the selected child's training (a read, over POST).
+ if(u.pathname==='/rest/v1/rpc/family_training_history') return json([]);
  if(u.pathname==='/rest/v1/player_parent_links') return failLinks?json({message:'Synthetic network error'},503):json([{player_user_id:alex},{player_user_id:zara}]);
  if(u.pathname==='/rest/v1/profiles') {
    const filter=u.searchParams.get('user_id')||'';
    const rows=filter===`eq.${parent}`?[profile]:filter.includes(coach)?[{user_id:coach,full_name:'Synthetic Coach'}]:[{user_id:alex,full_name:'Alex Example'},{user_id:zara,full_name:'Zara Example'}];
    return json(req.headers().accept?.includes('vnd.pgrst.object')?rows[0]:rows);
+ }
+ if(u.pathname==='/rest/v1/parental_consents' && req.method()==='GET') {
+   expect(u.searchParams.get('parent_user_id')).toBe(`eq.${parent}`);
+   expect([`eq.${alex}`,`eq.${zara}`]).toContain(u.searchParams.get('player_user_id'));
+   expect(u.searchParams.get('withdrawn_at')).toBe('is.null');
+   return json([]);
  }
  if(u.pathname==='/rest/v1/player_details') return json([{position:'Midfielder',current_club:'Synthetic Academy',age_group:'U15'}]);
  if(u.pathname==='/rest/v1/squad_players') return json([{id:u.searchParams.get('linked_player_id')?.slice(3)}]);
@@ -61,15 +72,24 @@ await context.route('**/*',async route=>{
  await page.getByRole('button',{name:'Retry',exact:true}).click();
  await expect(page.getByText('Alex Opposition',{exact:true})).toBeVisible();
  await page.getByRole('combobox').selectOption(zara);
- await page.getByRole('button',{name:'Alerts',exact:true}).click();
+ // TRAK-74: alerts are a bell on Home and show only the selected child's activity.
+ await page.getByRole('button',{name:'Home',exact:true}).click();
+ await page.getByRole('button',{name:/^Alerts/}).click();
+ const alertsSheet=page.getByRole('dialog',{name:'Alerts'});
+ await expect(alertsSheet.getByText(/vs Zara Opposition/).first()).toBeVisible();
+ await expect(alertsSheet.getByText(/vs Alex Opposition/)).toHaveCount(0);
+ await page.keyboard.press('Escape');
+ await expect(alertsSheet).toHaveCount(0);
  await expect(page.getByRole('combobox')).toHaveValue(zara);
+ await expect(page.getByText('Zara Opposition',{exact:true})).toBeVisible();
+ await expect(page.getByText('Alex Opposition',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Profile',exact:true}).click();
- await expect(page.getByText('Following Zara Example · 2 children linked',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:/Account settings/}).click();
+ await expect(page.getByText('Parent account · 2 children linked',{exact:true})).toBeVisible();
+ await expect(page.getByRole('combobox')).toHaveValue(zara);
  await expect(page.getByRole('list',{name:'Linked children'})).toContainText('Alex Example');
  await expect(page.getByRole('list',{name:'Linked children'})).toContainText('Zara Example');
  await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});
  expect(errors).toEqual([]);
  expect(unexpected).toEqual([]);
- expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/auth/v1/logout'].includes(write.path))).toBe(true);
+ expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/family_training_history', '/auth/v1/logout'].includes(write.path))).toBe(true);
 });

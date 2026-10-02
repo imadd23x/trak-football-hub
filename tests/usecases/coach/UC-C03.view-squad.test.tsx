@@ -11,6 +11,7 @@ const COACH = { id: 'coach-1' }
 function signedInCoach() {
   signInAs(COACH)
   server.use(
+    table('coach_assessments', []),
     table('profiles', [
       { id: 'p-coach', user_id: COACH.id, role: 'coach', full_name: 'Coach Vasilis', nationality: 'GR' },
     ]),
@@ -57,10 +58,9 @@ useCase('UC-C03', () => {
 
       await waitFor(() => expect(squadResponseLanded).toBe(true))
 
-      // The redesigned empty state no longer reads "No players in your squad
-      // yet" — it reads "Add your first player" (src/pages/coach/CoachSquadPage.tsx).
-      // Same use-case clause, updated selector.
-      expect(await screen.findByText(/add your first player/i)).toBeInTheDocument()
+      // Academy admission replaces the old Add Player prompt. Preserve the
+      // same explicit-empty-state clause with the approved J1 wording.
+      expect(await screen.findByText(/your squad is being prepared/i)).toBeInTheDocument()
     } finally {
       server.events.removeListener('response:mocked', onResponseMocked)
     }
@@ -94,15 +94,10 @@ useCase('UC-C03', () => {
 
       await waitFor(() => expect(squadResponseLanded).toBe(true))
 
-      // Same wording update as the sibling test above: "Add your first player"
-      // is the current empty-state copy. This assertion is EXPECTED TO FAIL —
-      // CoachSquadPage still destructures only `{ data }` from the failed
-      // request (src/pages/coach/CoachSquadPage.tsx:33), so `data` is null,
-      // `players` falls back to `[]`, and the empty-squad panel renders for a
-      // permission failure exactly as it would for a genuinely empty squad.
-      // Recorded as Q-2026-09-07-02 in docs/use-cases/OPEN-QUESTIONS.md — do
-      // not weaken this assertion to make it pass.
-      const emptyMessage = screen.queryByText(/add your first player/i)
+      // A refused read must show its error, never the academy-managed empty
+      // state. Keep both assertions after the actual response settles.
+      expect(await screen.findByText("Couldn't load your squad")).toBeInTheDocument()
+      const emptyMessage = screen.queryByText(/your squad is being prepared/i)
       expect(
         emptyMessage,
         'A failed load must not render the empty-squad message. ' +

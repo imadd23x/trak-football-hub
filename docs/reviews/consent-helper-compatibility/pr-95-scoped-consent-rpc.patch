@@ -1,0 +1,29 @@
+--- a/supabase/tests/parent_consent_journey.sql
++++ b/supabase/tests/parent_consent_journey.sql
+@@ -114,7 +114,7 @@
+   PERFORM pg_temp.cj_assert(v_sq = current_setting('trak.cj_sp')::uuid,
+     '2 the player joins the roster row the coach created', coalesce(v_sq::text, 'null'));
+ 
+-  SELECT public.player_age_years(pg_temp.cj(20)) INTO v_age;
++  SELECT (public.my_consent_status()->>'age')::integer INTO v_age;
+   PERFORM pg_temp.cj_assert(v_age = 15 AND public.consent_threshold_age() = 18,
+     '2 the player is 15 and the threshold is 18, so consent is required',
+     'age ' || coalesce(v_age::text, 'null') || ', threshold ' || public.consent_threshold_age());
+@@ -137,7 +137,7 @@
+ SELECT pg_temp.cj_as(pg_temp.cj(10), 'coach@consent-journey.test');
+ DO $test$
+ BEGIN
+-  PERFORM pg_temp.cj_assert(public.squad_player_consent_required(current_setting('trak.cj_sp')::uuid) IS TRUE,
++  PERFORM pg_temp.cj_assert(public.coach_squad_player_consent_required(current_setting('trak.cj_sp')::uuid) IS TRUE,
+     '3 the predicate #94 asks says consent is required');
+ END;
+ $test$;
+@@ -216,7 +216,7 @@
+ DO $test$
+ DECLARE v_sp uuid := current_setting('trak.cj_sp')::uuid; v_id uuid;
+ BEGIN
+-  PERFORM pg_temp.cj_assert(public.squad_player_consent_required(v_sp) IS FALSE,
++  PERFORM pg_temp.cj_assert(public.coach_squad_player_consent_required(v_sp) IS FALSE,
+     '7 the predicate #94 asks now says no consent is required');
+   INSERT INTO public.coach_assessments (coach_user_id, squad_player_id, work_rate, tactical, attitude, technical, physical, coachability)
+   VALUES (pg_temp.cj(10), v_sp, 7,7,7,7,7,7) RETURNING id INTO v_id;

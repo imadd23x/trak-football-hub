@@ -1,11 +1,12 @@
 -- @trak-suite mode=--feedback-publication-review in-all=true
--- T2 — does "the coach reviews every word" actually hold against the database?
+-- T2 records remain protected while G7 disables this deferred AI workflow.
 --
 -- Synthetic fixtures only. Run after real migrations in a disposable database.
 --
--- These are the six assertions I asked Imad to run when I could not replay this
--- myself, plus the five holes his PostgreSQL 17 review found (F-1 to F-5).
--- Written so the suite fails loudly if any of the repairs regress.
+-- G7 replaces publication/current-revision happy paths with denials. Keep the
+-- original negative controls for direct mutation, forged authorship, foreign
+-- coaches, children, anonymous callers and withdrawn consent. Historical rows
+-- are seeded by the fixture owner because no app role can publish them now.
 BEGIN;
 SET LOCAL TIME ZONE 'UTC';
 DO $test$
@@ -104,34 +105,26 @@ INSERT INTO public.coach_assessments
   (id, coach_user_id, squad_player_id, work_rate, tactical, attitude, technical, physical, coachability, organization_id)
 VALUES (pg_temp.fid(300), pg_temp.fid(10), pg_temp.fid(200), 7,7,7,7,7,7, pg_temp.fid(100));
 
--- ── Coach A publishes, which is the happy path ──────────────────────────────
+-- Retained revisions are still present, but the publication API is unavailable.
+INSERT INTO public.player_feedback
+  (squad_player_id, published_text, author_user_id, revision, superseded_at)
+VALUES
+  (pg_temp.fid(200), 'Great first touch this week.', pg_temp.fid(10), 1, now()),
+  (pg_temp.fid(200), 'Updated after Saturday.', pg_temp.fid(10), 2, NULL);
+SELECT pg_temp.fassert(
+  (SELECT count(*) FROM public.player_feedback WHERE squad_player_id = pg_temp.fid(200)) = 2,
+  'CONTROL historical feedback revisions exist before access denials');
 
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.actor(pg_temp.fid(10));
 
-DO $test$
-DECLARE v_id uuid; v_rev integer;
-BEGIN
-  v_id := public.publish_player_feedback(pg_temp.fid(200), 'Great first touch this week.', NULL);
-  SELECT revision INTO v_rev FROM public.player_feedback WHERE id = v_id;
-  PERFORM pg_temp.fassert(v_id IS NOT NULL AND v_rev = 1, 'a coach can publish to their own player', 'revision ' || coalesce(v_rev::text,'null'));
-END;
-$test$;
+SELECT pg_temp.fdenied(
+  format('SELECT public.publish_player_feedback(%L, %L, NULL)', pg_temp.fid(200), 'new publication'),
+  'G7 the owning coach cannot publish through the deferred AI workflow');
+SELECT pg_temp.fdenied('SELECT published_text FROM public.player_feedback',
+  'G7 the owning coach cannot read historical AI publications');
 
--- [6] A second publish supersedes the first, leaving exactly one current row.
-DO $test$
-DECLARE v_current integer; v_total integer;
-BEGIN
-  PERFORM public.publish_player_feedback(pg_temp.fid(200), 'Updated after Saturday.', NULL);
-  SELECT count(*) FILTER (WHERE superseded_at IS NULL), count(*)
-    INTO v_current, v_total FROM public.player_feedback WHERE squad_player_id = pg_temp.fid(200);
-  PERFORM pg_temp.fassert(v_current = 1 AND v_total = 2,
-    'a second publish supersedes the first, one current row remains',
-    v_current || ' current of ' || v_total || ' total');
-END;
-$test$;
-
--- [F-1] Publication DML must go through the RPC and nowhere else.
+-- [F-1] Direct application DML remains closed; G7 also disables the RPC.
 --
 -- Honest note on the first of these three: with the grant restored it is still
 -- refused, but by uq_player_feedback_one_current rather than by the missing
@@ -173,6 +166,8 @@ DECLARE v_drafts integer;
 BEGIN
   SELECT count(*) INTO v_drafts FROM public.ai_feedback_drafts WHERE squad_player_id = pg_temp.fid(200);
   PERFORM pg_temp.fassert(v_drafts = 0, '3 a foreign coach reads no drafts for that player', v_drafts || ' visible');
+EXCEPTION WHEN insufficient_privilege THEN
+  PERFORM pg_temp.fassert(true, '3 a foreign coach reads no drafts for that player', 'privilege denied');
 END;
 $test$;
 
@@ -224,17 +219,12 @@ EXCEPTION WHEN insufficient_privilege THEN
 END;
 $test$;
 
--- [2] A child reads only the current revision of their own feedback.
-DO $test$
-DECLARE v_seen integer; v_superseded integer;
-BEGIN
-  SELECT count(*) INTO v_seen FROM public.player_feedback;
-  SELECT count(*) INTO v_superseded FROM public.player_feedback WHERE superseded_at IS NOT NULL;
-  PERFORM pg_temp.fassert(v_seen = 1 AND v_superseded = 0,
-    '2 a child reads exactly one current revision and no superseded ones',
-    v_seen || ' row(s), ' || v_superseded || ' superseded');
-END;
-$test$;
+-- G7 closes both current and superseded AI text. Manual coach_shared_feedback
+-- has its own positive read/publication controls in pilot_g7.sql.
+SELECT pg_temp.fdenied('SELECT published_text FROM public.player_feedback WHERE superseded_at IS NULL',
+  'G7 a child cannot read retained current AI feedback');
+SELECT pg_temp.fdenied('SELECT published_text FROM public.player_feedback WHERE superseded_at IS NOT NULL',
+  'G7 a child cannot read retained superseded AI feedback');
 
 -- A child cannot publish on their own behalf.
 SELECT pg_temp.fdenied(
@@ -286,6 +276,9 @@ BEGIN
   PERFORM pg_temp.fassert(v_seen = 0,
     'F-3 a child without consent reads nothing, including what was published earlier',
     v_seen || ' row(s) still readable');
+EXCEPTION WHEN insufficient_privilege THEN
+  PERFORM pg_temp.fassert(true,
+    'F-3 a child without consent reads nothing, including what was published earlier', 'privilege denied');
 END;
 $test$;
 

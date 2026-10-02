@@ -122,9 +122,28 @@ beforeEach(() => {
     return new Response('{}', { status: 200 })
   }))
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/') })
 
 describe('account-bound onboarding and auth lifecycle', () => {
+  it('hydrates a recovery session on the reset route and tracks a later account change', async () => {
+    window.history.replaceState(null, '', '/reset-password')
+    mount()
+    await emit('PASSWORD_RECOVERY', session('a'))
+    await waitFor(() => expect(screen.getByTestId('identity')).toHaveTextContent('a:a'))
+    await emit('SIGNED_IN', session('b'))
+    await waitFor(() => expect(screen.getByTestId('identity')).toHaveTextContent('b:b'))
+  })
+
+  it('hydrates an already-consumed recovery callback and clears reset-route sign-out', async () => {
+    window.history.replaceState(null, '', '/reset-password')
+    api.session = session('a')
+    mount()
+    await waitFor(() => expect(screen.getByTestId('identity')).toHaveTextContent('a:a'))
+    await emit('SIGNED_OUT', null)
+    expect(screen.getByTestId('identity')).toHaveTextContent('-:-')
+    expect(window.location.pathname).toBe('/reset-password')
+  })
+
   it('provisions B only from B metadata, never A’s abandoned shared-phone payload', async () => {
     localStorage.setItem('trak_pending_profile', JSON.stringify(pending('A')))
     api.session = session('b', pending('B'))
@@ -132,6 +151,17 @@ describe('account-bound onboarding and auth lifecycle', () => {
     mount()
     await waitFor(() => expect(api.provision).toHaveBeenCalledWith('b', 'provision_my_profile', { p: expect.objectContaining(pending('B')) }))
     expect(localStorage.getItem('trak_pending_profile')).toBeNull()
+  })
+
+  // TRAK-48 slice 3: a child or parent the roster does not name is refused by
+  // the database. Retrying cannot help, so the message says what will.
+  it('tells an unrostered account to ask the academy, not to retry', async () => {
+    api.session = session('b', pending('B'))
+    api.lookup.mockResolvedValue({ data: null, error: null })
+    api.provision.mockResolvedValueOnce({ data: null, error: { code: '42501', message: "Your academy hasn't added this email yet" } })
+    mount()
+    await waitFor(() => expect(api.error).toHaveBeenCalledWith("Your academy hasn't added this email yet. Ask your academy to add it, then sign in again."))
+    expect(api.error).not.toHaveBeenCalledWith(expect.stringMatching(/Pull to refresh/))
   })
 
   it('does not provision an account without its own onboarding metadata', async () => {

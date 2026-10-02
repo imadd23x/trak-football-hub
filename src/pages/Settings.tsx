@@ -1,15 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
-import { ArrowLeft, Pencil, Check, X, Camera } from 'lucide-react'
+import { ArrowLeft, Pencil, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
-import { resolveAvatarUrl } from '@/lib/avatar-url'
-import { ParentConnections } from '@/components/parent/ParentConnections'
 import { supabase } from '@/integrations/supabase/client'
-import { POSITIONS, COACH_ROLES, AGE_GROUPS } from '@/lib/constants'
+import { isTechnicalChildAddress, childUsername } from '@/lib/child-login'
 
 const nameSchema = z
   .string()
@@ -24,12 +22,13 @@ export default function Settings() {
   </RouteGuard>
 }
 
-type Operation = 'name' | 'coach' | 'player' | 'avatar' | 'delete' | 'password' | 'signout'
+type Operation = 'name' | 'player' | 'delete' | 'password' | 'signout'
 
 function AccountSettings({ userId }: { userId: string }) {
   const navigate = useNavigate()
   const { user, profile, signOut, refreshProfile } = useAuth()
   const role = profile?.role
+  const childLogin = isTechnicalChildAddress(user?.email)
   const mounted = useRef(false)
   useLayoutEffect(() => {
     mounted.current = true
@@ -48,114 +47,50 @@ function AccountSettings({ userId }: { userId: string }) {
     if (isCurrent()) { operation.current = null; setPending(null) }
   }
   const saving = pending === 'name'
-  const uploadingAvatar = pending === 'avatar'
-  const savingCoach = pending === 'coach'
-  const savingPlayer = pending === 'player'
 
   const [editingName, setEditingName] = useState(false)
   const [displayName, setDisplayName] = useState(profile?.full_name ?? '')
   const [nameDraft, setNameDraft] = useState(profile?.full_name ?? '')
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  // Never the raw `profiles.avatar_url` value — it is a storage key or a
-  // legacy URL, not something an <img> can load. The effect below signs it.
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  // TRAK-72 item 11: a coach's club, age group and role come from the academy
+  // (Trak sets up staff, TRAK-12), so Settings shows them and edits none.
   const [coachClub, setCoachClub] = useState('')
   const [coachTeam, setCoachTeam] = useState('')
   const [coachRoleVal, setCoachRoleVal] = useState('')
-  const [playerPos, setPlayerPos] = useState('')
-  const [playerShirt, setPlayerShirt] = useState('')
-  const [linkedCoachNames, setLinkedCoachNames] = useState<string[]>([])
-  const [linkedParentNames, setLinkedParentNames] = useState<string[]>([])
-  const [connections, setConnections] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [connectionAttempt, setConnectionAttempt] = useState(0)
-  const [roleData, setRoleData] = useState<'loading' | 'ready' | 'error'>(role === 'coach' || role === 'player' ? 'loading' : 'ready')
+  // Players have nothing to edit here (TRAK-71): position and shirt number are
+  // coach-owned, and their connections are on the Profile tab.
+  const [roleData, setRoleData] = useState<'loading' | 'ready' | 'error'>(role === 'coach' ? 'loading' : 'ready')
   const [loadAttempt, setLoadAttempt] = useState(0)
 
   useEffect(() => { setDisplayName(profile?.full_name ?? '') }, [profile?.full_name])
-  // F-3: `profiles.avatar_url` holds a bare storage key going forward (a
-  // legacy public URL for anyone who uploaded before this fix), never
-  // something renderable as-is — the `avatars` bucket has been private since
-  // 26 May. Sign it into a URL that actually loads; null (no avatar, or a
-  // signing failure) falls through to the initials placeholder rather than a
-  // broken image.
-  useEffect(() => {
-    let cancelled = false
-    const current = () => mounted.current && !cancelled
-    if (!profile?.avatar_url) { setAvatarUrl(null); return }
-    void (async () => {
-      const { client } = await getSettingsAccount(userId, current)
-      const signed = await resolveAvatarUrl(
-        profile.avatar_url,
-        (path, expiresIn) => client.storage.from('avatars').createSignedUrl(path, expiresIn),
-        message => console.error('[avatar] could not sign stored avatar:', message),
-      )
-      if (current()) setAvatarUrl(signed)
-    })()
-    return () => { cancelled = true }
-  }, [userId, profile?.avatar_url])
-
   // Stable identity/role dependencies preserve unfinished drafts on token refresh.
   useEffect(() => {
-    if (role !== 'coach' && role !== 'player') return
+    if (role !== 'coach') return
     let cancelled = false
     const controller = new AbortController()
     const current = () => mounted.current && !cancelled
     setRoleData('loading')
     void (async () => {
       const { client } = await getSettingsAccount(userId, current)
-      if (role === 'coach') {
-        const { data, error } = await client.from('coach_details').select('current_club, team, coach_role')
-          .eq('user_id', userId).abortSignal(controller.signal).maybeSingle()
-        if (error) throw error
-        if (!current()) return
-        setCoachClub(data?.current_club ?? '')
-        setCoachTeam(data?.team ?? '')
-        setCoachRoleVal(data?.coach_role ?? '')
-      } else {
-        const { data, error } = await client.from('player_details').select('position, shirt_number')
-          .eq('user_id', userId).abortSignal(controller.signal).maybeSingle()
-        if (error) throw error
-        if (!current()) return
-        setPlayerPos(data?.position ?? '')
-        setPlayerShirt(data?.shirt_number == null ? '' : String(data.shirt_number))
+      const { data, error } = await client.from('coach_details').select('team, coach_role, organization_id')
+        .eq('user_id', userId).abortSignal(controller.signal).maybeSingle()
+      if (error) throw error
+      // The club is the academy's name, not the free-text current_club (empty
+      // for every staff account Trak sets up). "Coaches can read own org".
+      let club = ''
+      if (data?.organization_id) {
+        const { data: org, error: orgError } = await client.from('organizations').select('name')
+          .eq('id', data.organization_id).abortSignal(controller.signal).maybeSingle()
+        if (orgError) throw orgError
+        club = org?.name ?? ''
       }
+      if (!current()) return
+      setCoachClub(club)
+      setCoachTeam(data?.team ?? '')
+      setCoachRoleVal(data?.coach_role ?? '')
       if (current()) setRoleData('ready')
     })().catch(() => { if (current()) setRoleData('error') })
     return () => { cancelled = true; controller.abort() }
   }, [userId, role, loadAttempt])
-
-  // Ancillary connections cannot block editing the player's own details.
-  useEffect(() => {
-    if (role !== 'player') return
-    let cancelled = false
-    const controller = new AbortController()
-    const current = () => mounted.current && !cancelled
-    setConnections('loading')
-    void (async () => {
-      const { client } = await getSettingsAccount(userId, current)
-      const [squad, parents] = await Promise.all([
-        client.from('squad_players').select('coach_user_id').eq('linked_player_id', userId).eq('status', 'active').abortSignal(controller.signal),
-        client.from('player_parent_links').select('parent_user_id').eq('player_user_id', userId).abortSignal(controller.signal),
-      ])
-      if (squad.error) throw squad.error
-      if (parents.error) throw parents.error
-      const coachIds = [...new Set((squad.data ?? []).flatMap(row => row.coach_user_id ? [row.coach_user_id] : []))]
-      const parentIds = [...new Set((parents.data ?? []).map(row => row.parent_user_id))]
-      const ids = [...new Set([...coachIds, ...parentIds])]
-      const names = new Map<string, string>()
-      if (ids.length) {
-        const { data, error } = await client.from('profiles').select('user_id, full_name').in('user_id', ids).abortSignal(controller.signal)
-        if (error) throw error
-        for (const row of data ?? []) names.set(row.user_id, row.full_name)
-      }
-      if (!current()) return
-      // A profile name may be hidden by RLS without invalidating the link.
-      setLinkedCoachNames(coachIds.map(id => names.get(id) || 'Linked coach'))
-      setLinkedParentNames(parentIds.map(id => names.get(id) || 'Linked parent'))
-      setConnections('ready')
-    })().catch(() => { if (current()) setConnections('error') })
-    return () => { cancelled = true; controller.abort() }
-  }, [userId, role, connectionAttempt])
 
   const saveName = async () => {
     const parsed = nameSchema.safeParse(nameDraft)
@@ -178,47 +113,17 @@ function AccountSettings({ userId }: { userId: string }) {
   }
 
   const changePassword = async () => {
+    if (childLogin) {toast.info('Ask your parent or guardian to set a new password from their Trak profile.');return}
     if (!user?.email || !begin('password')) return
     try {
       const account = await getSettingsAccount(userId, isCurrent)
+      if (isTechnicalChildAddress(account.user.email)) return
       const { error } = await supabase.auth.resetPasswordForEmail(account.user.email!, {
         redirectTo: `${window.location.origin}/reset-password`,
       })
       if (error) throw error
       if (isCurrent()) toast.success('Check your email for a reset link')
     } catch { if (isCurrent()) toast.error('Could not send reset email') }
-    finally { finish() }
-  }
-
-  const saveCoachProfile = async () => {
-    if (roleData !== 'ready') return
-    if (!coachClub.trim()) { toast.error('Club name is required'); return }
-    if (!begin('coach')) return
-    try {
-      const { client } = await getSettingsAccount(userId, isCurrent)
-      const { data, error } = await client.from('coach_details')
-        .upsert({ user_id: userId, current_club: coachClub, team: coachTeam, coach_role: coachRoleVal }, { onConflict: 'user_id' })
-        .select('user_id').maybeSingle()
-      if (error) throw error
-      if (data?.user_id !== userId) throw new Error('Profile save was not confirmed')
-      if (isCurrent()) toast.success('Profile updated')
-    } catch { if (isCurrent()) toast.error('Could not save profile') }
-    finally { finish() }
-  }
-
-  const savePlayerProfile = async () => {
-    if (roleData !== 'ready') return
-    if (!playerPos) { toast.error('Please select a position'); return }
-    if (!begin('player')) return
-    try {
-      const { client } = await getSettingsAccount(userId, isCurrent)
-      const { data, error } = await client.from('player_details')
-        .upsert({ user_id: userId, position: playerPos, shirt_number: playerShirt ? Number(playerShirt) : null }, { onConflict: 'user_id' })
-        .select('user_id').maybeSingle()
-      if (error) throw error
-      if (data?.user_id !== userId) throw new Error('Profile save was not confirmed')
-      if (isCurrent()) toast.success('Profile updated')
-    } catch { if (isCurrent()) toast.error('Could not save profile') }
     finally { finish() }
   }
 
@@ -235,43 +140,6 @@ function AccountSettings({ userId }: { userId: string }) {
       await signOut(userId)
     } catch { if (isCurrent()) toast.error('Could not delete account. Please contact support.') }
     finally { finish() }
-  }
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return }
-    if (!begin('avatar')) return
-    try {
-      const { client } = await getSettingsAccount(userId, isCurrent)
-      const { error: uploadError } = await client.storage.from('avatars')
-        .upload(userId, file, { upsert: true, contentType: file.type })
-      if (uploadError) throw uploadError
-      await assertSettingsAccount(userId, isCurrent)
-      // F-3: store the bare object key, not getPublicUrl()'s output — the
-      // `avatars` bucket is private, so a "public" URL 404s everywhere it is
-      // rendered even though the upload and this save both report success.
-      // No cache-buster: a signed URL is minted fresh per render below and
-      // per read at every other call site, so there is nothing to bust.
-      const { data, error } = await client.from('profiles').update({ avatar_url: userId })
-        .eq('user_id', userId).select('user_id').maybeSingle()
-      if (error) throw error
-      if (data?.user_id !== userId) throw new Error('Profile photo save was not confirmed')
-      await assertSettingsAccount(userId, isCurrent)
-      const signed = await resolveAvatarUrl(
-        userId,
-        (path, expiresIn) => client.storage.from('avatars').createSignedUrl(path, expiresIn),
-        message => console.error('[avatar] could not sign the upload for preview:', message),
-      )
-      if (isCurrent()) setAvatarUrl(signed)
-      await refreshProfile()
-      if (isCurrent()) toast.success('Profile photo updated')
-    } catch (error) {
-      if (isCurrent()) toast.error(error instanceof Error ? error.message : 'Upload failed')
-    } finally {
-      finish()
-      if (isCurrent() && fileInputRef.current) fileInputRef.current.value = ''
-    }
   }
 
   const signOutAccount = async () => {
@@ -305,42 +173,13 @@ function AccountSettings({ userId }: { userId: string }) {
           </h1>
         </div>
 
-        {/* Avatar */}
         <div className="flex flex-col items-center mb-7">
-          <div className="relative">
-            <div
-              className="w-[72px] h-[72px] rounded-[22px] overflow-hidden flex items-center justify-center"
-              style={{ background: '#202024', border: '1px solid rgba(200,242,90,0.18)' }}
-            >
-              {avatarUrl
-                ? <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-                : <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 26, fontWeight: 600, color: '#C8F25A' }}>
-                    {(displayName || '?').charAt(0).toUpperCase()}
-                  </span>
-              }
-            </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!!pending}
-              className="absolute -bottom-1.5 -right-1.5 w-[26px] h-[26px] rounded-full flex items-center justify-center"
-              style={{ background: '#C8F25A', border: '2px solid #0A0A0B' }}
-              aria-label="Change profile photo"
-            >
-              <Camera size={13} color="#000" />
-            </button>
-          </div>
-          {uploadingAvatar && (
-            <span className="mt-3" style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>
-              Uploading…
+          <div className="w-[72px] h-[72px] rounded-[22px] bg-card border border-border flex items-center justify-center">
+            <span className="font-mono text-2xl font-semibold text-primary" aria-hidden="true">
+              {(displayName || '?').charAt(0).toUpperCase()}
             </span>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            className="hidden"
-            onChange={handleAvatarChange}
-          />
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Profile photos are coming soon.</p>
         </div>
 
         {/* Account */}
@@ -385,12 +224,12 @@ function AccountSettings({ userId }: { userId: string }) {
               )
             }
           />
-          <Row label="Email" right={<Value>{user?.email || '—'}</Value>} />
+          <Row label={childLogin ? 'Username' : 'Email'} right={<Value>{childLogin ? childUsername(user?.email) : user?.email || '—'}</Value>} />
           <Row
             label="Password"
             right={
               <button onClick={changePassword} disabled={!!pending} style={{ fontSize: 13, color: '#C8F25A' }}>
-                Send reset email
+                {childLogin ? 'Ask your guardian' : 'Send reset email'}
               </button>
             }
           />
@@ -403,86 +242,14 @@ function AccountSettings({ userId }: { userId: string }) {
         </div>}
 
         {/* Coach profile */}
-        {role === 'coach' && (
+        {role === 'coach' && roleData === 'ready' && (
           <Section label="My Profile">
-            <Row label="Club" right={
-              <input value={coachClub} disabled={!!pending || roleData !== 'ready'} onChange={e => setCoachClub(e.target.value)}
-                placeholder="Club name"
-                style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'rgba(255,255,255,0.88)', textAlign: 'right', width: 160 }} />
-            } />
-            <Row label="Age Group" right={
-              <select value={coachTeam} disabled={!!pending || roleData !== 'ready'} onChange={e => setCoachTeam(e.target.value)}
-                style={{ background: '#101012', border: 'none', outline: 'none', fontSize: 13, color: coachTeam ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.35)', textAlign: 'right' }}>
-                <option value="">Select…</option>
-                {AGE_GROUPS.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            } />
-            <Row label="Role" right={
-              <select value={coachRoleVal} disabled={!!pending || roleData !== 'ready'} onChange={e => setCoachRoleVal(e.target.value)}
-                style={{ background: '#101012', border: 'none', outline: 'none', fontSize: 13, color: 'rgba(255,255,255,0.88)', textAlign: 'right' }}>
-                <option value="">Select…</option>
-                {COACH_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            } />
-            <div className="py-3">
-              <button onClick={saveCoachProfile} disabled={!!pending || roleData !== 'ready'}
-                style={{ fontSize: 13, color: '#C8F25A' }}>
-                {savingCoach ? 'Saving…' : 'Save changes'}
-              </button>
-            </div>
-          </Section>
-        )}
-
-        {/* Player profile */}
-        {role === 'player' && (
-          <Section label="My Profile">
-            <Row label="Position" right={
-              <select value={playerPos} disabled={!!pending || roleData !== 'ready'} onChange={e => setPlayerPos(e.target.value)}
-                style={{ background: '#101012', border: 'none', outline: 'none', fontSize: 13, color: 'rgba(255,255,255,0.88)', textAlign: 'right' }}>
-                <option value="">Select…</option>
-                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            } />
-            <Row label="Shirt number" right={
-              <input value={playerShirt} disabled={!!pending || roleData !== 'ready'} onChange={e => setPlayerShirt(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                inputMode="numeric" placeholder="—"
-                style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'rgba(255,255,255,0.88)', textAlign: 'right', width: 48 }} />
-            } />
-            <div className="py-3">
-              <button onClick={savePlayerProfile} disabled={!!pending || roleData !== 'ready'}
-                style={{ fontSize: 13, color: '#C8F25A' }}>
-                {savingPlayer ? 'Saving…' : 'Save changes'}
-              </button>
-            </div>
-          </Section>
-        )}
-
-        {/* Connections — player */}
-        {role === 'player' && (
-          <Section label="Connections">
-            {connections === 'loading' && <p role="status" className="py-3 text-sm text-white/50">Loading connections…</p>}
-            {connections === 'error' && <div role="alert" className="py-3 text-sm text-white/50">
-              Connections could not be loaded. <button onClick={() => setConnectionAttempt(value => value + 1)}>Retry connections</button>
-            </div>}
-            {connections === 'ready' && <>
-              <ConnectionRow label={linkedCoachNames.length > 1 ? 'Coaches' : 'Coach'}
-                status={linkedCoachNames.length ? 'connected' : 'none'} name={linkedCoachNames.join(', ') || undefined} />
-              <ConnectionRow label={linkedParentNames.length > 1 ? 'Parents' : 'Parent'}
-                status={linkedParentNames.length ? 'connected' : 'none'} name={linkedParentNames.join(', ') || undefined} />
-              {(!linkedCoachNames.length || !linkedParentNames.length) && (
-                <div className="py-3" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                  {!linkedCoachNames.length && 'Ask your coach for their TRK- code and enter it on your Profile to connect. '}
-                  {!linkedParentNames.length && 'To add a parent, send them an invite from your Profile.'}
-                </div>
-              )}
-            </>}
-          </Section>
-        )}
-
-        {/* Connections — parent */}
-        {role === 'parent' && (
-          <Section label="Linked children">
-            <ParentConnections />
+            <Row label="Club" right={<Value>{coachClub || '—'}</Value>} />
+            <Row label="Age Group" right={<Value>{coachTeam || '—'}</Value>} />
+            <Row label="Role" right={<Value>{coachRoleVal || '—'}</Value>} />
+            <p className="py-3" style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+              Your academy sets these. Ask them if something is wrong.
+            </p>
           </Section>
         )}
 
@@ -588,71 +355,4 @@ function Row({ label, right, stack = false }: { label: string; right: React.Reac
 
 function Value({ children }: { children: React.ReactNode }) {
   return <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>{children}</span>
-}
-
-function ConnectionRow({
-  label,
-  status,
-  name,
-  onRemove,
-}: {
-  label: string
-  status: 'connected' | 'none'
-  name?: string
-  onRemove?: () => void
-}) {
-  const connected = status === 'connected'
-  return (
-    <div
-      className="py-3.5 flex items-center justify-between gap-3"
-      style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: 999,
-            background: connected ? '#C8F25A' : 'rgba(255,255,255,0.15)',
-            flexShrink: 0,
-          }}
-        />
-        <div className="min-w-0">
-          <div
-            style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: 9,
-              fontWeight: 500,
-              textTransform: 'uppercase',
-              letterSpacing: '0.12em',
-              color: 'rgba(255,255,255,0.45)',
-            }}
-          >
-            {label}
-          </div>
-          <div
-            className="truncate"
-            style={{ fontSize: 13, color: connected ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.4)' }}
-          >
-            {connected ? name : 'Not connected'}
-          </div>
-        </div>
-      </div>
-      {connected && onRemove && (
-        <button
-          onClick={onRemove}
-          style={{
-            fontFamily: "'DM Mono', monospace",
-            fontSize: 9,
-            textTransform: 'uppercase',
-            letterSpacing: '0.12em',
-            color: 'rgba(255,255,255,0.4)',
-            flexShrink: 0,
-          }}
-        >
-          Remove
-        </button>
-      )}
-    </div>
-  )
 }

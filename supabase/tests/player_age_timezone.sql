@@ -33,11 +33,12 @@ CREATE FUNCTION pg_temp.age_assert(ok boolean, description text) RETURNS void LA
 $test$;
 GRANT SELECT ON age_cases TO authenticated;
 GRANT INSERT ON age_results TO authenticated;
-SELECT pg_temp.age_assert(has_function_privilege('authenticated', 'public.player_age_years(uuid)', 'EXECUTE'), 'authenticated retains execute');
+SELECT pg_temp.age_assert(NOT has_function_privilege('authenticated', 'public.player_age_years(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.player_age_years(uuid)', 'EXECUTE'), 'raw age lookup is internal');
 SELECT pg_temp.age_assert((SELECT prosecdef AND provolatile = 's' FROM pg_proc WHERE oid = 'public.player_age_years(uuid)'::regprocedure), 'stable security-definer contract retained');
 
-SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', jsonb_build_object('role', 'authenticated', 'sub', pg_temp.age_id(2))::text, true);
+-- Preserve the arithmetic controls as owner. App clients use the scoped RPC,
+-- exercised as the corresponding player below in every timezone.
 DO $test$
 DECLARE zone text; fixture record; utc_day date := (now() AT TIME ZONE 'UTC')::date;
   different_dates integer := 0; old_helper_mismatches integer := 0;
@@ -61,6 +62,27 @@ BEGIN
   END LOOP;
   PERFORM pg_temp.age_assert(different_dates > 0, 'zones exercised a different calendar day');
   PERFORM pg_temp.age_assert(old_helper_mismatches > 0, 'negative control: old session-date expression misclassifies birthdays');
+END;
+$test$;
+SET LOCAL ROLE authenticated;
+DO $test$
+DECLARE zone text; fixture record; observed jsonb;
+BEGIN
+  FOREACH zone IN ARRAY ARRAY['UTC', 'Asia/Dubai', 'Europe/Athens', 'America/Los_Angeles', 'Etc/GMT+12', 'Etc/GMT-14'] LOOP
+    PERFORM set_config('TimeZone', zone, true);
+    FOR fixture IN SELECT * FROM pg_temp.age_cases LOOP
+      PERFORM set_config('request.jwt.claims', jsonb_build_object('role', 'authenticated', 'sub', fixture.id)::text, true);
+      observed := public.my_consent_status();
+      PERFORM pg_temp.age_assert((observed->>'age')::integer IS NOT DISTINCT FROM fixture.expected_age,
+        zone || ': scoped age for ' || fixture.id);
+      IF fixture.consent_required IS NOT NULL THEN
+        PERFORM pg_temp.age_assert((observed->>'required')::boolean = fixture.consent_required,
+          zone || ': scoped consent boundary for ' || fixture.id);
+      END IF;
+      PERFORM pg_temp.age_assert(current_setting('TimeZone') = zone,
+        zone || ': scoped helper restores caller timezone');
+    END LOOP;
+  END LOOP;
 END;
 $test$;
 RESET ROLE;

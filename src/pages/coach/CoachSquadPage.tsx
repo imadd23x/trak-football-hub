@@ -1,12 +1,37 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, BandPill } from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
-import { Plus, WifiOff } from 'lucide-react'
+import { Users, WifiOff } from 'lucide-react'
+import { fetchWaitReason } from '@/lib/wait-reason'
 
 const POSITIONS = ['All', 'Goalkeeper', 'Defender', 'Midfielder', 'Attacker'] as const
+
+/* J5: the squad marks each player "Ready to assess" or why they aren't yet:
+   no parent approval ('waiting'), or approved but not signed up ('signup',
+   TRAK-99). 'notReady' when the gate says no but the reason couldn't be read;
+   'unknown' when the gate check itself failed. The screen never claims a
+   player is ready on a guess. The database still refuses the write either way. */
+type ConsentStatus = 'ready' | 'waiting' | 'signup' | 'notReady' | 'unknown'
+
+const CONSENT_CHIP: Record<ConsentStatus, { label: string; color: string; bg: string }> = {
+  ready:    { label: 'Ready to assess',               color: '#C8F25A',             bg: 'rgba(200,242,90,0.10)' },
+  waiting:  { label: 'Waiting for parent',            color: 'rgb(251,191,36)',     bg: 'rgba(251,191,36,0.10)' },
+  signup:   { label: 'Waiting for player to sign up', color: 'rgb(251,191,36)',     bg: 'rgba(251,191,36,0.10)' },
+  notReady: { label: 'Not ready to assess',           color: 'rgb(251,191,36)',     bg: 'rgba(251,191,36,0.10)' },
+  unknown:  { label: 'Status unknown',                color: 'rgba(255,255,255,0.45)', bg: 'rgba(255,255,255,0.06)' },
+}
+
+/** The gate first, the same predicate the RLS policy evaluates; the reason only for a player it refuses. */
+async function squadStatus(squadPlayerId: string): Promise<ConsentStatus> {
+  const { data: required, error } = await supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: squadPlayerId } as never)
+  if (error || typeof required !== 'boolean') return 'unknown'
+  if (!required) return 'ready'
+  const reason = await fetchWaitReason(squadPlayerId)
+  return reason === 'parent' ? 'waiting' : reason === 'signup' ? 'signup' : 'notReady'
+}
 
 export default function CoachSquadPage() {
   const { user } = useAuth()
@@ -14,10 +39,14 @@ export default function CoachSquadPage() {
   const location = useLocation()
   const [players, setPlayers] = useState<any[]>([])
   const [assessments, setAssessments] = useState<Record<string, number>>({})
+  const [consent, setConsent] = useState<Record<string, ConsentStatus>>({})
   const [posFilter, setPosFilter] = useState<string>('All')
   const [ageFilter, setAgeFilter] = useState<string>('All')
   const [loadFailed, setLoadFailed] = useState(false)
   const [retry, setRetry] = useState(0)
+  // The account and Retry count of the last squad read that finished. A run
+  // for the same pair is a background refresh (see the load below).
+  const loadedFor = useRef<{ userId: string; retry: number } | null>(null)
 
   // Age group label: prefer the age_group text column ('U12'), fall back to legacy integer age
   const ageLabel = (p: any): string | null => p.age_group ?? (p.age != null ? String(p.age) : null)
@@ -30,12 +59,21 @@ export default function CoachSquadPage() {
   useEffect(() => {
     if (!user) return
     let cancelled = false
-    setLoadFailed(false)
+    // AuthContext hands out a new user object on every same-account token
+    // refresh (hourly, and on returning to the tab), which re-runs this load.
+    // That re-run keeps the chips on screen and replaces them from its own
+    // checks, instead of blinking them all off (TRAK-79). A first load, a
+    // Retry and a different account still start from nothing.
+    const background = loadedFor.current?.userId === user.id && loadedFor.current.retry === retry
+    // A background run also keeps a failure on screen until its own read
+    // succeeds, so a refresh never shows an empty squad in its place (UC-X02;
+    // Tarek, #149 review).
+    if (!background) { setConsent({}); setLoadFailed(false) }
 
     // Fetch squad players.
     // The error must be checked: falling through to `data || []` renders a
     // failed read as an empty squad, so a coach offline with a full roster is
-    // told to "Add your first player".
+    // shown "Your squad is being prepared".
     supabase
       .from('squad_players')
       .select('*')
@@ -43,11 +81,18 @@ export default function CoachSquadPage() {
       .order('player_name')
       .then(({ data, error }) => {
         if (cancelled) return
+        loadedFor.current = { userId: user.id, retry }
         if (error) {
           setLoadFailed(true)
           return
         }
+        setLoadFailed(false)
         setPlayers(data || [])
+        // One check per player, the same predicate the RLS policy evaluates. A
+        // pilot squad is about 25 players, so this stays a handful of requests.
+        void Promise.all((data || []).map(p =>
+          squadStatus(p.id).then((status): [string, ConsentStatus] => [p.id, status]),
+        )).then(entries => { if (!cancelled) setConsent(Object.fromEntries(entries)) })
       })
 
     // Fetch latest assessment per player for band display.
@@ -99,12 +144,6 @@ export default function CoachSquadPage() {
       {/* Topbar */}
       <div className="flex items-center justify-between px-5 py-[10px] border-b border-white/[0.07] shrink-0">
         <h1 className="text-[15px] font-semibold text-white/90">Squad</h1>
-        <button
-          onClick={() => navigate('/coach/squad/add')}
-          className="flex items-center justify-center w-8 h-8 rounded-[9px] bg-[#C8F25A] active:scale-95 transition-transform"
-        >
-          <Plus size={16} className="text-black" strokeWidth={2.5} />
-        </button>
       </div>
 
       {/* Filters */}
@@ -184,19 +223,12 @@ export default function CoachSquadPage() {
                 className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
                 style={{ background: 'rgba(200,242,90,0.08)', border: '1px solid rgba(200,242,90,0.15)' }}
               >
-                <Plus size={22} className="text-[#C8F25A]" strokeWidth={1.5} />
+                <Users size={22} className="text-[#C8F25A]" strokeWidth={1.5} />
               </div>
-              <p className="text-[15px] text-white/70 font-medium mb-1">Add your first player</p>
+              <p className="text-[15px] text-white/70 font-medium mb-1">Your squad is being prepared</p>
               <p className="text-[12px] text-white/35 leading-relaxed mb-5">
-                Build your squad to start logging sessions, assessments and match ratings.
+                Your academy will add players to this squad.
               </p>
-              <button
-                onClick={() => navigate('/coach/squad/add')}
-                className="px-5 py-2.5 rounded-[10px] text-[13px] font-medium text-black"
-                style={{ background: '#C8F25A' }}
-              >
-                Add player
-              </button>
             </div>
           ) : (
             <div className="pt-8 text-center">
@@ -245,6 +277,14 @@ export default function CoachSquadPage() {
                       {p.shirt_number ? ` · #${p.shirt_number}` : ''}
                       {ageLabel(p) ? ` · ${ageLabel(p)}` : ''}
                     </p>
+                    {consent[p.id] ? (
+                      <span
+                        className="inline-flex items-center h-[18px] px-1.5 mt-1 rounded-[5px] text-[9px] font-semibold"
+                        style={{ color: CONSENT_CHIP[consent[p.id]].color, background: CONSENT_CHIP[consent[p.id]].bg }}
+                      >
+                        {CONSENT_CHIP[consent[p.id]].label}
+                      </span>
+                    ) : null}
                   </div>
 
                   {/* Band pill */}

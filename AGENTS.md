@@ -2,6 +2,15 @@
 
 Quick orientation for AI agents and new contributors.
 
+## Pilot work and coordination
+
+Read `MVP Requirements` and your assigned Linear issue before coding. Agents
+work only their human's issues. Use one PR per issue with its `TRAK-#` key and
+J/G (or scope/launch-gate) purpose in the title. Record blockers in Linear.
+Imad posts the current merge queue in #coding-agents-at-work. Follow
+`docs/release/merge-gate.md`.
+Merged work enters Verifying; the owner moves it to Done once deployed proof is on the issue.
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -28,7 +37,7 @@ Quick orientation for AI agents and new contributors.
 | Error boundary | `src/components/trak/ErrorBoundary.tsx` |
 | Database migrations | `supabase/migrations/` (apply in filename order) |
 | Coach AI edge function | `supabase/functions/coach-assistant/` |
-| Strategic review — workshop outputs and prototype bet | `StrategicReview/` (start at `README.md`) |
+| Pilot scope: P0 journeys, coming soon, launch gate | `MVP Requirements` (progress: `docs/use-cases/PILOT-INDEX.md`) |
 
 ## Common Patterns
 

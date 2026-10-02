@@ -21,10 +21,10 @@ function signedInCoachWithSquad() {
       { id: 'p-coach', user_id: COACH.id, role: 'coach', full_name: 'Coach Vasilis', nationality: 'GR', invite_code: 'ABCD' },
     ]),
     table('squad_players', SQUAD),
-    // CoachAssessPage unconditionally fetches coach_sessions for the session
-    // dropdown, and coach_details on the destination home screen — mock both
-    // up front so every test in this file can reach the assess screen.
-    table('coach_sessions', []),
+    // CoachAssessPage fetches the coach's past sessions for the required
+    // session dropdown (TRAK-68), and coach_details on the destination home
+    // screen; mock both up front so every test here can reach the form.
+    table('coach_sessions', [{ id: 'session-1', coach_user_id: COACH.id, title: 'vs Synthetic FC', session_date: '2026-09-20' }]),
     table('coach_details', []),
   )
 }
@@ -40,6 +40,12 @@ function signedInCoachWithSquad() {
 async function findPlayerSelect() {
   const option = await screen.findByRole('option', { name: 'Nikos Papadopoulos' })
   return option.closest('select') as HTMLSelectElement
+}
+
+// UC-C04 v2 (TRAK-68): the assessment belongs to a past session.
+async function chooseSession(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByRole('option', { name: /vs Synthetic FC/ })
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Session' }), 'session-1')
 }
 
 useCase('UC-C04', () => {
@@ -67,6 +73,7 @@ useCase('UC-C04', () => {
     // combobox and fails with "Value not found in options".
     const playerSelect = await findPlayerSelect()
     await user.selectOptions(playerSelect, 'squad-1')
+    await chooseSession(user)
 
     // All six sliders default to 5 — an implementation that hardcoded 5 into
     // every column, or wired all six sliders to one shared value, would pass
@@ -99,6 +106,7 @@ useCase('UC-C04', () => {
     expect(inserted[0]).toMatchObject({
       coach_user_id: COACH.id,
       squad_player_id: 'squad-1',
+      session_id: 'session-1',
       work_rate: 10,
       tactical: 9,
       attitude: 8,
@@ -132,7 +140,7 @@ useCase('UC-C04', () => {
     expect(within(overallBandCard).getByText('Mixed')).toBeInTheDocument()
   })
 
-  it('refuses to submit until a player is selected', async () => {
+  it('refuses to submit until a player and a session are selected', async () => {
     signedInCoachWithSquad()
     const inserted: unknown[] = []
     server.use(
@@ -157,6 +165,13 @@ useCase('UC-C04', () => {
     // submitted anyway", matching the sibling assertion in
     // UC-C02.add-player.test.tsx.
     await user.click(submit)
+    expect(inserted).toHaveLength(0)
+
+    // A player alone is not enough: the session is required too (v2).
+    await user.selectOptions(await findPlayerSelect(), 'squad-1')
+    await screen.findByRole('option', { name: /vs Synthetic FC/ })
+    expect(screen.getByRole('button', { name: /save assessment/i })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: /save assessment/i }))
     expect(inserted).toHaveLength(0)
   })
 })

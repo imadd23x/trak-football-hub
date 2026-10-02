@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '@/integrations/supabase/client'
+import { passwordRecovery } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { Eye, EyeOff } from 'lucide-react'
 import { validatePassword } from '@/lib/password'
@@ -10,28 +10,9 @@ export default function ResetPassword() {
   const [password, setPassword]     = useState('')
   const [confirm, setConfirm]       = useState('')
   const [showPw, setShowPw]         = useState(false)
-  const [loading, setLoading]       = useState(false)
-  const [ready, setReady]           = useState(false)
-
-  // The reset link lands here with a session already in the URL hash.
-  // We just need an active session to be ready — no need to wait for a
-  // specific event. Poll briefly then show the form.
-  useEffect(() => {
-    // Supabase processes the hash token automatically — give it a moment
-    const check = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        setReady(true)
-        return
-      }
-      // Retry once after a short delay in case the token exchange is in progress
-      setTimeout(async () => {
-        const { data: { session: s2 } } = await supabase.auth.getSession()
-        setReady(!!s2)
-      }, 1500)
-    }
-    check()
-  }, [])
+  const recovery = useSyncExternalStore(passwordRecovery.subscribe, passwordRecovery.getSnapshot)
+  const loading = recovery.status === 'saving'
+  const ready = recovery.status === 'ready' || loading
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,15 +25,11 @@ export default function ResetPassword() {
       toast.error('Passwords do not match')
       return
     }
-    setLoading(true)
-    const { error } = await supabase.auth.updateUser({ password })
-    setLoading(false)
-    if (error) {
-      toast.error(error.message)
-      return
+    if (await passwordRecovery.updatePassword(password)) {
+      setPassword('')
+      setConfirm('')
+      toast.success('Password updated')
     }
-    toast.success('Password updated — signing you in')
-    setTimeout(() => navigate('/'), 1500)
   }
 
   return (
@@ -98,12 +75,19 @@ export default function ResetPassword() {
 
         {!ready ? (
           <div className="text-center py-8">
-            <p className="text-white/35 text-sm" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-              Verifying your reset link…
+            <p role={recovery.status === 'invalid' ? 'alert' : recovery.status === 'verifying' ? undefined : 'status'} className="text-white/60 text-sm" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+              {recovery.message || 'Verifying your reset link…'}
             </p>
+            {recovery.status !== 'verifying' && (
+              <button type="button" onClick={() => navigate('/')} className="min-h-11 mt-5 px-5 text-[#C8F25A] text-sm underline underline-offset-4">
+                {recovery.status === 'complete' ? 'Continue to Trak' : 'Return to Trak'}
+              </button>
+            )}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+
+            {recovery.message && <p role="alert" className="text-white/60 text-sm">{recovery.message}</p>}
 
             {/* New password */}
             <div className="relative">
@@ -116,8 +100,8 @@ export default function ResetPassword() {
               <button
                 type="button"
                 onClick={() => setShowPw(v => !v)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
-                tabIndex={-1}
+                className="absolute right-1 min-w-11 min-h-11 flex items-center justify-center top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                aria-label={showPw ? 'Hide password' : 'Show password'}
               >
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -188,6 +172,7 @@ function FloatingInput({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         required
+        autoComplete="new-password"
         className="w-full outline-none transition-all"
         style={{
           background: 'rgba(255,255,255,0.04)',

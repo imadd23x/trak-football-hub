@@ -90,7 +90,9 @@ export async function buildReplayPlan(projectRoot, mode) {
   }
   const suites = mode === '--baseline' ? ['parent_invite_security.sql'] : [
     ...(mode === 'all' || mode === '--academy-upgrade-review' || mode === '--assessment-upgrade-review' ? ['parent_invite_security.sql', 'pilot_view_security.sql',
-      'privilege_and_consent_security.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql'] : []),
+      'privilege_and_consent_security.sql', 'coach_notes_privacy.sql', 'org_referential_cleanup.sql', 'account_export.sql', 'pilot_g7.sql', 'avatar_storage.sql',
+      'family_training_history.sql', 'family_reads_follow_consent.sql', 'match_records_kept.sql',
+      ...(mode === 'all' ? ['guardian_child_login.sql', 'guardian_child_recovery.sql'] : [])] : []),
     'coach_departure_review.sql', 'academy_access_security.sql',
     // These committed fixtures must stay LAST; earlier suites assume a clean DB.
     'account_deletion_setup.sql', 'account_deletion_assertions.sql',

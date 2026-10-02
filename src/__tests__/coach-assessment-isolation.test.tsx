@@ -13,7 +13,7 @@ vi.mock('@/lib/telemetry', () => ({ trackEvent: vi.fn(), startTimer: () => () =>
 
 const endpoint = (table: string) => `${SUPABASE_URL}/rest/v1/${table}`
 const assessmentA = { id: 'assessment-a', work_rate: 8, tactical: 8, attitude: 8,
-  technical: 8, physical: 8, coachability: 8, appearance: 'sub', session_id: null }
+  technical: 8, physical: 8, coachability: 8, appearance: 'sub', session_id: 'session-1' }
 interface Write { table: string; method: string; id: string | null; body: Record<string, unknown> }
 let writes: Write[]
 let reads: string[]
@@ -38,9 +38,17 @@ const noteBox = () => screen.getByPlaceholderText(/First touch under pressure/)
 const feedbackBox = () => screen.getByPlaceholderText(/Great week/)
 const save = () => screen.getByRole('button', { name: /Save Assessment/ })
 
+// TRAK-68: an assessment needs a past session. It stays chosen across players.
+async function chooseSessionIfNone() {
+  await screen.findByRole('option', { name: /vs Synthetic FC/ })
+  const session = screen.getByRole('combobox', { name: 'Session' }) as HTMLSelectElement
+  if (session.value === '') await userEvent.selectOptions(session, 'session-1')
+}
+
 async function selectPlayer(player: string) {
   await screen.findByRole('option', { name: 'Alex Synthetic' })
   await userEvent.selectOptions(selector(), player)
+  await chooseSessionIfNone()
   await waitFor(() => expect(reads).toContain(player))
 }
 
@@ -52,7 +60,7 @@ beforeEach(() => {
       { id: 'player-a', player_name: 'Alex Synthetic' },
       { id: 'player-b', player_name: 'Bella Synthetic' },
     ])),
-    http.get(endpoint('coach_sessions'), () => HttpResponse.json([])),
+    http.get(endpoint('coach_sessions'), () => HttpResponse.json([{ id: 'session-1', title: 'vs Synthetic FC', session_date: '2026-09-20' }])),
     http.get(endpoint('coach_assessments'), ({ request }) => {
       const player = new URL(request.url).searchParams.get('squad_player_id')?.replace('eq.', '') ?? ''
       reads.push(player)
@@ -109,7 +117,8 @@ describe('full assessment player boundaries', () => {
     await selectPlayer('player-b')
     await act(async () => { pending.release(); await new Promise(resolve => setTimeout(resolve, 30)) })
     expect(feedbackBox()).toHaveValue('')
-    expect(screen.getByRole('button', { name: 'Publish to the player' })).toBeDisabled()
+    // J5: with no message there is nothing to publish, so no Publish action is offered.
+    expect(screen.queryByRole('button', { name: /^Publish/ })).toBeNull()
     await waitFor(() => expect(save()).toBeEnabled())
     await userEvent.click(save())
     await screen.findByText('Coach home')
@@ -203,8 +212,9 @@ describe('full assessment player boundaries', () => {
     await screen.findByText('Coach home')
     expect(writes.find(write => write.table === 'coach_assessment_notes')?.body)
       .toMatchObject({ assessment_id: 'assessment-a', note: '' })
-    expect(writes.find(write => write.table === 'coach_shared_feedback')?.body)
-      .toMatchObject({ body: 'Published feedback for Alex' })
+    // J5: the published message is unchanged, so it is left alone. Rewriting
+    // it would re-stamp published_at and mark it "new" for the family again.
+    expect(writes.find(write => write.table === 'coach_shared_feedback')).toBeUndefined()
   })
 
   it('clears the roster selection and draft when another coach signs in', async () => {

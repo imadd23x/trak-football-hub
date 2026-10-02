@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
+import { fetchWaitReason, WAIT_TITLE, waitText, type WaitReason } from '@/lib/wait-reason'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
 import { MobileShell } from '@/components/trak'
@@ -132,6 +133,30 @@ export default function CoachQuickAssess() {
   const band = scoreToBand(avg)
   const overallCfg = bandConfig(band)
   const currentPlayer = players[currentIdx] ?? null
+
+  /* Parental consent: same check and reasoning as CoachAssessPage. Since #80
+     every player under 18 needs a parent's approval before they can be
+     assessed. Ask the RLS policy's own predicate for the player on screen, so
+     the coach sees why and can Skip, instead of a "try again" that always fails. */
+  const [consentWait, setConsentWait] = useState(false)
+  const currentPlayerId = currentPlayer?.id as string | undefined
+  useEffect(() => {
+    setConsentWait(false)
+    if (!currentPlayerId) return
+    let cancelled = false
+    void supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: currentPlayerId } as never)
+      .then(({ data, error }) => { if (!cancelled && !error) setConsentWait(data === true) })
+    return () => { cancelled = true }
+  }, [currentPlayerId])
+  // TRAK-99: say which of the two waits it is. null until read, or if it can't be.
+  const [waitReason, setWaitReason] = useState<WaitReason | null>(null)
+  useEffect(() => {
+    setWaitReason(null)
+    if (!currentPlayerId || !consentWait) return
+    let cancelled = false
+    void fetchWaitReason(currentPlayerId).then(reason => { if (!cancelled) setWaitReason(reason) })
+    return () => { cancelled = true }
+  }, [currentPlayerId, consentWait])
   const total = players.length
   const displayIdx = Math.min(currentIdx + 1, total)
 
@@ -179,7 +204,7 @@ export default function CoachQuickAssess() {
     // Guarded here as well as on the button: the disabled attribute is a UI
     // affordance, and this is the line that actually decides what reaches a
     // child's record.
-    if (!user || !currentPlayer || saving || needsInput) return
+    if (!user || !currentPlayer || saving || needsInput || consentWait) return
     setSaving(true)
 
     const cardStats = deriveCardStats({ workRate, tactical, attitude, technical, physical, coachability })
@@ -201,7 +226,21 @@ export default function CoachQuickAssess() {
     } as any]).select('id').maybeSingle()
     if (insertError) {
       console.error('Save failed:', insertError)
-      toast.error('Could not save assessment. Please try again.')
+      // 42501 is an RLS refusal; re-ask the policy's predicate, never "try again".
+      if (insertError.code === '42501') {
+        const { data: waiting, error: waitingError } = await supabase.rpc('coach_squad_player_consent_required' as never, { p_squad_player_id: currentPlayer.id } as never)
+        // If the re-check itself fails we cannot say why; do not claim a reason.
+        if (waitingError) {
+          toast.error('Not saved, and the reason could not be confirmed. Check your connection and try again.')
+        } else if (waiting === true) {
+          setConsentWait(true)
+          toast.error(`Not saved. ${currentPlayer.player_name} needs a parent's approval before they can be assessed. Skip for now.`)
+        } else {
+          toast.error('Not saved. You no longer have access to this player\'s record.')
+        }
+      } else {
+        toast.error('Could not save assessment. Please try again.')
+      }
       setSaving(false)
       return
     }
@@ -504,7 +543,15 @@ export default function CoachQuickAssess() {
         )}
 
         {/* ---- 7. Action buttons ---- */}
-        {needsInput && (
+        {consentWait && currentPlayer ? (
+          <div role="status" className="p-3 rounded-[12px] border border-[rgba(255,196,0,0.25)] bg-[rgba(255,196,0,0.06)]">
+            <p className="text-[13px] font-medium text-white/85">{WAIT_TITLE[waitReason ?? 'unknown']}</p>
+            <p className="text-[12px] text-white/55 leading-relaxed mt-0.5">
+              {waitText(waitReason, currentPlayer.player_name)}{' '}
+              {waitReason === 'parent' ? 'Skip for now. If no parent is linked yet, the player can send the invite from their profile.' : 'Skip for now.'}
+            </p>
+          </div>
+        ) : needsInput && (
           <p className="text-[11px] text-white/35 leading-relaxed px-0.5">
             First assessment for this player — move a slider to rate them, or
             Skip. Nothing is recorded until you do.
@@ -524,7 +571,7 @@ export default function CoachQuickAssess() {
           </button>
           <button
             onClick={handleNext}
-            disabled={saving || needsInput}
+            disabled={saving || needsInput || consentWait}
             className="flex-[2] py-3.5 rounded-[10px] text-sm font-bold transition-opacity active:scale-[0.97] disabled:opacity-40"
             style={{ background: '#C8F25A', color: '#000' }}
           >

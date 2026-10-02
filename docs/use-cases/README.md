@@ -7,38 +7,49 @@ Owner: @kostasanastasioubusiness-lang
 Enforced use cases block commits when they fail. Pending ones are reported
 but do not block. Parked ones never run.
 
-## Enforced — 2
+These statuses describe the test harness, not pilot readiness. Pilot scope
+is in [MVP Requirements](../../MVP%20Requirements); progress is in the
+[pilot journey index](./PILOT-INDEX.md).
+
+## Enforced — 4
 
 | ID | Actor | Use case | Requirement | Tier |
 |----|-------|----------|-------------|------|
-| UC-C02 | coach | Add a player to the squad manually | REQ-002 | 1, 2 |
+| UC-A04 | athlete | View match history and match detail | REQ-001 | 1 |
+| UC-C03 | coach | View the squad | REQ-002 | 1 |
 | UC-C04 | coach | Assess a player on six sliders producing a band | REQ-002 | 1, 2 |
+| UC-X02 | system | A failed load never renders as a false empty state | REQ-004 | 1 |
 
-## Pending — 19
+## Pending — 15
+
+| ID | Actor | Use case | Requirement | Tier |
+|----|-------|----------|-------------|------|
+| UC-A09 | athlete | See the coach's assessment as band and six category bars | REQ-002 | 1, 2 |
+| UC-C02 | coach | Coaches do not add players; the academy roster decides the squad | J1 | 1, 2 |
+| UC-P02 | parent | See the child's season band | REQ-004 | 1, 2 |
+| UC-P03 | parent | See the child's match feed | REQ-004 | 1, 2 |
+| UC-P06 | parent | See the coach's assessments | REQ-004 | 1, 2 |
+| UC-P07 | parent | A guardian gives recorded consent for a child under 18 | J2 | 1, 2 |
+| UC-T01 | system | Every enforced use case emits telemetry answering the Q4 metric | REQ-005 | 2 |
+| UC-X01 | system | No role reads data belonging to anyone they are not linked to | REQ-004 | 2 |
+| UC-X03 | system | Only rostered children and academy-supplied guardians get a profile | J1 | 2 |
+| UC-X04 | system | A player cannot change their own date of birth | J1 | 2 |
+| UC-P08 | parent | Guardian invitation is sent at admission to the academy-supplied address | J2 | 2 |
+| UC-P09 | parent | Withdraw consent in one tap, effective immediately | J2 | 1, 2 |
+| UC-A11 | athlete | Activate an account only after a guardian consents | J3 | 1, 2 |
+| UC-C09 | coach | Log a match for the squad with no invented defaults | J4 | 1, 2 |
+| UC-C10 | coach | Log a training session | J4 | 1 |
+
+## Parked — 9
 
 | ID | Actor | Use case | Requirement | Tier |
 |----|-------|----------|-------------|------|
 | UC-A02 | athlete | Log a match with position inputs and live band preview | REQ-001 | 1, 2 |
 | UC-A03 | athlete | See band result after saving a match | REQ-001 | 1 |
-| UC-A04 | athlete | View match history and match detail | REQ-001 | 1 |
 | UC-A06 | athlete | Create and track a goal | REQ-001 | 1 |
 | UC-A07 | athlete | Earn and see medals | REQ-001 | 1 |
 | UC-A08 | athlete | Enter a TRK-XXXX code and claim the squad row | REQ-003 | 2 |
-| UC-A09 | athlete | See the coach's assessment as band and six category bars | REQ-002 | 1, 2 |
 | UC-A10 | athlete | Generate a PAR-XXXX code for a parent | REQ-003 | 2 |
-| UC-C03 | coach | View the squad | REQ-002 | 1 |
 | UC-C07 | coach | Receive a real, stored, unique TRK-XXXX code | REQ-003 | 2 |
 | UC-C08 | coach | See linked athletes' logged matches, bands only | REQ-003 | 2 |
 | UC-P01 | parent | Redeem PAR-XXXX, create an account and link to the child | REQ-003 | 2 |
-| UC-P02 | parent | See the child's season band | REQ-004 | 1, 2 |
-| UC-P03 | parent | See the child's match feed | REQ-004 | 1, 2 |
-| UC-P06 | parent | See the coach's assessments | REQ-004 | 1, 2 |
-| UC-P07 | parent | Give verifiable consent for a 13-14 year old | REQ-004 | 2 |
-| UC-T01 | system | Every enforced use case emits telemetry answering the Q4 metric | REQ-005 | 2 |
-| UC-X01 | system | No role reads data belonging to anyone they are not linked to | REQ-004 | 2 |
-| UC-X02 | system | A failed load never renders as a false empty state | REQ-004 | 1 |
-
-## Parked — 0
-
-| ID | Actor | Use case | Requirement | Tier |
-|----|-------|----------|-------------|------|

@@ -50,6 +50,17 @@ export function toInstant(date: string, time?: string | null): string | null {
   return built.toISOString()
 }
 
+/**
+ * Today, as the person holding the device would write it (YYYY-MM-DD).
+ *
+ * Not `new Date().toISOString().slice(0, 10)`: that is the UTC date, which in
+ * Dubai is still yesterday from local midnight until 04:00, and in Athens until
+ * 03:00 (02:00 after the 25 October clock change). S7.
+ */
+export function localTodayISO(): string {
+  return localParts(new Date().toISOString()).date
+}
+
 /** Split an instant back into the local date and time a person would read. */
 export function localParts(iso: string): { date: string; time: string } {
   const d = new Date(iso)

@@ -1,5 +1,7 @@
 # Trak Football — Growth Enhancements Implementation Plan
 
+> **23 September 2026:** An April post-pilot backlog, not pilot scope. Pilot scope and what comes first after it are in [MVP Requirements](../../MVP%20Requirements).
+
 > **Created:** 2026-04-12  
 > **Mode:** Hold Scope (pilot-first, validate before scaling)  
 > **Tech Stack:** React 18 + TypeScript, Tailwind CSS, Supabase, Vitest  

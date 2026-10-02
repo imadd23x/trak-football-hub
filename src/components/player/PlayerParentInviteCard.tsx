@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
-import { createOnboardingSession } from '@/lib/onboarding-session'
 
 interface PlayerParentInvite {
   id: string
@@ -33,11 +32,11 @@ function readInvites(value: unknown, playerId: string): PlayerParentInvite[] {
 }
 
 /** A key resets local notices and revealed links immediately on account change. */
-export function PlayerParentInviteCard({ playerUserId, allowCreate = false }: { playerUserId: string; allowCreate?: boolean }) {
-  return <PlayerInvitations key={playerUserId} playerUserId={playerUserId} allowCreate={allowCreate} />
+export function PlayerParentInviteCard({ playerUserId, showWhenEmpty = false, hideWhenLinked = false }: { playerUserId: string; showWhenEmpty?: boolean; hideWhenLinked?: boolean }) {
+  return <PlayerInvitations key={playerUserId} playerUserId={playerUserId} showWhenEmpty={showWhenEmpty} hideWhenLinked={hideWhenLinked} />
 }
 
-function PlayerInvitations({ playerUserId, allowCreate }: { playerUserId: string; allowCreate: boolean }) {
+function PlayerInvitations({ playerUserId, showWhenEmpty, hideWhenLinked }: { playerUserId: string; showWhenEmpty: boolean; hideWhenLinked: boolean }) {
   const queryClient = useQueryClient()
   const mounted = useRef(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -49,9 +48,6 @@ function PlayerInvitations({ playerUserId, allowCreate }: { playerUserId: string
   })
   const [revealed, setRevealed] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ id: string; text: string } | null>(null)
-  const [email, setEmail] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [createNotice, setCreateNotice] = useState<{ text: string; error: boolean } | null>(null)
   const [now, setNow] = useState(Date.now)
   const query = useQuery({
     queryKey: ['player', playerUserId, 'parent-invites'],
@@ -102,47 +98,9 @@ function PlayerInvitations({ playerUserId, allowCreate }: { playerUserId: string
       if (mounted.current) {
         reconcileRotations(result.data ?? NO_INVITES)
         setNotice(null)
-        setCreateNotice(null)
         setNow(Date.now())
       }
     } catch { /* Query error stays visible, and stale tokens stay blocked. */ }
-  }
-
-  async function createInvite(event: React.FormEvent) {
-    event.preventDefault()
-    if (creating) return
-    const value = email.trim()
-    if (!value) return
-    setCreating(true)
-    setCreateNotice(null)
-    let saved = false
-    try {
-      const { data, error: sessionError } = await supabase.auth.getSession()
-      if (sessionError || data.session?.user.id !== playerUserId) throw new Error('Your account changed. Please sign in again.')
-      const account = await createOnboardingSession(data.session)
-      if (!mounted.current) return
-      const { data: created, error } = await account.client.rpc('create_parent_invite', { p_email: value })
-      if (error) throw error
-      saved = true
-      if (!mounted.current) return
-      setEmail('')
-      const refreshed = await query.refetch({ throwOnError: true })
-      const current = refreshed.data?.find(row => row.id === created?.[0]?.id)
-      if (mounted.current) setCreateNotice({
-        text: current?.status === 'accepted' ? 'This parent is already linked.'
-          : current?.status === 'pending' && Date.parse(current.expires_at) <= Date.now()
-            ? 'This invitation expired. Use Resend email to renew it.'
-            : 'Invitation saved. Check its status below before sharing or resending.',
-        error: false,
-      })
-    } catch (error) {
-      const detail = error instanceof Error ? error.message
-        : (error as { message?: string })?.message || 'Please try again.'
-      if (mounted.current) setCreateNotice({
-        text: saved ? "Invitation saved, but couldn't reload its status. Retry loading before sharing." : `Couldn't create the invitation. ${detail}`,
-        error: true,
-      })
-    } finally { if (mounted.current) setCreating(false) }
   }
 
   async function resend(invite: PlayerParentInvite) {
@@ -210,10 +168,14 @@ function PlayerInvitations({ playerUserId, allowCreate }: { playerUserId: string
     }
   }
 
-  if (!allowCreate && !query.isPending && !query.isError && invites.length === 0) return null
+  if (!showWhenEmpty && !query.isPending && !query.isError && invites.length === 0) return null
+  // Home only (TRAK-71): once a parent is linked there is nothing to act on here.
+  if (hideWhenLinked && !query.isPending && !query.isError && invites.length > 0
+    && invites.every(invite => invite.status === 'accepted')) return null
   return (
     <section aria-label="Parent invitations" className="rounded-xl border border-border bg-card p-4 my-4">
       <h2 className="text-sm font-medium text-foreground">Parent invitations</h2>
+      <p className="text-sm text-muted-foreground mt-2">Contact your academy to add a guardian or correct their email.</p>
       {query.isPending && <p role="status" className="text-sm text-muted-foreground mt-2">Loading invitations…</p>}
       {(query.isError || (!busyId && Object.keys(blockedTokens).length > 0)) && <div role={query.isError ? 'alert' : 'status'} className="mt-2">
         <p className="text-sm text-muted-foreground">{query.isError
@@ -254,16 +216,7 @@ function PlayerInvitations({ playerUserId, allowCreate }: { playerUserId: string
           </label>}
         </div>
       })}
-      {createNotice && <p role={createNotice.error ? 'alert' : 'status'} className="text-sm mt-3">{createNotice.text}</p>}
-      {allowCreate && !query.isPending && !invites.some(invite => invite.status === 'pending') && <form onSubmit={createInvite} className="mt-3 flex gap-2">
-        <input type="email" aria-label="Parent’s email" placeholder="Parent’s email" required value={email}
-          onChange={event => setEmail(event.target.value)} disabled={creating}
-          className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
-        <button type="submit" disabled={creating || query.isError || query.isFetching}
-          className="min-h-11 rounded-lg bg-primary/20 border border-primary/40 px-3 text-sm text-foreground disabled:opacity-50">
-          {creating ? 'Adding…' : 'Invite'}
-        </button>
-      </form>}
+
     </section>
   )
 }

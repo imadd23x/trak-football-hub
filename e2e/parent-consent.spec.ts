@@ -71,6 +71,9 @@ async function consentFixture(page: Page, context: BrowserContext, replies: Repl
     // data requests are needed to establish consent-route recovery.
     if (url.pathname === '/rest/v1/player_parent_links' && observed.method === 'GET'
       && url.searchParams.get('parent_user_id') === `eq.${parentId}` && url.searchParams.get('select') === 'player_user_id') return json([])
+    // TRAK-11 phase 4: the consent screen also lists account-less roster children; none here.
+    if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent' && observed.method === 'POST') return json([])
+    if (url.pathname === '/rest/v1/rpc/get_my_child_logins' && observed.method === 'POST') return json([])
     if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent' && observed.method === 'POST') {
       pending.push(observed)
       expect(observed.body).toEqual({})
@@ -124,12 +127,12 @@ test('saved approval survives a failed refresh, then retries to a fresh child be
   ], true)
   try {
     await page.goto('/parent/consent')
-    await expect(page.getByRole('heading', { name: "Approve Alex's account" })).toBeVisible()
+    await expect(page.getByRole('heading', { name: "Approve Alex Synthetic's account" })).toBeVisible()
     await page.getByRole('button', { name: 'Legal guardian', exact: true }).click()
     await page.getByRole('checkbox', { name: /recognition awards/i }).check()
     await page.getByRole('checkbox', { name: /I can see their progress/i }).check()
     await page.getByRole('checkbox', { name: CONSENT_STATEMENT }).check()
-    await page.getByRole('button', { name: "Approve Alex's account" }).click()
+    await page.getByRole('button', { name: "Approve Alex Synthetic's account" }).click()
     await expect.poll(() => fixture.grants.length).toBe(1)
     const saving = page.getByRole('button', { name: 'Saving…', exact: true })
     await expect(saving).toBeDisabled()
@@ -151,17 +154,17 @@ test('saved approval survives a failed refresh, then retries to a fresh child be
     await page.screenshot({ path: testInfo.outputPath('consent-saved-refresh-error-mobile.png'), fullPage: true })
 
     await page.getByRole('button', { name: 'Retry', exact: true }).click()
-    await expect(page.getByRole('heading', { name: "Approve Blair's account" })).toBeVisible()
+    await expect(page.getByRole('heading', { name: "Approve Blair Synthetic's account" })).toBeVisible()
     await expect(page.getByRole('checkbox', { name: /recognition awards/i })).not.toBeChecked()
     await expect(page.getByRole('checkbox', { name: /I can see their progress/i })).not.toBeChecked()
     await expect(page.getByRole('checkbox', { name: CONSENT_STATEMENT })).not.toBeChecked()
-    await expect(page.getByRole('button', { name: "Approve Blair's account" })).toBeDisabled()
+    await expect(page.getByRole('button', { name: "Approve Blair Synthetic's account" })).toBeDisabled()
     expect(fixture.pending).toHaveLength(3)
     expect(fixture.grants).toHaveLength(1)
     await page.screenshot({ path: testInfo.outputPath('consent-next-child-mobile.png'), fullPage: true })
 
     await page.getByRole('checkbox', { name: CONSENT_STATEMENT }).check()
-    await page.getByRole('button', { name: "Approve Blair's account" }).click()
+    await page.getByRole('button', { name: "Approve Blair Synthetic's account" }).click()
     await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible()
     await expect(page).toHaveURL(`${appOrigin}/parent/home`)
     // The fifth list request is Home's own pending-approval read.

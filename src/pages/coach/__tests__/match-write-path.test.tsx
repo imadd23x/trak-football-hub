@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
-import { table, insertInto, SUPABASE_URL } from '../../../../tests/msw/supabase'
+import { table, insertInto, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
 
 /**
  * What the coach's form actually sends, driven through the rendered screen and
@@ -43,6 +43,7 @@ const STRIKER = {
   player_name: 'Ade Okafor',
   linked_player_id: 'player-1',
   position: 'Attacker',
+  age_group: 'U16',
   age: 15,
 }
 
@@ -60,6 +61,8 @@ function captureMatchRpc(): RpcBody[] {
     table('coach_sessions', []),
     insertInto('coach_sessions', body => ({ id: 'session-1', ...body })),
     insertInto('session_attendance', body => ({ id: 'att-1', ...body })),
+    // The child's consent is confirmed, so the screen offers them (G1).
+    rpc('coach_squad_player_consent_required', () => false),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/log_match_for_player`, async ({ request }) => {
       calls.push((await request.json()) as RpcBody)
       return HttpResponse.json(null)
@@ -94,11 +97,16 @@ async function logMatch(
   // Marking played auto-expands the row, which is what renders the steppers.
   await user.click(await screen.findByRole('button', { name: 'Mark played' }))
 
-  for (let i = 0; i < goals; i++) {
-    await user.click(screen.getByRole('button', { name: `One more goals for ${STRIKER.player_name}` }))
-  }
-  for (let i = 0; i < assists; i++) {
-    await user.click(screen.getByRole('button', { name: `One more assists for ${STRIKER.player_name}` }))
+  // J4: nothing is pre-filled, so minutes, goals and assists are all entered.
+  // "One fewer" from empty records an explicit 0.
+  await user.type(screen.getByRole('spinbutton', { name: `Minutes played by ${STRIKER.player_name}` }), '70')
+  for (const [key, count] of [['goals', goals], ['assists', assists]] as const) {
+    if (count === 0) {
+      await user.click(screen.getByRole('button', { name: `One fewer ${key} for ${STRIKER.player_name}` }))
+    }
+    for (let i = 0; i < count; i++) {
+      await user.click(screen.getByRole('button', { name: `One more ${key} for ${STRIKER.player_name}` }))
+    }
   }
 
   await user.click(screen.getByRole('button', { name: 'Save match' }))
@@ -109,6 +117,7 @@ async function logMatch(
 }
 
 describe('what the coach records reaches the database and the rating', () => {
+  // Several full render-type-save passes; typing minutes (J4) makes each one longer.
   beforeEach(() => signInAs(COACH))
 
   it('stores the exact count, and pays an attacker on the attacker scale', async () => {
@@ -129,7 +138,7 @@ describe('what the coach records reaches the database and the rating', () => {
     // scored twice was rated exactly as if they had not scored.
     expect(brace.p_computed_rating as number).toBeGreaterThan(none.p_computed_rating as number)
     expect(hat.p_computed_rating as number).toBeGreaterThan(brace.p_computed_rating as number)
-  })
+  }, 20_000)
 
   it('keys assists on the assists scale, which is not the goals one', async () => {
     const calls = captureMatchRpc()
@@ -144,5 +153,5 @@ describe('what the coach records reaches the database and the rating', () => {
 
     expect(three.p_assists).toBe(3)
     expect(three.p_computed_rating as number).toBeGreaterThan(none.p_computed_rating as number)
-  })
+  }, 20_000)
 })

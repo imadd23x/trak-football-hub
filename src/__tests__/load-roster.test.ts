@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, planLoad, validateRoster } from '../../scripts/load-roster.mjs'
+import { describeInviteFailure, inviteRequest, loadRows, operatorKey, parseArgs, parseCsv, planLoad, planReinvite, reinviteRows, validateRoster } from '../../scripts/load-roster.mjs'
+import { handleRosterInviteRequest } from '../../supabase/functions/send-roster-invites/handler'
 
 // TRAK-49 [J1]: the concierge roster file is checked before anything is
 // written. Synthetic addresses only.
@@ -185,6 +186,76 @@ describe('load-roster invitation switch', () => {
   })
 })
 
+// TRAK-91 (Kostas's #178 review): a failed or interrupted invitation left the
+// family uninvited for good, because a re-run skips admitted children.
+// --reinvite runs the same file again, admits nothing, and re-sends only where
+// a guardian has neither been invited nor signed up.
+describe('load-roster --reinvite', () => {
+  const rows = validateRoster(file(
+    'One Kid,2013-03-04,U13,kid1@roster.test,g1@roster.test,coach@roster.test',
+    'Two Kid,2013-05-06,U13,kid2@roster.test,g2@roster.test;g2b@roster.test,coach@roster.test',
+    'Three Kid,2013-07-08,U13,kid3@roster.test,g3@roster.test,coach@roster.test',
+    'Four Kid,2013-09-10,U13,kid4@roster.test,g4@roster.test,coach@roster.test',
+    'Young One,2016-02-03,U11,,g5@roster.test,coach@roster.test',
+  ), TODAY).rows
+  const guardian = (invited_at: string | null, parent_user_id: string | null = null) => ({ invited_at, parent_user_id })
+  const onRoster = [
+    // Line 2: its invitation failed, so nobody was ever invited.
+    { id: 'roster-2', child_email: 'kid1@roster.test', date_of_birth: '2013-03-04', player_name: 'One Kid', guardians: [guardian(null)] },
+    // Line 3: one guardian invited, the second never was.
+    { id: 'roster-3', child_email: 'kid2@roster.test', date_of_birth: '2013-05-06', player_name: 'Two Kid', guardians: [guardian('2026-09-28T10:00:00Z'), guardian(null)] },
+    // Line 4: invited. Line 5 is not on the roster at all.
+    { id: 'roster-4', child_email: 'kid3@roster.test', date_of_birth: '2013-07-08', player_name: 'Three Kid', guardians: [guardian('2026-09-28T10:00:00Z')] },
+    // Line 6: an email-less child, found by name and date of birth.
+    { id: 'roster-6', child_email: null, date_of_birth: '2016-02-03', player_name: ' young one ', guardians: [guardian(null)] },
+  ]
+
+  it('re-invites only children with a guardian never invited and not signed up', () => {
+    const plan = planReinvite(rows, onRoster)
+    expect(plan.toInvite).toEqual([
+      { line: 2, rosterChildId: 'roster-2' },
+      { line: 3, rosterChildId: 'roster-3' },
+      { line: 6, rosterChildId: 'roster-6' },
+    ])
+    expect(plan.upToDate).toEqual([4])
+    expect(plan.notOnRoster).toEqual([5])
+  })
+
+  it('leaves a family alone once the guardian has signed up, even if never invited', () => {
+    const signedUp = [{ ...onRoster[0], guardians: [guardian(null, 'parent-1')] }]
+    expect(planReinvite(rows.slice(0, 1), signedUp)).toMatchObject({ toInvite: [], upToDate: [2] })
+  })
+
+  it('never matches an email-less child on name alone', () => {
+    const otherBirthday = [{ ...onRoster[3], date_of_birth: '2016-02-04' }]
+    expect(planReinvite(rows.slice(4), otherBirthday)).toMatchObject({ toInvite: [], notOnRoster: [6] })
+  })
+
+  it('sends each re-invitation, reporting failures by line and carrying on', async () => {
+    const invite = vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce(false)
+    const log = vi.fn()
+    const out = await reinviteRows([
+      { line: 2, rosterChildId: 'roster-2' },
+      { line: 3, rosterChildId: 'roster-3' },
+      { line: 6, rosterChildId: 'roster-6' },
+    ], invite, log)
+    expect(invite.mock.calls.map(c => c[0])).toEqual(['roster-2', 'roster-3', 'roster-6'])
+    expect(out).toEqual({ invited: 1, failed: [3, 6] })
+    expect(log.mock.calls.flat().join(' ')).not.toMatch(/@|Kid|Young/)
+  })
+
+  it('stands alone: it sends by itself, so it refuses --send-invites and --no-invites', () => {
+    const base = ['--file', 'r.csv', '--org', 'org', '--loaded-by', 'op', '--reinvite']
+    expect(parseArgs(base).reinvite).toBe(true)
+    expect(parseArgs(['--file', 'r.csv']).reinvite).toBe(false)
+    expect(() => parseArgs([...base, '--send-invites'])).toThrow(/--reinvite/)
+    expect(() => parseArgs([...base, '--no-invites'])).toThrow(/--reinvite/)
+  })
+})
+
 // TRAK-9 (30 Sep TRAK-24 run): the invitations were refused because the loader
 // sent the legacy service_role JWT on Authorization. It now uses a secret key
 // (sb_secret_…), sent on apikey only, and says why an invitation failed.
@@ -216,5 +287,57 @@ describe('load-roster authenticates with a secret key', () => {
     expect(describeInviteFailure(502, { sent: 1, failed: 1, results: [{ kind: 'guardian', sent: false, reason: 'delivery_failed' }] }))
       .toBe('HTTP 502, 1 delivery failed')
     expect(describeInviteFailure(500, null)).toBe('HTTP 500')
+  })
+})
+
+// TRAK-91 (Imad, 30 Sep / 1 Oct): a family with one invited and one never-
+// invited guardian. Before the fix, --reinvite picked the child and the
+// function emailed BOTH unsigned guardians. Planner → request → real handler,
+// with targets that follow roster_invite_targets()'s SQL predicate.
+describe('load-roster --reinvite end to end (mixed family)', () => {
+  const guardians = [
+    { email: 'g2@roster.test', invited_at: '2026-09-28T10:00:00Z', parent_user_id: null },
+    { email: 'g2b@roster.test', invited_at: null, parent_user_id: null },
+  ]
+  const rows = validateRoster(file('Two Kid,2013-05-06,U13,kid2@roster.test,g2@roster.test;g2b@roster.test,coach@roster.test'), TODAY).rows
+  const onRoster = [{ id: '98a00000-0000-0000-0000-000000000073', child_email: 'kid2@roster.test', date_of_birth: '2013-05-06', player_name: 'Two Kid', guardians }]
+
+  async function run(onlyUninvited: boolean) {
+    const delivered: string[] = []
+    const deps = {
+      siteUrl: 'https://trakfootball.test', secretKeys: ['sb_secret_op'],
+      getCaller: vi.fn(),
+      // The SQL: every guardian not signed up; with only_uninvited, never invited too.
+      getTargets: vi.fn(async (_id: string, _guardian: string | null, only: boolean) => ({ error: null,
+        data: guardians.filter(g => !g.parent_user_id && (!only || !g.invited_at))
+          .map(g => ({ kind: 'guardian' as const, email: g.email, first_name: 'Two', academy: 'Roster FC' })) })),
+      markSent: vi.fn(async () => ({ error: null })),
+      sendInvite: vi.fn(async (email: string) => { delivered.push(email); return { error: null } }),
+      sendMagicLink: vi.fn(async () => ({ error: null })),
+    }
+    const plan = planReinvite(rows, onRoster)
+    const out = await reinviteRows(plan.toInvite, async (rosterChildId: string) => {
+      const { url, init } = inviteRequest('https://p.example.test', 'sb_secret_op', rosterChildId, { onlyUninvited })
+      const res = await handleRosterInviteRequest(new Request(url, init), deps)
+      return res.ok && (await res.json()).failed === 0
+    }, vi.fn())
+    return { plan, out, delivered }
+  }
+
+  it('re-sends only to the guardian who was never invited', async () => {
+    const { plan, out, delivered } = await run(true)
+    expect(plan.toInvite).toHaveLength(1)
+    expect(out).toEqual({ invited: 1, failed: [] })
+    expect(delivered).toEqual(['g2b@roster.test'])
+  })
+
+  it('CONTROL without only_uninvited the same call emails both (the bug)', async () => {
+    expect((await run(false)).delivered).toEqual(['g2@roster.test', 'g2b@roster.test'])
+  })
+
+  it('the request carries only_uninvited only when asked', () => {
+    expect(JSON.parse(inviteRequest('https://p.example.test', 'sb_secret_op', 'rc-1', { onlyUninvited: true }).init.body))
+      .toEqual({ roster_child_id: 'rc-1', only_uninvited: true })
+    expect(JSON.parse(inviteRequest('https://p.example.test', 'sb_secret_op', 'rc-1').init.body)).toEqual({ roster_child_id: 'rc-1' })
   })
 })

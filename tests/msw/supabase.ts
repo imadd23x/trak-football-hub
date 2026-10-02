@@ -71,6 +71,8 @@ export function authHandlers(): HttpHandler[] {
     // exercising TRAK-84 register explicit replies, including failure cases.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_logins`, () => HttpResponse.json([])),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_child_credentials`, () => HttpResponse.json([])),
+    // TRAK-98: no approved child waiting to sign up, unless a test says so.
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_approved_children_awaiting_signup`, () => HttpResponse.json([])),
     http.get(`${SUPABASE_URL}/auth/v1/user`, ({ request }) => {
       const token = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
       const user = authUserForToken(token)

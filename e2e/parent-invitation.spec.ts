@@ -88,6 +88,8 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
     if (account === player && request.method() === 'POST' && url.pathname === '/rest/v1/rpc/my_consent_status') {
       return json({ required: false, granted: true, invited_parent: null });
     }
+    // TRAK-104: an open player session checks it hasn't been ended (a read, over POST).
+    if (account === player && request.method() === 'POST' && url.pathname === '/rest/v1/rpc/my_session_is_live') return json(true);
     if (account === parent) {
       if (url.pathname === '/rest/v1/player_parent_links' && request.method() === 'GET') return json([]);
       if (request.method() === 'POST') {

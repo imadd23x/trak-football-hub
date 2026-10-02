@@ -18,4 +18,9 @@ serve(req => handleResetChildPassword(req, {
     const { error } = await admin.auth.admin.updateUserById(authUserId, { password });
     if (error) throw new Error('Auth password update failed');
   },
+  async endSessions(authUserId) {
+    const { data, error } = await admin.rpc('end_child_login_sessions', { p_auth_user_id: authUserId });
+    if (error || typeof data !== 'number') throw new Error('Could not end the child sessions');
+    return data;
+  },
 }));

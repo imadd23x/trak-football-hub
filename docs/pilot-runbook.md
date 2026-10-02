@@ -237,6 +237,32 @@ SELECT * FROM squad_duplicate_candidates;
 
 Merging is a human decision — assessments and awards may hang off either row.
 
+## Invitations that didn't go
+
+When the loader reports `Invitations went for N child(ren); not for line(s) …`, or a
+run stopped part-way, those families were admitted but some guardians never got an
+email. A plain re-run won't fix it: it skips children who are already admitted.
+`--reinvite` (TRAK-91) is the recovery. Run it with the **same file**:
+
+```bash
+# 1. Dry run: reads the roster, admits nothing, says which lines it would re-send
+SUPABASE_URL=… SUPABASE_SECRET_KEY=sb_secret_… TRAK_CONFIRM_HOST=<project host> \
+  node scripts/load-roster.mjs --file <roster.csv> --org <academy id> --loaded-by "<your name>" --reinvite
+# 2. The same command with --apply sends them
+```
+
+- It picks a child only if one of their guardians was **never invited** and hasn't
+  signed up. It asks the function for `only_uninvited`, so in a family where one
+  guardian was invited and another wasn't, only the second gets an email. A guardian
+  who already has an invitation is **never** sent a second one this way.
+- A failure is reported by line (no addresses). Fix the cause, then run `--reinvite`
+  again. It only ever picks up what is still missing.
+- It loads nothing and refuses `--send-invites` / `--no-invites`.
+- **An invitation that went but doesn't work** (expired link, or the older of two links;
+  see TRAK-97/TRAK-101) is not this case. `--reinvite` won't resend it, on purpose, and
+  there is no tested resend path for it yet. Don't improvise one: raise it in the
+  founders' channel with the roster child id (no address).
+
 ## Wrong address
 
 When the academy gave a wrong child or guardian email (TRAK-16, G5), the

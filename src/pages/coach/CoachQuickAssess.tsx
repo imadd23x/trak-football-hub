@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
+import { fetchWaitReason, WAIT_TITLE, waitText, type WaitReason } from '@/lib/wait-reason'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
 import { MobileShell } from '@/components/trak'
@@ -147,6 +148,15 @@ export default function CoachQuickAssess() {
       .then(({ data, error }) => { if (!cancelled && !error) setConsentWait(data === true) })
     return () => { cancelled = true }
   }, [currentPlayerId])
+  // TRAK-99: say which of the two waits it is. null until read, or if it can't be.
+  const [waitReason, setWaitReason] = useState<WaitReason | null>(null)
+  useEffect(() => {
+    setWaitReason(null)
+    if (!currentPlayerId || !consentWait) return
+    let cancelled = false
+    void fetchWaitReason(currentPlayerId).then(reason => { if (!cancelled) setWaitReason(reason) })
+    return () => { cancelled = true }
+  }, [currentPlayerId, consentWait])
   const total = players.length
   const displayIdx = Math.min(currentIdx + 1, total)
 
@@ -535,10 +545,10 @@ export default function CoachQuickAssess() {
         {/* ---- 7. Action buttons ---- */}
         {consentWait && currentPlayer ? (
           <div role="status" className="p-3 rounded-[12px] border border-[rgba(255,196,0,0.25)] bg-[rgba(255,196,0,0.06)]">
-            <p className="text-[13px] font-medium text-white/85">Waiting for a parent</p>
+            <p className="text-[13px] font-medium text-white/85">{WAIT_TITLE[waitReason ?? 'unknown']}</p>
             <p className="text-[12px] text-white/55 leading-relaxed mt-0.5">
-              You can assess {currentPlayer.player_name} once a parent has approved their account.
-              Skip for now. If no parent is linked yet, the player can send the invite from their profile.
+              {waitText(waitReason, currentPlayer.player_name)}{' '}
+              {waitReason === 'parent' ? 'Skip for now. If no parent is linked yet, the player can send the invite from their profile.' : 'Skip for now.'}
             </p>
           </div>
         ) : needsInput && (

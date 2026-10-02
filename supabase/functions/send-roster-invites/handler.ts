@@ -30,6 +30,8 @@ export interface RosterInviteDependencies {
   markSent(rosterChildId: string, target: RosterInviteTarget): Promise<{ error: DeliveryError | null }>;
   sendInvite(email: string, redirectTo: string, data: Record<string, string | null>): Promise<{ error: DeliveryError | null }>;
   sendMagicLink(email: string, redirectTo: string): Promise<{ error: DeliveryError | null }>;
+  /** TRAK-97: has this guardian address had an invitation for another of their roster children within the window? */
+  recentGuardianInvite(rosterChildId: string, email: string): Promise<Result<boolean>>;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -51,6 +53,26 @@ export function keyValues(raw: string | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+// TRAK-97 (1 Oct TRAK-24 run): Supabase keeps one pending token per user, so a
+// second /invite to the same guardian (the loader sends one per child) kills
+// the first email's link: 403 "One-time token not found". So while another of
+// this guardian's roster rows was invited within a link's lifetime, this
+// child's row is marked invited and no second email goes: the guardian's
+// consent screen lists every child. One hour is Supabase's default email link
+// lifetime. A deliberate resend after that, for an expired link, still goes.
+export const GUARDIAN_INVITE_WINDOW_MS = 60 * 60 * 1000;
+
+/** True when a roster row of another child, for this guardian address, was invited within windowMs of now. */
+export function invitedElsewhereWithin(
+  rows: { roster_child_id: string; invited_at: string | null }[], rosterChildId: string, now: number, windowMs: number,
+): boolean {
+  return rows.some(row => {
+    if (row.roster_child_id === rosterChildId || !row.invited_at) return false;
+    const at = Date.parse(row.invited_at);
+    return Number.isFinite(at) && at >= now - windowMs;
+  });
 }
 
 const alreadyRegistered = (e: DeliveryError) => e.code === 'email_exists' || e.code === 'user_already_exists' ||
@@ -112,6 +134,16 @@ export async function handleRosterInviteRequest(req: Request, deps: RosterInvite
     for (const target of targets) {
       const role = target.kind === 'child' ? 'player' : 'parent';
       const redirectTo = `${site}/onboarding/${role}`;
+      if (target.kind === 'guardian') {
+        const pending = await deps.recentGuardianInvite(rosterChildId, target.email);
+        // Unsure whether a fresh link exists: send nothing rather than risk killing it.
+        if (pending.error) { results.push({ kind: target.kind, sent: false, reason: 'delivery_failed' }); continue; }
+        if (pending.data) {
+          await deps.markSent(rosterChildId, target);
+          results.push({ kind: target.kind, sent: false, reason: 'guardian_invite_pending' });
+          continue;
+        }
+      }
       let via: 'invite' | 'magic_link' | null = 'invite';
       const { error: inviteError } = await deps.sendInvite(target.email, redirectTo,
         { invited_as: role, child_first_name: target.first_name, academy_name: target.academy });
@@ -124,7 +156,8 @@ export async function handleRosterInviteRequest(req: Request, deps: RosterInvite
       results.push({ kind: target.kind, sent: true, via });
     }
     const sent = results.filter(r => r.sent).length;
-    const failed = results.length - sent;
+    // A guardian with a fresh invitation (TRAK-97) is neither sent nor failed.
+    const failed = results.filter(r => !r.sent && r.reason !== 'guardian_invite_pending').length;
     return json({ sent, failed, results }, failed ? 502 : 200);
   } catch {
     return json({ sent: 0, error: 'Could not send the invitations' }, 500);

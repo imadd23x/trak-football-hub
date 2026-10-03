@@ -9,6 +9,13 @@ export interface ChildLoginDependencies {
   /** Admin createUser only; no invite, OTP or email API. SQL binds atomically. */
   createConfirmed(identity:ConfirmedChildIdentity):Promise<void>;
 }
+/** TRAK-106: Auth refused the password as too weak or too common (422 weak_password). */
+export class WeakPasswordError extends Error { constructor(){ super('weak_password') } }
+/** The SDK's AuthWeakPasswordError (auth-js 2.64+, code weak_password); nothing else. */
+export function isWeakPassword(error:unknown):boolean {
+ const e=error as {name?:unknown;code?:unknown}|null
+ return !!e && (e.name==='AuthWeakPasswordError' || e.code==='weak_password')
+}
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const cors={ 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type',
  'Access-Control-Allow-Methods':'POST, OPTIONS' };
@@ -39,7 +46,9 @@ export async function handleCreateChildLogin(req:Request,deps:ChildLoginDependen
    await deps.createConfirmed({email:`${r.username}@child.trakfootball.com`,password:b.password,email_confirm:true,
      app_metadata:{trak_child_login:true,child_login_reservation:r.reservation_id,child_login_guardian:r.guardian_user_id}});
    return reply(200,{username:r.username,state:'created'});
- } catch {
+ } catch(e) {
+   // Nothing was created, so there is nothing to recover: ask for another password.
+   if(e instanceof WeakPasswordError) return reply(422,{reason:'weak_password',error:'That password is too easy to guess. Choose a different one.'})
    // A provider/network failure can follow a committed creation. Re-read the
    // same reservation under the same JWT; never adopt an arbitrary email match.
    try {

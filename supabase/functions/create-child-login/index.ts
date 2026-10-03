@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { handleCreateChildLogin, type LoginReservation } from './handler.ts';
+import { handleCreateChildLogin, isWeakPassword, WeakPasswordError, type LoginReservation } from './handler.ts';
 
 // TRAK-96: the new API keys (JSON keyed by name, "default"), not the legacy
 // service_role/anon JWTs, which stop working at the end of 2026.
@@ -23,6 +23,6 @@ serve(req=>handleCreateChildLogin(req,{
   },
   async createConfirmed(identity) {
     const {error}=await admin.auth.admin.createUser(identity);
-    if(error) throw new Error('Auth creation failed');
+    if(error) throw isWeakPassword(error) ? new WeakPasswordError() : new Error('Auth creation failed');
   },
 }));

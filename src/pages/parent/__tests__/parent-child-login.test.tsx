@@ -21,8 +21,9 @@ let ready:boolean
 let created:unknown[]
 let invites:unknown[]
 let stateFailure:boolean
+let createReply:{status:number;body:Record<string,string>}|null
 beforeEach(()=>{
-  approved=false;ready=false;created=[];invites=[];stateFailure=false
+  approved=false;ready=false;created=[];invites=[];stateFailure=false;createReply=null
   vi.stubEnv('DEV',false)
   const uid=`98d00000-0000-4000-8000-${String(++sequence+100).padStart(12,'0')}`
   const expiresAt=Math.floor(Date.now()/1000)+3600
@@ -41,6 +42,7 @@ beforeEach(()=>{
     http.post(url('rpc/record_roster_consent'),()=>{approved=true;return HttpResponse.json('98d00000-0000-4000-8000-000000000050')}),
     http.post(`${SUPABASE_URL}/functions/v1/create-child-login`,async({request})=>{
       expect(request.headers.get('authorization')).toBe(`Bearer ${session.access_token}`)
+      if(createReply){created.push(await request.json());return HttpResponse.json(createReply.body,{status:createReply.status})}
       created.push(await request.json());ready=true
       return HttpResponse.json({username:'striker7',state:'created'})
     }),
@@ -89,4 +91,40 @@ it('a failed login-state check remains an error and cannot fall through to an em
   await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load pending approvals"))
   expect(screen.queryByText('Nothing to approve')).toBeNull()
   expect(invites).toEqual([])
+})
+
+// TRAK-106: a too-common password was reported as an approval problem. Each
+// failure now says what happened; a weak password keeps the username.
+async function tryCreate(){
+  approved=true;await open('/parent/home')
+  await userEvent.click(await screen.findByText("Finish your child's login setup"))
+  await userEvent.click(await screen.findByRole('button',{name:"Create Ana's login"}))
+  await userEvent.type(await screen.findByLabelText("Child's username"),'striker7')
+  await userEvent.type(screen.getByLabelText("Child's password"),'Synthetic-Pass7!')
+  await userEvent.type(screen.getByLabelText("Confirm child's password"),'Synthetic-Pass7!')
+  await userEvent.click(screen.getByRole('button',{name:'Create login'}))
+}
+it('a too-common password says so, keeps the username and clears only the passwords',async()=>{
+  createReply={status:422,body:{reason:'weak_password',error:'That password is too easy to guess. Choose a different one.'}}
+  await tryCreate()
+  const alert=await screen.findByRole('alert')
+  expect(alert).toHaveTextContent('That password is too easy to guess (it appears in known leaks). Choose a different one.')
+  expect(alert).not.toHaveTextContent(/approval/)
+  expect(screen.getByLabelText("Child's username")).toHaveValue('striker7')
+  expect(screen.getByLabelText("Child's password")).toHaveValue('')
+  expect(screen.getByLabelText("Confirm child's password")).toHaveValue('')
+  expect(screen.queryByRole('heading',{name:"Ana's login is ready"})).toBeNull()
+})
+it('only a refused reservation (403) is pointed at the username and approval',async()=>{
+  createReply={status:403,body:{error:'Could not reserve this login. Check the username and your guardian approval.'}}
+  await tryCreate()
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the login. Check the username and your approval, then try again.')
+})
+it('CONTROL any other failure says try again, with no approval wording',async()=>{
+  createReply={status:503,body:{error:'Could not create the login. Check its status and try again.'}}
+  await tryCreate()
+  const alert=await screen.findByRole('alert')
+  expect(alert).toHaveTextContent('Could not create the login. Please try again.')
+  expect(alert).not.toHaveTextContent(/approval|too easy/)
+  expect(screen.getByLabelText("Child's password")).toHaveValue('Synthetic-Pass7!')
 })

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
 import { createChildLogin } from '@/lib/parent-consent'
-import { validateChildUsername, type ChildLoginState } from '@/lib/child-login'
+import { ChildPasswordError, validateChildUsername, WEAK_PASSWORD_MESSAGE, type ChildLoginState } from '@/lib/child-login'
 import { PASSWORD_HINT, validatePassword } from '@/lib/password'
 
 export function ChildLoginCard({parentId,child,onContinue}:{parentId:string;child:ChildLoginState;onContinue:()=>void}) {
@@ -26,7 +26,15 @@ export function ChildLoginCard({parentId,child,onContinue}:{parentId:string;chil
       await createChildLogin(parentId,child.roster_child_id,username,password,controller.signal)
       if(controller.signal.aborted)return
       setPassword('');setConfirm('');setReady(true)
-    } catch {if(!controller.signal.aborted)setError('Could not create the login. Check the username and your approval, then try again.')}
+    } catch(e) {
+      // TRAK-106: only a refused reservation is about the username or approval.
+      const reason=e instanceof ChildPasswordError ? e.reason : 'failed'
+      if(controller.signal.aborted)return
+      if(reason==='weak_password'){setPassword('');setConfirm('');setError(WEAK_PASSWORD_MESSAGE)}
+      else setError(reason==='refused'
+        ? 'Could not create the login. Check the username and your approval, then try again.'
+        : 'Could not create the login. Please try again.')
+    }
     finally {if(!controller.signal.aborted){request.current=null;setBusy(false)}}
   }
   return <div className="p-6 flex flex-col gap-4">

@@ -5,6 +5,13 @@ export interface ChildPasswordDependencies {
   /** TRAK-104: end every session of this child login (end_child_login_sessions, server key). */
   endSessions(authUserId: string): Promise<number>;
 }
+/** TRAK-106: Auth refused the password as too weak or too common (422 weak_password). */
+export class WeakPasswordError extends Error { constructor() { super('weak_password') } }
+/** The SDK's AuthWeakPasswordError (auth-js 2.64+, code weak_password); nothing else. */
+export function isWeakPassword(error: unknown): boolean {
+  const e = error as { name?: unknown; code?: unknown } | null
+  return !!e && (e.name === 'AuthWeakPasswordError' || e.code === 'weak_password')
+}
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +41,12 @@ export async function handleResetChildPassword(req: Request, deps: ChildPassword
   } catch { return reply(403, { error: 'Use your linked guardian account with current approval' }); }
   try {
     await deps.reset(authUserId, body.password);
-  } catch { return reply(503, { error: 'Could not set the password. Please try again.' }); }
+  } catch (e) {
+    if (e instanceof WeakPasswordError) {
+      return reply(422, { reason: 'weak_password', error: 'That password is too easy to guess. Choose a different one.' });
+    }
+    return reply(503, { error: 'Could not set the password. Please try again.' });
+  }
   // TRAK-104: Auth's password update leaves existing sessions alive, so a lost
   // or shared phone stayed signed in. End them all; if that fails, the reply
   // says so (the new password stands either way, and a retry ends them).

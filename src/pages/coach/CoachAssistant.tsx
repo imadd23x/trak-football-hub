@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Send, Sparkles, ClipboardList } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { toast } from 'sonner'
-import { supabase, SUPABASE_FUNCTIONS_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client'
+import { supabase, SUPABASE_FUNCTIONS_URL, SUPABASE_PUBLISHABLE_KEY } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, MetadataLabel, PitchDiagram, detectDiagrams, PRESETS } from '@/components/trak'
 import type { DiagramData } from '@/components/trak'
@@ -166,7 +166,7 @@ export default function CoachAssistant() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-          apikey: SUPABASE_ANON_KEY,
+          apikey: SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({
           messages: [...messages, userMsg],

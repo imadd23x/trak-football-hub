@@ -10,6 +10,7 @@ import { SUPABASE_URL } from '../../../../tests/msw/supabase'
 
 const rosterId = '98c00000-0000-4000-8000-000000000030'
 let sequence = 200, session: Session, failure: boolean, resetFailure: boolean, signOutFailed = false
+let resetReply: { status: number; body: Record<string, string> } | null
 let resets: { token: string | null; body: unknown }[], recoveries: unknown[]
 function parentSession(): Session {
   const id = `98c00000-0000-4000-8000-${String(++sequence).padStart(12, '0')}`
@@ -21,7 +22,7 @@ function parentSession(): Session {
       email_confirmed_at: '2026-09-30T00:00:00Z', app_metadata: {}, user_metadata: {}, created_at: '2026-09-30T00:00:00Z' } }
 }
 beforeEach(() => {
-  session = parentSession(); failure = false; resetFailure = false; signOutFailed = false; resets = []; recoveries = []
+  session = parentSession(); failure = false; resetFailure = false; signOutFailed = false; resetReply = null; resets = []; recoveries = []
   vi.stubEnv('DEV', false)
   server.use(
     http.get(`${SUPABASE_URL}/auth/v1/user`, () => HttpResponse.json(session.user)),
@@ -34,6 +35,7 @@ beforeEach(() => {
       : HttpResponse.json([{ roster_child_id: rosterId, first_name: 'Ana', username: 'striker7' }])),
     http.post(`${SUPABASE_URL}/functions/v1/reset-child-password`, async ({ request }) => {
       resets.push({ token: request.headers.get('authorization'), body: await request.json() })
+      if (resetReply) return HttpResponse.json(resetReply.body, { status: resetReply.status })
       return resetFailure ? HttpResponse.json({ error: 'striker7@child.trakfootball.com private detail' }, { status: 503 })
         : HttpResponse.json({ state: signOutFailed ? 'password_updated_signout_failed' : 'password_updated' })
     }),
@@ -107,4 +109,35 @@ it('the parent keeps normal email recovery for their own account', async () => {
   await waitFor(() => expect(recoveries).toHaveLength(1))
   expect(recoveries[0]).toMatchObject({ email: 'parent@child-login.test' })
   expect(resets).toEqual([])
+})
+
+// TRAK-106 (TRAK-24 run 3, step 11): Auth refused a common password, and the
+// card told the guardian to check their link and approval. Each failure now
+// says what actually happened.
+const WEAK = 'That password is too easy to guess (it appears in known leaks). Choose a different one.'
+it('a too-common password says so, clears only the password fields and keeps the form open', async () => {
+  resetReply = { status: 422, body: { reason: 'weak_password', error: 'That password is too easy to guess. Choose a different one.' } }
+  await open(); await fillPassword()
+  await userEvent.click(screen.getByRole('button', { name: 'Save new password' }))
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent(WEAK)
+  expect(alert).not.toHaveTextContent(/approval/)
+  expect(screen.getByLabelText("Ana's new password")).toHaveValue('')
+  expect(screen.getByLabelText("Confirm Ana's password")).toHaveValue('')
+  expect(screen.queryByText(/Password set for Ana/)).toBeNull()
+})
+it('only a refused guardian (403) is pointed at their link and approval', async () => {
+  resetReply = { status: 403, body: { error: 'Use your linked guardian account with current approval' } }
+  await open(); await fillPassword()
+  await userEvent.click(screen.getByRole('button', { name: 'Save new password' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not set the password. Check your guardian link and approval, then try again.')
+})
+it('CONTROL any other failure says try again, with no approval wording and the password kept', async () => {
+  resetReply = { status: 503, body: { error: 'Could not set the password. Please try again.' } }
+  await open(); await fillPassword()
+  await userEvent.click(screen.getByRole('button', { name: 'Save new password' }))
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent('Could not set the password. Please try again.')
+  expect(alert).not.toHaveTextContent(/approval|too easy/)
+  expect(screen.getByLabelText("Ana's new password")).toHaveValue('Synthetic-Pass9!')
 })

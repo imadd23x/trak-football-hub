@@ -19,7 +19,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({
 }) }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => client() }));
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: client(), SUPABASE_FUNCTIONS_URL: 'https://test.supabase.co/functions/v1', SUPABASE_ANON_KEY: 'test-key',
+  supabase: client(), SUPABASE_FUNCTIONS_URL: 'https://test.supabase.co/functions/v1', SUPABASE_PUBLISHABLE_KEY: 'test-key',
 }));
 function client() {
   return {

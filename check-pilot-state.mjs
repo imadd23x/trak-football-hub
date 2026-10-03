@@ -7,7 +7,7 @@ const env = k => {
   const l = readFileSync('.env','utf8').split('\n').find(x=>x.startsWith(k+'='))
   return l ? l.slice(k.length+1).trim().replace(/^["']|["']$/g,'') : null
 }
-const sb = createClient(env('VITE_SUPABASE_URL'), env('VITE_SUPABASE_PUBLISHABLE_KEY') || env('VITE_SUPABASE_ANON_KEY'),
+const sb = createClient(env('VITE_SUPABASE_URL'), env('VITE_SUPABASE_PUBLISHABLE_KEY'),
   { auth: { persistSession:false, autoRefreshToken:false } })
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))

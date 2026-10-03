@@ -29,7 +29,7 @@ vi.mock('@supabase/supabase-js', () => ({
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: client(true),
   SUPABASE_FUNCTIONS_URL: 'https://test.supabase.co/functions/v1',
-  SUPABASE_ANON_KEY: 'test-anon-key',
+  SUPABASE_PUBLISHABLE_KEY: 'test-anon-key',
 }))
 vi.mock('@/lib/telemetry', () => ({ setTelemetryRole: vi.fn(), trackSessionOpen: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { warning: api.warning, error: api.error } }))

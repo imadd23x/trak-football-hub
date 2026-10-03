@@ -35,8 +35,9 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
   const [step, setStep] = useState<'password' | 'profile'>(guardianCreated ? 'profile' : 'password')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  // The invitation names the child; a guardian types their own name.
-  const [name, setName] = useState(guardian ? '' : firstName)
+  // A guardian types their own name. A child's name is the academy's roster
+  // name: the database saves it, so the child is never asked (TRAK-103).
+  const [name, setName] = useState('')
   const [position, setPosition] = useState('')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
@@ -56,7 +57,7 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
 
   const finish = async () => {
     if (busy) return
-    if (!name.trim()) { setProblem('Please enter your name'); return }
+    if (guardian && !name.trim()) { setProblem('Please enter your name'); return }
     setBusy(true)
     setProblem(null)
     try {
@@ -68,7 +69,7 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
       const { error } = await account.client.rpc('provision_my_profile' as never, {
         p: guardian
           ? { role: 'parent', full_name: name.trim() }
-          : { role: 'player', full_name: name.trim(), player_details: position ? { position } : {} },
+          : { role: 'player', player_details: position ? { position } : {} },
       } as never)
       if (error) {
         setBusy(false)
@@ -96,7 +97,8 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
           {guardian
             ? `${academy || 'Your academy'} has added you as ${firstName ? `${firstName}'s` : "a child's"} parent or guardian.`
             : academy ? `${academy} has added you to Trak.` : 'Your academy has added you to Trak.'}{' '}
-          {step === 'password' ? 'Choose a password to sign in with next time.' : 'Check your name, then you’re in.'}
+          {step === 'password' ? 'Choose a password to sign in with next time.'
+            : guardian ? 'Check your name, then you’re in.' : 'One last step, then you’re in.'}
         </p>
       </div>
 
@@ -111,8 +113,10 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
         </>
       ) : (
         <>
-          <label className="text-xs text-muted-foreground" htmlFor="invited-name">Your name</label>
-          <Input id="invited-name" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="bg-card" />
+          {guardian && <>
+            <label className="text-xs text-muted-foreground" htmlFor="invited-name">Your name</label>
+            <Input id="invited-name" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="bg-card" />
+          </>}
           {!guardian && <>
             <label className="text-xs text-muted-foreground" htmlFor="invited-position">Position (optional)</label>
             <select id="invited-position" value={position} onChange={e => setPosition(e.target.value)}
@@ -120,7 +124,7 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
               <option value="">Choose later</option>
               {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
-            <p className="text-xs text-muted-foreground">Your academy has your date of birth and age group.</p>
+            <p className="text-xs text-muted-foreground">Your academy has your name, date of birth and age group.</p>
           </>}
           {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
           <Button onClick={finish} disabled={busy} className="w-full">{busy ? 'Finishing…' : 'Finish'}</Button>

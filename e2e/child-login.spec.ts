@@ -110,7 +110,9 @@ test('a guardian-created child finishes first run without setting the password a
   await page.goto('/')
   await expect(page).toHaveURL(`${appOrigin}/onboarding/player`)
   await expect(page.getByLabel('New password')).toHaveCount(0)
-  await page.getByLabel('Your name').fill('Ana Synthetic')
+  // TRAK-103: the academy's roster name is the child's name; no name box.
+  await expect(page.getByText('Your academy has your name, date of birth and age group.')).toBeVisible()
+  await expect(page.getByLabel('Your name')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('child-first-run-local.png'), fullPage: true })
   await page.getByRole('button', { name: 'Finish', exact: true }).click()
   await expect(page).toHaveURL(`${appOrigin}/player/home`)

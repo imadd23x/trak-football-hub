@@ -54,7 +54,10 @@ for (const role of ['player', 'coach', 'club'] as const) {
     }
     await page.screenshot({ path: testInfo.outputPath('coming-soon-mobile.png'), fullPage: true })
     await page.goto('/settings')
-    await expect(page.getByRole('button', { name: 'Synthetic Pilot', exact: true })).toBeVisible()
+    // TRAK-103: a player's name is the academy's, shown without an edit button.
+    await expect(role === 'player'
+      ? page.getByText('Synthetic Pilot', { exact: true })
+      : page.getByRole('button', { name: 'Synthetic Pilot', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Delete my account' })).toBeVisible()
     await expect(page.locator('input[type=file], img')).toHaveCount(0)
     await expect(page.getByText('Profile photos are coming soon.')).toBeVisible()

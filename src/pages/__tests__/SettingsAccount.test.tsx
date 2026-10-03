@@ -193,7 +193,7 @@ describe('Settings with real AuthProvider, route guard and Supabase SDK', () => 
   // player's connections moved to the Profile tab (PlayerConnections).
   it('gives a player no position or shirt-number editor and no connections in Settings', async () => {
     profiles.a.role = 'player'
-    mount(); await ready()
+    mount(); await screen.findByText('Your academy sets your name.')
     expect(screen.queryByText('Position')).toBeNull()
     expect(screen.queryByText('Shirt number')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()

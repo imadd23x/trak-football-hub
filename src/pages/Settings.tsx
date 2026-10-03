@@ -187,7 +187,14 @@ function AccountSettings({ userId }: { userId: string }) {
           <Row
             label="Display name"
             right={
-              editingName ? (
+              // TRAK-103: a player's name is the academy's roster name; the
+              // database refuses a rename, so there is nothing to edit.
+              role === 'player' ? (
+                <span className="flex flex-col items-end" style={{ fontSize: 13 }}>
+                  <span style={{ color: 'rgba(255,255,255,0.88)' }}>{displayName || '—'}</span>
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Your academy sets your name.</span>
+                </span>
+              ) : editingName ? (
                 <div className="flex items-center gap-2">
                   <input
                     autoFocus

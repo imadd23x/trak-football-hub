@@ -14,3 +14,12 @@
 /docs/use-cases/        @imadd23x @kostasanastasioubusiness-lang @t-bones29
 /docs/release/          @imadd23x @kostasanastasioubusiness-lang @t-bones29
 /MVP\ Requirements      @imadd23x @kostasanastasioubusiness-lang @t-bones29
+
+# Markdown that isn't just docs (Tarek's #221 review): the rules every coding
+# agent follows, the pilot's legal decisions, the runbook operators paste SQL
+# from into production, and the security policy.
+/CLAUDE.md              @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/AGENTS.md              @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/Legal/                 @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/docs/pilot-runbook.md  @imadd23x @kostasanastasioubusiness-lang @t-bones29
+/docs/pm/SECURITY.md    @imadd23x @kostasanastasioubusiness-lang @t-bones29

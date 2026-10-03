@@ -7,7 +7,7 @@
 //   node scripts/rename-rehearsal-emails.mjs            dry run: counts only
 //   node scripts/rename-rehearsal-emails.mjs --apply    changes the accounts
 //
-// Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (listing and changing
+// Needs SUPABASE_URL and SUPABASE_SECRET_KEY, a secret key (sb_secret_…, TRAK-96) (listing and changing
 // accounts is admin-only). --apply also needs TRAK_CONFIRM_HOST set to the
 // host of SUPABASE_URL, as load-roster.mjs does.
 //
@@ -29,8 +29,10 @@ export function renamed(email) {
 async function main() {
   const apply = process.argv.includes('--apply');
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+  const key = (process.env.SUPABASE_SECRET_KEY ?? '').trim();
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SECRET_KEY are required');
+  // TRAK-96: the legacy service_role JWT stops working at the end of 2026.
+  if (!key.startsWith('sb_secret_')) throw new Error('SUPABASE_SECRET_KEY must be a secret key (sb_secret_…) from Settings → API Keys');
   const host = new URL(url).host;
   if (apply && process.env.TRAK_CONFIRM_HOST !== host) {
     throw new Error(`Set TRAK_CONFIRM_HOST=${host} to confirm which project --apply changes`);

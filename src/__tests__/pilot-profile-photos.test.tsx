@@ -30,7 +30,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   } },
   // Imported at load by the parent consent code the profile now renders (TRAK-13).
   SUPABASE_FUNCTIONS_URL: 'https://test.supabase.co/functions/v1',
-  SUPABASE_ANON_KEY: 'test-anon-key',
+  SUPABASE_PUBLISHABLE_KEY: 'test-anon-key',
 }))
 beforeEach(() => mocks.avatar.mockClear())
 afterEach(cleanup)

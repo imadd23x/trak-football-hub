@@ -18,7 +18,7 @@ vi.mock('@/integrations/supabase/client', async () => {
       auth: { storage: localStorage, persistSession: true, autoRefreshToken: false, detectSessionInUrl: false },
     }),
     SUPABASE_FUNCTIONS_URL: 'https://test.supabase.co/functions/v1',
-    SUPABASE_ANON_KEY: 'test-anon-key',
+    SUPABASE_PUBLISHABLE_KEY: 'test-anon-key',
   }
 })
 

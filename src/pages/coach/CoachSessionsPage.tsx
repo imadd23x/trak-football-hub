@@ -70,9 +70,12 @@ export default function CoachSessionsPage() {
         ) : (
           <div className="space-y-0">
             {sessions.map((s) => (
-              <div
+              // TRAK-102: a row opens its session.
+              <button
+                type="button"
                 key={s.id}
-                className="flex items-center gap-3 py-3 border-b border-white/[0.05]"
+                onClick={() => navigate(`/coach/sessions/${s.id}`)}
+                className="w-full text-left flex items-center gap-3 py-3 border-b border-white/[0.05] active:bg-white/[0.03]"
               >
                 {/* Icon */}
                 <div className="w-[34px] h-[34px] rounded-[10px] bg-[#202024] flex items-center justify-center shrink-0">
@@ -113,7 +116,7 @@ export default function CoachSessionsPage() {
                     {s.focus || 'Tactical'}
                   </span>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         )}

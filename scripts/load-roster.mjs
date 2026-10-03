@@ -12,6 +12,8 @@
 // none (TRAK-84): their guardian creates the login after consenting.
 // guardian_emails holds every guardian the
 // academy supplied, separated by ";". Quote a field that contains a comma.
+// A placeholder address (YOURNAME@…, you@…, <inbox>@…) is a problem on its
+// line (TRAK-93): it is a stranger's real inbox, never the family's.
 //
 // Without --apply this is a dry run: it validates every row and reports what
 // it would load, touching nothing. It never prints names, emails or dates of
@@ -54,7 +56,7 @@
 //
 //   node scripts/load-roster.mjs ... --apply --send-invites
 
-import { isSyntheticAddress } from './synthetic-domain.mjs';
+import { isPlaceholderAddress, isSyntheticAddress, isUnmailableAddress } from './synthetic-domain.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -131,6 +133,10 @@ export function validateRoster(text, { today = new Date().toISOString().slice(0,
     if (guardian_emails.length === 0) problems.push('no guardian email');
     if (guardian_emails.some(g => !EMAIL.test(g))) problems.push('a guardian email is not an email address');
     if (child_email && guardian_emails.includes(child_email)) problems.push('the child\'s email is also listed as a guardian\'s');
+    // TRAK-93: YOURNAME@gmail.com and the like belong to strangers at real providers.
+    if ([child_email, coach_email, ...guardian_emails].some(e => e && isPlaceholderAddress(e))) {
+      problems.push('an address is a placeholder (like YOURNAME@ or you@), not a real inbox');
+    }
     if (child_email && childLine.has(child_email)) problems.push(`same child_email as line ${childLine.get(child_email)}`);
     const person = `${child_name.toLowerCase()}|${date_of_birth}`;
     if (!child_email && noEmailLine.has(person)) problems.push(`same child (name and date of birth, no email) as line ${noEmailLine.get(person)}`);
@@ -212,19 +218,19 @@ export function planReinvite(rows, onRoster) {
   const toInvite = [];
   const upToDate = [];
   const notOnRoster = [];
-  const synthetic = [];
+  const unmailable = [];
   for (const r of rows) {
     const child = r.child_email ? byEmail.get(r.child_email) : byPerson.get(person(r.child_name, r.date_of_birth));
     if (!child) notOnRoster.push(r.line);
     else if (!child.guardians.some(g => !g.invited_at && !g.parent_user_id)) upToDate.push(r.line);
     // send-roster-invites emails every stored guardian who hasn't signed up,
-    // invited before or not. If one of them is on a reserved test domain, the
-    // line is refused: a file corrected since the load doesn't change who is
-    // stored (Imad, #202).
-    else if (child.guardians.some(g => !g.parent_user_id && isSyntheticAddress(g.email))) synthetic.push(r.line);
+    // invited before or not. If one of them is on a reserved test domain or a
+    // placeholder (TRAK-93), the line is refused: a file corrected since the
+    // load doesn't change who is stored (Imad, #202 and #204).
+    else if (child.guardians.some(g => !g.parent_user_id && isUnmailableAddress(g.email))) unmailable.push(r.line);
     else toInvite.push({ line: r.line, rosterChildId: child.id });
   }
-  return { toInvite, upToDate, notOnRoster, synthetic };
+  return { toInvite, upToDate, notOnRoster, unmailable };
 }
 
 // TRAK-91 follow-up: the lines holding a reserved test address (the J7 rule),
@@ -323,7 +329,7 @@ async function resolveCoaches(admin, emails) {
 
 /** TRAK-91: 1 when a line needs the operator (refused, not on the roster) or a send failed. */
 export function reinviteExitCode(plan, failedCount) {
-  return plan.synthetic.length || plan.notOnRoster.length || failedCount ? 1 : 0;
+  return plan.unmailable.length || plan.notOnRoster.length || failedCount ? 1 : 0;
 }
 
 // TRAK-91: the recovery for invitations that never went. Reads this academy's
@@ -342,11 +348,11 @@ async function reinvite(admin, args, rows, sendInvite) {
     guardians: c.roster_guardians ?? [],
   }));
   const plan = planReinvite(rows, onRoster);
-  const { toInvite, upToDate, notOnRoster, synthetic } = plan;
+  const { toInvite, upToDate, notOnRoster, unmailable } = plan;
   // Imad's ship check (2 Oct): a refused line printed its reason but exited 0.
   process.exitCode = reinviteExitCode(plan, 0) || process.exitCode;
-  if (synthetic.length) {
-    console.log(`[load-roster] Line(s) ${synthetic.join(', ')}: a stored guardian address is a reserved test address (e.g. .test); not invited. Correct it on the roster first.`);
+  if (unmailable.length) {
+    console.log(`[load-roster] Line(s) ${unmailable.join(', ')}: a stored guardian address is a reserved test address (e.g. .test) or a placeholder (like YOURNAME@); not invited. Correct it on the roster first.`);
   }
   if (notOnRoster.length) {
     console.log(`[load-roster] Line(s) ${notOnRoster.join(', ')} aren't on this academy's roster. --reinvite loads nothing: load them first.`);

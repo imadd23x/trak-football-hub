@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { handleResetChildPassword, type ChildPasswordDependencies } from '../../supabase/functions/reset-child-password/handler'
+import { handleResetChildPassword, WeakPasswordError, type ChildPasswordDependencies } from '../../supabase/functions/reset-child-password/handler'
 
 const rosterId = '98c00000-0000-4000-8000-000000000030'
 const authId = '98c00000-0000-4000-8000-000000000040'
@@ -95,5 +95,29 @@ describe('a password reset signs the child out of every device (TRAK-104)', () =
     vi.mocked(d.authorize).mockRejectedValue(new Error('withdrawn'))
     expect((await handleResetChildPassword(request(), d)).status).toBe(403)
     expect(d.endSessions).not.toHaveBeenCalled()
+  })
+})
+
+// TRAK-106 (found in TRAK-24 run 3, step 11): Auth refused a common password
+// with 422 weak_password, and the guardian was told to check their approval.
+// A weak password is now its own reason; everything else keeps today's reply.
+describe('a too-common password is reported as such (TRAK-106)', () => {
+  it('answers 422 weak_password and ends no session when Auth refuses the password as weak', async () => {
+    const d = dependencies()
+    vi.mocked(d.reset).mockRejectedValue(new WeakPasswordError())
+    const response = await handleResetChildPassword(request(), d)
+    expect(response.status).toBe(422)
+    const reply = await response.json()
+    expect(reply.reason).toBe('weak_password')
+    expect(JSON.stringify(reply)).not.toContain(body.password)
+    expect(d.endSessions).not.toHaveBeenCalled()
+  })
+
+  it('CONTROL any other Auth failure stays a plain 503 with no reason', async () => {
+    const d = dependencies()
+    vi.mocked(d.reset).mockRejectedValue(new Error('Auth unavailable'))
+    const response = await handleResetChildPassword(request(), d)
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'Could not set the password. Please try again.' })
   })
 })

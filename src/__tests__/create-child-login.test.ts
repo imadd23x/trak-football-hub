@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { handleCreateChildLogin, type ChildLoginDependencies } from '../../supabase/functions/create-child-login/handler'
+import { handleCreateChildLogin, WeakPasswordError, type ChildLoginDependencies } from '../../supabase/functions/create-child-login/handler'
 
 const child = '98c00000-0000-4000-8000-000000000030'
 const reservation = { reservation_id: '98c00000-0000-4000-8000-000000000050', username: 'striker7', ready: false, guardian_user_id: '98c00000-0000-4000-8000-000000000003' }
@@ -64,5 +64,28 @@ describe('guardian-created child login handler', () => {
     const d=dependencies()
     expect((await handleCreateChildLogin(request(undefined,''),d)).status).toBe(401)
     expect(d.reserve).not.toHaveBeenCalled()
+  })
+})
+
+// TRAK-106: Auth refuses a common password with 422 weak_password. Nothing was
+// created, so there is nothing to recover; the guardian is told to pick another.
+describe('a too-common password is reported as such (TRAK-106)', () => {
+  it('answers 422 weak_password without the lost-response re-read', async () => {
+    const d=dependencies()
+    vi.mocked(d.createConfirmed).mockRejectedValue(new WeakPasswordError())
+    const response=await handleCreateChildLogin(request(),d)
+    expect(response.status).toBe(422)
+    const reply=await response.json()
+    expect(reply.reason).toBe('weak_password')
+    expect(JSON.stringify(reply)).not.toContain('Synthetic-Pass7!')
+    expect(JSON.stringify(reply)).not.toContain('child.trakfootball.com')
+    expect(d.reserve).toHaveBeenCalledTimes(1)
+  })
+  it('CONTROL any other Auth failure keeps the 503 and the re-read', async () => {
+    const d=dependencies()
+    vi.mocked(d.createConfirmed).mockRejectedValue(new Error('Auth unavailable'))
+    const response=await handleCreateChildLogin(request(),d)
+    expect(response.status).toBe(503)
+    expect(d.reserve).toHaveBeenCalledTimes(2)
   })
 })

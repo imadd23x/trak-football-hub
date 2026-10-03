@@ -9,7 +9,7 @@ const auth = vi.hoisted(() => ({ getSession: vi.fn() }))
 const onboarding = vi.hoisted(() => ({ createOnboardingSession: vi.fn() }))
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: { auth: auth },
-  SUPABASE_ANON_KEY: 'test-anon-key',
+  SUPABASE_PUBLISHABLE_KEY: 'test-anon-key',
   SUPABASE_FUNCTIONS_URL: 'https://test.supabase.co/functions/v1',
 }))
 vi.mock('../onboarding-session', () => ({ createOnboardingSession: onboarding.createOnboardingSession }))

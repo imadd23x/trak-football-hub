@@ -1,5 +1,7 @@
 # Security Notes
 
+> **Update (TRAK-96, Oct 2026):** the app now uses the new API keys: `sb_publishable_…` in the browser, `sb_secret_…` for operators and edge functions. The legacy anon and service_role JWTs below are deactivated as TRAK-96's last step.
+
 ## Item 01 — Supabase Anon Key in Git History
 
 **Status:** ✅ Resolved — key rotated 2026-05-30. Old key invalidated.

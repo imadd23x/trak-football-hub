@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client'
 import { createOnboardingSession } from './onboarding-session'
 import { CONSENT_NOTICE_VERSION, CONSENT_STATEMENT, type ConsentPurposeKey } from './consent'
-import { parseChildLogins, type ChildLoginState } from './child-login'
+import { ChildPasswordError, childPasswordFailure, parseChildLogins, type ChildLoginState } from './child-login'
 
 export interface AwaitingConsentChild {
   player_user_id: string
@@ -189,9 +189,10 @@ export async function createChildLogin(expectedParentId:string,rosterChildId:str
   const client=await verifiedParentClient(expectedParentId,signal)
   const {data,error}=await client.functions.invoke('create-child-login',{body:{roster_child_id:rosterChildId,username,password}})
   if(signal.aborted) throw new DOMException('Cancelled','AbortError')
+  if(error) throw new ChildPasswordError(await childPasswordFailure(error))
   const reply=data as {username?:unknown;state?:unknown}|null
-  if(error || reply?.username!==username || !['created','already_created'].includes(String(reply.state))) {
-    throw new Error('Could not create the login. Check its status and try again.')
+  if(reply?.username!==username || !['created','already_created'].includes(String(reply.state))) {
+    throw new ChildPasswordError('failed')
   }
   return {username,state:reply.state as 'created'|'already_created'}
 }

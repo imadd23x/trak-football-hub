@@ -33,12 +33,12 @@ function env(key, fallback) {
   return fallback
 }
 
-// The project standardised on VITE_SUPABASE_PUBLISHABLE_KEY; VITE_SUPABASE_ANON_KEY
-// is accepted as an alias so either naming works.
+// TRAK-96: the publishable key (sb_publishable_…); the legacy VITE_SUPABASE_ANON_KEY
+// alias is gone with the legacy keys.
 const SUPABASE_URL = env('VITE_SUPABASE_URL')
-const SUPABASE_ANON_KEY = env('VITE_SUPABASE_PUBLISHABLE_KEY') || env('VITE_SUPABASE_ANON_KEY')
+const SUPABASE_PUBLISHABLE_KEY = env('VITE_SUPABASE_PUBLISHABLE_KEY')
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY (env or .env).')
   process.exit(1)
 }
@@ -64,7 +64,7 @@ const CONSENT_STATEMENT =
   'I confirm I hold parental responsibility for this child and I authorise the processing I have selected above. ' +
   'I understand I can withdraw at any time from my profile, and that withdrawing stops future processing.'
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 

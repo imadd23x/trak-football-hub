@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { supabase, SUPABASE_ANON_KEY, SUPABASE_FUNCTIONS_URL } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_PUBLISHABLE_KEY, SUPABASE_FUNCTIONS_URL } from '@/integrations/supabase/client';
 import { createOnboardingSession, type OnboardingSession } from './onboarding-session';
 import { validatePassword } from './password';
 
@@ -92,7 +92,7 @@ export async function completeParentInvitation(
     const pendingProfile = { role: 'parent', full_name: setup.fullName.trim(), nationality: null };
     const response = await fetch(`${SUPABASE_FUNCTIONS_URL.replace(/\/functions\/v1$/, '')}/auth/v1/user`, {
       method: 'PUT',
-      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${account.session.access_token}`, 'Content-Type': 'application/json' },
+      headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${account.session.access_token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: setup.password, data: { trak_onboarding: pendingProfile } }),
     });
     if (!response.ok) throw new Error('Could not save your account details. Please retry.');

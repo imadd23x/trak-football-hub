@@ -6,6 +6,7 @@ import { PasswordInput } from '@/components/ui/password-input'
 import { MetadataLabel } from '@/components/trak'
 import { fetchChildCredentials, resetChildPassword, type ChildCredential } from '@/lib/child-recovery'
 import { PASSWORD_HINT, validatePassword } from '@/lib/password'
+import { ChildPasswordError, WEAK_PASSWORD_MESSAGE } from '@/lib/child-login'
 
 export function ParentChildCredentials() {
   const { parentId } = useParentChildren()
@@ -50,8 +51,15 @@ function ChildPasswordCard({ parentId, child }: { parentId: string; child: Child
       if (!controller.signal.aborted) {
         if (result === 'signed_out') { clearForm(); setSaved(true) } else setSignOutFailed(true)
       }
-    } catch {
-      if (!controller.signal.aborted) setError('Could not set the password. Check your guardian link and approval, then try again.')
+    } catch (e) {
+      // TRAK-106: only a refused guardian is about the link or approval.
+      const reason = e instanceof ChildPasswordError ? e.reason : 'failed'
+      if (!controller.signal.aborted) {
+        if (reason === 'weak_password') { setPassword(''); setConfirm(''); setError(WEAK_PASSWORD_MESSAGE) }
+        else setError(reason === 'refused'
+          ? 'Could not set the password. Check your guardian link and approval, then try again.'
+          : 'Could not set the password. Please try again.')
+      }
     } finally {
       if (!controller.signal.aborted) { request.current = null; setBusy(false) }
     }

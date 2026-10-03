@@ -21,6 +21,25 @@ export function signInAddress(identity: string): string | null {
   return validateChildUsername(value) ? null : `${value}@${CHILD_LOGIN_DOMAIN}`
 }
 
+/** TRAK-106: why a child-login function refused. Only a 403 is about the guardian's
+ * link or approval; Auth's 422 weak_password is about the password itself. */
+export type ChildPasswordFailure = 'weak_password' | 'refused' | 'failed'
+export class ChildPasswordError extends Error {
+  constructor(readonly reason: ChildPasswordFailure) { super(`Child login request failed: ${reason}`) }
+}
+export const WEAK_PASSWORD_MESSAGE = 'That password is too easy to guess (it appears in known leaks). Choose a different one.'
+/** Reads the function's reply from the SDK's FunctionsHttpError (error.context is the Response). */
+export async function childPasswordFailure(error: unknown): Promise<ChildPasswordFailure> {
+  const response = (error as { context?: { status?: unknown; clone?: () => Response } } | null)?.context
+  if (!response || typeof response.status !== 'number') return 'failed'
+  if (response.status === 403) return 'refused'
+  if (response.status !== 422 || typeof response.clone !== 'function') return 'failed'
+  try {
+    const body: unknown = await response.clone().json()
+    return body && typeof body === 'object' && (body as { reason?: unknown }).reason === 'weak_password' ? 'weak_password' : 'failed'
+  } catch { return 'failed' }
+}
+
 export interface ChildLoginState {
   roster_child_id: string
   first_name: string

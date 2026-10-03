@@ -4,12 +4,19 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { corsHeaders, handleInviteRequest, json } from './handler.ts';
 
+const defaultKey = (raw: string | undefined): string | undefined => {
+  try { return (JSON.parse(raw ?? '') as Record<string, string>).default || undefined; } catch { return undefined; }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const url = Deno.env.get('SUPABASE_URL');
-    const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    // TRAK-96: the new API keys, not the legacy service_role/anon JWTs (which
+    // stop working at the end of 2026). Each variable is a JSON object keyed by
+    // name; the clients use the key named "default", as send-roster-invites does.
+    const serviceRole = defaultKey(Deno.env.get('SUPABASE_SECRET_KEYS'));
+    const anonKey = defaultKey(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS'));
     const siteUrl = Deno.env.get('SITE_URL') ?? 'https://trakfootball.com';
     if (!url || !serviceRole || !anonKey) {
       console.error('send-parent-invite: email credentials are not configured');

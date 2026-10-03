@@ -1,5 +1,5 @@
 import { createClient, type Session } from '@supabase/supabase-js';
-import { supabase, SUPABASE_ANON_KEY, SUPABASE_FUNCTIONS_URL } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_PUBLISHABLE_KEY, SUPABASE_FUNCTIONS_URL } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
 const supabaseUrl = SUPABASE_FUNCTIONS_URL.replace(/\/functions\/v1$/, '');
@@ -16,7 +16,7 @@ export async function createOnboardingSession(session: Session) {
 
   // The SDK's accessToken option never reads or refreshes the shared browser
   // session. An in-flight request therefore cannot acquire another user's JWT.
-  const client = createClient<Database>(supabaseUrl, SUPABASE_ANON_KEY, {
+  const client = createClient<Database>(supabaseUrl, SUPABASE_PUBLISHABLE_KEY, {
     accessToken: async () => accessToken,
   });
 
@@ -29,7 +29,7 @@ export async function createOnboardingSession(session: Session) {
       const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
         method: 'PUT',
         headers: {
-          apikey: SUPABASE_ANON_KEY,
+          apikey: SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, SUPABASE_FUNCTIONS_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client'
+import { supabase, SUPABASE_FUNCTIONS_URL, SUPABASE_PUBLISHABLE_KEY } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MetadataLabel } from '@/components/trak'
 import { ChevronLeft, Sparkles, Loader2 } from 'lucide-react'
@@ -119,7 +119,7 @@ export default function CoachReviewFeedback() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-          apikey: SUPABASE_ANON_KEY,
+          apikey: SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({ assessment_id: assessmentId }),
       })

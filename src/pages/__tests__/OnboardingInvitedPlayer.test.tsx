@@ -62,24 +62,25 @@ describe('an invited child finishes signing up (TRAK-11 phase 4)', () => {
     expect(screen.queryByPlaceholderText('Full name')).toBeNull()
   })
 
-  it('sets a password, confirms their name, and is admitted from the roster', async () => {
+  // TRAK-103: the academy's roster name is the child's name; no name box,
+  // and none is sent (the database saves the roster name).
+  it('sets a password and is admitted from the roster with the academy\'s name, typing none', async () => {
     renderApp('/onboarding/player')
     await setPassword()
     // The password goes through the SDK's auth client, which queues its own
     // session work; allow it a few seconds on a busy runner.
     await waitFor(() => expect(passwordSet).toEqual([expect.objectContaining({ password: 'SyntheticOnly1!' })]), { timeout: 4000 })
 
-    const name = await screen.findByLabelText('Your name', {}, { timeout: 4000 })
-    expect(name).toHaveValue('Ana')
-    await userEvent.clear(name)
-    await userEvent.type(name, 'Ana Synthetic')
+    expect(await screen.findByText('Your academy has your name, date of birth and age group.', {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Your name')).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
     await userEvent.selectOptions(screen.getByLabelText('Position (optional)'), 'Midfielder')
     await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
 
     await waitFor(() => expect(provisionCalls).toHaveLength(1))
     // The roster supplies date of birth, academy and age group; the child
     // names no guardian (G2).
-    expect(provisionCalls[0]).toEqual({ p: { role: 'player', full_name: 'Ana Synthetic', player_details: { position: 'Midfielder' } } })
+    expect(provisionCalls[0]).toEqual({ p: { role: 'player', player_details: { position: 'Midfielder' } } })
     await waitFor(() => expect(window.location.pathname).toBe('/player/home'), { timeout: 4000 })
   })
 

@@ -108,6 +108,7 @@ describe('settings controls reflect supported behavior', () => {
   })
 
   it('keeps a failed name save editable and persists only the valid retry to this account', async () => {
+    state.role = 'parent'
     const requests: unknown[] = []
     let fail = true
     server.use(http.patch(`${SUPABASE_URL}/rest/v1/profiles`, async ({ request }) => {
@@ -131,5 +132,25 @@ describe('settings controls reflect supported behavior', () => {
     await waitFor(() => expect(state.success).toHaveBeenCalledWith('Name updated'))
     expect(requests).toEqual([{ full_name: 'Revised Name' }, { full_name: 'Revised Name' }])
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+  })
+
+  // TRAK-103: a player's name is the academy's roster name. The database
+  // refuses a rename, so Settings shows it without an edit control.
+  it('shows a player their name read-only, set by the academy, and sends no rename', async () => {
+    const renames: unknown[] = []
+    server.use(http.patch(`${SUPABASE_URL}/rest/v1/profiles`, async ({ request }) => { renames.push(await request.json()); return HttpResponse.json({}) }))
+    mount()
+    expect(await screen.findByText('Settings User')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Settings User' })).toBeNull()
+    expect(screen.getByText('Your academy sets your name.')).toBeInTheDocument()
+    expect(renames).toEqual([])
+  })
+
+  it.each<Role>(['parent', 'coach'])('CONTROL a %s can still edit their name', async role => {
+    state.role = role
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings User' }))
+    expect(screen.getByDisplayValue('Settings User')).toBeInTheDocument()
+    expect(screen.queryByText('Your academy sets your name.')).toBeNull()
   })
 })

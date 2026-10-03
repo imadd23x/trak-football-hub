@@ -47,14 +47,14 @@ it('does not send reset mail when a technical child address is pasted with white
 })
 it('routes an unprofiled guardian-created child from sign-in to the existing setup, without setting the password again',async()=>{
  renderApp('/')
- expect(await screen.findByLabelText('Your name')).toHaveValue('Ana')
+ expect(await screen.findByText('Your academy has your name, date of birth and age group.')).toBeInTheDocument()
  expect(window.location.pathname).toBe('/onboarding/player')
  expect(screen.queryByLabelText('New password')).toBeNull()
- await userEvent.clear(screen.getByLabelText('Your name'))
- await userEvent.type(screen.getByLabelText('Your name'),'Ana Synthetic')
+ // TRAK-103: the guardian-created child types no name either.
+ expect(screen.queryByLabelText('Your name')).toBeNull()
  await userEvent.click(screen.getByRole('button',{name:'Finish'}))
  await waitFor(()=>expect(window.location.pathname).toBe('/player/home'))
- expect(profiles).toEqual([{p:{role:'player',full_name:'Ana Synthetic',player_details:{}}}])
+ expect(profiles).toEqual([{p:{role:'player',player_details:{}}}])
  expect(passwords).toEqual([])
  expect(document.body.textContent).not.toContain('child.trakfootball.com')
 })

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // TRAK-24: the 25-player synthetic roster for the deployed rehearsal.
 //
-//   node scripts/rehearsal/make-roster.mjs --inbox you@gmail.com --out /tmp/trak24-roster.csv
+//   node scripts/rehearsal/make-roster.mjs --inbox <tester-inbox> --out /tmp/trak24-roster.csv
 //     [--phone-out /tmp/trak24-phones.csv] [--synthetic-domain rehearsal.trak.test]
 //
 // With --phone-out, the 3 phone families go to that file and the 22 synthetic
@@ -20,13 +20,15 @@
 // Every child is under 18, so every one needs consent (G1).
 //
 // --inbox is a tester's own mailbox, used with plus-addressing
-// (you+sib1@gmail.com). It is written only to --out, which must be outside
-// the repository. Never commit the output or paste it into Slack or Linear;
+// (<tester-inbox>+sib1). Replace <tester-inbox> with your real address: the
+// shell reads <…> as a redirect, so the line fails if pasted unedited, and a
+// placeholder like YOURNAME@ is refused (TRAK-93). It is written only to
+// --out, which must be outside the repository. Never commit the output or paste it into Slack or Linear;
 // load-roster.mjs itself prints only row numbers and counts.
 import { writeFile } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isSyntheticDomain } from '../synthetic-domain.mjs';
+import { isPlaceholderAddress, isSyntheticDomain } from '../synthetic-domain.mjs';
 
 // The repository root, from this file's own location: scripts/rehearsal/.
 // Not the current folder, which is wherever the script happens to be run
@@ -61,7 +63,9 @@ export function dob(today, years, monthsAgo) {
 }
 
 export function rows(inbox, today = new Date(), domain = SYNTHETIC_DOMAIN) {
-  if (!/^[^\s@+]+@[^\s@]+\.[^\s@]+$/.test(inbox)) throw new Error('--inbox must be a plain address like you@gmail.com (no +tag)');
+  if (!/^[^\s@+]+@[^\s@]+\.[^\s@]+$/.test(inbox)) throw new Error('--inbox must be a plain address with no +tag, the tester\'s own mailbox');
+  // TRAK-93: the usage line's example is not an inbox (29 Sep: YOURNAME@gmail.com).
+  if (isPlaceholderAddress(inbox)) throw new Error('--inbox is a placeholder (like YOURNAME@gmail.com or you@gmail.com); use the tester\'s real mailbox');
   if (!isSyntheticDomain(domain)) throw new Error(`--synthetic-domain must be a reserved test domain J7 counts as synthetic (e.g. ${SYNTHETIC_DOMAIN})`);
   const COACHES = coaches(domain);
   const out = [
@@ -96,7 +100,7 @@ export const toCsv = (list) => [COLUMNS.join(','), ...list.map(r => COLUMNS.map(
 async function main() {
   const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) =>
     (a.startsWith('--') ? [...acc, [a.slice(2), all[i + 1]]] : acc), []));
-  if (!args.inbox || !args.out) throw new Error('Usage: --inbox you@gmail.com --out /path/outside/the/repo.csv [--phone-out /other/path.csv]');
+  if (!args.inbox || !args.out) throw new Error('Usage: --inbox <tester-inbox> --out /path/outside/the/repo.csv [--phone-out /other/path.csv]');
   const out = resolve(args.out);
   const phoneOut = args['phone-out'] ? resolve(args['phone-out']) : null;
   // Check every destination before writing any, so a refusal writes nothing.

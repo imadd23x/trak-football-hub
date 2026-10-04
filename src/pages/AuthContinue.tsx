@@ -22,7 +22,7 @@ function verifyLink(params: URLSearchParams, origin: string): string | null {
   const type = params.get('type') ?? ''
   const token = params.get('token') ?? ''
   const redirect = params.get('redirect_to')
-  if (!Object.prototype.hasOwnProperty.call(COPY, type) ||!/^(pkce_)?[0-9a-f]{20,128}$/i.test(token)) return null
+  if (!Object.prototype.hasOwnProperty.call(COPY, type) || !/^(pkce_)?[0-9a-f]{20,128}$/i.test(token)) return null
   const verify = new URL(`${SUPABASE_URL}/auth/v1/verify`)
   verify.searchParams.set('token', token)
   verify.searchParams.set('type', type)

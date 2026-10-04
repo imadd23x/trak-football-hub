@@ -6,7 +6,8 @@ import { MobileShell, NavBar, MatchCard, LoadError } from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
 import { TrainingHistory } from '@/components/player/TrainingHistory'
 
-const FILTERS = ['All', 'League', 'Cup', 'Friendly']
+// TRAK-112: the tab holds matches and training, so Training is a chip too.
+const FILTERS = ['All', 'League', 'Cup', 'Friendly', 'Training']
 const PAGE_SIZE = 20
 
 export default function PlayerMatches() {
@@ -81,6 +82,8 @@ export default function PlayerMatches() {
 
   const [filter, setFilter] = useState('All')
   const filtered = filter === 'All' ? matches : matches.filter(m => m.competition === filter)
+  const showMatches = filter !== 'Training'
+  const showTraining = filter === 'All' || filter === 'Training'
 
   return (
     <MobileShell>
@@ -91,11 +94,11 @@ export default function PlayerMatches() {
             <p className="text-[9px] tracking-[0.12em] uppercase text-white/35 mb-0.5"
               style={{ fontFamily: "'DM Mono', monospace" }}>Player</p>
             <h1 className="text-[22px] font-light text-white/88 leading-tight"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}>Matches</h1>
+              style={{ fontFamily: "'DM Sans', sans-serif" }}>Sessions</h1>
           </div>
-          <span className="text-[10px] text-white/30" style={{ fontFamily: "'DM Mono', monospace" }}>
+          {showMatches && <span className="text-[10px] text-white/30" style={{ fontFamily: "'DM Mono', monospace" }}>
             {failed ? '—' : `${filtered.length} ${filtered.length === 1 ? 'match' : 'matches'}`}
-          </span>
+          </span>}
         </div>
 
         {/* Filter chips */}
@@ -118,7 +121,7 @@ export default function PlayerMatches() {
         </div>
 
         {/* Match list */}
-        {failed ? (
+        {!showMatches ? null : failed ? (
           <LoadError what="your matches" onRetry={retry} retrying={loading} />
         ) : loading ? (
           <p className="text-white/35 text-sm mt-4">Loading…</p>
@@ -162,7 +165,7 @@ export default function PlayerMatches() {
         )}
 
         {/* J6: the training the coach logged (TRAK-76). */}
-        {user && <TrainingHistory playerUserId={user.id} reloadOn={user} />}
+        {user && showTraining && <TrainingHistory playerUserId={user.id} reloadOn={user} />}
       </div>
       <NavBar role="player" activeTab={location.pathname} onNavigate={navigate} />
     </MobileShell>

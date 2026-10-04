@@ -51,7 +51,7 @@ useCase('UC-A04', () => {
 
     renderApp('/player/matches')
 
-    expect(await screen.findByRole('heading', { name: 'Matches' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Sessions' })).toBeInTheDocument()  // TRAK-112: the tab is Sessions
     // A single mocked row cannot distinguish "renders the array" from
     // "renders only the first element" — two distinguishable rows can.
     // findByText on the first row waits out the fetch; getByText on the
@@ -102,7 +102,7 @@ useCase('UC-A04', () => {
       tableError('matches', 401, { code: '42501', message: 'permission denied for table matches' }),
     )
 
-    // PlayerMatches renders its "Matches" heading and filter chips
+    // PlayerMatches renders its "Sessions" heading and filter chips
     // synchronously, before the fetch resolves, so waiting on those proves
     // nothing about whether the mocked failure was processed. As in UC-C03,
     // the independent settle signal is the mocked matches response landing;

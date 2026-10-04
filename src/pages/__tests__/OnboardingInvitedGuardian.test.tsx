@@ -101,6 +101,49 @@ describe('an invited guardian finishes signing up (TRAK-11 phase 4)', () => {
     expect(screen.queryByText('Invalid role')).toBeNull()
   })
 
+  // TRAK-109 (run 4, Family X): a guardian whose invitation expired reset their
+  // password, then setup asked for a password again; the same one read as a
+  // connection error, and they couldn't tell which password was theirs.
+  describe('TRAK-109: a guardian who already has a password', () => {
+    const authRefusal = (code: string, msg: string) => server.use(
+      http.put(`${SUPABASE_URL}/auth/v1/user`, () => HttpResponse.json({ code: 422, error_code: code, msg }, { status: 422 })))
+    afterEach(() => sessionStorage.clear())
+
+    it('goes straight to their name after a password reset in this tab', async () => {
+      sessionStorage.setItem('trak:password-set', account)
+      renderApp('/onboarding/parent')
+      await userEvent.type(await screen.findByLabelText('Your name', {}, { timeout: 4000 }), 'Maria Synthetic')
+      expect(screen.queryByLabelText('New password')).toBeNull()
+      await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
+      await waitFor(() => expect(window.location.pathname).toBe('/parent/home'), { timeout: 4000 })
+      expect(passwordSet).toEqual([])
+    })
+
+    it('CONTROL a reset for another account still asks this one for a password', async () => {
+      sessionStorage.setItem('trak:password-set', 'someone-else')
+      renderApp('/onboarding/parent')
+      expect(await screen.findByLabelText('New password', {}, { timeout: 4000 })).toBeInTheDocument()
+    })
+
+    it('carries on to their name when they type the password they already have', async () => {
+      authRefusal('same_password', 'New password should be different from the old password.')
+      renderApp('/onboarding/parent')
+      await setPassword()
+      expect(await screen.findByLabelText('Your name', {}, { timeout: 4000 })).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('a too-common password says so, not "check your connection"', async () => {
+      authRefusal('weak_password', 'Password is known to be weak and easy to guess, please choose a different one.')
+      renderApp('/onboarding/parent')
+      await setPassword()
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('That password is too easy to guess (it appears in known leaks). Choose a different one.')
+      expect(alert).not.toHaveTextContent(/connection/)
+      expect(screen.getByLabelText('New password')).toBeInTheDocument()
+    })
+  })
+
   it('CONTROL /onboarding/unknown is still an invalid role', async () => {
     renderApp('/onboarding/unknown')
     expect(await screen.findByText('Invalid role', {}, { timeout: 4000 })).toBeInTheDocument()

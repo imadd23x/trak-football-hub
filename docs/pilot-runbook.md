@@ -318,3 +318,23 @@ node scripts/correct-roster-email.mjs --roster-child <roster child id> --kind gu
   ```
 - The addresses go only on the command line on the operator's own machine,
   never into Slack or Linear.
+
+## Wrong child name
+
+A rostered child's name is the academy's roster name, everywhere (TRAK-103):
+the coach, the family and the child all see `squad_players.player_name`. The
+child can't change it, and neither can a direct edit of `profiles.full_name`,
+not even by the table owner in the SQL editor. That is refused with 42501
+"Your academy sets your name". When the academy gave a wrong name, correct it
+on the roster's squad row; the child's profile follows by itself:
+
+```sql
+-- Find the squad row first (read-only): the child's roster id, from the load output.
+SELECT sp.id, sp.player_name FROM roster_children rc
+JOIN squad_players sp ON sp.id = rc.squad_player_id WHERE rc.id = '<roster child id>';
+-- Then correct it:
+UPDATE squad_players SET player_name = '<right name>' WHERE id = '<squad player id>';
+```
+
+Only the operator does this; no coach screen edits a name. The child sees
+the name at setup ("You're added as …"), so ask families to report a wrong one.

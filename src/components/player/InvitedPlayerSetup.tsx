@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +41,18 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
   const [position, setPosition] = useState('')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  // TRAK-103: the academy's name for this child, shown so a wrong one is
+  // caught on day one. A failed read just leaves it out; it never blocks setup.
+  const [rosterName, setRosterName] = useState<string | null>(null)
+  useEffect(() => {
+    if (guardian || !user?.id) return
+    let current = true
+    void supabase.rpc('my_roster_name' as never).then(({ data, error }) => {
+      const name: unknown = data  // the generated types predate this function
+      if (current && !error && typeof name === 'string' && name.trim()) setRosterName(name.trim())
+    }, () => { /* unavailable: setup goes on without it */ })
+    return () => { current = false }
+  }, [guardian, user?.id])
 
   const savePassword = async () => {
     if (busy) return
@@ -124,7 +136,10 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
               <option value="">Choose later</option>
               {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
-            <p className="text-xs text-muted-foreground">Your academy has your name, date of birth and age group.</p>
+            {rosterName ? <>
+              <p className="text-sm text-foreground">You're added as {rosterName}.</p>
+              <p className="text-xs text-muted-foreground">Your academy has your date of birth and age group.</p>
+            </> : <p className="text-xs text-muted-foreground">Your academy has your name, date of birth and age group.</p>}
           </>}
           {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
           <Button onClick={finish} disabled={busy} className="w-full">{busy ? 'Finishing…' : 'Finish'}</Button>

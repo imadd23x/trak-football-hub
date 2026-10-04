@@ -24,6 +24,7 @@ beforeEach(()=>{
   http.post(`${SUPABASE_URL}/auth/v1/recover`,async({request})=>{recovery.push(await request.json());return HttpResponse.json({})}),
   rpc('provision_my_profile',args=>{profiles.push(args);provisioned=true;return {warnings:[]}}),
   rpc('my_consent_status',()=>({required:false,granted:true,invited_parent:null})),
+  rpc('my_roster_name',()=>'Ana Synthetic'),
   rpc('get_player_invites_for_current_user',()=>[]),
   http.get(`${SUPABASE_URL}/rest/v1/:table`,()=>HttpResponse.json([])),
  )
@@ -47,10 +48,10 @@ it('does not send reset mail when a technical child address is pasted with white
 })
 it('routes an unprofiled guardian-created child from sign-in to the existing setup, without setting the password again',async()=>{
  renderApp('/')
- expect(await screen.findByText('Your academy has your name, date of birth and age group.')).toBeInTheDocument()
+ expect(await screen.findByText("You're added as Ana Synthetic.")).toBeInTheDocument()
  expect(window.location.pathname).toBe('/onboarding/player')
  expect(screen.queryByLabelText('New password')).toBeNull()
- // TRAK-103: the guardian-created child types no name either.
+ // TRAK-103: the guardian-created child types no name either, and sees the academy's.
  expect(screen.queryByLabelText('Your name')).toBeNull()
  await userEvent.click(screen.getByRole('button',{name:'Finish'}))
  await waitFor(()=>expect(window.location.pathname).toBe('/player/home'))

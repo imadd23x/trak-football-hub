@@ -171,14 +171,31 @@ SELECT pg_temp.rn_check(pg_temp.rn_name(pg_temp.rn(10)) = 'Corrected Child A',
 SELECT pg_temp.rn_check(pg_temp.rn_name(pg_temp.rn(11)) = 'Synthetic Child B',
   'CONTROL the other child''s name is untouched', pg_temp.rn_name(pg_temp.rn(11)));
 
+-- ── 5. The child can read their own roster name before setup (follow-up) ──
+-- Setup shows "You're added as <roster name>" so a wrong name is spotted on
+-- day one. Only the caller's own name; nothing for anyone else.
+SELECT pg_temp.rn_as(pg_temp.rn(10));
+SELECT pg_temp.rn_check((SELECT public.my_roster_name()) = 'Corrected Child A',
+  'a signed-up child reads their own roster name', (SELECT public.my_roster_name()));
+SELECT pg_temp.rn_as(pg_temp.rn(12));
+SELECT pg_temp.rn_check((SELECT public.my_roster_name()) = 'Synthetic Child C',
+  'a child not yet claimed reads their roster name by confirmed email', (SELECT public.my_roster_name()));
+SELECT pg_temp.rn_as(pg_temp.rn(20));
+SELECT pg_temp.rn_check((SELECT public.my_roster_name()) IS NULL, 'CONTROL a guardian gets no roster name');
+SELECT pg_temp.rn_as(pg_temp.rn(13));
+SELECT pg_temp.rn_check((SELECT public.my_roster_name()) IS NULL, 'CONTROL an unrostered account gets no roster name');
+RESET ROLE;
+SET LOCAL ROLE anon;
+SELECT pg_temp.rn_refused($s$SELECT public.my_roster_name()$s$, '42501', 'signed-out callers cannot read roster names');
+
 RESET ROLE;
 
 DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.rn_results;
-  IF total <> 20 THEN
-    RAISE EXCEPTION 'Roster name: % assertions ran; expected exactly 20', total;
+  IF total <> 25 THEN
+    RAISE EXCEPTION 'Roster name: % assertions ran; expected exactly 25', total;
   END IF;
   IF failed > 0 THEN
     RAISE EXCEPTION 'Roster name: % of % failed: %', failed, total,

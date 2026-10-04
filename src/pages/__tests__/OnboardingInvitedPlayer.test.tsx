@@ -21,6 +21,7 @@ let provisioned: boolean
 let passwordSet: unknown[]
 let provisionCalls: unknown[]
 let provisionAnswer: () => Record<string, unknown>
+let rosterName: string | null | 'fail'
 
 beforeEach(() => {
   account = `invited-child-${++sequence}`
@@ -28,6 +29,7 @@ beforeEach(() => {
   passwordSet = []
   provisionCalls = []
   provisionAnswer = () => { provisioned = true; return { ok: true } }
+  rosterName = 'Ana Synthetic'
   signInAs({ id: account, email: `${account}@example.test`,
     user_metadata: { invited_as: 'player', child_first_name: 'Ana', academy_name: 'Synthetic Academy' } })
   server.use(
@@ -40,6 +42,8 @@ beforeEach(() => {
     }),
     rpc('provision_my_profile', args => { provisionCalls.push(args); return provisionAnswer() }),
     rpc('my_consent_status', () => ({ required: false, granted: true, invited_parent: null })),
+    rpc('my_roster_name', () => rosterName === 'fail'
+      ? { status: 503, body: { message: 'Synthetic unavailable', code: 'XX000', details: null, hint: null } } : rosterName),
     rpc('get_player_invites_for_current_user', () => []),
     http.get(`${SUPABASE_URL}/rest/v1/:table`, () => HttpResponse.json([])),
     http.post(`${SUPABASE_URL}/rest/v1/telemetry_events`, () => HttpResponse.json(null, { status: 201 })),
@@ -54,6 +58,25 @@ async function setPassword(password = 'SyntheticOnly1!', confirm = password) {
 }
 
 describe('an invited child finishes signing up (TRAK-11 phase 4)', () => {
+  // TRAK-103 follow-up: the child sees the academy's name for them before
+  // finishing, so a wrong name is caught on day one.
+  it('shows the child the roster name they are added under', async () => {
+    renderApp('/onboarding/player')
+    await setPassword()
+    expect(await screen.findByText("You're added as Ana Synthetic.", {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Your name')).toBeNull()
+  })
+
+  it.each([['fails', 'fail'], ['finds no roster name', null]] as const)('CONTROL when the name read %s, setup still finishes without it', async (_what, answer) => {
+    rosterName = answer
+    renderApp('/onboarding/player')
+    await setPassword()
+    expect(await screen.findByText('Your academy has your name, date of birth and age group.', {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.queryByText(/You're added as/)).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
+    await waitFor(() => expect(provisionCalls).toHaveLength(1))
+  })
+
   it('is welcomed by first name and academy, and is not shown the email signup form', async () => {
     renderApp('/onboarding/player')
     expect(await screen.findByRole('heading', { name: 'Welcome, Ana' })).toBeInTheDocument()
@@ -71,7 +94,7 @@ describe('an invited child finishes signing up (TRAK-11 phase 4)', () => {
     // session work; allow it a few seconds on a busy runner.
     await waitFor(() => expect(passwordSet).toEqual([expect.objectContaining({ password: 'SyntheticOnly1!' })]), { timeout: 4000 })
 
-    expect(await screen.findByText('Your academy has your name, date of birth and age group.', {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(await screen.findByText("You're added as Ana Synthetic.", {}, { timeout: 4000 })).toBeInTheDocument()
     expect(screen.queryByLabelText('Your name')).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
     await userEvent.selectOptions(screen.getByLabelText('Position (optional)'), 'Midfielder')

@@ -60,8 +60,9 @@ export default function ParentHome() {
         {/* TRAK-98: approved children who haven't signed up aren't in the family list yet. */}
         <ApprovedAwaitingList />
         <ParentChildSelector />
+        {/* TRAK-111: only for a login still to make; a ready one is listed until the child's first sign-in. */}
         {loginQuery.isError ? <ParentLoadError message="Couldn't check your children's logins." onRetry={() => {void loginQuery.refetch()}} />
-          : (loginQuery.data?.length??0)>0 && <button onClick={()=>navigate('/parent/consent')}
+          : loginQuery.data?.some(login => !login.ready) && <button onClick={()=>navigate('/parent/consent')}
             className="w-full text-left rounded-xl border border-primary/30 bg-primary/10 p-4 mb-4">
             <p className="text-sm text-foreground">Finish your child's login setup</p>
             <p className="text-xs text-muted-foreground">Create or view the username they need to sign in.</p>

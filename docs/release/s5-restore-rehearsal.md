@@ -117,8 +117,8 @@ compute + $0.50 disk), same organisation, Frankfurt, initial disk 1.5×. He canc
 starting. **Nobody starts a restore without Kostas saying so**, and the restored project is deleted
 at the end of the rehearsal so the charge does not recur.
 
-Do not restore into `trak-football-test` (`vklpncpwenulmjilnxuj`) — it holds Imad's isolated
-rehearsal fixtures and is in active use.
+Always restore into a new project. The old `trak-football-test` project (`vklpncpwenulmjilnxuj`)
+was deleted on 5 Oct 2026 (TRAK-115), so production is the only standing project.
 
 ## Procedure
 

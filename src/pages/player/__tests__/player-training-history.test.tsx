@@ -5,7 +5,7 @@
  * AuthProvider and SDK, with MSW behind them.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { act, cleanup, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
@@ -54,8 +54,9 @@ describe('TRAK-76: player training history', () => {
     expect(await screen.findByText('Technical · Tactical')).toBeInTheDocument()
     expect(screen.getByText(formatParentDate('2026-09-23'))).toBeInTheDocument()
     expect(screen.getByText('Present')).toBeInTheDocument()
-    // No structured focus: just "Training", never a guess.
-    expect(screen.getAllByText('Training').length).toBe(2)
+    // No structured focus: just "Training", never a guess. (In the section:
+    // the page also has a Training filter chip, TRAK-112.)
+    expect(within(screen.getByRole('region', { name: 'Training' })).getAllByText('Training').length).toBe(2)
     expect(screen.getByText(formatParentDate('2026-09-21'))).toBeInTheDocument()
     expect(screen.getByText('Late')).toBeInTheDocument()
     expect(asked).toEqual({ p_player_user_id: account })

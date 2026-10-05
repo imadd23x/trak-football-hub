@@ -24,7 +24,7 @@ interface NavItem {
 function getNavItems(role: Role): NavItem[] {
   if (role === 'player') return [
     { label: 'Home', path: '/player/home', Icon: IconHome },
-    { label: 'Matches', path: '/player/matches', Icon: IconMatch },
+    { label: 'Sessions', path: '/player/matches', Icon: IconMatch },  // TRAK-112: matches and training
     { label: 'Card', path: '/player/evolution', Icon: IconRecognition },
     { label: 'Profile', path: '/player/profile', Icon: IconProfile },
   ]

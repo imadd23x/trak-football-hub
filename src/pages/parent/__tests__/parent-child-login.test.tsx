@@ -80,6 +80,27 @@ it('recovers a consented unfinished child after reload through the Home banner',
   expect(await screen.findByLabelText("Child's username")).toBeInTheDocument()
   expect(invites).toEqual([])
 })
+// TRAK-111 (run 4): the banner stayed after the login was made, until the
+// child's first sign-in. It is for logins still to create, not ready ones.
+it('shows no Home banner once every login is made',async()=>{
+  approved=true;ready=true
+  let reads=0
+  server.use(http.post(url('rpc/get_my_child_logins'),()=>{reads++
+    return HttpResponse.json([{roster_child_id:id,first_name:'Ana',username:'striker7',ready:true}])}))
+  await open('/parent/home')
+  await waitFor(()=>expect(reads).toBeGreaterThan(0))
+  await screen.findByRole('heading',{name:'Home'})
+  await new Promise(resolve=>setTimeout(resolve,50))
+  expect(screen.queryByText("Finish your child's login setup")).toBeNull()
+})
+it('keeps the Home banner while one of two logins is still to make',async()=>{
+  approved=true
+  server.use(http.post(url('rpc/get_my_child_logins'),()=>HttpResponse.json([
+    {roster_child_id:id,first_name:'Ana',username:'striker7',ready:true},
+    {roster_child_id:'98d00000-0000-4000-8000-000000000031',first_name:'Ben',username:null,ready:false}])))
+  await open('/parent/home')
+  expect(await screen.findByText("Finish your child's login setup")).toBeInTheDocument()
+})
 it('shows the previously created username after a lost creation response, without another create',async()=>{
   approved=true;ready=true;await open()
   await userEvent.click(await screen.findByRole('button',{name:"View Ana's login"}))

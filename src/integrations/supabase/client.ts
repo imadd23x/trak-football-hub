@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { createPasswordRecovery } from '@/lib/password-recovery';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://xbykbqolvqyqmipikuae.supabase.co';
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://xbykbqolvqyqmipikuae.supabase.co';
 // TRAK-96: the new publishable key ("production"), not the legacy anon JWT,
 // which stops working at the end of 2026. It is public by design, like the old one.
 export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_vhCCK1tFnndJ6UBLm81YKQ_yLDZSRxt';

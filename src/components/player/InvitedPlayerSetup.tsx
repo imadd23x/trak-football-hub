@@ -7,7 +7,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/integrations/supabase/client'
 import { POSITIONS } from '@/lib/constants'
 import { validatePassword, PASSWORD_HINT } from '@/lib/password'
-import { isGuardianCreatedChild } from '@/lib/child-login'
+import { isGuardianCreatedChild, WEAK_PASSWORD_MESSAGE } from '@/lib/child-login'
+import { forgetPasswordJustSet, passwordJustSet } from '@/lib/password-recovery'
 import { createOnboardingSession } from '@/lib/onboarding-session'
 
 /* TRAK-11 phase 4, player side: a rostered child follows the invitation the
@@ -32,7 +33,7 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
   const academy = typeof meta.academy_name === 'string' ? meta.academy_name.trim() : ''
   const guardianCreated = !guardian && isGuardianCreatedChild(user)
 
-  const [step, setStep] = useState<'password' | 'profile'>(guardianCreated ? 'profile' : 'password')
+  const [step, setStep] = useState<'password' | 'profile'>(guardianCreated || passwordJustSet(user?.id) ? 'profile' : 'password')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   // A guardian types their own name. A child's name is the academy's roster
@@ -63,7 +64,13 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
     setProblem(null)
     const { error } = await supabase.auth.updateUser({ password })
     setBusy(false)
-    if (error) { setProblem("Couldn't set your password. Check your connection and try again."); return }
+    // TRAK-109: `same_password` means this already is their password (an
+    // earlier visit or a reset set it), so carry on. A leaked-password refusal
+    // is the password's fault, not the connection's.
+    if (error && error.code !== 'same_password') {
+      setProblem(error.code === 'weak_password' ? WEAK_PASSWORD_MESSAGE : "Couldn't set your password. Check your connection and try again.")
+      return
+    }
     setStep('profile')
   }
 
@@ -90,6 +97,7 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
         setProblem(error.code === '42501' ? error.message : "Couldn't finish setting up your account. Please try again.")
         return
       }
+      forgetPasswordJustSet()
       await refreshProfile()
       const { data: current, error: currentError } = await supabase.auth.getSession()
       if (currentError) throw currentError

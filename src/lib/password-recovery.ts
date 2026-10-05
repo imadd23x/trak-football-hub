@@ -6,6 +6,20 @@ export type RecoveryState = {
 }
 export type PasswordUpdateResult = { error: string | null; expired?: boolean }
 const invalidLink = 'This reset link is invalid, expired, or has already been used. Request a new reset link from sign in or Settings. If another account is signed in, sign out first.'
+
+// TRAK-109: someone who resets before finishing setup (an expired invitation)
+// already has a password, so setup mustn't ask for another. This tab only;
+// without it, setup asks again and accepts the same password.
+const PASSWORD_SET = 'trak:password-set'
+export function passwordJustSet(userId: string | undefined): boolean {
+  try { return !!userId && sessionStorage.getItem(PASSWORD_SET) === userId } catch { return false }
+}
+export function forgetPasswordJustSet(): void {
+  try { sessionStorage.removeItem(PASSWORD_SET) } catch { /* nothing stored */ }
+}
+function rememberPasswordJustSet(userId: string): void {
+  try { sessionStorage.setItem(PASSWORD_SET, userId) } catch { /* setup asks again */ }
+}
 const changedAccount = 'Your account changed while this reset link was open. Request a new reset link for the account you want to update.'
 
 /**
@@ -178,6 +192,7 @@ export function createPasswordRecovery(
         proof = null
         expectedToken = null
         version++
+        rememberPasswordJustSet(captured.user.id)
         publish({ status: 'complete', message: 'Your password has been updated.' })
         return true
       }

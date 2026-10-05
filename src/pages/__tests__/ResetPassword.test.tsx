@@ -133,6 +133,8 @@ describe('password recovery with the actual Auth SDK and synthetic network', () 
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }))
     await waitFor(() => expect(notices.success).toHaveBeenCalled())
     expect(requests).toEqual([{ authorization: `Bearer ${accountA.access_token}`, password: 'Synthetic-Reset-9!' }])
+    // TRAK-109: setup, next in this tab, must not ask this account for another password.
+    expect(sessionStorage.getItem('trak:password-set')).toBe(idA)
   })
 
   it('removes recovery controls when the active account switches', async () => {

@@ -247,4 +247,46 @@ SELECT pg_temp.assert_true(
   AND NOT has_table_privilege('service_role', 'public.pilot_j7_this_week', 'INSERT,UPDATE,DELETE,TRUNCATE'),
   'D3: service_role reads the report and cannot write through it');
 
+-- ── E. A username child is as synthetic as the guardian who made it (TRAK-108)
+-- A guardian-made login (TRAK-84) lives at @child.trakfootball.com, which is
+-- no test domain. Run 4 (4 Oct): a .test family's three children counted as
+-- real. The binding trigger is deferred to COMMIT, so this file's ROLLBACK
+-- never runs it. D left a signed-in user's claims behind; fixtures run as none.
+SELECT set_config('request.jwt.claims', '', true);
+INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
+  (pg_temp.jid(23), 'guardian.r4@rehearsal.trak.test',    now()),  -- synthetic guardian
+  (pg_temp.jid(13), 'synthkid7@child.trakfootball.com',   now()),  -- made by the synthetic guardian
+  (pg_temp.jid(14), 'realkid7@child.trakfootball.com',    now()),  -- made by real parent one
+  (pg_temp.jid(15), 'orphankid7@child.trakfootball.com',  now());  -- its guardian's account is gone
+INSERT INTO public.squad_players (id, coach_user_id, player_name, linked_player_id) VALUES
+  (pg_temp.jid(205), pg_temp.jid(1), 'Synth Kid',  pg_temp.jid(13)),
+  (pg_temp.jid(206), pg_temp.jid(1), 'Real Kid',   pg_temp.jid(14)),
+  (pg_temp.jid(207), pg_temp.jid(1), 'Orphan Kid', pg_temp.jid(15));
+INSERT INTO public.roster_children (id, organization_id, squad_player_id, date_of_birth, child_email, player_user_id, loaded_by) VALUES
+  (pg_temp.jid(401), pg_temp.jid(101), pg_temp.jid(205), '2013-01-01', 'synthkid7@child.trakfootball.com',  pg_temp.jid(13), 'fixture'),
+  (pg_temp.jid(402), pg_temp.jid(101), pg_temp.jid(206), '2013-01-01', 'realkid7@child.trakfootball.com',   pg_temp.jid(14), 'fixture'),
+  (pg_temp.jid(403), pg_temp.jid(101), pg_temp.jid(207), '2013-01-01', 'orphankid7@child.trakfootball.com', pg_temp.jid(15), 'fixture');
+INSERT INTO public.child_logins (roster_child_id, username, created_by, auth_user_id) VALUES
+  (pg_temp.jid(401), 'synthkid7',  pg_temp.jid(23), pg_temp.jid(13)),
+  (pg_temp.jid(402), 'realkid7',   pg_temp.jid(21), pg_temp.jid(14)),
+  (pg_temp.jid(403), 'orphankid7', NULL,            pg_temp.jid(15));
+
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+SELECT pg_temp.assert_true(
+  pg_temp.jid(13) IN (SELECT user_id FROM public.pilot_synthetic_user_ids()),
+  'E1: a username child made by a synthetic guardian is synthetic');
+SELECT pg_temp.assert_true(
+  pg_temp.jid(14) NOT IN (SELECT user_id FROM public.pilot_synthetic_user_ids())
+  AND pg_temp.jid(15) NOT IN (SELECT user_id FROM public.pilot_synthetic_user_ids()),
+  'E2: a username child of a real guardian, or of a deleted one, still counts as real');
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.pilot_synthetic_user_ids() WHERE user_id IN (pg_temp.jid(3), pg_temp.jid(23))) = 2
+  AND (SELECT count(*) FROM public.pilot_synthetic_user_ids() WHERE user_id IN (pg_temp.jid(1), pg_temp.jid(11), pg_temp.jid(21))) = 0,
+  'E3: the domain rule is unchanged (test domains in, real domains out)');
+SELECT pg_temp.assert_true(
+  (SELECT count(*) FROM public.pilot_synthetic_user_ids() WHERE user_id = pg_temp.jid(13)) = 1,
+  'E4: each synthetic account is listed once');
+RESET ROLE;
+
 ROLLBACK;

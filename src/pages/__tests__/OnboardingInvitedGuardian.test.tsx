@@ -149,3 +149,24 @@ describe('an invited guardian finishes signing up (TRAK-11 phase 4)', () => {
     expect(await screen.findByText('Invalid role', {}, { timeout: 4000 })).toBeInTheDocument()
   })
 })
+
+// TRAK-120 (run 6): pressing Enter after typing did nothing; the steps weren't forms.
+describe('Enter on the invited setup screen (TRAK-120)', () => {
+  it('Enter finishes each step, once', async () => {
+    renderApp('/onboarding/parent')
+    await userEvent.type(await screen.findByLabelText('New password', {}, { timeout: 4000 }), 'SyntheticOnly1!')
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'SyntheticOnly1!{Enter}')
+    await waitFor(() => expect(passwordSet).toHaveLength(1), { timeout: 4000 })
+    await userEvent.type(await screen.findByLabelText('Your name', {}, { timeout: 4000 }), 'Maria Synthetic{Enter}')
+    await waitFor(() => expect(provisionCalls).toEqual([{ p: { role: 'parent', full_name: 'Maria Synthetic' } }]))
+    await waitFor(() => expect(window.location.pathname).toBe('/parent/home'), { timeout: 4000 })
+  })
+
+  it('Enter with passwords that differ sends nothing and says why', async () => {
+    renderApp('/onboarding/parent')
+    await userEvent.type(await screen.findByLabelText('New password', {}, { timeout: 4000 }), 'SyntheticOnly1!')
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'SyntheticOnly2!{Enter}')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Passwords do not match')
+    expect(passwordSet).toEqual([])
+  })
+})

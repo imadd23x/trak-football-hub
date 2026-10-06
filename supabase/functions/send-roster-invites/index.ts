@@ -52,7 +52,16 @@ serve(async (req) => {
         if (error) return { data: false, error };
         return { data: invitedElsewhereWithin(data ?? [], rosterChildId, Date.now(), GUARDIAN_INVITE_WINDOW_MS), error: null };
       },
-      async sendMagicLink(email, redirectTo) {
+      async sendMagicLink(email, redirectTo, data) {
+        // TRAK-118: the Magic Link template can only print the account's
+        // user_metadata, so put this child's details there first (Auth merges
+        // the keys). Display only: nothing authorizes on user_metadata. A
+        // failed write still sends the email, with the template's plain wording.
+        // ponytail: one page of 1,000 accounts; page through when prod passes that.
+        const { data: page } = await admin.auth.admin.listUsers({ perPage: 1000 });
+        const account = page?.users.find(user => user.email?.toLowerCase() === email.toLowerCase());
+        if (account) await admin.auth.admin.updateUserById(account.id, { user_metadata: data });
+        else console.warn('send-roster-invites: existing account not found for the sign-in email');
         return await publicAuth.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });
       },
     });

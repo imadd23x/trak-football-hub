@@ -29,7 +29,8 @@ export interface RosterInviteDependencies {
   getTargets(rosterChildId: string, guardianId: string | null, onlyUninvited: boolean): Promise<Result<RosterInviteTarget[] | null>>;
   markSent(rosterChildId: string, target: RosterInviteTarget): Promise<{ error: DeliveryError | null }>;
   sendInvite(email: string, redirectTo: string, data: Record<string, string | null>): Promise<{ error: DeliveryError | null }>;
-  sendMagicLink(email: string, redirectTo: string): Promise<{ error: DeliveryError | null }>;
+  /** TRAK-118: data is this child's, for the Magic Link template to name, as the invitation does. */
+  sendMagicLink(email: string, redirectTo: string, data: Record<string, string | null>): Promise<{ error: DeliveryError | null }>;
   /** TRAK-97: has this guardian address had an invitation for another of their roster children within the window? */
   recentGuardianInvite(rosterChildId: string, email: string): Promise<Result<boolean>>;
 }
@@ -145,10 +146,10 @@ export async function handleRosterInviteRequest(req: Request, deps: RosterInvite
         }
       }
       let via: 'invite' | 'magic_link' | null = 'invite';
-      const { error: inviteError } = await deps.sendInvite(target.email, redirectTo,
-        { invited_as: role, child_first_name: target.first_name, academy_name: target.academy });
+      const data = { invited_as: role, child_first_name: target.first_name, academy_name: target.academy };
+      const { error: inviteError } = await deps.sendInvite(target.email, redirectTo, data);
       if (inviteError) {
-        via = alreadyRegistered(inviteError) && !(await deps.sendMagicLink(target.email, redirectTo)).error ? 'magic_link' : null;
+        via = alreadyRegistered(inviteError) && !(await deps.sendMagicLink(target.email, redirectTo, data)).error ? 'magic_link' : null;
       }
       if (!via) { results.push({ kind: target.kind, sent: false, reason: 'delivery_failed' }); continue; }
       // The email went; a failed count is not worth failing the delivery over.

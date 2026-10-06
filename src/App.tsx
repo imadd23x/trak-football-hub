@@ -23,7 +23,6 @@ const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const ParentInfoPage = lazy(() => import("./pages/ParentInfoPage"));
 const ParentOnboarding = lazy(() => import("./pages/ParentOnboarding"));
 const AuthConfirm = lazy(() => import("./pages/AuthConfirm"));
-const AuthContinue = lazy(() => import("./pages/AuthContinue"));
 const AuthCode = lazy(() => import("./pages/AuthCode"));
 const Settings = lazy(() => import("./pages/Settings"));
 // The import itself is conditional, not just the route. A bare
@@ -112,7 +111,6 @@ const App = () => (
             <Route path="/" element={<LandingPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/auth/confirm" element={<AuthConfirm />} />
-            <Route path="/auth/continue" element={<AuthContinue />} />
             <Route path="/auth/code" element={<AuthCode />} />
             <Route path="/onboarding/:role" element={<OnboardingPage />} />
             <Route path="/settings" element={<Settings />} />

@@ -97,4 +97,12 @@ describe('TRAK-107: /auth/code', () => {
     expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
     expect(verifies).toHaveLength(0)
   })
+
+  // TRAK-116: #233's Continue page turned an old email into Auth's one-time
+  // link, and Microsoft pressed its button. Nothing may serve it any more.
+  it('the old /auth/continue page is gone', async () => {
+    renderApp(`/auth/continue?type=invite&token=${'a'.repeat(56)}&redirect_to=${encodeURIComponent(`${origin()}/onboarding/parent`)}`)
+    expect(await screen.findByRole('heading', { name: '404' }, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Continue' })).toBeNull()
+  })
 })

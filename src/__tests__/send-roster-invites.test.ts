@@ -97,11 +97,14 @@ describe('send-roster-invites', () => {
     expect(deps.getTargets).not.toHaveBeenCalled();
   });
 
-  it('sends an existing account a magic link instead', async () => {
+  // TRAK-118 (run 5): a guardian adding a second child got a bare sign-in
+  // code. The fallback carries this child's details, as the invitation does.
+  it('sends an existing account a magic link instead, naming this child and academy', async () => {
     const deps = dependencies();
     deps.sendInvite.mockResolvedValue({ error: { message: 'A user with this email address has already been registered', code: 'email_exists' } });
     const res = await handleRosterInviteRequest(operator(), deps);
-    expect(deps.sendMagicLink).toHaveBeenCalledWith('g@example.test', 'https://trakfootball.test/onboarding/parent');
+    expect(deps.sendMagicLink).toHaveBeenCalledWith('g@example.test', 'https://trakfootball.test/onboarding/parent',
+      { invited_as: 'parent', child_first_name: 'Ana', academy_name: 'Invite FC' });
     expect(await res.json()).toMatchObject({ sent: 1, results: [{ kind: 'guardian', sent: true, via: 'magic_link' }] });
   });
 

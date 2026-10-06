@@ -20,6 +20,10 @@ import { supabase } from '@/integrations/supabase/client'
  * Password reset and parent invitations deliberately still carry a session:
  * both exist to set a password, which cannot be done signed out.
  */
+// TRAK-117: Auth answers "used or expired" alike. Email scanners (Microsoft's,
+// run 5) run this page before the person does, and that run confirmed them.
+const USED_LINK = 'This link was already used or has expired. If your email app opened it before you did, your email is already confirmed: sign in with your password.'
+
 const AuthConfirm = () => {
   const [params] = useSearchParams()
   const [error, setError] = useState<string | null>(null)
@@ -46,11 +50,7 @@ const AuthConfirm = () => {
       })
 
       if (verifyError) {
-        setError(
-          /expired/i.test(verifyError.message)
-            ? 'This link has expired. Sign in and we can send you a new one.'
-            : verifyError.message,
-        )
+        setError(/expired/i.test(verifyError.message) ? USED_LINK : verifyError.message)
         return
       }
 
@@ -67,7 +67,7 @@ const AuthConfirm = () => {
     <div className="app-container flex flex-col items-center justify-center px-6 py-12 min-h-screen text-center">
       {error ? (
         <>
-          <h1 className="text-2xl text-foreground mb-3">Couldn't confirm</h1>
+          <h1 className="text-2xl text-foreground mb-3">{error === USED_LINK ? 'Link already used' : "Couldn't confirm"}</h1>
           <p className="text-sm text-muted-foreground mb-8 max-w-[320px]">{error}</p>
           <a href="/" className="text-primary text-sm font-semibold">Go to sign in</a>
         </>

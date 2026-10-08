@@ -26,7 +26,7 @@ const parked: [string, string, RegExp][] = [
 ]
 // Reads that travel as POST, and the app's own page-view telemetry.
 const READ_POSTS = ['/rest/v1/telemetry_events', ...['get_children_awaiting_consent', 'get_roster_children_awaiting_consent', 'get_player_invites_for_current_user',
-  'my_consent_status', 'my_session_is_live', 'coach_squad_player_consent_required'].map(name => `/rest/v1/rpc/${name}`)]
+  'my_consent_status', 'my_session_is_live', 'coach_squad_player_consent_required', 'feature_on'].map(name => `/rest/v1/rpc/${name}`)]
 let sent: string[]
 beforeEach(() => {
   vi.stubEnv('DEV', false)
@@ -52,6 +52,8 @@ beforeEach(() => {
     rpc('get_player_invites_for_current_user', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),
     rpc('coach_squad_player_consent_required', () => false),
+    // TRAK-124: events are switched off for this academy unless a test says so.
+    rpc('feature_on', () => false),
     http.post(endpoint('telemetry_events'), () => HttpResponse.json(null, { status: 201 })),
     http.get(endpoint(':other'), () => HttpResponse.json([])),
   )
@@ -67,6 +69,27 @@ describe('TRAK-47 parked feature boundary', () => {
     expect(screen.queryByRole('heading', { name: 'Coming soon' })).toBeNull()
     await new Promise(r => setTimeout(r, 300))
     expect(sent).toEqual([])
+  })
+
+  // TRAK-124 (J8.1): the schedule is parked unless events are switched on for
+  // the coach's academy. Off is the case above.
+  it('shows the coach schedule plainly once events are switched on for the academy', async () => {
+    const asked: unknown[] = []
+    server.use(rpc('feature_on', args => { asked.push(args.p_feature); return true }))
+    renderApp('/coach/schedule')
+    expect((await screen.findAllByText(/Calendar/, {}, { timeout: 4000 })).length).toBeGreaterThan(0)
+    await waitFor(() => expect(asked).toEqual(['events']))
+    await waitFor(() => expect(screen.queryByRole('note', { name: 'This screen is coming soon' })).toBeNull())
+  })
+
+  it('keeps the coach schedule parked when the switch cannot be read', async () => {
+    let asked = 0
+    server.use(rpc('feature_on', () => { asked++; return { status: 500, body: { message: 'Synthetic failure' } } }))
+    renderApp('/coach/schedule')
+    expect((await screen.findAllByText(/Calendar/, {}, { timeout: 4000 })).length).toBeGreaterThan(0)
+    // The app retries once; both answers are failures.
+    await waitFor(() => expect(asked).toBe(2), { timeout: 4000 })
+    expect(screen.getByRole('note', { name: 'This screen is coming soon' })).toHaveTextContent('Coming soon')
   })
 
   it.each([

@@ -84,6 +84,12 @@ function fixtures(over: { attendanceInsert?: (body: { squad_player_id: string })
 
 const tile = (name: RegExp) => screen.getByRole('button', { name })
 const attendanceWrites = () => writes.filter(w => w.table === 'session_attendance')
+// TRAK-119: "Edit session" shows while the saved session is still loading, so
+// wait until the form holds it (the saved focus is pressed), not for the heading.
+async function openSaved() {
+  renderApp('/coach/sessions/session-1')
+  await screen.findByRole('button', { name: /^Finishing/, pressed: true }, { timeout: 5000 })
+}
 
 describe('TRAK-102: a coach opens and corrects a saved training session', () => {
   beforeEach(() => { signInAs(COACH); fixtures() })
@@ -94,7 +100,8 @@ describe('TRAK-102: a coach opens and corrects a saved training session', () => 
     await user.click(await screen.findByRole('button', { name: /Finishing Training/ }, { timeout: 5000 }))
 
     expect(await screen.findByText('Edit session')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Finishing/, pressed: true })).toBeInTheDocument()
+    // TRAK-119: the heading shows while the saved session still loads; wait for the form.
+    expect(await screen.findByRole('button', { name: /^Finishing/, pressed: true })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '60 min', pressed: true })).toBeInTheDocument()
     expect(screen.getByLabelText('Session date')).toHaveValue('2026-10-01')
     expect(screen.getByLabelText('Notes')).toHaveValue('')
@@ -104,8 +111,7 @@ describe('TRAK-102: a coach opens and corrects a saved training session', () => 
 
   it('saves the missed note, a new date and focus, without touching attendance', async () => {
     const user = userEvent.setup()
-    renderApp('/coach/sessions/session-1')
-    await screen.findByText('Edit session', undefined, { timeout: 5000 })
+    await openSaved()
 
     await user.type(screen.getByLabelText('Notes'), 'Good first touch')
     await user.click(screen.getByRole('button', { name: /^Set Pieces/ }))
@@ -128,8 +134,7 @@ describe('TRAK-102: a coach opens and corrects a saved training session', () => 
 
   it('adds and removes attendance one player at a time; assessed and unconsented players are not offered', async () => {
     const user = userEvent.setup()
-    renderApp('/coach/sessions/session-1')
-    await screen.findByText('Edit session', undefined, { timeout: 5000 })
+    await openSaved()
 
     // TRAK-100: assessed on this session, so it stays present.
     expect(tile(/Asa Assessed/)).toBeDisabled()
@@ -158,8 +163,7 @@ describe('TRAK-102: a coach opens and corrects a saved training session', () => 
   it('a failed save keeps what was typed and stays on the screen', async () => {
     sessionPatch = () => HttpResponse.json({ message: 'network down', code: 'XX000' }, { status: 500 })
     const user = userEvent.setup()
-    renderApp('/coach/sessions/session-1')
-    await screen.findByText('Edit session', undefined, { timeout: 5000 })
+    await openSaved()
 
     await user.type(screen.getByLabelText('Notes'), 'Do not lose me')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
@@ -172,8 +176,7 @@ describe('TRAK-102: a coach opens and corrects a saved training session', () => 
   it('an update that changes no row is a failure, not a save', async () => {
     sessionPatch = () => HttpResponse.json([])
     const user = userEvent.setup()
-    renderApp('/coach/sessions/session-1')
-    await screen.findByText('Edit session', undefined, { timeout: 5000 })
+    await openSaved()
 
     await user.type(screen.getByLabelText('Notes'), 'Still here')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
@@ -191,8 +194,7 @@ describe('TRAK-102: a coach opens and corrects a saved training session', () => 
         : HttpResponse.json([{ id: 'att-anna' }], { status: 201 }),
     })
     const user = userEvent.setup()
-    renderApp('/coach/sessions/session-1')
-    await screen.findByText('Edit session', undefined, { timeout: 5000 })
+    await openSaved()
 
     await user.click(tile(/Anna Added/))
     await user.click(tile(/Remi Removed/))
@@ -212,8 +214,7 @@ describe('TRAK-102: a coach opens and corrects a saved training session', () => 
 
   it('a future date blocks the save', async () => {
     const user = userEvent.setup()
-    renderApp('/coach/sessions/session-1')
-    await screen.findByText('Edit session', undefined, { timeout: 5000 })
+    await openSaved()
 
     await user.clear(screen.getByLabelText('Session date'))
     await user.type(screen.getByLabelText('Session date'), '2099-01-01')

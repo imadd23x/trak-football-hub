@@ -66,7 +66,7 @@ forgetting this is the usual reason a merged change appears to do nothing:
 | `src/**` | `deploy` job, on merge to `main` |
 | `supabase/migrations/*.sql` | `supabase` job (`db push`), on merge to `main` |
 | `supabase/functions/**` | `supabase` job (`functions deploy`), on merge to `main` |
-| `email-templates/*.html` | Supabase dashboard → Authentication → Email Templates, **by hand** |
+| `email-templates/*.html` | **Do not copy the current repository files into the live dashboard.** They have not been reconciled with the working dashboard templates; see the warning below. |
 
 Merging to `main` ships the frontend *and* the backend. The `supabase` job runs
 before `deploy`, so a build that calls a new RPC can never reach production ahead
@@ -79,10 +79,35 @@ service-role key. It passes `--db-url` and `--project-ref` explicitly instead, s
 the token needs only Edge Functions and Migrations. Required secrets:
 `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `SUPABASE_DB_URL`.
 
-Email templates are the one exception — they live in the dashboard and cannot be
-deployed from the repo. `supabase/config.toml` is the source of truth for each
-function's `verify_jwt`; a value changed in the dashboard is overwritten on the
-next deploy.
+### Email templates: live export required
+
+The repository's email templates are stale as of 8 October 2026. Copying them
+into Supabase could restore the one-click links that Microsoft's email scanner
+used before families could sign in (TRAK-107).
+
+Kostas must export the complete live HTML and subject for each of the four
+emails before these files are reconciled. Preserve the existing filenames.
+The recorded working flows differ:
+
+- **Invite user, Magic Link and Reset Password:** display `{{ .Token }}` and
+  send the person to `/auth/code`. Their full HTML, including fallback links,
+  must contain no `{{ .ConfirmationURL }}`, `{{ .TokenHash }}` or
+  `/auth/continue` link. Keep the Magic Link wording for a second child from
+  TRAK-118.
+- **Confirm signup:** retains the separate `/auth/confirm` flow. TRAK-117
+  explicitly kept its confirmation-and-sign-out behavior; do not convert it
+  to the code flow as part of this documentation update.
+
+The [typed-code change](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/236),
+[second-child email change](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/240)
+and [signup-confirmation change](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/239)
+record the intended behavior. They do not replace a fresh dashboard export.
+These templates are managed manually in the dashboard; the repository's CI
+does not deploy them. Replacing the repository copies requires no dashboard
+change.
+
+`supabase/config.toml` is the source of truth for each function's `verify_jwt`;
+a value changed in the dashboard is overwritten on the next deploy.
 
 For local work the CLIs need no global install (`npm i -g` fails against a
 root-owned prefix on a stock macOS Node):

@@ -22,7 +22,7 @@ vi.mock('html2canvas', () => ({ default: canvas }))
 const COMING_SOON_DETAIL = 'This will be available in a future update.'
 // Reads that travel as POST, and the app's own page-view telemetry.
 const READ_RPCS = ['my_consent_status', 'my_session_is_live', 'get_children_awaiting_consent', 'get_roster_children_awaiting_consent', 'get_player_invites_for_current_user',
-  'coach_squad_player_consent_required', 'family_training_history']
+  'coach_squad_player_consent_required', 'family_training_history', 'feature_on']
 // Buttons that only move around the app or the screen, never send anything.
 // Unlabelled buttons are the screens' icon-only Back (navigate(-1)); every
 // handler that writes, calls AI, shares or copies is guarded and listed in the
@@ -64,6 +64,8 @@ function fixtures() {
     rpc('get_roster_children_awaiting_consent', () => []),
     rpc('get_player_invites_for_current_user', () => []),
     rpc('coach_squad_player_consent_required', () => false),
+    // TRAK-124: events are switched off for this academy, so the schedule stays parked.
+    rpc('feature_on', () => false),
     http.post(`${SUPABASE_URL}/rest/v1/telemetry_events`, () => HttpResponse.json(null, { status: 201 })),
   ]
 }

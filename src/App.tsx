@@ -152,7 +152,7 @@ const App = () => (
             <Route path="/coach/player/:id" element={<RouteGuard allowedRole="coach"><CoachPlayerProfilePage /></RouteGuard>} />
             <Route path="/coach/recognition" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachRecognition /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/award" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachAwardPlayer /></ParkedScreen></RouteGuard>} />
-            <Route path="/coach/schedule" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachSchedule /></ParkedScreen></RouteGuard>} />
+            <Route path="/coach/schedule" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="events"><CoachSchedule /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/assistant" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachAssistant /></ParkedScreen></RouteGuard>} />
 
             {/* Parent routes */}

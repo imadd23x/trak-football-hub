@@ -361,6 +361,10 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   const alertsSheet = page.getByRole('dialog', { name: 'Alerts' });
   await expect(alertsSheet.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
   await expect(alertsSheet.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  // TRAK-122: Escape pressed during the sheet's 500 ms opening animation was
+  // ignored in about half the runs (not handled; the sheet stayed open). Wait
+  // for the animation, as a person would, then press it.
+  await alertsSheet.evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
   await page.keyboard.press('Escape');
   await expect(alertsSheet).toHaveCount(0);
   await expect(page.getByRole('combobox')).toHaveValue(zaraId);

@@ -14,7 +14,7 @@ export const CONSENT_THRESHOLD_AGE = 18
  * Bump whenever the wording below changes. Stored on every consent record so
  * a past consent can be reconstructed against the text actually shown.
  */
-export const CONSENT_NOTICE_VERSION = '2026-09-12.1'
+export const CONSENT_NOTICE_VERSION = '2026-10-09.1'
 
 /** Whole years from a valid YYYY-MM-DD, using the database's UTC calendar day. */
 export const ageFromDateOfBirth = (dob: string): number | null => {
@@ -49,9 +49,12 @@ export const needsParentalConsent = (dob: string): boolean => {
  * exists and is presented as required — if a parent declines it there is
  * nothing to use, so the honest answer is not to create the account. The rest
  * are genuinely optional and default to off, per the Children's Code standard
- * that new features start at high privacy.
+ * that new features start at high privacy. Offer only choices the backend
+ * enforces: "I can see their progress" was optional here but never controlled
+ * what parents read, so parent viewing now sits in the required purpose, as
+ * MVP J2 says (TRAK-145, 9 Oct 2026).
  */
-export type ConsentPurposeKey = 'coaching_records' | 'recognition' | 'parent_visibility'
+export type ConsentPurposeKey = 'coaching_records' | 'recognition'
 
 export const CONSENT_PURPOSES: {
   key: ConsentPurposeKey
@@ -63,20 +66,13 @@ export const CONSENT_PURPOSES: {
     key: 'coaching_records',
     label: "Their coach can record assessments and matches",
     detail:
-      "Six skill ratings after a session, the matches they play, and a written note from the coach. This is what the app is for.",
+      "Six skill ratings after a session, the matches they play, and a written note from the coach that only they see. You see their bands and match history. The coach's private notes are never shared with anyone. This is what the app is for.",
     required: true,
   },
   {
     key: 'recognition',
     label: 'Their coach can give them recognition awards',
     detail: 'Things like player of the week, visible to you and to them.',
-    required: false,
-  },
-  {
-    key: 'parent_visibility',
-    label: 'I can see their progress',
-    detail:
-      "Their season band, match history and coach assessments. The coach's private notes are never shared with anyone.",
     required: false,
   },
 ]

@@ -59,7 +59,7 @@ const JOIN_CODE = 'REHRS'
 
 // Mirrors src/lib/consent.ts (CONSENT_NOTICE_VERSION, CONSENT_STATEMENT) — a
 // .mjs cannot import the TS module. Change both together, as the app does.
-const CONSENT_NOTICE_VERSION = '2026-09-12.1'
+const CONSENT_NOTICE_VERSION = '2026-10-09.1'
 const CONSENT_STATEMENT =
   'I confirm I hold parental responsibility for this child and I authorise the processing I have selected above. ' +
   'I understand I can withdraw at any time from my profile, and that withdrawing stops future processing.'
@@ -570,7 +570,7 @@ async function seed() {
       const { error } = await supabase.rpc('record_parental_consent', {
         p_player_user_id: playerAcct.id,
         p_relationship: 'parent',
-        p_purposes: { coaching_records: true, recognition: true, parent_visibility: true },
+        p_purposes: { coaching_records: true, recognition: true },
         p_notice_version: CONSENT_NOTICE_VERSION,
         p_consent_text: CONSENT_STATEMENT,
       })

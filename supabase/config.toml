@@ -1,6 +1,6 @@
 project_id = "xbykbqolvqyqmipikuae"
 
-# All five functions are declared explicitly. `supabase functions deploy` applies
+# All eight functions are declared explicitly. `supabase functions deploy` applies
 # what is written here, so anything left out silently falls back to the CLI
 # default (verify_jwt = true) and a deploy can flip a setting that was changed in
 # the dashboard. Declaring every function keeps this file the source of truth.
@@ -40,3 +40,9 @@ verify_jwt = true
 # Guardian-authorized direct password change, never a child email recovery.
 [functions.reset-child-password]
 verify_jwt = true
+
+# TRAK-126 (J8.3): one plain email through Resend, operator only. Like
+# send-roster-invites, the secret key on apikey can't pass the gateway's JWT
+# check, so the handler checks it and refuses everyone else (handler.ts).
+[functions.send-email]
+verify_jwt = false

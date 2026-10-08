@@ -47,6 +47,8 @@ function aiFunctions(): string[] {
   return readdirSync(FUNCTIONS, { withFileTypes: true })
     .filter(e => e.isDirectory())
     .map(e => e.name)
+    // `_shared` and other `_` folders hold imported code, not deployed functions.
+    .filter(name => !name.startsWith('_'))
     .filter(name => source(name).includes('LOVABLE_API_KEY'))
 }
 

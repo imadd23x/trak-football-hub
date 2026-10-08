@@ -79,6 +79,8 @@ await context.route('**/*',async route=>{
  const alertsSheet=page.getByRole('dialog',{name:'Alerts'});
  await expect(alertsSheet.getByText(/vs Zara Opposition/).first()).toBeVisible();
  await expect(alertsSheet.getByText(/vs Alex Opposition/)).toHaveCount(0);
+ // TRAK-122: Escape during the sheet's opening animation can be ignored; wait for it first.
+ await alertsSheet.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
  await page.keyboard.press('Escape');
  await expect(alertsSheet).toHaveCount(0);
  await expect(page.getByRole('combobox')).toHaveValue(zara);

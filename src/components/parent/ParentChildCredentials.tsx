@@ -69,14 +69,15 @@ function ChildPasswordCard({ parentId, child }: { parentId: string; child: Child
     <p className="text-sm text-muted-foreground">Username: <strong className="text-foreground">{child.username}</strong></p>
     {saved && <p role="status" className="text-sm text-foreground">Password set for {child.first_name}. {child.first_name} is now signed out on every device.</p>}
     {signOutFailed && <p role="alert" className="text-sm text-destructive">{child.first_name}'s password changed, but we couldn't sign {child.first_name} out of other devices. Set the password again to retry.</p>}
-    {open ? <>
+    {open ? <form onSubmit={e => { e.preventDefault(); void save() }} className="space-y-3">
       <PasswordInput label={`${child.first_name}'s new password`} autoComplete="new-password" placeholder={PASSWORD_HINT}
         value={password} disabled={busy} onChange={e => setPassword(e.target.value)} />
       <PasswordInput label={`Confirm ${child.first_name}'s password`} autoComplete="new-password"
         value={confirm} disabled={busy} onChange={e => setConfirm(e.target.value)} />
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <Button disabled={busy} onClick={() => { void save() }}>{busy ? 'Saving…' : 'Save new password'}</Button>
-      <Button variant="ghost" disabled={busy} onClick={clearForm}>Cancel</Button>
-    </> : <Button variant="outline" onClick={() => { setOpen(true); setError(null); setSaved(false); setSignOutFailed(false) }}>Set a new password</Button>}
+      <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save new password'}</Button>
+      {/* type="button": inside the form, a plain button would submit it. */}
+      <Button type="button" variant="ghost" disabled={busy} onClick={clearForm}>Cancel</Button>
+    </form> : <Button variant="outline" onClick={() => { setOpen(true); setError(null); setSaved(false); setSignOutFailed(false) }}>Set a new password</Button>}
   </section>
 }

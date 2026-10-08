@@ -149,3 +149,25 @@ it('CONTROL any other failure says try again, with no approval wording',async()=
   expect(alert).not.toHaveTextContent(/approval|too easy/)
   expect(screen.getByLabelText("Child's password")).toHaveValue('Synthetic-Pass7!')
 })
+
+// TRAK-120 (run 6): pressing Enter after typing the passwords did nothing.
+it('Enter in the last field creates the login, once',async()=>{
+  approved=true;await open('/parent/home')
+  await userEvent.click(await screen.findByText("Finish your child's login setup"))
+  await userEvent.click(await screen.findByRole('button',{name:"Create Ana's login"}))
+  await userEvent.type(await screen.findByLabelText("Child's username"),'striker7')
+  await userEvent.type(screen.getByLabelText("Child's password"),'Synthetic-Pass7!')
+  await userEvent.type(screen.getByLabelText("Confirm child's password"),'Synthetic-Pass7!{Enter}')
+  await screen.findByRole('heading',{name:"Ana's login is ready"})
+  expect(created).toEqual([{roster_child_id:id,username:'striker7',password:'Synthetic-Pass7!'}])
+})
+it('Enter with passwords that differ creates nothing and says why',async()=>{
+  approved=true;await open('/parent/home')
+  await userEvent.click(await screen.findByText("Finish your child's login setup"))
+  await userEvent.click(await screen.findByRole('button',{name:"Create Ana's login"}))
+  await userEvent.type(await screen.findByLabelText("Child's username"),'striker7')
+  await userEvent.type(screen.getByLabelText("Child's password"),'Synthetic-Pass7!')
+  await userEvent.type(screen.getByLabelText("Confirm child's password"),'Synthetic-Pass8!{Enter}')
+  expect(await screen.findByRole('alert')).toHaveTextContent('Passwords do not match')
+  expect(created).toEqual([])
+})

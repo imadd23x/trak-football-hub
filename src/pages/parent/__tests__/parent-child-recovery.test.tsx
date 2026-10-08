@@ -141,3 +141,18 @@ it('CONTROL any other failure says try again, with no approval wording and the p
   expect(alert).not.toHaveTextContent(/approval|too easy/)
   expect(screen.getByLabelText("Ana's new password")).toHaveValue('Synthetic-Pass9!')
 })
+
+// TRAK-120 (run 6): pressing Enter after typing the passwords did nothing.
+it('Enter in the confirm field saves the new password, once', async () => {
+  await open(); await fillPassword()
+  await userEvent.type(screen.getByLabelText("Confirm Ana's password"), '{Enter}')
+  expect(await screen.findByRole('status')).toHaveTextContent('Password set for Ana.')
+  expect(resets).toHaveLength(1)
+})
+it('CONTROL Cancel closes the form and saves nothing', async () => {
+  await open(); await fillPassword()
+  await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  expect(screen.queryByLabelText("Ana's new password")).toBeNull()
+  await new Promise(resolve => setTimeout(resolve, 50))
+  expect(resets).toEqual([])
+})

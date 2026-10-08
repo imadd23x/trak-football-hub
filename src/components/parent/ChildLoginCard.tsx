@@ -43,7 +43,7 @@ export function ChildLoginCard({parentId,child,onContinue}:{parentId:string;chil
       <p className="text-sm text-foreground">Username: <strong>{username}</strong></p>
       <p className="text-sm text-muted-foreground">Share this username and the password you set with {child.first_name}. They sign in on Trak and finish their account setup. No email is sent.</p>
       <Button onClick={onContinue}>Continue</Button>
-    </> : <>
+    </> : <form onSubmit={e=>{e.preventDefault();void save()}} className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">Your approval is saved. Choose a username different from your child's name and a password to share with them. They do not need an email address.</p>
       <label htmlFor="child-username" className="text-sm text-muted-foreground">Child's username</label>
       <Input id="child-username" autoComplete="off" value={username} disabled={!!child.username||busy}
@@ -52,7 +52,7 @@ export function ChildLoginCard({parentId,child,onContinue}:{parentId:string;chil
       <PasswordInput label="Child's password" autoComplete="new-password" placeholder={PASSWORD_HINT} value={password} disabled={busy} onChange={e=>setPassword(e.target.value)} />
       <PasswordInput label="Confirm child's password" autoComplete="new-password" value={confirm} disabled={busy} onChange={e=>setConfirm(e.target.value)} />
       {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
-      <Button disabled={busy} onClick={()=>{void save()}}>{busy?'Creating…':'Create login'}</Button>
-    </>}
+      <Button type="submit" disabled={busy}>{busy?'Creating…':'Create login'}</Button>
+    </form>}
   </div>
 }

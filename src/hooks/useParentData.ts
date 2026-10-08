@@ -62,6 +62,9 @@ export function useApprovedAwaitingSignup() {
     queryFn: ({ signal }) => fetchApprovedAwaitingSignup(signal),
     enabled: !!parentId,
     staleTime: 0,
+    // TRAK-121: the child signs up on another device. Re-read on return to the
+    // tab, as the family list does, or Home says "waiting" beside a linked child.
+    refetchOnWindowFocus: true,
     networkMode: 'always',
   })
 }

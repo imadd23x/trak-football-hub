@@ -36,6 +36,8 @@ for (const role of ['player', 'coach', 'club'] as const) {
       if (role === 'player' && url.pathname === '/rest/v1/rpc/my_consent_status') return json({ required: false, granted: true, invited_parent: null })
       if (role === 'player' && url.pathname === '/rest/v1/rpc/my_session_is_live') return json(true)
       if (['/rest/v1/squad_players', '/rest/v1/player_parent_links', '/rest/v1/coach_sessions', '/rest/v1/coach_assessments'].includes(url.pathname)) return json([])
+      // TRAK-124: events are switched off for this academy (a read, over POST).
+      if (url.pathname === '/rest/v1/rpc/feature_on') return json(false)
       // TRAK-85: the parked screens render for real, so their reads (GET only) are answered.
       if (request.method() === 'GET' && ['/rest/v1/organizations', '/rest/v1/coach_details', '/rest/v1/matches', '/rest/v1/player_details',
         '/rest/v1/recognition_awards', '/rest/v1/coach_calendar_events'].includes(url.pathname)) return json([])

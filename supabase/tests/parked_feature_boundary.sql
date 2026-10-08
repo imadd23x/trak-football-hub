@@ -140,10 +140,13 @@ INSERT INTO public.recognition_awards(id,coach_user_id,squad_player_id,award_typ
  (pg_temp.p47id(610),pg_temp.p47id(11),pg_temp.p47id(205),'player_of_week','Foreign award'),
  (pg_temp.p47id(611),pg_temp.p47id(13),pg_temp.p47id(201),'player_of_week','Colleague award');
 
--- Both explicit and PUBLIC-inherited capabilities must be absent.
+-- Both explicit and PUBLIC-inherited capabilities must be absent. TRAK-124
+-- (J8.1): the calendar's authenticated writes are back, but only behind the
+-- restrictive events switch (events_switch.sql), and these academies are off.
 DO $$ DECLARE t text; r text; op text; BEGIN
  FOREACH t IN ARRAY ARRAY['coach_calendar_events','recognition_awards'] LOOP
   FOREACH r IN ARRAY ARRAY['anon','authenticated'] LOOP
+   CONTINUE WHEN t = 'coach_calendar_events' AND r = 'authenticated';
    FOREACH op IN ARRAY ARRAY['INSERT','UPDATE','DELETE'] LOOP
     PERFORM pg_temp.p47check(NOT has_table_privilege(r,'public.'||t,op),r||' has no '||op||' on '||t);
    END LOOP;
@@ -155,12 +158,18 @@ DO $$ DECLARE t text; r text; op text; BEGIN
   FOREACH op IN ARRAY ARRAY['SELECT','INSERT','UPDATE','DELETE'] LOOP
    PERFORM pg_temp.p47check(has_table_privilege('service_role','public.'||t,op),t||' retains service '||op);
   END LOOP;
-  -- Grant re-derivation must find no enabling write policies.
-  PERFORM pg_temp.p47check(NOT EXISTS(SELECT 1 FROM pg_policies p
-   WHERE p.schemaname='public' AND p.tablename=t AND p.cmd IN ('ALL','INSERT','UPDATE','DELETE')
-   AND p.roles && ARRAY['authenticated','public']::name[]
-   AND coalesce(p.qual,'true') NOT IN ('false','(false)')
-   AND coalesce(p.with_check,'true') NOT IN ('false','(false)')),t||' policy-derived grants remain read-only');
+  IF t = 'coach_calendar_events' THEN
+   PERFORM pg_temp.p47check((SELECT count(*)=3 FROM pg_policies p
+    WHERE p.schemaname='public' AND p.tablename=t AND p.permissive='RESTRICTIVE' AND p.cmd IN ('INSERT','UPDATE','DELETE')
+    AND coalesce(p.qual,p.with_check) LIKE '%feature_on(''events''::text)%'),t||' writes stay behind the restrictive events switch');
+  ELSE
+   -- Grant re-derivation must find no enabling write policies.
+   PERFORM pg_temp.p47check(NOT EXISTS(SELECT 1 FROM pg_policies p
+    WHERE p.schemaname='public' AND p.tablename=t AND p.cmd IN ('ALL','INSERT','UPDATE','DELETE')
+    AND p.roles && ARRAY['authenticated','public']::name[]
+    AND coalesce(p.qual,'true') NOT IN ('false','(false)')
+    AND coalesce(p.with_check,'true') NOT IN ('false','(false)')),t||' policy-derived grants remain read-only');
+  END IF;
  END LOOP;
  FOREACH r IN ARRAY ARRAY['anon','authenticated'] LOOP
   PERFORM pg_temp.p47check(NOT has_function_privilege(r,'public.remove_coach_from_org(uuid)','EXECUTE'),r||' cannot execute removal RPC');

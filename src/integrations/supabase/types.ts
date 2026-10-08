@@ -773,6 +773,7 @@ export type Database = {
         }[]
       }
       delete_my_account: { Args: never; Returns: undefined }
+      feature_on: { Args: { p_feature: string }; Returns: boolean }
       get_children_awaiting_consent: {
         Args: never
         Returns: {

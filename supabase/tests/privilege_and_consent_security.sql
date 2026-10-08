@@ -228,18 +228,16 @@ BEGIN
                 AND cmd = 'DELETE' AND coalesce(qual, '') IN ('false', '(false)')),
       format('A1c: %s still carries its no-deletion policy (both barriers, not one)', t));
   END LOOP;
-  -- Retained attendance keeps DELETE; parked calendar authoring has both
-  -- privilege and restrictive-policy barriers, while its history stays readable.
+  -- Retained attendance keeps DELETE; calendar authoring is back (TRAK-124,
+  -- J8.1) but only behind the restrictive events switch, so an academy that
+  -- is off still can't delete, while its history stays readable.
   FOREACH t IN ARRAY ARRAY['session_attendance', 'coach_calendar_events'] LOOP
     IF t = 'coach_calendar_events' THEN
       PERFORM pg_temp.pc_assert(
-        NOT has_table_privilege('authenticated', ('public.' || t)::regclass, 'DELETE'),
-        format('A1c parked control: %s no longer grants DELETE', t));
-      PERFORM pg_temp.pc_assert(
         EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = t
           AND cmd = 'DELETE' AND permissive = 'RESTRICTIVE'
-          AND coalesce(qual, '') IN ('false', '(false)')),
-        format('A1c parked control: %s retains its restrictive deletion barrier', t));
+          AND coalesce(qual, '') LIKE '%feature_on(''events''::text)%'),
+        format('A1c switch control: %s deletion stays behind the restrictive events switch', t));
       PERFORM pg_temp.pc_assert(
         has_table_privilege('authenticated', ('public.' || t)::regclass, 'SELECT'),
         format('A1c parked control: %s keeps historical SELECT', t));

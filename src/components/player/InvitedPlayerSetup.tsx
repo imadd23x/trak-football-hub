@@ -122,17 +122,18 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
         </p>
       </div>
 
+      {/* TRAK-120: real forms, so Enter submits like the button does. */}
       {step === 'password' ? (
-        <>
+        <form onSubmit={e => { e.preventDefault(); void savePassword() }} className="flex flex-col gap-4">
           <PasswordInput label="New password" autoComplete="new-password" placeholder={PASSWORD_HINT}
             value={password} onChange={e => setPassword(e.target.value)} className="bg-card" />
           <PasswordInput label="Confirm password" autoComplete="new-password" placeholder="Confirm password"
             value={confirm} onChange={e => setConfirm(e.target.value)} className="bg-card" />
           {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
-          <Button onClick={savePassword} disabled={busy} className="w-full">{busy ? 'Saving…' : 'Set password'}</Button>
-        </>
+          <Button type="submit" disabled={busy} className="w-full">{busy ? 'Saving…' : 'Set password'}</Button>
+        </form>
       ) : (
-        <>
+        <form onSubmit={e => { e.preventDefault(); void finish() }} className="flex flex-col gap-4">
           {guardian && <>
             <label className="text-xs text-muted-foreground" htmlFor="invited-name">Your name</label>
             <Input id="invited-name" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="bg-card" />
@@ -150,8 +151,8 @@ export function InvitedPlayerSetup({ role = 'player' }: { role?: 'player' | 'par
             </> : <p className="text-xs text-muted-foreground">Your academy has your name, date of birth and age group.</p>}
           </>}
           {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
-          <Button onClick={finish} disabled={busy} className="w-full">{busy ? 'Finishing…' : 'Finish'}</Button>
-        </>
+          <Button type="submit" disabled={busy} className="w-full">{busy ? 'Finishing…' : 'Finish'}</Button>
+        </form>
       )}
     </div>
   )

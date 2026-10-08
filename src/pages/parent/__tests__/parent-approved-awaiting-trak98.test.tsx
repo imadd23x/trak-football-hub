@@ -7,7 +7,8 @@
  * withdraw one who has no account yet (withdraw_roster_consent).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
+import { focusManager } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
@@ -118,5 +119,19 @@ describe('a guardian sees and can withdraw children they approved who have not s
     expect(await screen.findByText('No child has signed up yet', {}, { timeout: 4000 })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Approved, waiting to sign up' })).toBeNull()
     expect(screen.queryByText(/Open the parent invite/)).toBeNull()
+  })
+})
+
+// TRAK-121 (run 6): the child signed up on another device, but parent home
+// kept "Waiting for Lucas to sign up" until a reload. The family list already
+// re-reads when the tab regains focus; the waiting list must too.
+describe('the waiting card follows the child signing up elsewhere (TRAK-121)', () => {
+  it('drops a child who has signed up when the tab regains focus, without a reload', async () => {
+    renderApp('/parent/home')
+    expect(await screen.findByText('Approved. Waiting for Sam to sign up.', {}, { timeout: 4000 })).toBeInTheDocument()
+    approved = approved.filter(child => child.roster_child_id !== SAM)
+    act(() => { focusManager.setFocused(false); focusManager.setFocused(true) })
+    await waitFor(() => expect(screen.queryByText('Approved. Waiting for Sam to sign up.')).toBeNull(), { timeout: 4000 })
+    expect(screen.getByText('Approved. Waiting for Tia to sign up.')).toBeInTheDocument()
   })
 })

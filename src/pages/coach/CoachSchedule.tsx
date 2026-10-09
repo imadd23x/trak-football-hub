@@ -151,7 +151,8 @@ export default function CoachSchedule() {
       supabase.from('coach_calendar_events')
         .select('*').eq('coach_user_id', user.id).order('starts_at'),
       supabase.from('coach_sessions')
-        .select('id, title, session_type, session_date, opponent, competition, venue, notes')
+        // coach_sessions has no opponent column; naming one failed the whole read.
+        .select('id, title, session_type, session_date, competition, venue, notes')
         .eq('coach_user_id', user.id).order('session_date'),
     ])
     // A failed read is not an empty calendar (the J4 standard).
@@ -185,11 +186,10 @@ export default function CoachSchedule() {
     for (const s of sessions) {
       ev.push({
         id:       s.id,
-        title:    s.title || (s.session_type === 'match' ? `vs ${s.opponent}` : 'Training'),
+        title:    s.title || (s.session_type === 'match' ? 'Match' : 'Training'),
         type:     (s.session_type === 'match' ? 'match' : s.session_type === 'training' ? 'training' : 'other') as ShownType,
         date:     s.session_date ?? '',
         source:   'session',
-        opponent: s.opponent,
         venue:    s.venue,
       })
     }

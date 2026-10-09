@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -210,6 +211,30 @@ describe('J8.4: the coach creates, edits and cancels events', () => {
     expect(screen.queryByRole('button', { name: /Read Schedule/i })).toBeNull()
     expect(screen.queryByText(/Import from text/i)).toBeNull()
     expect(requests.some(p => p.includes('parse-schedule'))).toBe(false)
+  })
+
+  it('reads past sessions with real coach_sessions columns only', async () => {
+    // coach_sessions has no opponent column. Asking for one failed every load
+    // with 42703, so the live screen said "Couldn't connect" (found 9 Oct).
+    const types = readFileSync(`${process.cwd()}/src/integrations/supabase/types.ts`, 'utf8')
+    const block = types.match(/\n {6}coach_sessions: \{\n {8}Row: \{\n([\s\S]*?)\n {8}\}/)![1]
+    const real = new Set([...block.matchAll(/^\s+(\w+):/gm)].map(m => m[1]))
+    let asked: string[] = []
+    server.use(http.get(`${SUPABASE_URL}/rest/v1/coach_sessions`, ({ request }) => {
+      asked = (new URL(request.url).searchParams.get('select') ?? '').split(',')
+      const unknown = asked.filter(c => !real.has(c))
+      if (unknown.length) {
+        return HttpResponse.json({ code: '42703', message: `column coach_sessions.${unknown[0]} does not exist` }, { status: 400 })
+      }
+      return HttpResponse.json([{
+        id: 's-1', coach_user_id: COACH.id, title: 'Recovery session', session_type: 'training',
+        session_date: today, competition: null, venue: 'Gym', notes: null,
+      }])
+    }))
+    await open()
+    expect(await screen.findByText('Recovery session')).toBeInTheDocument()
+    expect(screen.queryByText(/We couldn't load your calendar/)).toBeNull()
+    expect(asked.length).toBeGreaterThan(0)
   })
 
   it('says the calendar failed to load instead of showing it empty', async () => {

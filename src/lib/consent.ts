@@ -66,7 +66,7 @@ export const CONSENT_PURPOSES: {
     key: 'coaching_records',
     label: "Their coach can record assessments and matches",
     detail:
-      "Six skill ratings after a session, the matches they play, and a written note from the coach that only they see. You see their bands and match history. The coach's private notes are never shared with anyone. This is what the app is for.",
+      "Six skill ratings after a session, the matches they play, and a written note from the coach that only they see. You see their bands and their match and training history. The coach's private notes are never shared with anyone. This is what the app is for.",
     required: true,
   },
   {

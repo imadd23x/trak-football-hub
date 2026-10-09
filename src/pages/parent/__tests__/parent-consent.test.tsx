@@ -96,7 +96,7 @@ async function approveAlex() {
   expect(screen.getByRole('checkbox', { name: /recognition awards/i })).not.toBeChecked()
   // TRAK-145: no "I can see their progress" choice; parent viewing is part of the required consent.
   expect(screen.queryByRole('checkbox', { name: /I can see their progress/i })).toBeNull()
-  expect(screen.getByText(/You see their bands and match history/)).toBeInTheDocument()
+  expect(screen.getByText(/You see their bands and their match and training history/)).toBeInTheDocument()
   const button = screen.getByRole('button', { name: "Approve Alex Synthetic's account" })
   expect(button).toBeDisabled()
   await userEvent.click(screen.getByRole('checkbox', { name: CONSENT_STATEMENT }))

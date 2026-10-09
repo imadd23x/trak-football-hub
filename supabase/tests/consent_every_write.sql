@@ -210,7 +210,7 @@ SELECT pg_temp.ce_refused(format('INSERT INTO public.session_attendance (session
   '3 G1 the coach cannot record attendance after withdrawal');
 SELECT pg_temp.ce_refused(format('UPDATE public.session_attendance SET status = %L WHERE session_id = %L', 'absent', current_setting('trak.ce_s1')),
   '3 G1 the coach cannot change attendance after withdrawal');
-SELECT pg_temp.ce_refused(format($$SELECT public.log_match_for_player(%L, 'Rivals FC', 1, 1, 'League', 'Away', 'Defender', 'U16', 45, 0, 0, NULL, NULL, NULL, 6.0, current_date)$$,
+SELECT pg_temp.ce_refused(format($$SELECT public.log_match_for_player(%L, 'Rivals FC Away', 1, 1, 'League', 'Away', 'Defender', 'U16', 45, 0, 0, NULL, NULL, NULL, 6.0, current_date)$$,
   pg_temp.ce(20)),
   '3 G1 log_match_for_player refuses a child without consent');
 -- G6: the coach must still be able to take back what the family could see.
@@ -354,7 +354,7 @@ SELECT pg_temp.ce_allowed(format('UPDATE public.coach_assessment_notes SET note 
 SELECT pg_temp.ce_allowed(format('UPDATE public.coach_shared_feedback SET body = %L, published_at = now() WHERE assessment_id = %L',
   'Republished after re-approval', current_setting('trak.ce_a1')), 1,
   '5 CONTROL after re-approval the coach can republish the message');
-SELECT pg_temp.ce_allowed(format($$SELECT public.log_match_for_player(%L, 'Rivals FC', 1, 1, 'League', 'Away', 'Defender', 'U16', 45, 0, 0, NULL, NULL, NULL, 6.0, current_date)$$,
+SELECT pg_temp.ce_allowed(format($$SELECT public.log_match_for_player(%L, 'Rivals FC Away', 1, 1, 'League', 'Away', 'Defender', 'U16', 45, 0, 0, NULL, NULL, NULL, 6.0, current_date)$$,
   pg_temp.ce(20)), 1,
   '5 CONTROL after re-approval log_match_for_player accepts the child again');
 

@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, MatchCard, LoadError } from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
 import { TrainingHistory } from '@/components/player/TrainingHistory'
+import { UpcomingEvents } from '@/components/player/UpcomingEvents'
 
 // TRAK-112: the tab holds matches and training, so Training is a chip too.
 const FILTERS = ['All', 'League', 'Cup', 'Friendly', 'Training']
@@ -100,6 +101,9 @@ export default function PlayerMatches() {
             {failed ? '—' : `${filtered.length} ${filtered.length === 1 ? 'match' : 'matches'}`}
           </span>}
         </div>
+
+        {/* TRAK-130: what's coming up, above what has happened. */}
+        {user && <UpcomingEvents playerUserId={user.id} />}
 
         {/* Filter chips */}
         <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">

@@ -32,6 +32,7 @@ beforeEach(() => {
   account = `training-player-${++sequence}`
   signInAs({ id: account })
   server.use(
+    table('coach_calendar_events', []), // TRAK-130: the Sessions tab also reads upcoming events
     table('profiles', [{ id: 'p', user_id: account, role: 'player', full_name: 'Training Player' }]),
     table('matches', []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),

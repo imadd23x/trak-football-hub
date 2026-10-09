@@ -1,41 +1,49 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Eye, EyeOff, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Pencil, Send, Trash2, Ban, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
-import { toInstant, localParts, normalizeInstant, calendarFields, calendarFieldsFromInstant, displayEventTime, localTodayISO } from '@/lib/event-time'
+import { displayEventTime } from '@/lib/event-time'
 import { useAuth } from '@/contexts/AuthContext'
-import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
-import { trackEvent } from '@/lib/telemetry'
+import { MobileShell, NavBar, LoadError } from '@/components/trak'
 import { useParked } from '@/components/trak/parked'
+import {
+  DURATIONS, EVENT_KINDS, blankForm, canDelete, cancelPatch, formProblem, formToRow,
+  isCancelled, rowToForm, savedVenues, type EventForm, type EventKind, type EventRow,
+} from '@/lib/coach-events'
+
+/* TRAK-127 (J8.4): the coach creates, edits and cancels events. A save is a
+   draft only the coach sees; Publish sends it to families (Imad, 9 Oct). Once
+   published, an edit goes live on save. A cancel keeps the event on the
+   schedule as Cancelled; only a draft nobody has seen can be deleted. The AI
+   "Read Schedule" import is gone (G7): fixtures come in by CSV (J8.6). */
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type EventType = 'match' | 'training' | 'tournament' | 'other'
+type ShownType = EventKind | 'tournament'
 
 type CalEvent = {
   id: string
   title: string
-  type: EventType
+  type: ShownType
   date: string        // YYYY-MM-DD
   time?: string       // HH:MM
   source: 'calendar' | 'session'
-  published?: boolean
+  row?: EventRow
   opponent?: string
   venue?: string
-  notes?: string
 }
 
 // ── Colours ──────────────────────────────────────────────────────────────────
 
-const TYPE_COLOR: Record<EventType, string> = {
+const TYPE_COLOR: Record<ShownType, string> = {
   match:      '#4ade80',
   training:   '#C8F25A',
   tournament: '#c084fc',
   other:      'rgba(255,255,255,0.45)',
 }
 
-const TYPE_LABEL: Record<EventType, string> = {
+const TYPE_LABEL: Record<ShownType, string> = {
   match: 'Match', training: 'Training', tournament: 'Tournament', other: 'Other',
 }
 
@@ -68,34 +76,53 @@ function formatMonthYear(year: number, month: number) {
   return new Date(year, month, 1).toLocaleString('en-GB', { month: 'long', year: 'numeric' })
 }
 
-function formatEventTime(time?: string) {
-  if (!time) return ''
-  return ' · ' + time
-}
-
 function formatEventDay(date: string) {
   return new Date(date + 'T12:00:00').toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 }
 
-// ── Add-event modal ──────────────────────────────────────────────────────────
-
-type AddEventModal = {
-  open: boolean
-  date: string
-  title: string
-  type: EventType
-  time: string
-  opponent: string
-  venue: string
+/** A write that changed no row was refused (RLS filters, it doesn't error). */
+function failed(error: unknown, data: unknown[] | null) {
+  return !!error || !data?.length
 }
 
-const BLANK_MODAL: AddEventModal = {
-  open: false, date: '', title: '', type: 'training', time: '', opponent: '', venue: '',
+const SAVE_FAILED = "Couldn't save the event. Check your connection and try again; your details are still here."
+
+const inputClass = 'w-full bg-[#0A0A0B] border border-white/[0.07] rounded-[12px] px-3 py-2.5 text-[14px] text-white/88 placeholder-white/20 outline-none'
+const font = { fontFamily: "'DM Sans', sans-serif" }
+const mono = { fontFamily: "'DM Mono', monospace" }
+
+function Chip({ on, color = '#C8F25A', onClick, children }: { on: boolean; color?: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={on}
+      className="px-3 py-1.5 rounded-full text-xs transition-colors"
+      style={{
+        background: on ? `${color}22` : 'rgba(255,255,255,0.05)',
+        color: on ? color : 'rgba(255,255,255,0.45)',
+        border: `1px solid ${on ? color + '55' : 'rgba(255,255,255,0.07)'}`,
+        ...font,
+      }}>
+      {children}
+    </button>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1">
+      <span className="text-[9px] tracking-[0.1em] uppercase text-white/40" style={mono}>{label}</span>
+      {children}
+    </label>
+  )
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
+
+type Sheet =
+  | { kind: 'closed' }
+  | { kind: 'edit'; id: string | null; form: EventForm; published: boolean; error: string | null }
+  | { kind: 'cancel'; row: EventRow; reason: string; error: string | null }
 
 export default function CoachSchedule() {
   // TRAK-85: parked, so actions say "Coming soon" and send nothing.
@@ -110,66 +137,66 @@ export default function CoachSchedule() {
   const [selected,  setSelected]  = useState<string>(toDateStr(today))
 
   // Data
-  const [calEvents, setCalEvents] = useState<any[]>([])
+  const [calEvents, setCalEvents] = useState<EventRow[]>([])
   const [sessions,  setSessions]  = useState<any[]>([])
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [retrying, setRetrying] = useState(false)
 
-  // Add-event modal
-  const [modal, setModal] = useState<AddEventModal>(BLANK_MODAL)
+  const [sheet, setSheet] = useState<Sheet>({ kind: 'closed' })
   const [saving, setSaving] = useState(false)
-
-  // AI import (collapsed by default)
-  const [importOpen, setImportOpen] = useState(false)
-  const [importText, setImportText] = useState('')
-  const [parsing,    setParsing]    = useState(false)
-  const [drafts,     setDrafts]     = useState<any[]>([])
 
   const loadData = async () => {
     if (!user) return
-    const [{ data: evData }, { data: sessData }] = await Promise.all([
+    const [ev, sess] = await Promise.all([
       supabase.from('coach_calendar_events')
         .select('*').eq('coach_user_id', user.id).order('starts_at'),
       supabase.from('coach_sessions')
         .select('id, title, session_type, session_date, opponent, competition, venue, notes')
         .eq('coach_user_id', user.id).order('session_date'),
     ])
-    setCalEvents(evData || [])
-    setSessions(sessData || [])
+    // A failed read is not an empty calendar (the J4 standard).
+    setLoadFailed(!!ev.error || !!sess.error)
+    if (!ev.error) setCalEvents((ev.data as EventRow[]) || [])
+    if (!sess.error) setSessions(sess.data || [])
   }
 
   useEffect(() => { loadData() }, [user])
+
+  const retry = async () => { setRetrying(true); await loadData(); setRetrying(false) }
 
   // Normalise both data sources into CalEvent[]
   const allEvents = useMemo<CalEvent[]>(() => {
     const ev: CalEvent[] = []
     for (const e of calEvents) {
+      const shown = displayEventTime(e)
       ev.push({
-        id:        e.id,
-        title:     e.title,
-        type:      (e.event_type || 'other') as EventType,
-        date:      displayEventTime(e).date,
+        id:       e.id,
+        title:    e.title,
+        type:     (e.event_type in TYPE_LABEL ? e.event_type : 'other') as ShownType,
+        date:     shown.date,
         // undefined rather than null keeps the existing "no time set" rendering.
-        time:      displayEventTime(e).time ?? undefined,
-        source:    'calendar',
-        published: e.published,
-        opponent:  e.opponent,
-        venue:     e.venue,
-        notes:     e.notes,
+        time:     shown.time ?? undefined,
+        source:   'calendar',
+        row:      e,
+        opponent: e.opponent ?? undefined,
+        venue:    e.venue ?? undefined,
       })
     }
     for (const s of sessions) {
       ev.push({
         id:       s.id,
         title:    s.title || (s.session_type === 'match' ? `vs ${s.opponent}` : 'Training'),
-        type:     (s.session_type === 'match' ? 'match' : s.session_type === 'training' ? 'training' : 'other') as EventType,
+        type:     (s.session_type === 'match' ? 'match' : s.session_type === 'training' ? 'training' : 'other') as ShownType,
         date:     s.session_date ?? '',
         source:   'session',
         opponent: s.opponent,
         venue:    s.venue,
-        notes:    s.notes,
       })
     }
     return ev.filter(e => e.date)
   }, [calEvents, sessions])
+
+  const venues = useMemo(() => savedVenues(calEvents), [calEvents])
 
   // Index events by date string for fast lookup
   const byDate = useMemo<Record<string, CalEvent[]>>(() => {
@@ -194,186 +221,72 @@ export default function CoachSchedule() {
   const cells   = useMemo(() => buildMonthGrid(viewYear, viewMonth), [viewYear, viewMonth])
   const todayStr = toDateStr(today)
 
-  // Selected day events
   const selectedEvents = byDate[selected] ?? []
 
-  // Open add-event modal for a date
-  const openAdd = (date: string) => {
-    setModal({ ...BLANK_MODAL, open: true, date })
-  }
+  const openNew = (date: string) =>
+    setSheet({ kind: 'edit', id: null, form: blankForm(date), published: false, error: null })
+  const openEdit = (row: EventRow) =>
+    setSheet({ kind: 'edit', id: row.id, form: rowToForm(row), published: row.published, error: null })
+  const setForm = (patch: Partial<EventForm>) =>
+    setSheet(s => s.kind === 'edit' ? { ...s, form: { ...s.form, ...patch }, error: null } : s)
 
   const saveEvent = async () => {
     if (parked) return comingSoon()
-    if (!user || !modal.title.trim()) return
+    if (!user || sheet.kind !== 'edit') return
+    const problem = formProblem(sheet.form)
+    if (problem) { setSheet({ ...sheet, error: problem }); return }
     setSaving(true)
-    // A naive string handed to timestamptz is read as UTC, so the coach's
-    // 18:00 was stored four hours late in Dubai. Send a real instant.
-    const starts_at = toInstant(modal.date, modal.time || null)
-    if (!starts_at) {
-      setSaving(false)
-      toast.error("That date and time isn't valid — please check it")
-      return
-    }
-    // Written alongside starts_at, not instead of it: old clients still read
-    // the instant, new readers prefer the calendar day. start_time NULL is the
-    // explicit "time not known" that an instant cannot express.
-    const cal = calendarFields(modal.date, modal.time || null)
-
-    const { error } = await supabase.from('coach_calendar_events').insert({
-      coach_user_id: user.id,
-      title:         modal.title.trim(),
-      event_type:    modal.type,
-      starts_at,
-      ...(cal ?? {}),
-      opponent:      modal.opponent.trim() || null,
-      venue:         modal.venue.trim() || null,
-      published:     false,
-      source:        'manual',
-    })
+    const row = formToRow(sheet.form)
+    // New events start as drafts; an edit leaves published alone, so a
+    // published event's change goes live on save.
+    const { data, error } = sheet.id
+      ? await supabase.from('coach_calendar_events').update(row).eq('id', sheet.id).select('id')
+      : await supabase.from('coach_calendar_events')
+          .insert({ ...row, coach_user_id: user.id, published: false, source: 'manual' }).select('id')
     setSaving(false)
-    if (error) { toast.error('Could not save'); return }
-    setModal(BLANK_MODAL)
+    // Errors keep what was typed and say what failed (the J4 standard).
+    if (failed(error, data)) { setSheet({ ...sheet, error: SAVE_FAILED }); return }
+    setSheet({ kind: 'closed' })
+    setSelected(sheet.form.date)
     loadData()
-    toast.success('Event added')
+    toast.success(sheet.id
+      ? sheet.published ? 'Saved. Families see the change.' : 'Draft saved'
+      : 'Saved as a draft. Tap Publish when it’s ready.')
   }
 
-  const togglePublish = async (ev: CalEvent) => {
+  const publish = async (row: EventRow) => {
     if (parked) return comingSoon()
-    if (ev.source !== 'calendar') return
-    const current = calEvents.find(e => e.id === ev.id)
-    const { error } = await supabase.from('coach_calendar_events')
-      .update({ published: !current?.published }).eq('id', ev.id)
-    if (error) { toast.error('Could not update'); return }
+    const { data, error } = await supabase.from('coach_calendar_events')
+      .update({ published: true }).eq('id', row.id).select('id')
+    if (failed(error, data)) { toast.error(`Couldn't publish "${row.title}". Try again.`); return }
     loadData()
-    toast.success(!current?.published ? 'Published to squad' : 'Unpublished')
+    toast.success('Published to the squad')
   }
 
-  const deleteEvent = async (ev: CalEvent) => {
+  const confirmCancel = async () => {
     if (parked) return comingSoon()
-    if (ev.source !== 'calendar') return
-    const { error } = await supabase.from('coach_calendar_events').delete().eq('id', ev.id)
-    if (error) { toast.error('Could not delete'); return }
-    loadData()
-  }
-
-  // AI import
-  const parseImport = async () => {
-    if (parked) return comingSoon()
-    if (!importText.trim()) { toast.error('Paste some text first'); return }
-    setParsing(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('parse-schedule', {
-        body: { text: importText, todayISO: localTodayISO() },
-      })
-      // On a non-2xx, supabase-js puts the body on the error's response rather
-      // than in `data` (the same idiom AuthContext uses for send-parent-invite).
-      // Without this a spent daily allowance surfaced as "Parse failed", which
-      // tells the coach nothing and invites them to retry immediately — the one
-      // thing that cannot work. Prefer the function's own sentence.
-      let failure = data?.error as string | undefined
-      if (error && !failure) {
-        try { failure = (await (error as { context?: Response }).context?.json())?.error } catch { /* no body */ }
-      }
-      if (error || failure) throw new Error(failure || 'Parse failed')
-      const list = data?.events || []
-      trackEvent('schedule_parsed', {
-        input_chars: importText.trim().length,
-        events_found: list.length,
-      })
-      if (!list.length) toast.error('No events found. Try clearer dates/times.')
-      else { setDrafts(list); toast.success(`Found ${list.length} event${list.length > 1 ? 's' : ''}`) }
-    } catch (e: any) {
-      toast.error(e.message || 'Could not read schedule')
-    } finally {
-      setParsing(false)
-    }
-  }
-
-  const saveDraft = async (idx: number) => {
-    if (parked) return comingSoon()
-    if (!user) return
-    const ev = drafts[idx]
-    const startsAt = normalizeInstant(ev.starts_at)
-    if (!startsAt) {
-      toast.error(`"${ev.title}" has no usable date — set one before saving it`)
+    if (sheet.kind !== 'cancel') return
+    setSaving(true)
+    const { data, error } = await supabase.from('coach_calendar_events')
+      .update(cancelPatch(sheet.reason)).eq('id', sheet.row.id).select('id')
+    setSaving(false)
+    if (failed(error, data)) {
+      setSheet({ ...sheet, error: "Couldn't cancel the event. Check your connection and try again." })
       return
     }
-    // An unreadable end time was being written as NULL without a word, while
-    // an unreadable start was reported. Same input, same parser, two different
-    // outcomes — so an event silently lost the time it was due to finish.
-    const endsAt = ev.ends_at ? normalizeInstant(ev.ends_at) : null
-    if (ev.ends_at && !endsAt) {
-      toast.error(`"${ev.title}" has an end time we couldn't read — check it before saving`)
-      return
-    }
-    const { error } = await supabase.from('coach_calendar_events').insert({
-      coach_user_id: user.id,
-      title: ev.title, event_type: ev.event_type, starts_at: startsAt,
-      // Imported rows need the calendar columns too. Without this every row
-      // the parser creates lands with them NULL after the one-time backfill,
-      // and keeps the untimed/filter ambiguity the columns exist to remove.
-      ...(calendarFieldsFromInstant(startsAt, ev.time_known) ?? {}),
-      ends_at: endsAt, venue: ev.venue || null,
-      opponent: ev.opponent || null, notes: ev.notes || null,
-      published: false, source: 'ai_text',
-    })
-    // A rejected insert used to remove the draft and report success, so the
-    // coach believed a session was in the calendar that was never written.
-    if (error) {
-      toast.error(`Couldn't save "${ev.title}" — it's still here, try again`)
-      return
-    }
-    setDrafts(d => d.filter((_, i) => i !== idx))
+    setSheet({ kind: 'closed' })
     loadData()
-    toast.success('Event saved')
+    toast.success('Event cancelled. It stays on the schedule as Cancelled.')
   }
 
-  const saveAllDrafts = async () => {
+  const deleteDraft = async (row: EventRow) => {
     if (parked) return comingSoon()
-    if (!user || !drafts.length) return
-    // A draft the parser could not date is not silently dropped into the
-    // calendar at the wrong moment — it is left behind and named.
-    const rows = drafts
-      .map(ev => ({
-        ev,
-        startsAt: normalizeInstant(ev.starts_at),
-        // Treated exactly like a bad start: reported, not silently nulled.
-        endsAt: ev.ends_at ? normalizeInstant(ev.ends_at) : null,
-        endBroken: !!ev.ends_at && normalizeInstant(ev.ends_at) === null,
-      }))
-      .filter((r): r is { ev: typeof drafts[number]; startsAt: string; endsAt: string | null; endBroken: boolean } =>
-        r.startsAt !== null && !r.endBroken)
-
-    const undated = drafts.length - rows.length
-    if (undated > 0) {
-      toast.error(`${undated} event${undated === 1 ? '' : 's'} had a date or end time we couldn't read and ${undated === 1 ? 'was' : 'were'} not saved`)
-    }
-    if (!rows.length) return
-
-    const { error } = await supabase.from('coach_calendar_events').insert(
-      rows.map(({ ev, startsAt, endsAt }) => ({
-        coach_user_id: user.id,
-        title: ev.title, event_type: ev.event_type, starts_at: startsAt,
-        ...(calendarFieldsFromInstant(startsAt, ev.time_known) ?? {}),
-        ends_at: endsAt, venue: ev.venue || null,
-        opponent: ev.opponent || null, notes: ev.notes || null,
-        published: false, source: 'ai_text',
-      }))
-    )
-    // A rejected insert used to clear every draft and report them all saved.
-    // Nothing was written, so nothing is removed and nothing is claimed.
-    if (error) {
-      toast.error("Couldn't save those events — they're still here, try again")
-      return
-    }
-    // Keep the ones that were not saved, so they are not lost silently, and
-    // report the number actually written rather than the number attempted.
-    setDrafts(drafts.filter(ev =>
-      normalizeInstant(ev.starts_at) === null ||
-      (!!ev.ends_at && normalizeInstant(ev.ends_at) === null)))
-    if (!undated) setImportText('')
+    if (!canDelete(row)) return
+    const { data, error } = await supabase.from('coach_calendar_events').delete().eq('id', row.id).select('id')
+    if (failed(error, data)) { toast.error(`Couldn't delete "${row.title}". Try again.`); return }
+    if (sheet.kind === 'edit' && sheet.id === row.id) setSheet({ kind: 'closed' })
     loadData()
-    toast.success(`Saved ${rows.length} event${rows.length === 1 ? '' : 's'}`)
+    toast.success('Draft deleted')
   }
 
   return (
@@ -383,16 +296,18 @@ export default function CoachSchedule() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-[22px] font-light text-white/88 tracking-tight"
-            style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.02em' }}>
+            style={{ ...font, letterSpacing: '-0.02em' }}>
             Calendar
           </h1>
           <button
-            onClick={() => openAdd(selected)}
+            onClick={() => openNew(selected)}
             className="flex items-center justify-center w-8 h-8 rounded-full bg-[#C8F25A]"
             aria-label="Add event">
             <Plus size={16} color="#000" strokeWidth={2.5} />
           </button>
         </div>
+
+        {loadFailed && <LoadError what="your calendar" onRetry={retry} retrying={retrying} />}
 
         {/* ── Month grid ───────────────────────────────────────────────────── */}
         <div className="rounded-[18px] border border-white/[0.07] overflow-hidden"
@@ -400,15 +315,14 @@ export default function CoachSchedule() {
 
           {/* Month nav */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
-            <button onClick={prevMonth} className="w-7 h-7 flex items-center justify-center rounded-full"
+            <button onClick={prevMonth} aria-label="Previous month" className="w-7 h-7 flex items-center justify-center rounded-full"
               style={{ background: 'rgba(255,255,255,0.06)' }}>
               <ChevronLeft size={14} color="rgba(255,255,255,0.6)" />
             </button>
-            <span className="text-[13px] font-medium text-white/88"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <span className="text-[13px] font-medium text-white/88" style={font}>
               {formatMonthYear(viewYear, viewMonth)}
             </span>
-            <button onClick={nextMonth} className="w-7 h-7 flex items-center justify-center rounded-full"
+            <button onClick={nextMonth} aria-label="Next month" className="w-7 h-7 flex items-center justify-center rounded-full"
               style={{ background: 'rgba(255,255,255,0.06)' }}>
               <ChevronRight size={14} color="rgba(255,255,255,0.6)" />
             </button>
@@ -418,7 +332,7 @@ export default function CoachSchedule() {
           <div className="grid grid-cols-7 px-1 pt-2 pb-1">
             {DAY_LABELS.map(l => (
               <div key={l} className="text-center text-[9px] font-medium tracking-[0.08em] uppercase"
-                style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.25)' }}>
+                style={{ ...mono, color: 'rgba(255,255,255,0.25)' }}>
                 {l}
               </div>
             ))}
@@ -446,7 +360,7 @@ export default function CoachSchedule() {
                   }}>
                   <span className="text-[12px] leading-none"
                     style={{
-                      fontFamily: "'DM Sans', sans-serif",
+                      ...font,
                       color: isSel ? '#C8F25A'
                         : isToday ? '#C8F25A'
                         : isPast  ? 'rgba(255,255,255,0.3)'
@@ -459,7 +373,7 @@ export default function CoachSchedule() {
                   <div className="flex items-center gap-[3px] mt-1.5 h-[5px]">
                     {dots.map((ev, di) => (
                       <div key={di} className="w-[5px] h-[5px] rounded-full flex-shrink-0"
-                        style={{ background: TYPE_COLOR[ev.type] }} />
+                        style={{ background: ev.row && isCancelled(ev.row) ? 'rgba(255,255,255,0.15)' : TYPE_COLOR[ev.type] }} />
                     ))}
                   </div>
                 </button>
@@ -469,12 +383,12 @@ export default function CoachSchedule() {
 
           {/* Legend */}
           <div className="flex items-center gap-4 px-4 py-2.5 border-t border-white/[0.05]">
-            {Object.entries(TYPE_COLOR).map(([type, color]) => (
+            {EVENT_KINDS.map(type => (
               <div key={type} className="flex items-center gap-1.5">
-                <div className="w-[6px] h-[6px] rounded-full" style={{ background: color }} />
+                <div className="w-[6px] h-[6px] rounded-full" style={{ background: TYPE_COLOR[type] }} />
                 <span className="text-[8px] uppercase tracking-[0.08em]"
-                  style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.3)' }}>
-                  {TYPE_LABEL[type as EventType]}
+                  style={{ ...mono, color: 'rgba(255,255,255,0.3)' }}>
+                  {TYPE_LABEL[type]}
                 </span>
               </div>
             ))}
@@ -484,14 +398,13 @@ export default function CoachSchedule() {
         {/* ── Selected day ─────────────────────────────────────────────────── */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[9px] font-medium tracking-[0.1em] uppercase text-white/40"
-              style={{ fontFamily: "'DM Mono', monospace" }}>
+            <span className="text-[9px] font-medium tracking-[0.1em] uppercase text-white/40" style={mono}>
               {formatEventDay(selected)}
             </span>
             <button
-              onClick={() => openAdd(selected)}
+              onClick={() => openNew(selected)}
               className="text-[9px] tracking-[0.1em] uppercase text-[#C8F25A]"
-              style={{ fontFamily: "'DM Mono', monospace" }}>
+              style={mono}>
               + Add
             </button>
           </div>
@@ -503,230 +416,215 @@ export default function CoachSchedule() {
             </div>
           ) : (
             <div className="space-y-2">
-              {selectedEvents.map(ev => (
-                <div key={ev.id}
-                  className="rounded-[14px] px-4 py-3 flex items-start gap-3"
-                  style={{ background: '#101012', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  {/* Color bar */}
-                  <div className="w-1 self-stretch rounded-full flex-shrink-0"
-                    style={{ background: TYPE_COLOR[ev.type], minHeight: 28 }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium truncate"
-                      style={{ color: 'rgba(255,255,255,0.88)', fontFamily: "'DM Sans', sans-serif" }}>
-                      {ev.title}
-                    </p>
-                    <p className="text-[9px] mt-0.5"
-                      style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.35)' }}>
-                      {TYPE_LABEL[ev.type]}{formatEventTime(ev.time)}
-                      {ev.opponent ? ` · vs ${ev.opponent}` : ''}
-                      {ev.venue ? ` · ${ev.venue}` : ''}
-                    </p>
+              {selectedEvents.map(ev => {
+                const row = ev.row
+                const cancelled = !!row && isCancelled(row)
+                return (
+                  <div key={ev.id}
+                    className="rounded-[14px] px-4 py-3 flex items-start gap-3"
+                    style={{ background: '#101012', border: '1px solid rgba(255,255,255,0.06)', opacity: cancelled ? 0.7 : 1 }}>
+                    <div className="w-1 self-stretch rounded-full flex-shrink-0"
+                      style={{ background: cancelled ? 'rgba(255,255,255,0.15)' : TYPE_COLOR[ev.type], minHeight: 28 }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium truncate"
+                        style={{ color: 'rgba(255,255,255,0.88)', ...font, textDecoration: cancelled ? 'line-through' : undefined }}>
+                        {ev.title}
+                      </p>
+                      <p className="text-[9px] mt-0.5" style={{ ...mono, color: 'rgba(255,255,255,0.35)' }}>
+                        {TYPE_LABEL[ev.type]}{ev.time ? ` · ${ev.time}` : ''}
+                        {row?.meet_time ? ` · meet ${row.meet_time.slice(0, 5)}` : ''}
+                        {row?.home_away ? ` · ${row.home_away === 'home' ? 'Home' : 'Away'}` : ''}
+                        {ev.venue ? ` · ${ev.venue}` : ''}
+                      </p>
+                      {row?.kit && (
+                        <p className="text-[9px] mt-0.5" style={{ ...mono, color: 'rgba(255,255,255,0.35)' }}>Kit: {row.kit}</p>
+                      )}
+                      {ev.source === 'session' && (
+                        <span className="text-[8px] tracking-[0.06em] uppercase mt-0.5 inline-block"
+                          style={{ color: 'rgba(255,255,255,0.22)', ...mono }}>
+                          Logged
+                        </span>
+                      )}
+                      {row && (
+                        <span className="text-[8px] tracking-[0.06em] uppercase mt-0.5 inline-block"
+                          style={{ color: cancelled ? '#f87171' : row.published ? '#C8F25A' : 'rgba(255,255,255,0.35)', ...mono }}>
+                          {cancelled ? 'Cancelled' : row.published ? 'Published' : 'Draft · only you see this'}
+                        </span>
+                      )}
+                      {cancelled && row?.cancel_reason && (
+                        <p className="text-[11px] mt-0.5 text-white/45" style={font}>{row.cancel_reason}</p>
+                      )}
+                    </div>
+                    {row && !cancelled && (
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <button onClick={() => openEdit(row)} aria-label={`Edit ${row.title}`}>
+                          <Pencil size={14} color="rgba(255,255,255,0.5)" />
+                        </button>
+                        {!row.published && (
+                          <button onClick={() => publish(row)} aria-label={`Publish ${row.title}`}>
+                            <Send size={14} color="#C8F25A" />
+                          </button>
+                        )}
+                        {canDelete(row) ? (
+                          <button onClick={() => deleteDraft(row)} aria-label={`Delete ${row.title}`}>
+                            <Trash2 size={14} color="rgba(255,255,255,0.3)" />
+                          </button>
+                        ) : (
+                          <button onClick={() => setSheet({ kind: 'cancel', row, reason: '', error: null })}
+                            aria-label={`Cancel ${row.title}`}>
+                            <Ban size={14} color="rgba(248,113,113,0.8)" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {ev.source === 'session' && (
-                      <span className="text-[8px] tracking-[0.06em] uppercase mt-0.5 inline-block"
-                        style={{ color: 'rgba(255,255,255,0.22)', fontFamily: "'DM Mono', monospace" }}>
-                        Logged
-                      </span>
-                    )}
-                    {ev.source === 'calendar' && (
-                      <span className="text-[8px] tracking-[0.06em] uppercase mt-0.5 inline-block"
-                        style={{
-                          color: ev.published ? '#C8F25A' : 'rgba(255,255,255,0.22)',
-                          fontFamily: "'DM Mono', monospace",
-                        }}>
-                        {ev.published ? 'Published' : 'Private'}
-                      </span>
+                      <button
+                        onClick={() => navigate('/coach/sessions/list')}
+                        className="text-[9px] uppercase tracking-[0.08em] flex-shrink-0"
+                        style={{ color: 'rgba(255,255,255,0.3)', ...mono }}>
+                        View
+                      </button>
                     )}
                   </div>
-                  {/* Actions — only for calendar events */}
-                  {ev.source === 'calendar' && (
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button onClick={() => togglePublish(ev)} aria-label="Toggle publish">
-                        {ev.published
-                          ? <EyeOff size={14} color="rgba(255,255,255,0.4)" />
-                          : <Eye size={14} color="#C8F25A" />}
-                      </button>
-                      <button onClick={() => deleteEvent(ev)} aria-label="Delete">
-                        <Trash2 size={14} color="rgba(255,255,255,0.3)" />
-                      </button>
-                    </div>
-                  )}
-                  {/* Logged sessions — link to log another */}
-                  {ev.source === 'session' && (
-                    <button
-                      onClick={() => navigate('/coach/sessions/list')}
-                      className="text-[9px] uppercase tracking-[0.08em] flex-shrink-0"
-                      style={{ color: 'rgba(255,255,255,0.3)', fontFamily: "'DM Mono', monospace" }}>
-                      View
-                    </button>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
-
-        {/* ── Import from text (collapsed) ──────────────────────────────────── */}
-        <div className="rounded-[18px] border border-white/[0.07] overflow-hidden"
-          style={{ background: '#101012' }}>
-          <button
-            onClick={() => setImportOpen(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3.5">
-            <div className="flex items-center gap-2">
-              <Sparkles size={13} color="rgba(255,255,255,0.45)" />
-              <span className="text-[12px] text-white/60"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Import from text or club website
-              </span>
-            </div>
-            <ChevronRight size={14} color="rgba(255,255,255,0.3)"
-              style={{ transform: importOpen ? 'rotate(90deg)' : undefined, transition: 'transform 150ms' }} />
-          </button>
-
-          {importOpen && (
-            <div className="px-4 pb-4 border-t border-white/[0.05] pt-3 space-y-3">
-              <p className="text-[11px] text-white/40"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Paste your fixture list or training schedule — any format works.
-              </p>
-              <textarea
-                value={importText}
-                onChange={e => setImportText(e.target.value)}
-                placeholder={'e.g.\nTraining Tue 6pm at the academy\nMatch vs PAOK Sat 4pm'}
-                rows={5}
-                className="w-full rounded-[12px] p-3 text-[13px] outline-none"
-                style={{ background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.88)', fontFamily: "'DM Sans', sans-serif" }}
-              />
-              <button
-                onClick={parseImport}
-                disabled={parsing}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-semibold ml-auto"
-                style={{ background: parsing ? 'rgba(200,242,90,0.4)' : '#C8F25A', color: '#000' }}>
-                <Sparkles size={11} />
-                {parsing ? 'Reading…' : 'Read Schedule'}
-              </button>
-
-              {drafts.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <div className="flex items-center justify-between">
-                    <MetadataLabel text={`FOUND · ${drafts.length}`} />
-                    <button onClick={saveAllDrafts}
-                      className="text-[10px] uppercase tracking-[0.1em] text-[#C8F25A]"
-                      style={{ fontFamily: "'DM Mono', monospace" }}>
-                      Save all
-                    </button>
-                  </div>
-                  {drafts.map((ev, i) => (
-                    <div key={i}
-                      className="rounded-[12px] p-3 flex items-start justify-between gap-2"
-                      style={{ background: 'rgba(200,242,90,0.05)', border: '1px solid rgba(200,242,90,0.15)' }}>
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-medium text-white/88 truncate">{ev.title}</p>
-                        <p className="text-[10px] text-white/45 mt-0.5">
-                          {ev.starts_at?.slice(0, 10)} · {TYPE_LABEL[ev.event_type as EventType] || ev.event_type}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button onClick={() => saveDraft(i)}
-                          className="text-[10px] px-2.5 py-1 rounded-full font-semibold"
-                          style={{ background: '#C8F25A', color: '#000' }}>
-                          Save
-                        </button>
-                        <button onClick={() => setDrafts(d => d.filter((_, j) => j !== i))}>
-                          <Trash2 size={13} color="rgba(255,255,255,0.35)" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
       </div>
 
-      {/* ── Add-event modal ─────────────────────────────────────────────────── */}
-      {modal.open && (
+      {/* ── Event sheet: new or edit ──────────────────────────────────────── */}
+      {sheet.kind === 'edit' && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center"
           style={{ background: 'rgba(0,0,0,0.75)' }}
-          onClick={e => { if (e.target === e.currentTarget) setModal(BLANK_MODAL) }}>
-          <div className="w-full max-w-[430px] rounded-t-[24px] p-5 space-y-4 overflow-y-auto"
-            style={{ background: '#17171A', border: '1px solid rgba(255,255,255,0.10)', maxHeight: '75vh', marginBottom: 64 }}>
+          onClick={e => { if (e.target === e.currentTarget) setSheet({ kind: 'closed' }) }}>
+          <div role="dialog" aria-label={sheet.id ? 'Edit event' : 'New event'}
+            className="w-full max-w-[430px] rounded-t-[24px] p-5 space-y-3 overflow-y-auto"
+            style={{ background: '#17171A', border: '1px solid rgba(255,255,255,0.10)', maxHeight: '85vh', marginBottom: 64 }}>
             <div className="flex items-center justify-between">
-              <span className="text-[16px] font-medium text-white/88"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Add Event
+              <span className="text-[16px] font-medium text-white/88" style={font}>
+                {sheet.id ? 'Edit event' : 'New event'}
               </span>
-              <button onClick={() => setModal(BLANK_MODAL)}>
+              <button onClick={() => setSheet({ kind: 'closed' })} aria-label="Close">
                 <X size={18} color="rgba(255,255,255,0.5)" />
               </button>
             </div>
 
-            {/* Type chips */}
-            <div className="flex gap-2 flex-wrap">
-              {(['training', 'match', 'tournament', 'other'] as EventType[]).map(t => (
-                <button key={t}
-                  onClick={() => setModal(m => ({ ...m, type: t }))}
-                  className="px-3 py-1.5 rounded-full text-xs transition-colors"
-                  style={{
-                    background: modal.type === t ? `${TYPE_COLOR[t]}22` : 'rgba(255,255,255,0.05)',
-                    color: modal.type === t ? TYPE_COLOR[t] : 'rgba(255,255,255,0.45)',
-                    border: `1px solid ${modal.type === t ? TYPE_COLOR[t] + '55' : 'rgba(255,255,255,0.07)'}`,
-                    fontFamily: "'DM Sans', sans-serif",
-                  }}>
+            <div className="flex gap-2 flex-wrap" role="group" aria-label="Event type">
+              {EVENT_KINDS.map(t => (
+                <Chip key={t} on={sheet.form.kind === t} color={TYPE_COLOR[t]} onClick={() => setForm({ kind: t })}>
                   {TYPE_LABEL[t]}
-                </button>
+                </Chip>
               ))}
             </div>
 
-            {/* Title */}
-            <input
-              value={modal.title}
-              onChange={e => setModal(m => ({ ...m, title: e.target.value }))}
-              placeholder={modal.type === 'match' ? 'vs Opponent' : modal.type === 'training' ? 'e.g. Tactical Training' : 'Event title'}
-              className="w-full bg-[#0A0A0B] border border-white/[0.07] rounded-[12px] px-3 py-2.5 text-[14px] text-white/88 placeholder-white/20 outline-none"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}
-            />
+            {sheet.form.kind === 'match' && (
+              <>
+                <Field label="Opponent">
+                  <input value={sheet.form.opponent} onChange={e => setForm({ opponent: e.target.value })}
+                    placeholder="e.g. Al Wasl U15" className={inputClass} style={font} />
+                </Field>
+                <div className="flex gap-2" role="group" aria-label="Home or away">
+                  <Chip on={sheet.form.homeAway === 'home'} onClick={() => setForm({ homeAway: sheet.form.homeAway === 'home' ? '' : 'home' })}>Home</Chip>
+                  <Chip on={sheet.form.homeAway === 'away'} onClick={() => setForm({ homeAway: sheet.form.homeAway === 'away' ? '' : 'away' })}>Away</Chip>
+                </div>
+              </>
+            )}
 
-            {/* Date + Time */}
+            <Field label={sheet.form.kind === 'other' ? 'What is it' : 'Title (optional)'}>
+              <input value={sheet.form.title} onChange={e => setForm({ title: e.target.value })}
+                placeholder={sheet.form.kind === 'match' ? `vs ${sheet.form.opponent || 'Opponent'}` : sheet.form.kind === 'training' ? 'Training' : 'e.g. Team photo'}
+                className={inputClass} style={font} />
+            </Field>
+
             <div className="flex gap-2">
-              <input type="date" value={modal.date}
-                onChange={e => setModal(m => ({ ...m, date: e.target.value }))}
-                className="flex-1 bg-[#0A0A0B] border border-white/[0.07] rounded-[12px] px-3 py-2.5 text-[13px] text-white/88 outline-none"
-                style={{ fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark' }} />
-              <input type="time" value={modal.time}
-                onChange={e => setModal(m => ({ ...m, time: e.target.value }))}
-                placeholder="Time"
-                className="w-[100px] bg-[#0A0A0B] border border-white/[0.07] rounded-[12px] px-3 py-2.5 text-[13px] text-white/88 outline-none"
-                style={{ fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark' }} />
+              <div className="flex-1">
+                <Field label="Date">
+                  <input type="date" value={sheet.form.date} onChange={e => setForm({ date: e.target.value })}
+                    className={inputClass} style={{ ...font, colorScheme: 'dark' }} />
+                </Field>
+              </div>
+              <div className="w-[120px]">
+                <Field label={sheet.form.kind === 'match' ? 'Kickoff' : 'Start'}>
+                  <input type="time" value={sheet.form.time} onChange={e => setForm({ time: e.target.value })}
+                    className={inputClass} style={{ ...font, colorScheme: 'dark' }} />
+                </Field>
+              </div>
             </div>
 
-            {/* Match extras */}
-            {modal.type === 'match' && (
-              <div className="flex gap-2">
-                <input value={modal.opponent}
-                  onChange={e => setModal(m => ({ ...m, opponent: e.target.value }))}
-                  placeholder="Opponent"
-                  className="flex-1 bg-[#0A0A0B] border border-white/[0.07] rounded-[12px] px-3 py-2.5 text-[13px] text-white/88 placeholder-white/20 outline-none"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }} />
-                <input value={modal.venue}
-                  onChange={e => setModal(m => ({ ...m, venue: e.target.value }))}
-                  placeholder="Venue"
-                  className="flex-1 bg-[#0A0A0B] border border-white/[0.07] rounded-[12px] px-3 py-2.5 text-[13px] text-white/88 placeholder-white/20 outline-none"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }} />
+            <div className="space-y-1">
+              <span className="text-[9px] tracking-[0.1em] uppercase text-white/40" style={mono}>Length</span>
+              <div className="flex gap-2 flex-wrap" role="group" aria-label="Length">
+                {DURATIONS.map(d => (
+                  <Chip key={d} on={sheet.form.duration === d} onClick={() => setForm({ duration: d })}>{d} min</Chip>
+                ))}
               </div>
+            </div>
+
+            <Field label="Venue">
+              <input value={sheet.form.venue} onChange={e => setForm({ venue: e.target.value })}
+                list="saved-venues" placeholder="Pick a saved venue or type a new one" className={inputClass} style={font} />
+              <datalist id="saved-venues">
+                {venues.map(v => <option key={v} value={v} />)}
+              </datalist>
+            </Field>
+
+            <Field label="Meet time (if earlier)">
+              <input type="time" value={sheet.form.meetTime} onChange={e => setForm({ meetTime: e.target.value })}
+                className={inputClass} style={{ ...font, colorScheme: 'dark' }} />
+            </Field>
+
+            {sheet.form.kind === 'match' && (
+              <Field label="Kit">
+                <input value={sheet.form.kit} onChange={e => setForm({ kit: e.target.value })}
+                  placeholder="e.g. Red shirts, black shorts" className={inputClass} style={font} />
+              </Field>
+            )}
+
+            {sheet.error && (
+              <p role="alert" className="text-[12px] text-[#f87171]" style={font}>{sheet.error}</p>
             )}
 
             <button
               onClick={saveEvent}
-              disabled={!modal.title.trim() || !modal.date || saving}
+              disabled={saving}
               className="w-full py-3.5 rounded-[12px] text-[14px] font-medium transition-opacity"
-              style={{
-                background: modal.title.trim() && modal.date ? '#C8F25A' : 'rgba(255,255,255,0.06)',
-                color: modal.title.trim() && modal.date ? '#000' : 'rgba(255,255,255,0.3)',
-                opacity: saving ? 0.6 : 1,
-              }}>
-              {saving ? 'Saving…' : 'Add to calendar'}
+              style={{ background: '#C8F25A', color: '#000', opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Saving…' : sheet.published ? 'Save changes' : 'Save draft'}
+            </button>
+            {sheet.published && (
+              <p className="text-[11px] text-white/40 text-center" style={font}>Families see the change as soon as you save.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel sheet ──────────────────────────────────────────────────── */}
+      {sheet.kind === 'cancel' && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.75)' }}
+          onClick={e => { if (e.target === e.currentTarget) setSheet({ kind: 'closed' }) }}>
+          <div role="dialog" aria-label="Cancel event"
+            className="w-full max-w-[430px] rounded-t-[24px] p-5 space-y-3"
+            style={{ background: '#17171A', border: '1px solid rgba(255,255,255,0.10)', marginBottom: 64 }}>
+            <span className="text-[16px] font-medium text-white/88 block" style={font}>Cancel {sheet.row.title}?</span>
+            <p className="text-[12px] text-white/50" style={font}>
+              It stays on everyone's schedule, marked Cancelled.
+            </p>
+            <Field label="Reason (optional)">
+              <input value={sheet.reason}
+                onChange={e => setSheet(s => s.kind === 'cancel' ? { ...s, reason: e.target.value, error: null } : s)}
+                placeholder="e.g. Pitch waterlogged" className={inputClass} style={font} />
+            </Field>
+            {sheet.error && <p role="alert" className="text-[12px] text-[#f87171]" style={font}>{sheet.error}</p>}
+            <button onClick={confirmCancel} disabled={saving}
+              className="w-full py-3.5 rounded-[12px] text-[14px] font-medium"
+              style={{ background: '#f87171', color: '#000', opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Cancelling…' : 'Cancel event'}
+            </button>
+            <button onClick={() => setSheet({ kind: 'closed' })}
+              className="w-full py-2 text-[13px] text-white/60" style={font}>
+              Keep event
             </button>
           </div>
         </div>

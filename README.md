@@ -80,7 +80,7 @@ forgetting this is the usual reason a merged change appears to do nothing:
 | `src/**` | `deploy` job, on merge to `main` |
 | `supabase/migrations/*.sql` | `supabase` job (`db push`), after `test` passes on `main` |
 | `supabase/functions/**` | `supabase` job (`functions deploy`), after `test` passes on `main` |
-| `email-templates/*.html` | Supabase dashboard → Authentication → Email Templates, **by hand** |
+| `email-templates/*.html` | Supabase dashboard → Authentication → Emails → Templates, **by hand**. The files equal the live templates as of 8 Oct 2026; see below. |
 
 Merging to `main` ships the frontend *and* the backend. The `supabase` job runs
 before `deploy`, so a build that calls a new RPC can't reach production ahead of
@@ -94,10 +94,36 @@ service-role key. It passes `--db-url` and `--project-ref` explicitly instead, s
 the token needs only Edge Functions and Migrations. Required secrets:
 `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `SUPABASE_DB_URL`.
 
-Email templates are the one exception — they live in the dashboard and cannot be
-deployed from the repo. `supabase/config.toml` is the source of truth for each
-function's `verify_jwt`; a value changed in the dashboard is overwritten on the
-next deploy.
+### Email templates
+
+The four files in `email-templates/` equal the live Supabase templates as
+exported by Kostas on 8 October 2026 (after his 17:19 UTC dashboard fixes;
+TRAK-142). The dashboard is where they run: CI does not deploy them. Change a
+template in the dashboard and in its file together, in one reviewed PR.
+
+| File | Dashboard template | Subject |
+|---|---|---|
+| `invite-parent.html` | Invite user | `You're invited to Trak` |
+| `magic-link.html` | Magic link / OTP | `{{ if .Data.child_first_name }}{{ .Data.academy_name }} has added {{ .Data.child_first_name }} to Trak{{ else }}Your Trak sign-in code{{ end }}` |
+| `reset-password.html` | Reset password | `Reset your Password` |
+| `confirm-signup.html` | Confirm signup | `Confirm your Trak Account` |
+
+- **Invite, Magic Link and Reset Password** show `{{ .Token }}` and link only
+  to `/auth/code`, where the person types the code. A one-click
+  `{{ .ConfirmationURL }}` is what Microsoft's scanner used up before families
+  could sign in (TRAK-107).
+- **Confirm signup** keeps its separate `/auth/confirm?token_hash=` flow
+  (TRAK-117).
+- Go evaluates `{{ ... }}` actions even inside HTML comments, so never write
+  one in a comment.
+
+`src/__tests__/email-templates.test.ts` fails if any file regains a
+`{{ .ConfirmationURL }}` or an `/auth/continue` link, if a code email links
+anywhere but `/auth/code`, or if a file contains non-ASCII characters (which
+turn into mojibake when Gmail strips the charset).
+
+`supabase/config.toml` is the source of truth for each function's `verify_jwt`;
+a value changed in the dashboard is overwritten on the next deploy.
 
 For local work the CLIs need no global install (`npm i -g` fails against a
 root-owned prefix on a stock macOS Node):

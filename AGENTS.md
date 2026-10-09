@@ -111,7 +111,8 @@ development SQL on the shared project.
 `supabase/config.toml` controls function JWT settings. `vercel.json` controls
 rewrites, caching and CSP; verify allowed origins when adding an integration.
 Email templates run in the Supabase dashboard; CI never deploys them. Read the
-email-template notes in the [README](README.md) before touching them (TRAK-142
-brings the repository copies in line with the live ones). Never use
+email-template notes in the [README](README.md) before touching them. Since
+TRAK-142 (#252) the repository copies equal the live ones, and a test guards
+them; change both together. Never use
 `{{ .ConfirmationURL }}`: Microsoft's link scanner uses up one-click links
 (TRAK-107). Signup confirmation has a different flow from the three code emails.

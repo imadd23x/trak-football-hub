@@ -291,6 +291,7 @@ export type Database = {
       }
       coach_calendar_events: {
         Row: {
+          cancel_reason: string | null
           coach_user_id: string
           created_at: string
           ends_at: string | null
@@ -298,17 +299,25 @@ export type Database = {
           event_date: string | null
           start_time: string | null
           event_type: string
+          home_away: string | null
           id: string
+          kit: string | null
+          meet_time: string | null
           notes: string | null
           opponent: string | null
+          organization_id: string | null
           published: boolean
+          sequence: number
+          series_id: string | null
           source: string
           starts_at: string
+          status: string
           title: string
           updated_at: string
           venue: string | null
         }
         Insert: {
+          cancel_reason?: string | null
           coach_user_id: string
           created_at?: string
           ends_at?: string | null
@@ -316,17 +325,25 @@ export type Database = {
           event_date?: string | null
           start_time?: string | null
           event_type?: string
+          home_away?: string | null
           id?: string
+          kit?: string | null
+          meet_time?: string | null
           notes?: string | null
           opponent?: string | null
+          organization_id?: string | null
           published?: boolean
+          sequence?: number
+          series_id?: string | null
           source?: string
           starts_at: string
+          status?: string
           title: string
           updated_at?: string
           venue?: string | null
         }
         Update: {
+          cancel_reason?: string | null
           coach_user_id?: string
           created_at?: string
           ends_at?: string | null
@@ -334,12 +351,19 @@ export type Database = {
           event_date?: string | null
           start_time?: string | null
           event_type?: string
+          home_away?: string | null
           id?: string
+          kit?: string | null
+          meet_time?: string | null
           notes?: string | null
           opponent?: string | null
+          organization_id?: string | null
           published?: boolean
+          sequence?: number
+          series_id?: string | null
           source?: string
           starts_at?: string
+          status?: string
           title?: string
           updated_at?: string
           venue?: string | null

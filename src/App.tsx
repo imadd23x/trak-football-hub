@@ -40,6 +40,7 @@ const DevSwitcher = import.meta.env.DEV
 const PlayerHome = lazy(() => import("./pages/player/PlayerHome"));
 const PlayerMatches = lazy(() => import("./pages/player/PlayerMatches"));
 const PlayerMatchDetail = lazy(() => import("./pages/player/PlayerMatchDetail"));
+const PlayerEvent = lazy(() => import("./pages/player/PlayerEvent"));
 const PlayerProfilePage = lazy(() => import("./pages/player/PlayerProfilePage"));
 const PlayerFeedback = lazy(() => import("./pages/player/PlayerFeedback"));
 const HowTrakWorks = lazy(() => import("./pages/HowTrakWorks"));
@@ -122,6 +123,7 @@ const App = () => (
             <Route path="/player/home" element={<RouteGuard allowedRole="player"><PlayerHome /></RouteGuard>} />
             <Route path="/player/matches" element={<RouteGuard allowedRole="player"><PlayerMatches /></RouteGuard>} />
             <Route path="/player/match/:id" element={<RouteGuard allowedRole="player"><PlayerMatchDetail /></RouteGuard>} />
+            <Route path="/player/event/:id" element={<RouteGuard allowedRole="player"><PlayerEvent /></RouteGuard>} />
             <Route path="/player/profile" element={<RouteGuard allowedRole="player"><PlayerProfilePage /></RouteGuard>} />
             <Route path="/player/passport" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerPassport /></ParkedScreen></RouteGuard>} />
             <Route path="/player/evolution" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerEvolutionCard /></ParkedScreen></RouteGuard>} />

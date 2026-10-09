@@ -1,3 +1,4 @@
+import { format, parseISO } from 'date-fns'
 import { displayEventTime } from './event-time'
 
 /**
@@ -77,6 +78,16 @@ export function toPlayerEvent(row: Record<string, unknown>): PlayerEvent | null 
   }
 }
 
+/**
+ * PostgREST filter for "from today on". An untimed event is stored at local
+ * midnight, so filtering on the instant would drop it from its own day the
+ * moment the clock passed 00:00; the calendar day decides, with the instant
+ * as the fallback for rows written before event_date existed.
+ */
+export function upcomingEventsFilter(now: Date = new Date()): string {
+  return `event_date.gte.${now.toLocaleDateString('en-CA')},and(event_date.is.null,starts_at.gte.${now.toISOString()})`
+}
+
 /** "Match vs Rivals FC (away)", the coach's title, or the type. */
 export function eventHeading(event: PlayerEvent): string {
   if (event.kind === 'match' && event.opponent) {
@@ -84,6 +95,11 @@ export function eventHeading(event: PlayerEvent): string {
   }
   return event.title?.trim() || EVENT_KIND_LABEL[event.kind]
 }
+
+/** "Sat 14 Nov", from the calendar day itself. */
+export const eventDay = (event: PlayerEvent) => format(parseISO(event.date), 'EEE d MMM')
+/** The coach's time, or "Time to be confirmed": never midnight. */
+export const eventTime = (event: PlayerEvent) => event.time ?? 'Time to be confirmed'
 
 // ── "Changed" until opened ──────────────────────────────────────────────────
 // Per device, like the parent bell (ParentAlertsBell): for each event, the

@@ -20,6 +20,7 @@ const TRAINING = { session_id: 'session-1', session_date: '2026-10-04', focus: [
 beforeEach(() => {
   signInAs(PLAYER)
   server.use(
+    table('coach_calendar_events', []), // TRAK-130: the Sessions tab also reads upcoming events
     table('profiles', [{ id: 'p', user_id: PLAYER.id, role: 'player', full_name: 'Synthetic Player' }]),
     table('matches', [MATCH]),
     rpc('family_training_history', () => [TRAINING]),

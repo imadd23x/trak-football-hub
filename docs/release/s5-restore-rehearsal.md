@@ -1,14 +1,16 @@
 # S5 — recovery procedure and restore rehearsal
 
-Owner: Kostas. Updated 8 October 2026. **Restore remains unrehearsed; no recovery
+Owner: Kostas. Updated 9 October 2026. **Restore remains unrehearsed; no recovery
 duration has been measured.** This is an unexecuted procedure, not recovery proof.
+**A rehearsal on an isolated copy is now required before real families** (Imad,
+9 October; TRAK-150, part of the live tests).
 
 ## Accepted risk and pending disclosure
 
 The decision on TRAK-23, 2 October 2026 at 19:18:57 UTC, supersedes the older open
 TRAK-46 note: daily backups retained for seven days, no point-in-time recovery
-(PITR), and acceptance of the unrehearsed
-restore risk for the pilot. There is no staging environment. A second synthetic
+(PITR). The earlier acceptance of an unrehearsed restore was replaced on 9
+October by the required rehearsal above. There is no staging environment. A second synthetic
 academy inside production is an isolation fixture, not a separate environment or
 backup.
 

@@ -309,10 +309,11 @@ Real children join only when every gate passes and a founder majority says go:
 5. Counsel approves data roles, notice, withdrawal/deletion and retention,
    including planned event/calendar processing. Pilot plus 90 days remains a
    proposed retention period, not approved policy.
-6. Backup and written recovery procedures exist. The recorded 2 October
-   decision accepts daily backups retained for seven days, no PITR and an
-   unrehearsed restore. The go decision records that limitation and potential
-   loss of writes since the latest backup. Recovery duration is unmeasured.
+6. Backup and written recovery procedures exist, and **a restore rehearsal on
+   an isolated copy passes, with the recovery time measured** (Imad, 9 October;
+   TRAK-150, part of the live tests). The 2 October decision keeps daily backups
+   retained for seven days and no PITR; the go decision records the potential
+   loss of writes since the latest backup.
 7. The agreed support path is ready: academy staff and founders in a WhatsApp
    group, without parents or children. The first of Tarek, Imad or Kostas to
    read owns the response and fix. The internal aim is two hours; no response time is promised.
@@ -349,8 +350,6 @@ A founder majority decides restart, subject to legal duties.
   fallback), the email sender's proven delivery (TRAK-126), and whether
   switching events off should also hide existing events, calendar feeds and
   emails. Decided link revocation still needs implementation and rehearsal.
-- Whether to rehearse a restore on an isolated copy before real families
-  (recommended by the 9 October independent audit; not yet a founder decision).
 - Changes during the pilot: permitted features/fixes, notice, deploy window,
   emergency review rule and duty rota. The 8 October discussion is a proposal;
   existing review/merge requirements continue until a new rule is agreed and

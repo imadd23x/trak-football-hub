@@ -15,7 +15,8 @@ There is no staging environment; production previews share the backend. An
 isolated restore rehearsal requires a separate, explicitly configured target.
 The decision recorded on TRAK-23 on 2 October 2026 at 19:18:57 UTC supersedes the
 older open TRAK-46 note: daily backups retained for seven days, no PITR,
-and an accepted risk that restore has not been rehearsed. No recovery duration is
+and, since 9 October, a required restore rehearsal on an isolated copy before
+real families (TRAK-150). No recovery duration is
 proven. **Academy disclosure is pending:** the academy has not been briefed.
 Record the disclosure and go decision before launch. See [the restore procedure](release/s5-restore-rehearsal.md).
 

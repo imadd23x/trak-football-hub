@@ -62,8 +62,10 @@ change (#221) lands, which waits until after the smallest credible product.
 
 ## During the pilot: decision open
 
-The 8 October discussion has not settled which features or fixes may ship,
-notice periods, the deployment window, urgent-change approval or a duty rota.
+**Urgent fixes keep one independent review, with no bypass** (Imad, 9 October):
+a frontend rollback can't undo a database change, and Rehearsal FC shares the
+production database. The 8 October discussion has not settled which features or
+fixes may ship, notice periods, the deployment window or a duty rota.
 A 48-hour notice, a quiet deployment window, a 15-minute verification period
 and rollback in seconds are proposals, not established policy or measured
 capabilities. Existing review and release requirements continue until an agreed
@@ -117,13 +119,13 @@ proof; otherwise leave Verifying and record the blocker.
 5. The coordinator resumes the merge queue after the release is verified.
    Restart after an incident covered by the pilot pause rule requires a founder
    majority, subject to legal duties. A privacy or safeguarding incident also
-   follows the runbook's escalation path. The urgent-change approval policy
-   remains open; these steps do not create a bypass.
+   follows the runbook's escalation path. Urgent changes still need one
+   independent review; these steps do not create a bypass.
 
 The last recorded decision (2 October, TRAK-23, superseding the earlier open
-TRAK-46 note) accepts daily backups retained for seven days, no point-in-time
-recovery and an unrehearsed restore for the pilot. These settings need checking
-at admission; recovery duration remains unmeasured. A restore can lose writes
+TRAK-46 note) keeps daily backups retained for seven days and no point-in-time
+recovery. On 9 October Imad added a restore rehearsal on an isolated copy before
+real families (TRAK-150); until it runs, recovery duration remains unmeasured. A restore can lose writes
 since the selected backup. See [the restore record](s5-restore-rehearsal.md)
 before any restore; a database restore is not a frontend rollback.
 

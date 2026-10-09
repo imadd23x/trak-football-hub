@@ -118,7 +118,7 @@
 <li>For J8, enable events for the designated synthetic academy and leave the other off, using the implemented operator control once available. Record the switch state and test its off behavior; this script supplies no speculative SQL.</li>
 <li>There is no staging environment. Coordinate writes and fixture cleanup on the shared backend. Existing seed data does not prove admission, consent, email delivery or calendar behavior.</li>
 <li>Record pilot cohort/window and <code>count_synthetic</code> before changing them for a designated run; restore the agreed state afterwards. Real-pilot reports must exclude synthetic accounts.</li>
-<li>The academy briefing is still pending. No staging, daily backups retained for seven days, no PITR and an unrehearsed restore remain disclosures to make before launch; no recovery duration is proven.</li>
+<li>The academy briefing is still pending. No staging, daily backups retained for seven days and no PITR remain disclosures to make before launch. The restore rehearsal on an isolated copy (TRAK-150) is part of these live tests; record its measured recovery time here.</li>
 </ul>
 <p class="small">Check boxes are working notes only. Put durable, redacted evidence on the assigned issue: commit · deployment · device · synthetic identity · date/time · expected/observed result. Do not include passwords, codes, tokens, full calendar links or family data.</p>
 </section>

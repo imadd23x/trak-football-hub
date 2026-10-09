@@ -787,6 +787,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      child_events: {
+        Args: { p_child: string }
+        Returns: {
+          id: string
+          event_type: string
+          title: string
+          event_date: string | null
+          start_time: string | null
+          starts_at: string
+          meet_time: string | null
+          venue: string | null
+          kit: string | null
+          opponent: string | null
+          home_away: string | null
+          status: string
+          cancel_reason: string | null
+          sequence: number
+        }[]
+      }
       create_parent_invite: {
         Args: { p_email: string }
         Returns: {

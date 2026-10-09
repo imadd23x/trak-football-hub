@@ -12,17 +12,19 @@ const TYPE_COLOR: Record<PlayerEvent['kind'], string> = {
  * One upcoming event (TRAK-130). `nextUp` is the home card; otherwise a row
  * in the Sessions tab's list. Either opens the event page.
  */
-export function UpcomingEventCard({ event, changed, nextUp = false }: {
+export function UpcomingEventCard({ event, changed, nextUp = false, linkBase = '/player/event' }: {
   event: PlayerEvent
   changed: boolean
   nextUp?: boolean
+  /** The event page's route; parents open /parent/event (J8.8). */
+  linkBase?: string
 }) {
   const cancelled = event.status === 'cancelled'
   const heading = eventHeading(event)
   const where = [event.meetTime ? `Meet ${event.meetTime}` : null, event.venue].filter(Boolean).join(' · ')
   return (
     <Link
-      to={`/player/event/${event.id}`}
+      to={`${linkBase}/${event.id}`}
       aria-label={nextUp ? `Next up: ${heading}` : undefined}
       className="flex items-stretch gap-3 rounded-[14px] p-3.5"
       style={{ background: '#101012', border: `1px solid ${cancelled ? 'hsl(var(--destructive) / 0.5)' : 'rgba(255,255,255,0.06)'}` }}

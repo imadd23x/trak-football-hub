@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { ParentAssessmentBands, ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
 import { ParentAlertsBell } from '@/components/parent/ParentAlertsBell'
+import { ParentUpcomingEvents } from '@/components/parent/ParentEvents'
 import { ApprovedAwaitingList } from '@/components/parent/ApprovedAwaitingSignup'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatches, useRosterChildrenAwaitingConsent, useChildLogins } from '@/hooks/useParentData'
@@ -77,6 +78,8 @@ export default function ParentHome() {
                     {[details.position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
                   </p>}
                 </div>
+                {/* J8.8 (TRAK-131): what's next for the selected child. */}
+                <ParentUpcomingEvents nextUpOnly />
                 {matches.length > 0 && (
                   <section className="rounded-xl p-5 mb-4 bg-card border border-border" aria-label="Recorded matches summary">
                     <div className="flex items-start justify-between gap-3">

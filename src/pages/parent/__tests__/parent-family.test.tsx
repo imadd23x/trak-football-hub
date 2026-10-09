@@ -75,6 +75,8 @@ function installFamily() {
     http.post(endpoint('rpc/get_children_awaiting_consent'), () => HttpResponse.json([])),
     // TRAK-77: Matches also lists the selected child's training; none here.
     http.post(endpoint('rpc/family_training_history'), () => HttpResponse.json([])),
+    // J8.8 (TRAK-131): Home and Matches read the selected child's events.
+    http.post(endpoint('rpc/child_events'), () => HttpResponse.json([])),
   )
 }
 

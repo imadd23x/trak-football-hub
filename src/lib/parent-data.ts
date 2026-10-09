@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client'
 import { scoreToBand } from '@/lib/rating-engine'
 import type { Tables } from '@/integrations/supabase/types'
+import { toPlayerEvent, upcomingEventsFilter, type PlayerEvent } from '@/lib/player-events'
 
 export interface ParentChild {
   id: string
@@ -61,6 +62,29 @@ export async function fetchParentMatches(childId: string, signal: AbortSignal): 
     .order('created_at', { ascending: false }).abortSignal(signal).retry(false)
   if (error) throw error
   return data ?? []
+}
+
+/**
+ * The selected child's upcoming events (TRAK-131, J8.8) through child_events(),
+ * which applies THAT child's consent: RLS alone would still list a squad's
+ * events for a withdrawn sibling of a consented child.
+ */
+export async function fetchParentEvents(childId: string, signal: AbortSignal): Promise<PlayerEvent[]> {
+  const { data, error } = await supabase.rpc('child_events', { p_child: childId })
+    .or(upcomingEventsFilter())
+    .order('event_date', { ascending: true, nullsFirst: false })
+    .order('starts_at', { ascending: true })
+    .limit(20).abortSignal(signal)
+  if (error) throw error
+  return (data ?? []).map(row => toPlayerEvent(row)).filter((e): e is PlayerEvent => e !== null)
+}
+
+/** One of the selected child's events, or null when that child can't see it. */
+export async function fetchParentEvent(childId: string, eventId: string, signal: AbortSignal): Promise<PlayerEvent | null> {
+  const { data, error } = await supabase.rpc('child_events', { p_child: childId })
+    .eq('id', eventId).abortSignal(signal).maybeSingle()
+  if (error) throw error
+  return data ? toPlayerEvent(data) : null
 }
 
 export async function fetchParentDevelopment(childId: string, signal: AbortSignal): Promise<ParentDevelopment> {

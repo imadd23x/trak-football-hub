@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
-import { fetchAwaitingConsent, fetchParentDevelopment, fetchParentMatches } from '@/lib/parent-data'
+import { fetchAwaitingConsent, fetchParentDevelopment, fetchParentEvents, fetchParentMatches } from '@/lib/parent-data'
 import { fetchRosterAwaitingConsent, fetchMyChildLogins, fetchApprovedAwaitingSignup } from '@/lib/parent-consent'
 
 export function useParentMatches() {
@@ -9,6 +9,18 @@ export function useParentMatches() {
   return useQuery({
     queryKey: ['parent', parentId, childId, 'matches'],
     queryFn: ({ signal }) => fetchParentMatches(childId!, signal),
+    enabled: !!parentId && !!childId,
+    networkMode: 'always',
+  })
+}
+
+/** The selected child's upcoming events (J8.8). Refetches on refocus, so a withdrawal shows at once (TRAK-88). */
+export function useParentEvents() {
+  const { parentId, selectedChild } = useParentChildren()
+  const childId = selectedChild?.id
+  return useQuery({
+    queryKey: ['parent', parentId, childId, 'events'],
+    queryFn: ({ signal }) => fetchParentEvents(childId!, signal),
     enabled: !!parentId && !!childId,
     networkMode: 'always',
   })

@@ -86,6 +86,8 @@ beforeEach(() => {
     http.post(endpoint('rpc/get_my_approved_children_awaiting_signup'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_my_child_credentials'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_children_awaiting_consent'), () => HttpResponse.json([])),
+    // J8.8 (TRAK-131): Home reads the selected child's events.
+    http.post(endpoint('rpc/child_events'), () => HttpResponse.json([])),
     http.post(endpoint('telemetry_events'), () => new HttpResponse(null, { status: 201 })),
     http.all('*', ({ request }) => { unexpected.push(`${request.method} ${request.url}`); return new HttpResponse(null, { status: 500 }) }),
   )

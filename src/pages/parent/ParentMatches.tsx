@@ -4,6 +4,7 @@ import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoadin
 import { useParentMatches } from '@/hooks/useParentData'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { TrainingHistory } from '@/components/player/TrainingHistory'
+import { ParentUpcomingEvents } from '@/components/parent/ParentEvents'
 import { formatParentDate, matchResult } from '@/lib/parent-data'
 
 export default function ParentMatches() {
@@ -18,6 +19,8 @@ export default function ParentMatches() {
         <h1 className="text-xl text-foreground mb-5">Matches</h1>
         <ParentChildSelector />
         <ParentFamilyContent>
+          {/* J8.8 (TRAK-131): the selected child's upcoming events. */}
+          <ParentUpcomingEvents />
           {query.isError ? <ParentLoadError message="Couldn't load matches." onRetry={() => { void query.refetch() }} />
             : query.isPending ? <ParentLoading />
               : matches.length === 0 ? <p className="text-sm text-muted-foreground text-center py-12">No matches yet.</p>

@@ -102,6 +102,7 @@ beforeEach(() => {
     rpc('get_roster_children_awaiting_consent', () => []),
     // Player and parent Matches also list training (TRAK-76/77); none here.
     rpc('family_training_history', () => []),
+    rpc('child_events', () => []),
     http.post(`${SUPABASE_URL}/auth/v1/token`, () => {
       const previous = JSON.parse(localStorage.getItem('sb-test-auth-token')!)
       const user = structuredClone(previous.user)

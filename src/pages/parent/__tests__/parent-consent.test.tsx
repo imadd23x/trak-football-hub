@@ -45,7 +45,7 @@ function expectedGrant(childId: string) {
   return {
     p_player_user_id: childId,
     p_relationship: 'parent',
-    p_purposes: { coaching_records: true, recognition: false, parent_visibility: false },
+    p_purposes: { coaching_records: true, recognition: false },
     p_notice_version: CONSENT_NOTICE_VERSION,
     p_consent_text: CONSENT_STATEMENT,
   }
@@ -94,7 +94,9 @@ async function openConsent(replies: PendingReply[]) {
 async function approveAlex() {
   await screen.findByRole('heading', { name: "Approve Alex Synthetic's account" })
   expect(screen.getByRole('checkbox', { name: /recognition awards/i })).not.toBeChecked()
-  expect(screen.getByRole('checkbox', { name: /I can see their progress/i })).not.toBeChecked()
+  // TRAK-145: no "I can see their progress" choice; parent viewing is part of the required consent.
+  expect(screen.queryByRole('checkbox', { name: /I can see their progress/i })).toBeNull()
+  expect(screen.getByText(/You see their bands and their match and training history/)).toBeInTheDocument()
   const button = screen.getByRole('button', { name: "Approve Alex Synthetic's account" })
   expect(button).toBeDisabled()
   await userEvent.click(screen.getByRole('checkbox', { name: CONSENT_STATEMENT }))
@@ -262,14 +264,13 @@ describe('parent consent read and grant recovery through the real route', () => 
     expect(window.location.pathname).toBe('/parent/consent')
     expect(screen.queryByText(/Approval saved for/i)).not.toBeInTheDocument()
     const chosenGrant = { ...expectedGrant(childA.player_user_id), p_relationship: 'legal_guardian',
-      p_purposes: { coaching_records: true, recognition: true, parent_visibility: false } }
+      p_purposes: { coaching_records: true, recognition: true } }
     expect(grantBodies).toEqual([chosenGrant])
     expect(pendingBodies).toEqual([{}])
 
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     await screen.findByRole('heading', { name: "Approve Alex Synthetic's account" })
     expect(screen.getByRole('checkbox', { name: /recognition awards/i })).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: /I can see their progress/i })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: CONSENT_STATEMENT })).toBeChecked()
     expect(screen.getByRole('button', { name: "Approve Alex Synthetic's account" })).toBeEnabled()
     expect(pendingBodies).toEqual([{}, {}])
@@ -289,16 +290,14 @@ describe('parent consent read and grant recovery through the real route', () => 
     await screen.findByRole('heading', { name: "Approve Alex Synthetic's account" })
     await userEvent.click(screen.getByRole('button', { name: 'Legal guardian' }))
     await userEvent.click(screen.getByRole('checkbox', { name: /recognition awards/i }))
-    await userEvent.click(screen.getByRole('checkbox', { name: /I can see their progress/i }))
     await userEvent.click(screen.getByRole('checkbox', { name: CONSENT_STATEMENT }))
     await userEvent.click(screen.getByRole('button', { name: "Approve Alex Synthetic's account" }))
     await screen.findByRole('heading', { name: "Approve Blair Synthetic's account" })
     expect(screen.getByRole('checkbox', { name: /recognition awards/i })).not.toBeChecked()
-    expect(screen.getByRole('checkbox', { name: /I can see their progress/i })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: CONSENT_STATEMENT })).not.toBeChecked()
     expect(screen.getByRole('button', { name: "Approve Blair Synthetic's account" })).toBeDisabled()
     expect(grantBodies).toEqual([{ ...expectedGrant(childA.player_user_id), p_relationship: 'legal_guardian',
-      p_purposes: { coaching_records: true, recognition: true, parent_visibility: true } }])
+      p_purposes: { coaching_records: true, recognition: true } }])
 
     await userEvent.click(screen.getByRole('checkbox', { name: CONSENT_STATEMENT }))
     await userEvent.click(screen.getByRole('button', { name: "Approve Blair Synthetic's account" }))

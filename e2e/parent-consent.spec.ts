@@ -18,7 +18,7 @@ function expectedGrant(childId: string) {
   return {
     p_player_user_id: childId,
     p_relationship: 'parent',
-    p_purposes: { coaching_records: true, recognition: false, parent_visibility: false },
+    p_purposes: { coaching_records: true, recognition: false },
     p_notice_version: CONSENT_NOTICE_VERSION,
     p_consent_text: CONSENT_STATEMENT,
   }
@@ -131,7 +131,6 @@ test('saved approval survives a failed refresh, then retries to a fresh child be
     await expect(page.getByRole('heading', { name: "Approve Alex Synthetic's account" })).toBeVisible()
     await page.getByRole('button', { name: 'Legal guardian', exact: true }).click()
     await page.getByRole('checkbox', { name: /recognition awards/i }).check()
-    await page.getByRole('checkbox', { name: /I can see their progress/i }).check()
     await page.getByRole('checkbox', { name: CONSENT_STATEMENT }).check()
     await page.getByRole('button', { name: "Approve Alex Synthetic's account" }).click()
     await expect.poll(() => fixture.grants.length).toBe(1)
@@ -157,7 +156,8 @@ test('saved approval survives a failed refresh, then retries to a fresh child be
     await page.getByRole('button', { name: 'Retry', exact: true }).click()
     await expect(page.getByRole('heading', { name: "Approve Blair Synthetic's account" })).toBeVisible()
     await expect(page.getByRole('checkbox', { name: /recognition awards/i })).not.toBeChecked()
-    await expect(page.getByRole('checkbox', { name: /I can see their progress/i })).not.toBeChecked()
+    // TRAK-145: the progress choice is gone; parent viewing is part of the required consent.
+    await expect(page.getByRole('checkbox', { name: /I can see their progress/i })).toHaveCount(0)
     await expect(page.getByRole('checkbox', { name: CONSENT_STATEMENT })).not.toBeChecked()
     await expect(page.getByRole('button', { name: "Approve Blair Synthetic's account" })).toBeDisabled()
     expect(fixture.pending).toHaveLength(3)
@@ -172,7 +172,7 @@ test('saved approval survives a failed refresh, then retries to a fresh child be
     await expect.poll(() => fixture.pending.length).toBe(5)
     expect(fixture.grants.map(request => request.body)).toEqual([
       { ...expectedGrant(childA.player_user_id), p_relationship: 'legal_guardian',
-        p_purposes: { coaching_records: true, recognition: true, parent_visibility: true } },
+        p_purposes: { coaching_records: true, recognition: true } },
       expectedGrant(childB.player_user_id),
     ])
     expect(fixture.pending.map(request => request.body)).toEqual([{}, {}, {}, {}, {}])

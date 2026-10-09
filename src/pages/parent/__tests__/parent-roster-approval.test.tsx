@@ -103,7 +103,7 @@ describe('TRAK-11 phase 4: approving a child who has no account yet', () => {
     await waitFor(() => expect(grants).toEqual([{
       p_roster_child_id: ana.roster_child_id,
       p_relationship: 'parent',
-      p_purposes: { coaching_records: true, recognition: false, parent_visibility: false },
+      p_purposes: { coaching_records: true, recognition: false },
       p_notice_version: CONSENT_NOTICE_VERSION,
       p_consent_text: CONSENT_STATEMENT,
     }]))

@@ -66,7 +66,7 @@ forgetting this is the usual reason a merged change appears to do nothing:
 | `src/**` | `deploy` job, on merge to `main` |
 | `supabase/migrations/*.sql` | `supabase` job (`db push`), on merge to `main` |
 | `supabase/functions/**` | `supabase` job (`functions deploy`), on merge to `main` |
-| `email-templates/*.html` | **Do not copy the current repository files into the live dashboard.** They have not been reconciled with the working dashboard templates; see the warning below. |
+| `email-templates/*.html` | Supabase dashboard → Authentication → Emails → Templates, **by hand**. The files equal the live templates as of 8 Oct 2026; see below. |
 
 Merging to `main` ships the frontend *and* the backend. The `supabase` job runs
 before `deploy`, so a build that calls a new RPC can never reach production ahead
@@ -79,32 +79,33 @@ service-role key. It passes `--db-url` and `--project-ref` explicitly instead, s
 the token needs only Edge Functions and Migrations. Required secrets:
 `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `SUPABASE_DB_URL`.
 
-### Email templates: live export required
+### Email templates
 
-The repository's email templates are stale as of 8 October 2026. Copying them
-into Supabase could restore the one-click links that Microsoft's email scanner
-used before families could sign in (TRAK-107).
+The four files in `email-templates/` equal the live Supabase templates as
+exported by Kostas on 8 October 2026 (after his 17:19 UTC dashboard fixes;
+TRAK-142). The dashboard is where they run: CI does not deploy them. Change a
+template in the dashboard and in its file together, in one reviewed PR.
 
-Kostas must export the complete live HTML and subject for each of the four
-emails before these files are reconciled. Preserve the existing filenames.
-The recorded working flows differ:
+| File | Dashboard template | Subject |
+|---|---|---|
+| `invite-parent.html` | Invite user | `You're invited to Trak` |
+| `magic-link.html` | Magic link / OTP | `{{ if .Data.child_first_name }}{{ .Data.academy_name }} has added {{ .Data.child_first_name }} to Trak{{ else }}Your Trak sign-in code{{ end }}` |
+| `reset-password.html` | Reset password | `Reset your Password` |
+| `confirm-signup.html` | Confirm signup | `Confirm your Trak Account` |
 
-- **Invite user, Magic Link and Reset Password:** display `{{ .Token }}` and
-  send the person to `/auth/code`. Their full HTML, including fallback links,
-  must contain no `{{ .ConfirmationURL }}`, `{{ .TokenHash }}` or
-  `/auth/continue` link. Keep the Magic Link wording for a second child from
-  TRAK-118.
-- **Confirm signup:** retains the separate `/auth/confirm` flow. TRAK-117
-  explicitly kept its confirmation-and-sign-out behavior; do not convert it
-  to the code flow as part of this documentation update.
+- **Invite, Magic Link and Reset Password** show `{{ .Token }}` and link only
+  to `/auth/code`, where the person types the code. A one-click
+  `{{ .ConfirmationURL }}` is what Microsoft's scanner used up before families
+  could sign in (TRAK-107).
+- **Confirm signup** keeps its separate `/auth/confirm?token_hash=` flow
+  (TRAK-117).
+- Go evaluates `{{ ... }}` actions even inside HTML comments, so never write
+  one in a comment.
 
-The [typed-code change](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/236),
-[second-child email change](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/240)
-and [signup-confirmation change](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/239)
-record the intended behavior. They do not replace a fresh dashboard export.
-These templates are managed manually in the dashboard; the repository's CI
-does not deploy them. Replacing the repository copies requires no dashboard
-change.
+`src/__tests__/email-templates.test.ts` fails if any file regains a
+`{{ .ConfirmationURL }}` or an `/auth/continue` link, if a code email links
+anywhere but `/auth/code`, or if a file contains non-ASCII characters (which
+turn into mojibake when Gmail strips the charset).
 
 `supabase/config.toml` is the source of truth for each function's `verify_jwt`;
 a value changed in the dashboard is overwritten on the next deploy.

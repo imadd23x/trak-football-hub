@@ -132,8 +132,11 @@ describe('J8.4: the coach creates, edits and cancels events', () => {
     expect(writes).toEqual([])
   })
 
-  it.each([['error', 'the request fails'], ['no-row', 'the database refuses the row']] as const)(
-    'keeps what was typed and says what failed when %s (%s)', async mode => {
+  it.each([
+    { mode: 'error', why: 'the request fails' },
+    { mode: 'no-row', why: 'the database refuses the row' },
+  ] as const)(
+    'keeps what was typed and says what failed when $mode ($why)', async ({ mode }) => {
       await open()
       failWrites = mode
       await userEvent.click(screen.getByRole('button', { name: 'Add event' }))

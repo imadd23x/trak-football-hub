@@ -192,9 +192,10 @@ TRAK-25 defines nine acceptance checks; check 9 was added on 8 October:
 
 1. Create eight weeks of weekly training in under two minutes.
 2. Every affected player and parent sees changes/cancellations on next app
-   load; the parent's bell includes them. Same-day changes/cancellations also
-   reach guardians, and players who have their own email, by email within 60
-   seconds.
+   load; the parent's bell includes them. A cancellation of a published event
+   (whatever its date, Imad 9 October) and a same-day change also reach
+   guardians, and players who have their own email, by email within 60 seconds,
+   in Gmail and Microsoft 365 inboxes.
 3. Apple, Google and Outlook subscriptions show new, changed and cancelled
    events after refresh without duplicates, tested on real phones.
 4. Withdrawal removes the child's events from the app and calendar link on

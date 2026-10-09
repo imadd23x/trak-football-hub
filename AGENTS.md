@@ -56,8 +56,9 @@ remains hidden; the pilot uses `/coach/assess`. Existing AI handlers return
 - The consent screen must offer only choices the backend enforces. The
   unenforced "I can see their progress" box was removed for that reason
   (TRAK-145, notice `2026-10-09.1`); bump `CONSENT_NOTICE_VERSION` whenever the
-  wording changes. Family reads follow active consent; a known gap is a
-  withdrawn child's own attendance (TRAK-147) and squad events (TRAK-125).
+  wording changes. Family reads follow active consent; the known gap is a
+  withdrawn child's own attendance (TRAK-147). Squad events follow consent
+  since J8.2 (TRAK-125, #254). A published event is cancelled, never deleted.
 
 ## Local work and checks
 
@@ -96,13 +97,14 @@ historical migrations cannot safely be rerun. New public tables start without
 Production is `trakfootball.com` on Vercel, with Supabase as the backend.
 The canonical main workflow applies pending migrations and deploys functions
 before deploying the frontend. Vercel's Git integration is disabled, so the
-frontend ships only after `test` passes. **Migrations and edge functions do not
-wait for main's tests:** an earlier path, most likely Supabase's GitHub
-integration, applies them about a minute after a merge. On 8 October, #249's
-migration was live at 20:15:21 UTC and main's tests finished at 20:24:59. So
-the PR's own checks on an up-to-date branch are the real gate for database
-changes, and merging is deploying (TRAK-148 decides whether to switch that
-path off). A PR preview shares the backend; there is no separate staging
+frontend ships only after `test` passes. **Migrations and edge functions also
+wait for main's tests now.** Until 9 October, Supabase's GitHub integration
+applied them about a minute after a merge. Kostas switched its production
+deploy off at 14:10 UTC that day (TRAK-148). The next migration, #254's, was
+absent while main's `test` ran and arrived from the `supabase` job after it
+passed, about 12 minutes after the merge. A failed `test` on main therefore
+stops the database change too, but a merged migration still goes live without
+a further approval. A PR preview shares the backend; there is no separate staging
 environment. Use reviewed deployments for production changes, never
 development SQL on the shared project.
 

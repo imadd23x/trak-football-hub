@@ -64,13 +64,13 @@ disabled (`git.deploymentEnabled: false` in `vercel.json`), so `.github/workflow
 is the only route for the **frontend** — the `deploy` job needs `test`, so no
 frontend reaches production unless lint, typecheck, tests and build all passed.
 
-**Database migrations and edge functions don't wait for main's tests.** An
-earlier path, most likely Supabase's own GitHub integration, applies them about
-a minute after a merge to `main`. On 8 October, #249 merged at 20:13:15 UTC, its
-migration was live by 20:15:21 and main's tests finished at 20:24:59; the
-`supabase` job then found it already applied. So the PR's checks on an
-up-to-date branch are the real gate for database changes: treat merging as
-deploying. Whether to switch that path off is decided in TRAK-148.
+**Database migrations and edge functions now wait for main's tests too.** Until
+9 October, Supabase's own GitHub integration applied them about a minute after a
+merge to `main`, before the tests finished. Kostas switched its production
+deploy off at 14:10 UTC that day (TRAK-148). The next migration, #254's
+(merged 17:33:18 UTC), was absent while `test` ran and arrived from the
+`supabase` job (17:44:50 to 17:45:13) after it passed. A merged migration still
+goes live with no further approval, so review database changes as deployments.
 
 The Supabase half of the app ships separately from the frontend, and
 forgetting this is the usual reason a merged change appears to do nothing:
@@ -78,8 +78,8 @@ forgetting this is the usual reason a merged change appears to do nothing:
 | What changed | How it ships |
 |---|---|
 | `src/**` | `deploy` job, on merge to `main` |
-| `supabase/migrations/*.sql` | about a minute after merge (see above), then the `supabase` job (`db push`) |
-| `supabase/functions/**` | about a minute after merge (see above), then the `supabase` job (`functions deploy`) |
+| `supabase/migrations/*.sql` | `supabase` job (`db push`), after `test` passes on `main` |
+| `supabase/functions/**` | `supabase` job (`functions deploy`), after `test` passes on `main` |
 | `email-templates/*.html` | Supabase dashboard → Authentication → Email Templates, **by hand** |
 
 Merging to `main` ships the frontend *and* the backend. The `supabase` job runs

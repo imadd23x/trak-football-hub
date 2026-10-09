@@ -82,12 +82,13 @@ rather than describing it as already disclosed.
 Wait for the full workflow before the next schema merge. Canonical main's
 workflow serializes production releases. It applies pending migrations and
 edge functions, then deploys the frontend only after a successful Supabase job.
-**A merged migration or function is usually live before that:** an earlier
-path, most likely Supabase's GitHub integration, applies it about a minute
-after the merge, while main's tests are still running (8 October: #249's
-migration live at 20:15:21 UTC, tests finished 20:24:59). Treat the merge as
-the deploy, and check `supabase_migrations.schema_migrations` straight after it.
-TRAK-148 decides whether to switch that path off.
+Since 9 October that is the only path. Supabase's GitHub integration used to
+apply a merged migration or function about a minute after the merge, before
+main's tests finished. Kostas switched its production deploy off at 14:10 UTC
+(TRAK-148), and #254's migration then arrived only from the Supabase job,
+after `test` passed (17:44:50 to 17:45:13 UTC, merge at 17:33:18). Check
+`supabase_migrations.schema_migrations` after the Supabase job. A migration
+that appears before it means the integration is back on: tell Kostas.
 Missing production credentials fail the workflow. Fork CI cannot deploy
 production. Preview deployments share the backend and do not prove a new
 migration before it is applied.

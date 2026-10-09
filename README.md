@@ -1,6 +1,10 @@
 # Trak Football
 
-Performance tracking app for youth football players, coaches, parents, and club admins.
+Youth football coaching records for players, coaches and linked guardians.
+The first pilot's required journeys, including events, are defined in
+[MVP Requirements](MVP%20Requirements); recorded evidence is in
+[PILOT-INDEX](docs/use-cases/PILOT-INDEX.md). A feature's presence in the source
+does not establish that it is admitted to the pilot.
 
 ## Prerequisites
 
@@ -19,15 +23,15 @@ cd trak-football-hub
 # If you use nvm:
 nvm install
 nvm use
-npm ci
+npm ci --legacy-peer-deps
 
 # 3. Configure environment
 cp .env.example .env
 # Edit .env and fill in your Supabase URL and publishable key (sb_publishable_…)
 
-# 4. Apply database migrations
-# Open your Supabase project → SQL Editor
-# Run each file in supabase/migrations/ in chronological order
+# 4. Use a disposable development database
+# Replay migrations in filename order; see AGENTS.md.
+# Never run development SQL against the shared production project.
 
 # 5. Start the dev server
 npm run dev
@@ -40,8 +44,10 @@ Without nvm, install Node 22 some other way. npm refuses a different Node major 
 ## Running Tests
 
 ```bash
-npm test          # watch mode
-npm test -- --run # single run (used in CI)
+npm test            # source tests, once (used in CI)
+npm run test:watch  # watch mode
+npm run test:harness
+npm run uc:check    # enforced use cases block; pending failures are reported
 ```
 
 ## Linting & Build
@@ -55,23 +61,32 @@ npm run build     # Vite production build → dist/
 
 Production is **trakfootball.com**, hosted on Vercel. Vercel's own Git integration is
 disabled (`git.deploymentEnabled: false` in `vercel.json`), so `.github/workflows/ci.yml`
-is the only route to a deployment — the `deploy` job needs `test`, meaning nothing
-reaches production unless lint, typecheck, tests and build all passed first.
+is the only route for the **frontend** — the `deploy` job needs `test`, so no
+frontend reaches production unless lint, typecheck, tests and build all passed.
 
-Nothing else auto-deploys. The Supabase half of the app ships separately, and
+**Database migrations and edge functions now wait for main's tests too.** Until
+9 October, Supabase's own GitHub integration applied them about a minute after a
+merge to `main`, before the tests finished. Kostas switched its production
+deploy off at 14:10 UTC that day (TRAK-148). The next migration, #254's
+(merged 17:33:18 UTC), was absent while `test` ran and arrived from the
+`supabase` job (17:44:50 to 17:45:13) after it passed. A merged migration still
+goes live with no further approval, so review database changes as deployments.
+
+The Supabase half of the app ships separately from the frontend, and
 forgetting this is the usual reason a merged change appears to do nothing:
 
 | What changed | How it ships |
 |---|---|
 | `src/**` | `deploy` job, on merge to `main` |
-| `supabase/migrations/*.sql` | `supabase` job (`db push`), on merge to `main` |
-| `supabase/functions/**` | `supabase` job (`functions deploy`), on merge to `main` |
+| `supabase/migrations/*.sql` | `supabase` job (`db push`), after `test` passes on `main` |
+| `supabase/functions/**` | `supabase` job (`functions deploy`), after `test` passes on `main` |
 | `email-templates/*.html` | Supabase dashboard → Authentication → Emails → Templates, **by hand**. The files equal the live templates as of 8 Oct 2026; see below. |
 
 Merging to `main` ships the frontend *and* the backend. The `supabase` job runs
-before `deploy`, so a build that calls a new RPC can never reach production ahead
-of the migration that creates it, and a failed migration stops the frontend from
-shipping at all.
+before `deploy`, so a build that calls a new RPC can't reach production ahead of
+the migration that creates it, and a failed migration stops the frontend from
+shipping. It does not stop a bad migration that the earlier path already
+applied.
 
 The `supabase` job deliberately does not run `supabase link`: linking fetches the
 project's API keys, which would mean giving the CI token read access to the
@@ -165,13 +180,18 @@ supabase/
 
 | Role | Sign-up path | Key features |
 |---|---|---|
-| **Player** | Invite code from coach | Match history, evolution card, passport, coach feedback |
-| **Coach** | Direct sign-up | Squad management, assessments, match logging, AI assistant |
-| **Parent** | Link token from player | View child's matches, assessments, alerts |
-| **Club admin** | Direct sign-up (club role) | Cross-squad overview, movement radar |
+| **Player** | Academy roster, guardian consent, then email invitation or guardian-created username/password | Bands, coach message, coach-recorded history |
+| **Coach** | Coordinated academy setup | Squad, completed sessions, attendance and assessments |
+| **Parent** | Academy-supplied guardian address and invitation | Consent, selected child's bands/history, child activation and recovery |
+| **Club admin** | Coordinated academy setup | Academy console remains coming soon |
+
+J8 events and family calendars are required for launch and still await their
+implementation and deployed rehearsal. AI, recognition, passport/sharing and
+child photos remain outside the pilot.
 
 ## Contributing
 
-1. Create a feature branch off `main`
-2. Run `npm test -- --run` and `npm run build` before pushing
-3. CI (GitHub Actions) runs lint + test + build automatically on every push
+Read [AGENTS.md](AGENTS.md) and [the release gate](docs/release/merge-gate.md)
+before editing. Work on the assigned issue in a branch, record checks and
+limitations, and obtain an independent review. The CI workflow defines its
+triggered branches and checks; a local commit alone does not run it.

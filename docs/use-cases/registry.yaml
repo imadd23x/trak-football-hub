@@ -514,19 +514,23 @@ use_cases:
       - The eight-week schedule is created in under two minutes
     source: https://linear.app/trak-football/issue/TRAK-25
 
+  # v2, 9 Oct 2026: Imad decided on 8 Oct that a same-day change or
+  # cancellation also emails players who have their own email, not only
+  # guardians (TRAK-25, TRAK-135). A no-email child's login address is never
+  # mailed.
   - id: UC-E02
     actor: system
     title: Deliver event changes and cancellations to affected families
     requirement: J8
     status: pending
     tier: [1, 2]
-    spec_version: 1
+    spec_version: 2
     given: A scheduled event with affected players and parents
     when: The coach changes or cancels the event
     then:
       - Every affected player and parent sees the change or cancellation on their next app load
       - The change or cancellation appears in the parent's bell
-      - A same-day change or cancellation also reaches guardians by email within 60 seconds
+      - A same-day change or cancellation also reaches guardians, and players who have their own email, by email within 60 seconds
     source: https://linear.app/trak-football/issue/TRAK-25
 
   - id: UC-E03

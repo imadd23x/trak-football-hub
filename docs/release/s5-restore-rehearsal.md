@@ -12,8 +12,7 @@ restore risk for the pilot. There is no staging environment. A second synthetic
 academy inside production is an isolation fixture, not a separate environment or
 backup.
 
-**The academy has not been briefed. Disclosure is pending**, with a meeting expected
-in the coming weeks. Record that disclosure and the accepted risk in the launch
+**The academy has not been briefed. Disclosure is pending.** Record that disclosure and the accepted risk in the launch
 decision. A backup and this written procedure do not establish a recovery time or
 prove that all application services can be restored. Admission still requires the
 full [MVP launch gate](../../MVP%20Requirements), including J8, and founder-majority go.
@@ -61,7 +60,7 @@ exports containing private configuration out of the public repository.
 ### Planned J8 services and access state
 
 The expanded [TRAK-25](https://linear.app/trak-football/issue/TRAK-25) scope has nine
-acceptance checks and 18 implementation issues, all Todo when reviewed on 8 October.
+acceptance checks and 18 implementation issues; their status lives in Linear.
 It introduces recovery concerns that must be added to an executed procedure once
 the services exist; this document supplies no invented tables or commands:
 
@@ -74,8 +73,11 @@ the services exist; this document supplies no invented tables or commands:
   backup can revive an old hash/revocation state, so reconcile later revocations
   before permitting requests. Validate every still-valid link after a target change;
   the feed endpoint remains undecided. Cached phone entries are a separate limitation.
-- Configure the new ordinary-email sender separately from Supabase Auth mail.
-  Provider, region, sender and server-side secrets remain to be selected (TRAK-126).
+- Configure the event-email sender separately from Supabase Auth mail: Resend,
+  called by `send-email`, with the `RESEND_API_KEY` and `EMAIL_FROM` function
+  secrets (TRAK-126). Function secrets are not in a database backup; re-enter them.
+- Re-insert the `academy_features` rows (Rehearsal FC's `events` switch today) if a
+  restore predates them, or events stay off for that academy.
   Do not assume an Auth template or SMTP setting recovers event notifications.
 - Inspect urgent-change delivery state and two-day reminder schedules, opt-outs,
   retry/deduplication records and job failures (TRAK-135/136). Restoring old state

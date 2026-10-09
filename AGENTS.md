@@ -13,6 +13,9 @@ issue, with its `TRAK-#` and J/G or scope/launch-gate purpose in the title.
 Follow [the release gate](docs/release/merge-gate.md) before review, merge or
 release. Imad coordinates the merge queue in #coding-agents-at-work. The owner
 moves merged work to Verifying, then Done after recording deployed proof.
+**Announce migrations and shared-file changes in #coding-agents-at-work before
+editing them**, so two agents don't change the same tables or files at once.
+Commit only green; never bypass the pre-commit hook.
 
 This repository is public. Keep academy identities, competitor analysis and
 private meeting/artifact links out of new documentation and evidence. Use
@@ -50,9 +53,11 @@ remains hidden; the pilot uses `/coach/assess`. Existing AI handlers return
   wording and colors; keep player-visible messages separate from private notes.
 - The roster owns the child's name. A child email is optional. Use the existing
   guardian-created login/recovery flow for a child without email (TRAK-84).
-- Before changing consent, read the discrepancy recorded in MVP J2: optional
-  parent visibility is stored but does not control family reads. Reconcile
-  wording and enforcement; do not promise a choice the backend ignores.
+- The consent screen must offer only choices the backend enforces. The
+  unenforced "I can see their progress" box was removed for that reason
+  (TRAK-145, notice `2026-10-09.1`); bump `CONSENT_NOTICE_VERSION` whenever the
+  wording changes. Family reads follow active consent; a known gap is a
+  withdrawn child's own attendance (TRAK-147) and squad events (TRAK-125).
 
 ## Local work and checks
 
@@ -90,14 +95,21 @@ historical migrations cannot safely be rerun. New public tables start without
 
 Production is `trakfootball.com` on Vercel, with Supabase as the backend.
 The canonical main workflow applies pending migrations and deploys functions
-before deploying the frontend. Vercel's Git integration is disabled. A PR
-preview shares the backend; there is no separate staging environment. Use
-reviewed deployments for production changes, never development SQL on the
-shared project.
+before deploying the frontend. Vercel's Git integration is disabled, so the
+frontend ships only after `test` passes. **Migrations and edge functions do not
+wait for main's tests:** an earlier path, most likely Supabase's GitHub
+integration, applies them about a minute after a merge. On 8 October, #249's
+migration was live at 20:15:21 UTC and main's tests finished at 20:24:59. So
+the PR's own checks on an up-to-date branch are the real gate for database
+changes, and merging is deploying (TRAK-148 decides whether to switch that
+path off). A PR preview shares the backend; there is no separate staging
+environment. Use reviewed deployments for production changes, never
+development SQL on the shared project.
 
 `supabase/config.toml` controls function JWT settings. `vercel.json` controls
 rewrites, caching and CSP; verify allowed origins when adding an integration.
-Email templates are managed separately in the dashboard. Read the
-[README export warning](README.md#email-templates-live-export-required) before
-touching them: repository copies are stale and must await the complete live
-exports. Signup confirmation has a different flow from the three code emails.
+Email templates run in the Supabase dashboard; CI never deploys them. Read the
+email-template notes in the [README](README.md) before touching them (TRAK-142
+brings the repository copies in line with the live ones). Never use
+`{{ .ConfirmationURL }}`: Microsoft's link scanner uses up one-click links
+(TRAK-107). Signup confirmation has a different flow from the three code emails.

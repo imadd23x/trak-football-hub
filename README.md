@@ -61,23 +61,32 @@ npm run build     # Vite production build → dist/
 
 Production is **trakfootball.com**, hosted on Vercel. Vercel's own Git integration is
 disabled (`git.deploymentEnabled: false` in `vercel.json`), so `.github/workflows/ci.yml`
-is the only route to a deployment — the `deploy` job needs `test`, meaning nothing
-reaches production unless lint, typecheck, tests and build all passed first.
+is the only route for the **frontend** — the `deploy` job needs `test`, so no
+frontend reaches production unless lint, typecheck, tests and build all passed.
 
-Nothing else auto-deploys. The Supabase half of the app ships separately, and
+**Database migrations and edge functions don't wait for main's tests.** An
+earlier path, most likely Supabase's own GitHub integration, applies them about
+a minute after a merge to `main`. On 8 October, #249 merged at 20:13:15 UTC, its
+migration was live by 20:15:21 and main's tests finished at 20:24:59; the
+`supabase` job then found it already applied. So the PR's checks on an
+up-to-date branch are the real gate for database changes: treat merging as
+deploying. Whether to switch that path off is decided in TRAK-148.
+
+The Supabase half of the app ships separately from the frontend, and
 forgetting this is the usual reason a merged change appears to do nothing:
 
 | What changed | How it ships |
 |---|---|
 | `src/**` | `deploy` job, on merge to `main` |
-| `supabase/migrations/*.sql` | `supabase` job (`db push`), on merge to `main` |
-| `supabase/functions/**` | `supabase` job (`functions deploy`), on merge to `main` |
+| `supabase/migrations/*.sql` | about a minute after merge (see above), then the `supabase` job (`db push`) |
+| `supabase/functions/**` | about a minute after merge (see above), then the `supabase` job (`functions deploy`) |
 | `email-templates/*.html` | Supabase dashboard → Authentication → Email Templates, **by hand** |
 
 Merging to `main` ships the frontend *and* the backend. The `supabase` job runs
-before `deploy`, so a build that calls a new RPC can never reach production ahead
-of the migration that creates it, and a failed migration stops the frontend from
-shipping at all.
+before `deploy`, so a build that calls a new RPC can't reach production ahead of
+the migration that creates it, and a failed migration stops the frontend from
+shipping. It does not stop a bad migration that the earlier path already
+applied.
 
 The `supabase` job deliberately does not run `supabase link`: linking fetches the
 project's API keys, which would mean giving the CI token read access to the

@@ -134,7 +134,7 @@
   <p class="lede">Data categories, source access controls and open decisions for the first UAE pilot.</p>
   <div class="mast-meta">
     <span><b>Baseline</b> <code>d0ed55ff618ee0a0b943399236527f9e3f7ebbb5</code></span>
-    <span><b>Scope</b> 123 migrations; 28 public base tables after drops</span>
+    <span><b>Scope</b> 124 migrations; 29 public base tables after drops (main <code>386d255</code>, 9 Oct 2026)</span>
     <span><b>Evidence</b> Repository inspection, not a live database audit</span>
   </div>
   <p class="small">Read with <a href="../MVP%20Requirements">MVP Requirements</a> and the <a href="lawyer-meeting-brief-uae.md">UAE counsel brief</a>. Current source, retained legacy data and planned requirements are distinguished below. Auth, storage, provider logs and operator files are additional to the public tables.</p>
@@ -148,7 +148,7 @@
   </div>
   <div class="alarm">
     <h3>The academy has not been briefed</h3>
-    <p>A meeting is planned in the coming weeks. Scope, data responsibilities, notices, retention, suppliers, calendar exposure and recovery limitations have not been accepted by the academy. Counsel decisions and operational confirmations remain open.</p>
+    <p>The academy has not yet been briefed. Scope, data responsibilities, notices, retention, suppliers, calendar exposure and recovery limitations have not been accepted by the academy. Counsel decisions and operational confirmations remain open.</p>
   </div>
   <div class="grid-2">
     <div class="card">
@@ -157,7 +157,7 @@
     </div>
     <div class="card">
       <h3>The consent choice and access control differ</h3>
-      <p class="small">The routed screen requires <code>coaching_records</code> and offers <code>recognition</code> and <code>parent_visibility</code> as optional. Database approval checks use active coaching consent; a false parent-visibility choice does not independently block linked-parent history reads. Recognition authoring is separately parked. Align the screen, enforcement and final notice before relying on the approval.</p>
+      <p class="small">The routed screen requires <code>coaching_records</code>, which now states what linked parents see (bands, and match and training history; never the coach's message or private notes), and offers <code>recognition</code> as the only optional choice; recognition authoring is parked. The unenforced optional <code>parent_visibility</code> box was removed on 9 October 2026 (TRAK-145, notice version <code>2026-10-09.1</code>); consents recorded earlier keep their stored choice as history. Counsel reviews the final wording.</p>
     </div>
     <div class="card">
       <h3>Classification and retention need answers</h3>
@@ -178,7 +178,7 @@
   </div>
   <div class="tbl-scroll">
     <table>
-      <caption class="small">28 public base tables implied by the source migrations</caption>
+      <caption class="small">29 public base tables implied by the source migrations (production matched on 9 October 2026)</caption>
       <thead><tr><th scope="col">Table</th><th scope="col">Data category</th><th scope="col">Status and access in source</th></tr></thead>
       <tbody>
         <tr><td class="tbl-name">profiles</td><td>Name, role, nationality, account link; legacy avatar URL and coach code.</td><td>Self and role/relationship policies; club admin reads are organization-scoped. New avatar use is disabled.</td></tr>
@@ -198,11 +198,12 @@
         <tr><td class="tbl-name">coach_shared_feedback</td><td>Separately written coach message, assessment link and publication time.</td><td>Owning coach; child reads published content with required consent. Parents cannot read the message. No automatic copying of private notes.</td></tr>
         <tr><td class="tbl-name">matches</td><td>Date, opponent, scores, competition, venue, position, minutes, goals, assists, cards, ratings and logging actor.</td><td>Coach writes through a guarded function; family reads of coach-logged matches follow consent. Retained player-logged rows have an explicit read exception. Account export is separate. Player INSERT/UPDATE and app DELETE are closed. Legacy body-condition/self-rating columns remain; the routed coach flow sends null.</td></tr>
         <tr><td class="tbl-name">coach_sessions</td><td>Training/match type, date, title, focus, venue, competition, notes and coach.</td><td>Coach diary plus scoped admin reads. Families receive only the training projection below. Session context is associated with children through attendance.</td></tr>
-        <tr><td class="tbl-name">session_attendance</td><td>Child/session link, presence and minutes played.</td><td>Coach access requires session and roster ownership. The consent-gated family history function returns date, focus and own-child attendance, excluding diary title/notes.</td></tr>
+        <tr><td class="tbl-name">session_attendance</td><td>Child/session link, presence and minutes played.</td><td>Coach access requires session and roster ownership. The consent-gated family history function returns date, focus and own-child attendance, excluding diary title/notes. Gap: a player's direct read of their own attendance rows has no consent check, so a withdrawn child can still see them (TRAK-147).</td></tr>
         <tr><td class="tbl-name">telemetry_events</td><td>User ID, role, event type, JSON metadata and time.</td><td>App users append own events. Raw table reads and pilot reports are service-role-only; account export includes the caller's events. This includes behavioural data about children.</td></tr>
         <tr><td class="tbl-name">pilot_config</td><td>Pilot date/organization, measurement configuration and synthetic-account inclusion switch.</td><td>Operational configuration; service-role access. J7 uses it to scope counts.</td></tr>
         <tr><td class="tbl-name">recognition_awards</td><td>Child, award, reason, coach note and provenance.</td><td>Parked: app writes denied. Retained table reads follow owner, scoped admin and consent-gated family policies; account export is separate.</td></tr>
-        <tr><td class="tbl-name">coach_calendar_events</td><td>Title, event type, dates/times, venue, opponent, notes, published flag and source.</td><td>Legacy calendar: app writes denied. Coach and published family reads remain. This is squad time/location data; no J8 subscription or recurrence schema is present.</td></tr>
+        <tr><td class="tbl-name">academy_features</td><td>Academy and feature name (only <code>events</code> today), with the time it was switched on.</td><td>Operator-only per-academy switch (TRAK-124, 8 Oct 2026); no app role can read or change it. A row means the feature is on. No child data.</td></tr>
+        <tr><td class="tbl-name">coach_calendar_events</td><td>Title, event type, dates/times, venue, opponent, notes, published flag and source.</td><td>A coach writes their own events only while their academy's events switch is on (TRAK-124; Rehearsal FC only, since 8 Oct 2026); otherwise writes are denied. Coach reads, and published family reads, remain. Family reads do not yet check consent: a withdrawn child's family can still read the coach's published events (TRAK-125). Free-text titles, venues and notes could hold a child's name. This is squad time/location data; no J8 subscription or recurrence schema is present yet.</td></tr>
         <tr><td class="tbl-name">meeting_requests</td><td>Coach/child links, meeting reason, status and time.</td><td>Parked: app access revoked. Retained data remains accessible to the service role.</td></tr>
         <tr><td class="tbl-name">admin_notes</td><td>Free text about a child or coach, author, target and organization.</td><td>Console parked, table retained. Author-ID read/write policies remain; do not describe all console backends as closed.</td></tr>
         <tr><td class="tbl-name">staff_compliance</td><td>Staff licensing, DBS status/expiry, safeguarding, first aid and notes.</td><td>Adult staff data. App writes parked; organization-scoped admin SELECT retained.</td></tr>
@@ -214,7 +215,7 @@
   </div>
   <div class="callout">
     <h3>Dropped and disabled are different</h3>
-    <p><code>wellness_logs</code> and <code>player_goals</code> are dropped by migration. They are excluded from the 28-table count. Parked tables and avatar objects can retain earlier data. No statement here confirms the contents of the live database or historical supplier copies.</p>
+    <p><code>wellness_logs</code> and <code>player_goals</code> are dropped by migration. They are excluded from the 29-table count. Parked tables and avatar objects can retain earlier data. No statement here confirms the contents of the live database or historical supplier copies.</p>
   </div>
 </section>
 
@@ -227,7 +228,7 @@
     <div class="card">
       <h3>Supabase Auth and email</h3>
       <p class="small">Auth processes identities, credentials and sessions. For a child without email, the guardian-created username maps to an internal address under <code>child.trakfootball.com</code>; this is not a mailbox. Create/reset handlers pass passwords to Auth without storing them in application tables or returning them. Reset attempts to end existing child sessions and reports a partial outcome if that step fails.</p>
-      <p class="small">Roster emails carry the recipient address and invitation context, including child first name and organization name. Auth's invitation and sign-in APIs deliver them. The actual Auth delivery provider, dashboard templates, expiry settings, message/log retention and processing regions need operational confirmation. J8 also requires a general event-email sender; its provider, region and from address are open in TRAK-126.</p>
+      <p class="small">Roster emails carry the recipient address and invitation context, including child first name and organization name. Auth's invitation and sign-in APIs deliver them. The actual Auth delivery provider, dashboard templates, expiry settings, message/log retention and processing regions need operational confirmation. J8 event emails use a separate sender: Resend, from <code>noreply@trakfootball.com</code>, called by the <code>send-email</code> code (TRAK-126, merged 8 October 2026). Its account owner states the EU (Ireland, eu-west-1) region; that, the secrets and SPF/DKIM delivery are pending proof on TRAK-126. Resend is a further processor of recipient addresses and event details for counsel's supplier review.</p>
     </div>
     <div class="card">
       <h3>Hosting and monitoring</h3>
@@ -250,7 +251,7 @@
   <div class="sec-head">
     <div class="eyebrow">04 &nbsp;Confirmed requirements, implementation pending</div>
     <h2 id="planned">J8 events and post-pilot data</h2>
-    <p class="small">TRAK-25, updated 8 October 2026 at 14:19 UTC, has nine launch checks and 18 slices (TRAK-124–141), all Todo when reviewed. These planned categories are additional to the source inventory above. They do not increase its current table count or establish deployed behaviour.</p>
+    <p class="small">TRAK-25 has nine launch checks and 18 slices (TRAK-124–141); their status lives in Linear, and only the off switch is built. These planned categories are additional to the source inventory above. They do not increase its current table count or establish deployed behaviour.</p>
   </div>
   <div class="card">
     <h3>Events belong in the first real-child pilot</h3>
@@ -262,11 +263,11 @@
       <thead><tr><th scope="col">Flow</th><th scope="col">Planned data</th><th scope="col">Agreed boundary</th></tr></thead>
       <tbody>
         <tr><td>Events and series</td><td>Academy/squad, type, date/time, duration, meet time, venue/saved venues; opponent, home/away, kit; status, cancellation reason, series ID and change sequence.</td><td>Owning coach writes behind the organization switch. Families see their squad/linked child's events with active consent. Weekly repetition creates dated rows through an inclusive end date in Dubai time. Cancellation retains the event.</td></tr>
-        <tr><td>Fixture import</td><td>CSV fixture fields; PDF source material if that path is selected; preview corrections and confirmed events.</td><td>CSV is read in the browser, previewed and confirmed before saving; repeat imports deduplicate. PDF method is open: local typed-PDF parsing or operator conversion. No AI parsing. Do not assume a server file store for browser-only import.</td></tr>
+        <tr><td>Fixture import</td><td>CSV fixture fields; preview corrections and confirmed events.</td><td>CSV is read in the browser, previewed and confirmed before saving; repeat imports deduplicate. CSV only: PDF reading is out for now (8 Oct). No AI parsing. Do not assume a server file store for browser-only import.</td></tr>
         <tr><td>Personal calendar link</td><td>Person/account, token hash, label, created/revoked/last-fetch metadata and authorized event feed.</td><td>One personal link per person; possession of the token authorizes access without an app login. Parent scope covers children with active consent; player scope is their squad. Stable event IDs and sequences; cancelled entries retained. No child names or coach notes.</td></tr>
         <tr><td>Extra family links</td><td>Guardian-created label, token hash, selected child/all-child and matches/all-event scope, lifecycle/fetch metadata.</td><td>Optional named links for relatives/drivers without accounts, each revocable separately and tied to the guardian's continuing access. Same no-child-name feed rule. Low-priority J8 slice, not an implemented capability.</td></tr>
         <tr><td>App change notices</td><td>New/changed/cancelled event state and per-user seen/opened state.</td><td>Parent bell is scoped to the selected child; player sees their squad. No coach message or private note added to parent views.</td></tr>
-        <tr><td>Event emails</td><td>Guardian addresses, event/old-to-new details, reminder preferences, grouping and send/deduplication/retry outcomes.</td><td>Today/tomorrow changes reach consented guardians; same-day delivery target is 60 seconds. Two-day reminders group all children's events into one guardian email per day. Settings opt-out; no state-changing email links. No child names in subjects or coach notes/messages. Player change-email recipients remain open.</td></tr>
+        <tr><td>Event emails</td><td>Guardian addresses, the address of a player who has their own email, event/old-to-new details, reminder preferences, grouping and send/deduplication/retry outcomes.</td><td>Today/tomorrow changes reach consented guardians and consented players with their own email (never a no-email child's login address); same-day delivery target is 60 seconds. Only published events are emailed. Two-day reminders group all children's events into one guardian email per day. Settings opt-out; no state-changing email links. No child names in subjects or coach notes/messages.</td></tr>
         <tr><td>Absence and completed register</td><td>Event/child, reporting guardian, time, optional short reason; later confirmed attendance and completed session link.</td><td>Only linked guardians with active consent report “Can't make it”, undoable until start. Coach sees own-squad absences; families never see other children's absences. Expected attendance is the default, not a completed record. Coach reviews/saves after the event through the consent-checked session path; no duplicate session on retry.</td></tr>
         <tr><td>Manual WhatsApp share</td><td>Squad, type, date/time, venue, meet time, kit and cancellation details in prefilled text.</td><td>Coach selects recipient/group and sends in WhatsApp. No child names or absence list; no automatic posting or account integration. Shared text creates copies outside Trak.</td></tr>
       </tbody>
@@ -280,7 +281,7 @@
     </div>
     <div class="card">
       <h3>Actual open choices</h3>
-      <p class="small">Event email provider, region and from address (TRAK-126); local PDF parser/dependency versus operator conversion (TRAK-129); feed endpoint location (TRAK-132); verified Android subscription fallback if needed (TRAK-133); and whether players with email receive change notices (TRAK-135, guardians only by default). Lifecycle periods, notices, rights handling, provider terms and the review of free-text/cached/shared copies remain counsel and operational questions.</p>
+      <p class="small">Proof of the event-email sender's region and delivery (TRAK-126); feed endpoint location (TRAK-132); verified Android subscription fallback if needed (TRAK-133); and whether switching events off should also hide existing events, feeds and emails (today it blocks coach writes only). Lifecycle periods, notices, rights handling, provider terms and the review of free-text/cached/shared copies remain counsel and operational questions.</p>
     </div>
   </div>
   <div class="card">

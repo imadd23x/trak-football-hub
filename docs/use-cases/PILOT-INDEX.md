@@ -1,8 +1,8 @@
 # First pilot: journey index
 
-Updated 8 October 2026 against source `d0ed55f` and the dated evidence below.
-**The pilot is not launch-ready:** J8 is required but not implemented or
-rehearsed, and admission still requires every launch gate in MVP Requirements.
+Updated 9 October 2026 against main `386d255` and the dated evidence below.
+**The pilot is not launch-ready:** J8 is required and only its off switch is
+built, and admission still requires every launch gate in MVP Requirements.
 The academy briefing and risk disclosures have not yet happened.
 
 Tracks the P0 journeys and guarantees in [MVP Requirements](../../MVP%20Requirements) and what has been proven for each one. That file defines the scope. This file only records progress. Current assignments, dependencies and delivery status live in the [Linear pilot project](https://linear.app/trak-football/project/trak-first-real-child-pilot-38b7cba7d7ff). This index records deployed journey evidence; it is not a second task board.
@@ -18,8 +18,8 @@ A row passes only on the **deployed** build, under real roles. Record evidence a
 | J5 Assessment and message | Kostas | UC-C03, UC-C04 (enforced) | **Pass, TRAK-24 run 3.** `c080135` · CI 37012802094 (bundle `index-CzAoreWH.js`) · Apple devices (iPhone, iPad, Mac) · run-3 synthetic roles · 2 Oct 2026. coach.u15 assessed on the attended session only (15:30:28), with a published message and a private note (TRAK-100). The database refuses an unattended session (G1 check, 23514) **Runs 4–5:** `c406896` · CI 37180822129 (bundle `index-DhOmvAa2.js`) · 4 Oct; `eb72a9a` (bundle `index-BpUutIw9.js`) and `cee5db1` · CI 37366011299 (bundle `index-LeBP9wzv.js`) · 5 Oct. A score of 0 shows Difficult on the child's home (TRAK-110, run 5 live). Rehearsal United's coach assessed their own child only. |
 | J6 Player and parent see it | Tarek (player), Imad (parent) | UC-A04, UC-X02 (enforced); UC-A09, UC-P02, UC-P03, UC-P06 (pending) | **Pass for one child, TRAK-24 run 3.** `c080135` · CI 37012802094 (bundle `index-CzAoreWH.js`) · Apple devices (iPhone, iPad, Mac) · run-3 synthetic roles · 2 Oct 2026. The player saw the band, six bars, the message and match and training history, never the private note. The guardian saw bands and history, and the bell (2 alerts) opened the match. Run 3 did not cover a sibling switch with both children assessed (TRAK-74): the second sibling had no data. Run 4 below covers it. **Run 4 (both siblings assessed):** `c406896` · CI 37180822129 (bundle `index-DhOmvAa2.js`) · 4 Oct. Switching child showed only that child's data, and the bell followed (TRAK-6, TRAK-74, TRAK-77). No coach message for the guardian, no private note for the child. The player tab is now Sessions, with a Training chip (TRAK-112, live 5 Oct). |
 | J7 Measure | Kostas | UC-T01 (pending) | Not verified on the real academy. Kostas read the J7 counts for run 3 with `count_synthetic` on, then set it back to false (2 Oct). `pilot_config` pointed at the synthetic rehearsal academy in this evidence **Run 4:** the 3 username children of `.test` families are now synthetic (TRAK-108, 38 → 41 ids). Still not verified on the real academy. |
-| J8 Events and family calendars | Individual owners on TRAK-124–141 | UC-E01–UC-E09 (pending) | **No implementation or rehearsal proof established. Required before the first real-child pilot.** [TRAK-25](https://linear.app/trak-football/issue/TRAK-25), updated 8 Oct 2026 at 14:19 UTC, is Todo with 18 scoped subissues (TRAK-124–141). The nine checks below all remain pending. |
-| G1–G7 Guarantees | Owner of each write/read path | UC-X01 (pending) | **Pass as a set, TRAK-24 run 3** (Tarek). `c080135` · CI 37012802094 (bundle `index-CzAoreWH.js`) · Apple devices (iPhone, iPad, Mac) · run-3 synthetic roles · 2 Oct 2026. 15:53–15:57 UTC: 37/37 database checks as the real run-3 roles, rolled back, each with a CONTROL that the data exists; 5/5 over HTTP (AI functions 403, photos private). Table on TRAK-24 **5 Oct, G3 across two academies (TRAK-12):** 29/29 rolled-back checks as real roles. No reads either way, no writes either way, siblings 0, and 7 controls see their own. |
+| J8 Events and family calendars | Individual owners on TRAK-124–141 | UC-E01–UC-E09 (pending) | **Required before the first real-child pilot; not rehearsed.** [TRAK-25](https://linear.app/trak-football/issue/TRAK-25) has 18 slices (TRAK-124–141); their status lives in Linear. **Proven so far: J8.1, the per-academy off switch** ([TRAK-124](https://linear.app/trak-football/issue/TRAK-124), #249 · `e29c651` · CI 37837805463 · 8 Oct 2026). Live as the real roles: with Rehearsal FC switched on (20:26:54 UTC), its coach could create an event and Rehearsal United's coach was refused (42501); coaches can't read the switch table; Rehearsal FC coaches see the schedule without the Coming soon pill. The switch gates coach writes only, not family reads, feeds or emails. The nine checks below all remain pending. |
+| G1–G7 Guarantees | Owner of each write/read path | UC-X01 (pending) | **Pass as a set, TRAK-24 run 3** (Tarek). `c080135` · CI 37012802094 (bundle `index-CzAoreWH.js`) · Apple devices (iPhone, iPad, Mac) · run-3 synthetic roles · 2 Oct 2026. 15:53–15:57 UTC: 37/37 database checks as the real run-3 roles, rolled back, each with a CONTROL that the data exists; 5/5 over HTTP (AI functions 403, photos private). Table on TRAK-24 **5 Oct, G3 across two academies (TRAK-12):** 29/29 rolled-back checks as real roles. No reads either way, no writes either way, siblings 0, and 7 controls see their own. **Known G6 gaps (9 Oct, independent audit, confirmed on prod):** a child whose consent was withdrawn can still read their own attendance rows ([TRAK-147](https://linear.app/trak-football/issue/TRAK-147)) and their coach's published events ([TRAK-125](https://linear.app/trak-football/issue/TRAK-125)). Assessment reads correctly return nothing. |
 
 The run-6 J2/J3 evidence above reconciles the same records as [PR #243](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/pull/243), reviewed by Kostas on 6 Oct and merged on 8 Oct (`fa53d1f`). It is evidence from the deployed `d0ed55f` build.
 
@@ -40,8 +40,8 @@ The run-6 J2/J3 evidence above reconciles the same records as [PR #243](https://
 | UC-E09 | A parent or player adds Trak to their phone calendar in one tap from signup on iPhone, Android with Google, and Outlook. | Pending |
 
 The 8 October slices also require a per-academy off switch without a deploy
-([TRAK-124](https://linear.app/trak-football/issue/TRAK-124)), match kit and meet
-time ([TRAK-127](https://linear.app/trak-football/issue/TRAK-127)), CSV/PDF fixture
+([TRAK-124](https://linear.app/trak-football/issue/TRAK-124), done), match kit and meet
+time ([TRAK-127](https://linear.app/trak-football/issue/TRAK-127)), CSV fixture
 import with preview ([TRAK-129](https://linear.app/trak-football/issue/TRAK-129)),
 and private calendar links per person
 ([TRAK-132](https://linear.app/trak-football/issue/TRAK-132)). Attendance follows
@@ -50,6 +50,8 @@ the school-register model: everyone is assumed coming, a parent can report
 ([TRAK-137](https://linear.app/trak-football/issue/TRAK-137),
 [TRAK-138](https://linear.app/trak-football/issue/TRAK-138)). Manual WhatsApp
 sharing is in scope ([TRAK-139](https://linear.app/trak-football/issue/TRAK-139)).
+A saved event stays a coach-only draft until the coach taps Publish; families see
+only published events (9 Oct).
 
 Implementation choices still open in the slices are recorded in
 [OPEN-QUESTIONS](./OPEN-QUESTIONS.md).

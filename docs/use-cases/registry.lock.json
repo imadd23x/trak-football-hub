@@ -116,8 +116,8 @@
     "hash": "41db6fd74d04e031007bec850658d618ea14c1771192d9d1f8c643136266c51b"
   },
   "UC-E02": {
-    "spec_version": 1,
-    "hash": "1a9200a74ceaffc62e78013979ebeca9b6f6cb1c9fd64084f9c80f402bb9e790"
+    "spec_version": 2,
+    "hash": "769b9555949308c0fbc253b43ba565ce526732474a5e6b515c4727a64d27eebf"
   },
   "UC-E03": {
     "spec_version": 1,

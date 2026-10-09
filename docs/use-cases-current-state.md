@@ -33,7 +33,7 @@ its migrations before changing it; file existence is not behavioral proof.
 | J5 Assessment and message | Assessment on an attended completed session; one Save publishes the child-facing message; private note is coach-only. | [CoachAssessPage](../src/pages/coach/CoachAssessPage.tsx), [coach player profile](../src/pages/coach/CoachPlayerProfilePage.tsx), [private/shared split](../supabase/migrations/20260918135500_private_notes_and_shared_feedback.sql) | TRAK-5/63/64/68/100; registry UC-C04 remains enforced. |
 | J6 Family readback | Child sees message and bands; parent sees selected child's bands/history, never the message or private notes. Failed load is distinguishable from empty data. | [PlayerHome](../src/pages/player/PlayerHome.tsx), [ParentHome](../src/pages/parent/ParentHome.tsx), [family context](../src/contexts/ParentChildrenContext.tsx), [parent-message exclusion](../supabase/migrations/20260926120000_parents_do_not_read_coach_messages.sql), [consent-aware family reads](../supabase/migrations/20260927130000_family_reads_follow_consent.sql) | TRAK-6/71/74/77; run-4 sibling-switch proof is recorded in PILOT-INDEX. |
 | J7 Measurement | Weekly coach-assessment counts and distinct player/parent assessment opens for the configured cohort; exclude synthetic accounts. | [J7 measurement views](../supabase/migrations/20260926130000_pilot_j7_measure.sql), PlayerHome and ParentHome telemetry, [runbook](pilot-runbook.md) | TRAK-10. A player open means the message was shown, not deliberate reading. Value targets and a better reading measure remain open. |
-| J8 Events | Weekly schedules; fixture import; match kit; family app views and private calendar links with one-tap setup; change/cancellation delivery; parent absence response and coach attendance; withdrawal and isolation; manual WhatsApp sharing. | [TRAK-25](https://linear.app/trak-football/issue/TRAK-25), its 18 scoped subissues TRAK-124–141, MVP Requirements J8, registry UC-E01–UC-E09 | Required before launch. TRAK-25 is Todo as of 8 Oct, 14:19 UTC; specific choices remain open in the slices. No implementation or real-phone rehearsal proof established. Existing calendar code is not proof of the new contract. |
+| J8 Events | Weekly schedules; fixture import; match kit; family app views and private calendar links with one-tap setup; change/cancellation delivery; parent absence response and coach attendance; withdrawal and isolation; manual WhatsApp sharing. | [TRAK-25](https://linear.app/trak-football/issue/TRAK-25), its 18 scoped subissues TRAK-124–141, MVP Requirements J8, registry UC-E01–UC-E09 | Required before launch. Slice status lives in Linear; only the per-academy off switch is built and proven (TRAK-124, 8 Oct). No real-phone rehearsal proof established. Existing calendar code is not proof of the new contract. |
 
 ## Safety and parked surfaces
 
@@ -46,7 +46,7 @@ together: a retained screen or schema is not permission to use a parked feature.
 AI tools and AI schedule import, player passport/sharing, child photos, recognition,
 player-entered match logging and academy console remain outside the pilot.
 Lineups and broader matchday planning remain parked under
-[TRAK-123](https://linear.app/trak-football/issue/TRAK-123). Match kit, CSV/PDF
+[TRAK-123](https://linear.app/trak-football/issue/TRAK-123). Match kit, CSV
 fixture import and a parent's “Can't make it” response are now J8. Automatic
 WhatsApp posting and direct Google/Microsoft calendar connections remain out.
 Coach-only birthday

@@ -33,17 +33,20 @@ admin enforcement. `Supabase` and `Deploy` run after merge, not as PR checks.
 An administrator should compare the live settings with that file before
 changing protection; committing the JSON does not apply it.
 
-The old unprotected-branch Slack-verdict fallback no longer applies. CODEOWNERS
-exists, but the proposed reduced-approval route for documentation is not an
-agreed replacement for the one-approval rule.
+The old unprotected-branch Slack-verdict fallback no longer applies. On 28
+September Imad decided that non-code files (documentation, slides, notes) need
+no approval, only a notice in #coding-agents-at-work. That is agreed but not in
+force: GitHub still requires one approval for every PR until the CODEOWNERS
+change (#221) lands, which waits until after the smallest credible product.
 
 ## Before merge
 
 - Read the assigned issue and name its journey, guarantee or launch-gate purpose.
   Agree the acceptance checks in the PR description. Use one issue per PR.
-- Coordinate migration/RPC changes and shared-file reservations in
-  #coding-agents-at-work. The author or an explicitly authorized delegate posts
-  the notice. Keep private child data out of public evidence.
+- Announce migration/RPC changes and shared-file reservations in
+  #coding-agents-at-work **before editing**. The author or an explicitly
+  authorized delegate posts the notice. Keep private child data out of public
+  evidence.
 - Update from current main; identify dependent PRs and compatibility between SQL,
   edge functions, callers and generated types. Keep historical migrations intact.
 - Run `npm test`, `npm run test:harness`, `npm run typecheck`, `npm run build`,
@@ -77,6 +80,12 @@ rather than describing it as already disclosed.
 Wait for the full workflow before the next schema merge. Canonical main's
 workflow serializes production releases. It applies pending migrations and
 edge functions, then deploys the frontend only after a successful Supabase job.
+**A merged migration or function is usually live before that:** an earlier
+path, most likely Supabase's GitHub integration, applies it about a minute
+after the merge, while main's tests are still running (8 October: #249's
+migration live at 20:15:21 UTC, tests finished 20:24:59). Treat the merge as
+the deploy, and check `supabase_migrations.schema_migrations` straight after it.
+TRAK-148 decides whether to switch that path off.
 Missing production credentials fail the workflow. Fork CI cannot deploy
 production. Preview deployments share the backend and do not prove a new
 migration before it is applied.

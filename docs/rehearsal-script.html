@@ -110,7 +110,7 @@
   <p class="lede">Walk the J1–J8 journeys and G1–G7 guarantees on the deployed build, using two real phones and approved inboxes. Record what happens; this checklist is not evidence that a run passed.</p>
 </header>
 <section aria-labelledby="setup"><div class="sec-head"><h2 id="setup">Before the run</h2></div>
-<div class="alarm"><p><b>Events are required and not yet implemented.</b> TRAK-25 now has nine acceptance checks and 18 implementation issues (TRAK-124–141), all Todo when reviewed on 8 October. The final rehearsal cannot pass until all nine checks below pass. Earlier journey passes do not waive the event gate.</p></div>
+<div class="alarm"><p><b>Events are required; only the per-academy off switch is built (TRAK-124).</b> TRAK-25 has nine acceptance checks and 18 implementation issues (TRAK-124–141); their status lives in Linear. The final rehearsal cannot pass until all nine checks below pass. Earlier journey passes do not waive the event gate.</p></div>
 <ul class="plain">
 <li>Read <a href="../MVP%20Requirements">MVP Requirements</a>, the <a href="pilot-runbook.md">operational runbook</a> and the <a href="release/merge-gate.md">release gate</a>. Record commit, workflow, served build, backend target, operator and start time.</li>
 <li>Use designated synthetic roles and an approved roster: two siblings and a child whose guardian withholds consent, plus a separate academy for isolation tests. Exercise both email activation and a child without email. Prepare a synthetic squad of at least 25 players for the size check.</li>
@@ -331,14 +331,14 @@
 <h3>Exercise the specified operating cases as their slices are delivered</h3>
 <p class="small">These support the nine checks; they do not create a tenth acceptance check or claim that a pending feature is available.</p>
 <ul class="plain">
-<li><b>Import and kit (TRAK-129):</b> preview 12 CSV fixtures, correct a bad row, confirm 12 matches and re-import with zero duplicates. Verify date, kickoff, meet time, opponent, home/away, venue and kit. No writes occur before confirmation. PDF handling remains an open implementation choice; no AI parsing.</li>
+<li><b>Import and kit (TRAK-129):</b> preview 12 CSV fixtures, correct a bad row, confirm 12 matches and re-import with zero duplicates. Verify date, kickoff, meet time, opponent, home/away, venue and kit. No writes occur before confirmation. CSV only (PDF reading is out for now); no AI parsing.</li>
 <li><b>Absence (TRAK-137):</b> the linked guardian reports Can't make it for one child, optionally adds a reason, then undoes before start. The coach sees it after one reload; the sibling is unaffected. Guardians of another child, withdrawn consent and players cannot submit it; families cannot see others’ absences.</li>
 <li><b>Reminders (TRAK-136):</b> check a two-day-ahead reminder, one email per guardian/day across their children, Settings → Notifications opt-out, and safe rerun without duplicate mail. Omit cancelled events and withdrawn children; email contains no unsubscribe action link.</li>
 <li><b>Manual WhatsApp share (TRAK-139):</b> on iPhone and Android, inspect training, match and cancellation text, including kit where applicable. No child names or absence lists. The coach must choose a destination and send; opening the share control must not send.</li>
 <li><b>Additional links (TRAK-140):</b> this lower-priority slice follows the core work. When delivered, verify named extra links, one/all-child and match/all-event choices, independent revocation and last-fetch data. Revoking an extra link must not break the guardian’s own link; withdrawal/departure removes the affected access.</li>
 </ul>
 </div>
-<div class="callout"><p><b>Still unresolved:</b> ordinary-email provider/region/sender, PDF method, feed endpoint, Android handoff/fallback, player change emails, and exact operator recovery controls. Use the implemented specification for commands and retry procedures. Kit and absence reporting are in J8; lineups and broader matchday planning remain parked.</p></div>
+<div class="callout"><p><b>Still unresolved:</b> proof of the Resend sender's region and delivery (TRAK-126), the feed endpoint, the Android handoff/fallback, whether switching events off hides existing events and feeds, and exact operator recovery controls. Decided: same-day change emails also go to players who have their own email, and only published events reach families. Use the implemented specification for commands and retry procedures. Kit and absence reporting are in J8; lineups and broader matchday planning remain parked.</p></div>
 </section>
 <section aria-labelledby="close"><div class="sec-head"><h2 id="close">Close the run</h2></div>
 <ul class="plain">

@@ -16,9 +16,8 @@ isolated restore rehearsal requires a separate, explicitly configured target.
 The decision recorded on TRAK-23 on 2 October 2026 at 19:18:57 UTC supersedes the
 older open TRAK-46 note: daily backups retained for seven days, no PITR,
 and an accepted risk that restore has not been rehearsed. No recovery duration is
-proven. **Academy disclosure is pending:** the academy has not been briefed; the
-meeting is expected in the coming weeks. Record the disclosure and go decision
-before launch. See [the restore procedure](release/s5-restore-rehearsal.md).
+proven. **Academy disclosure is pending:** the academy has not been briefed.
+Record the disclosure and go decision before launch. See [the restore procedure](release/s5-restore-rehearsal.md).
 
 ## Support and incidents
 
@@ -262,9 +261,10 @@ views are not substitutes for the current J7 definition or the launch gate.
 
 ## J8 — event operations required before launch
 
-Events are required scope and remain unimplemented. [TRAK-25](https://linear.app/trak-football/issue/TRAK-25)
-was expanded on 8 October: its 18 implementation issues (TRAK-124–141) were Todo
-when reviewed. Before real families receive events, complete all **nine** checks
+Events are required scope. Only the off switch is built so far (TRAK-124); the
+status of the other slices lives in [TRAK-25](https://linear.app/trak-football/issue/TRAK-25)
+and Linear. Families see only events the coach has published; a saved event is
+a coach-only draft until then. Before real families receive events, complete all **nine** checks
 in [MVP Requirements](../MVP%20Requirements), including one-tap calendar setup,
 and the final production rehearsal in TRAK-141. The controls below are specified
 behavior to build and rehearse; they are not current UI or executable procedures.
@@ -272,9 +272,9 @@ behavior to build and rehearse; they are not current UI or executable procedures
 | Operation | Decided behavior | Implementation and proof still needed |
 |---|---|---|
 | Create/repeat | Training, matches and other events; eight weeks of weekly training in under two minutes. Match fields include kit. | Create/edit/cancel controls, recurrence and saved values. |
-| Import fixtures | CSV preview is editable and flags bad rows before confirmation; no writes before confirmation and no duplicates on repeat import. The template includes date, kickoff, meet time, opponent, home/away, venue and kit; no opponent means training. | CSV first. PDF method is open: approved browser parsing of typed PDFs or operator conversion; no AI extraction. [TRAK-129](https://linear.app/trak-football/issue/TRAK-129). |
+| Import fixtures | CSV preview is editable and flags bad rows before confirmation; no writes before confirmation and no duplicates on repeat import. The template includes date, kickoff, meet time, opponent, home/away, venue and kit; no opponent means training. | CSV only (PDF reading is out for now); no AI extraction. [TRAK-129](https://linear.app/trak-football/issue/TRAK-129). |
 | Change/cancel | Every affected family sees the change on next app load. The parent's existing bell includes the selected child's events; the player's Next up marker clears when the event is opened. | Preserve existing assessment alerts and family boundaries. [TRAK-134](https://linear.app/trak-football/issue/TRAK-134). |
-| Urgent change email | Changes/cancellations for today or tomorrow in Dubai time email affected guardians with active consent. Same-day mail must reach Gmail and Microsoft inboxes within 60 seconds. No child name in the subject, coach notes or state-changing links. | A new ordinary-email sender is required. Provider, region and sender configuration remain open; do not use Auth emails for event messages. Collapse quick edits into the final change, retry failures and expose failure to operators; exact timing and recovery controls remain open. Player emails await a decision; guardians only is the default. [TRAK-126](https://linear.app/trak-football/issue/TRAK-126), [TRAK-135](https://linear.app/trak-football/issue/TRAK-135). |
+| Urgent change email | Changes/cancellations for today or tomorrow in Dubai time email affected guardians with active consent, and players with active consent who have their own email (never a no-email child's login address). Same-day mail must reach Gmail and Microsoft inboxes within 60 seconds. No child name in the subject, coach notes or state-changing links. | Sender: Resend through `send-email` (TRAK-126, merged 8 October); proof of delivery, SPF/DKIM and region is pending on TRAK-126. One email per request, within Resend's limit of **10 requests per second per team**: pace sends and retry on HTTP 429. Strip links a coach typed (venue, title) before sending, or the sender refuses the whole email. Do not use Auth emails for event messages. Collapse quick edits into the final change, retry failures and expose failure to operators; exact timing and recovery controls remain open. [TRAK-135](https://linear.app/trak-football/issue/TRAK-135). |
 | Event reminder | Two days before an event, send one email per guardian per day covering their children; omit cancelled events and withdrawn children. Opt out in Settings → Notifications, with no unsubscribe action link in email. | Prove idempotent job reruns, opt-out and visible failure. The proposed scheduler needs an approved migration; it is not an installed control established by this runbook. [TRAK-136](https://linear.app/trak-football/issue/TRAK-136). |
 | Subscribe to a personal calendar | A private bearer link belongs to a person, not a squad. Signup offers a skippable, one-tap native-calendar choice; Settings → Calendar offers it later. The feed has stable occurrence IDs, explicit cancellations and no child names or coach notes. | Apple, Google and Outlook behavior on real phones; the Android fallback and feed endpoint remain open. Record last fetched separately from when a phone displays the update. Counsel reviews this privacy design before real-family links. [TRAK-132](https://linear.app/trak-football/issue/TRAK-132), [TRAK-133](https://linear.app/trak-football/issue/TRAK-133). |
 | Lost/shared calendar link | Settings → Calendar → Get a new link replaces the personal link; the old link must lose access on its next fetch. Treat an exposed link as access to private schedule data. | Replacement/revocation tests and instructions for resubscribing. A revoked feed cannot erase copies already cached on a phone; measure that behavior. Until implemented, escalate through support and never post the URL. |
@@ -282,7 +282,7 @@ behavior to build and rehearse; they are not current UI or executable procedures
 | Report absence | Everyone is expected to attend unless a linked guardian with active consent chooses Can't make it for the selected child. Optional short reason; undo until start. Players do not respond in v1. | Own-squad coach visibility, sibling separation, withdrawal denial and no other family's absence data. [TRAK-137](https://linear.app/trak-football/issue/TRAK-137). |
 | Complete a past event | Take register starts with everyone present except reported absences; coach corrects attendance. Save creates/links one completed session, and retry must not duplicate it. A match opens the existing match log with date/opponent. | Past-event-only controls; withdrawn children cannot be marked present; assessment selection uses attended sessions. Preserve J4/J5. [TRAK-138](https://linear.app/trak-football/issue/TRAK-138). |
 | Share in WhatsApp | A manual button prefills event details, including kit and cancellation reason. No child names or absence lists. The coach chooses the group and taps Send. | Prove training, match and cancellation text on iPhone and Android; the Trak button must never send automatically. [TRAK-139](https://linear.app/trak-football/issue/TRAK-139). |
-| Disable events for one academy | Operator-only, per-academy switch, no deployment. Off, missing configuration or a read failure means off; the database refuses event writes while disabled. | Exact reviewed controls/SQL and read/feed effects await implementation and rehearsal. Do not invent a table or command. [TRAK-124](https://linear.app/trak-football/issue/TRAK-124). |
+| Disable events for one academy | Operator-only, per-academy switch in `public.academy_features`, no deployment. No row, or a failed read in the app, means off. On: `INSERT INTO public.academy_features(organization_id, feature) VALUES ('<academy id>', 'events');` Off: `DELETE FROM public.academy_features WHERE organization_id = '<academy id>' AND feature = 'events';` Rehearsal FC has been on since 8 October 2026; no other academy is. | Built and proven live (TRAK-124, #249): while off, the database refuses coach event writes and the schedule shows Coming soon. **Off does not yet hide existing events, calendar feeds or emails**; whether it should is an open question (OPEN-QUESTIONS). Switching a real academy on is a founder decision. [TRAK-124](https://linear.app/trak-football/issue/TRAK-124). |
 
 [TRAK-140](https://linear.app/trak-football/issue/TRAK-140) is a lower-priority J8
 follow-up after the core slices: named extra family/driver links, one/all children

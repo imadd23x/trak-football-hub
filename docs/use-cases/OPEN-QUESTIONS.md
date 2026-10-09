@@ -171,36 +171,46 @@ Status: RESOLVED 2026-09-24
 ---
 
 ## Q-2026-10-08-J8 · UC-E01–UC-E09 · Remaining events decisions
-Raised: 2026-10-08 · updated against TRAK-25 at 14:19 UTC · J8
+Raised: 2026-10-08 · updated 2026-10-09 · J8
 
 Events are required for the first real-child pilot. [TRAK-25](https://linear.app/trak-football/issue/TRAK-25)
-is now Todo with nine decided acceptance checks and 18 scoped subissues,
-TRAK-124–141. The nine checks are pending registry cases. Kit, CSV/PDF fixture
+has nine decided acceptance checks and 18 slices, TRAK-124–141; their status
+lives in Linear. The nine checks are pending registry cases. Kit, CSV fixture
 import, per-person calendar links, one-tap subscription, guardian absence
-responses, coach register attendance and manual WhatsApp sharing are decided
-scope. The earlier “detailed spec in progress” description is superseded.
+responses, coach register attendance, a Publish step and manual WhatsApp
+sharing are decided scope. The earlier “detailed spec in progress” description
+is superseded.
+
+**Answered on 8–9 October (Imad):** fixture import is **CSV only** (PDF is out
+for now); same-day change emails go to guardians **and** players who have their
+own email (UC-E02 v2); a saved event is a coach-only draft until the coach taps
+**Publish**. The email sender is Resend through `send-email` (TRAK-126, #248,
+merged 8 October): one plain email per request, within Resend's limit of 10
+requests per second per team, and links a coach types are stripped from email
+text because the sender refuses any link that is not a plain trakfootball.com
+page.
 
 The remaining choices belong to the individual slices:
 
 | Decision / proof still needed | Source |
 |---|---|
-| Choose the event-email provider/API, processing region and sender address/domain; prove SPF/DKIM and Gmail/Microsoft 365 inbox delivery. | [TRAK-126](https://linear.app/trak-football/issue/TRAK-126), Kostas; region also belongs in the PR #247 legal review |
-| Choose typed-PDF parsing in the browser with an approved dependency, or operator conversion. CSV import can proceed separately; AI import stays out. | [TRAK-129](https://linear.app/trak-football/issue/TRAK-129), Imad |
+| Prove the chosen sender: secrets set, the stated eu-west-1 region, SPF/DKIM passing, and Gmail/Microsoft 365 inbox delivery in under 60 seconds. | [TRAK-126](https://linear.app/trak-football/issue/TRAK-126), Kostas; region also belongs in the PR #247 legal review |
 | Choose the token-authorized feed endpoint and document it; obtain counsel review before real-family calendar links. | [TRAK-132](https://linear.app/trak-football/issue/TRAK-132) |
 | Establish the supported Android/Google setup path on real phones. A fallback proposal does not by itself satisfy the one-tap acceptance check. | [TRAK-133](https://linear.app/trak-football/issue/TRAK-133), UC-E09 |
-| Decide whether players also receive change emails; guardian delivery is the current requirement. | [TRAK-135](https://linear.app/trak-football/issue/TRAK-135) |
+| Decide whether switching events off for an academy should also hide its existing events, calendar feeds and emails. Today the switch gates coach writes only. | [TRAK-124](https://linear.app/trak-football/issue/TRAK-124), [TRAK-125](https://linear.app/trak-football/issue/TRAK-125), [TRAK-132](https://linear.app/trak-football/issue/TRAK-132), [TRAK-135](https://linear.app/trak-football/issue/TRAK-135) |
 | Approve installation if the reminder scheduler requires pg_cron; no installation is implied by this document. | [TRAK-136](https://linear.app/trak-football/issue/TRAK-136) |
 
-Two source ambiguities also need resolution before executable procedures are
-written: how to prove that a mistaken event has never been seen before allowing
-deletion (TRAK-127), and how a multi-child parent's feed preserves consented
-siblings when one child's consent is withdrawn (TRAK-132). Withdrawal must
+One source ambiguity still needs resolution before executable procedures are
+written: how a multi-child parent's feed preserves consented siblings when one
+child's consent is withdrawn (TRAK-132). The other, how to prove a mistaken
+event was never seen before deleting it (TRAK-127), is settled by the Publish
+step: an event nobody was shown is one that was never published. Withdrawal must
 remove the withdrawn child's events on the next request; calendar-client cached
 copies need real-device evidence rather than a promise of immediate removal.
 
-The per-academy off switch is specified in TRAK-124. “Get a new link” revoking
-the previous link is specified in TRAK-133. These are no longer unwritten scope,
-but implementation and operator proof are still required. Do not treat the
+The per-academy off switch is built and proven on production (TRAK-124, 8
+October). “Get a new link” revoking the previous link is specified in TRAK-133
+and still needs implementation and operator proof. Do not treat the
 existing rehearsal results or the old parked calendar as proof that these new
 cases pass. No acceptance check is relaxed by this question.
 

@@ -60,12 +60,11 @@ Each guardian has their own sign-in. One guardian can approve siblings without
 a second account. Withdrawal is one tap from the signed-in parent profile and
 blocks processing and family access, including sessions already open.
 
-**Open implementation/notice discrepancy:** at the audited main `d0ed55f`, the
-consent screen also records optional parent-visibility and recognition choices.
-Family read access does not depend on the parent-visibility choice, and
-recognition authoring is parked. This must be reconciled with the required
-consent wording and counsel-approved notice; existing J2 rehearsal results do
-not establish that those optional choices control access.
+The consent screen offers one optional choice, recognition awards, which stays
+off while recognition is parked. Its former optional "I can see their
+progress" box was removed on 9 October (TRAK-145, notice version
+`2026-10-09.1`) because family reads never depended on it; parent viewing is
+part of the required consent above. Counsel still reviews the final wording.
 
 ### J3 — Child activation and recovery
 
@@ -101,9 +100,10 @@ workflow rather than create an incompatible second record.
 
 The squad marks each child ready to assess or waiting for a parent. A coach may
 open the academy-supplied profile before consent, but cannot assess the player
-until consent is active. Show the waiting reason plainly. This distinction was
-confirmed on 8 October and replaces the older blanket restriction on opening
-the profile. Assessment and development writes remain consent-gated. If consent is
+until consent is active. Show the waiting reason plainly. Imad confirmed this
+on 9 October, replacing the older rule that a waiting player cannot be opened:
+the profile is the academy's own record of the child, and assessing or rating
+is what needs consent. Assessment and development writes remain consent-gated. If consent is
 withdrawn while a form is open, saving is refused and the entered values remain.
 
 The assessment screen has six sliders, the resulting band, a message visible
@@ -150,9 +150,13 @@ The coach schedules training, matches and other events with weekly repeat.
 Players and parents see relevant events in the app and their phone calendar.
 Changes and cancellations reach affected families. A past event becomes a
 completed session with attendance. A per-academy off switch must require no
-deployment. The latest 8 October TRAK-25 decision splits this into 18
-implementation issues, TRAK-124–TRAK-141, all Todo when reviewed. The academy
-console and AI schedule import remain out of scope.
+deployment. TRAK-25 splits this into 18 implementation issues, TRAK-124–TRAK-141;
+their status lives in Linear. The academy console and AI schedule import remain
+out of scope.
+
+A saved event is a coach-only draft until the coach taps **Publish** (9 October),
+so a coach can fix what he forgot after saving. Families, calendar feeds and
+emails see only published events; once published, an edit goes live on save.
 
 The updated scope includes:
 
@@ -161,15 +165,21 @@ The updated scope includes:
   reports “Can't make it”; the coach records actual absence after the event.
   The guardian can give an optional short reason and undo the response until
   the start. These responses are not a published family absence list.
-- League fixtures imported from CSV or PDF. CSV is the first path; the PDF
-  method remains open. AI extraction is outside the pilot (TRAK-129).
+- League fixtures imported from a CSV file (8 October: CSV only; PDF reading is
+  out for now). AI extraction is outside the pilot (TRAK-129).
 - A private calendar link per person, with replacement revoking the previous
   link, and one-tap subscription during signup or later from Settings. A feed
   fetch is not proof a phone has displayed its update (TRAK-132/133).
-- Changes in the app and parent bell. Today/tomorrow changes use guardian
-  email; player email remains open. Two-day reminders are grouped per guardian
-  and day, with opt-out in Settings. Emails contain no unsubscribe link or
-  one-click action that changes state when a scanner opens it (TRAK-134–136).
+- Changes in the app and parent bell. Today/tomorrow changes email every
+  affected guardian and every affected player who has their own email (8
+  October); a no-email child's login address is never mailed. Two-day reminders
+  are grouped per guardian and day, with opt-out in Settings. Emails contain no
+  unsubscribe link or one-click action that changes state when a scanner opens
+  it (TRAK-134–136). The sender is Resend through the J8.3 `send-email` code
+  (TRAK-126): one plain email per request, within Resend's limit of 10
+  requests per second per team; links typed by a coach are removed from email
+  text, because the sender refuses any link that is not a plain
+  trakfootball.com page.
 - A manual WhatsApp share action with event details and no child names or
   absence list. The coach chooses the destination and sends; automatic posting
   is out (TRAK-139).
@@ -183,7 +193,8 @@ TRAK-25 defines nine acceptance checks; check 9 was added on 8 October:
 1. Create eight weeks of weekly training in under two minutes.
 2. Every affected player and parent sees changes/cancellations on next app
    load; the parent's bell includes them. Same-day changes/cancellations also
-   reach guardians by email within 60 seconds.
+   reach guardians, and players who have their own email, by email within 60
+   seconds.
 3. Apple, Google and Outlook subscriptions show new, changed and cancelled
    events after refresh without duplicates, tested on real phones.
 4. Withdrawal removes the child's events from the app and calendar link on
@@ -197,8 +208,7 @@ TRAK-25 defines nine acceptance checks; check 9 was added on 8 October:
 9. A parent or player subscribes from signup in one tap on iPhone, Android
    with Google Calendar, and Outlook.
 
-Implementation, provider choices and executable operating procedures are not
-yet complete. These are required outcomes, not claims that the feature is
+Implementation and executable operating procedures are not yet complete. These are required outcomes, not claims that the feature is
 available. Follow the open decisions in the 18 issues; do not invent controls,
 import parsing or provider behavior. Direct Google/Microsoft calendar account
 connections, the academy view, lineups and automatic WhatsApp posting remain out.
@@ -245,9 +255,11 @@ The TRAK-43 route decisions remain part of the contract:
   (AI draft review), `/coach/assistant`, `/coach/recognition`, `/coach/award`,
   `/parent/alerts` and the `/club/*` console remain Coming soon.
   `/club/home` must render without errors when the academy director signs in.
-- `/coach/schedule` remains parked at the audited baseline. TRAK-127 requires
-  reusing `CoachSchedule` and enabling that route behind TRAK-124's academy
-  switch; this is planned work, not a current deployment claim.
+- `/coach/schedule` shows plainly only for an academy whose events switch is
+  on (TRAK-124, live since 8 October; Rehearsal FC only). Everywhere else it
+  stays Coming soon. TRAK-127 reworks the screen itself. The switch currently
+  gates coach event writes only; reads, calendar feeds and emails do not check
+  it yet (see Decisions still open).
 - `/coach/squad/add` and avatar upload stay removed. `/coach/quick-assess`
   stays hidden; its former home/post-match entry points use `/coach/assess`.
 
@@ -278,8 +290,9 @@ Other agreed later scope, without a committed release date or ordering:
 
 The quality bar is that no required journey fails during the eight weeks. A
 workaround may keep support moving but is not a pass; repair and retest the
-journey. Value measures and numeric targets are still to be agreed, using the
-J7 measurement limitation honestly.
+journey. The founders set the value measures and their numeric targets before
+the first real child joins (TRAK-10, gate 10 below), using the J7 measurement
+limitation honestly.
 
 The existing proposed value measures are the share of published messages shown
 to players within seven days, and the share of players receiving a published
@@ -312,12 +325,13 @@ Real children join only when every gate passes and a founder majority says go:
 9. J8's nine checks, including one-tap setup, three calendar apps and two-phone rehearsal,
    pass before events reach real families. Adding J8 does not inherit earlier
    J1–J7 rehearsal passes.
+10. The founders record the value measures and numeric targets (TRAK-10). Nobody
+    else invents them.
 
 The service has no separate staging environment. Synthetic rehearsal and pilot
 organizations share the system. The pilot disclosure must explain this and the
-recovery limitations. As confirmed on 8 October, the academy has not yet been
-briefed; a meeting is planned in the coming weeks. Disclosure is pending and
-must be recorded when it happens.
+recovery limitations. The academy has not yet been briefed. Disclosure is
+pending and must be recorded when it happens.
 
 For a wrong recipient, consent bypass, cross-child read, safeguarding concern
 or stop/delete request, pause the affected scope and new admissions immediately.
@@ -326,13 +340,17 @@ A founder majority decides restart, subject to legal duties.
 ## Decisions still open
 
 - Final start date, cohort count, squad and named operational contacts.
-- Numeric value targets and a better measure of whether a player reads feedback.
-- Counsel-approved notice, data roles, retention, transfers and rights handling;
-  reconciliation of optional consent wording with actual enforcement.
-- J8's remaining choices and verified procedures: email sender/provider/region,
-  PDF import method, calendar-feed endpoint, player change emails and reliable
-  subscription behavior on the supported phones. Decided link revocation and
-  off-switch outcomes still need implementation and rehearsal.
+- The numeric value targets themselves (required before admission, gate 10) and
+  a better measure of whether a player reads feedback.
+- Counsel-approved notice, data roles, retention, transfers and rights handling,
+  including how account-data export relates to withdrawal.
+- J8's remaining choices and verified procedures: the calendar-feed endpoint,
+  reliable one-tap subscription on the supported phones (Android may need a
+  fallback), the email sender's proven delivery (TRAK-126), and whether
+  switching events off should also hide existing events, calendar feeds and
+  emails. Decided link revocation still needs implementation and rehearsal.
+- Whether to rehearse a restore on an isolated copy before real families
+  (recommended by the 9 October independent audit; not yet a founder decision).
 - Changes during the pilot: permitted features/fixes, notice, deploy window,
   emergency review rule and duty rota. The 8 October discussion is a proposal;
   existing review/merge requirements continue until a new rule is agreed and

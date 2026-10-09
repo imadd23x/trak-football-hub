@@ -1,7 +1,10 @@
 # CLAUDE.md — Trak Football
 
-Read [AGENTS.md](AGENTS.md) for the contributor workflow, implementation entry
-points, data conventions, local commands and deployment safeguards.
+@AGENTS.md
+
+The line above imports AGENTS.md, so Claude Code loads the contributor workflow,
+implementation entry points, data conventions, local commands and deployment
+safeguards with this file. A plain link is not loaded automatically.
 
 Before coding, read [MVP Requirements](MVP%20Requirements) and your assigned
 Linear issue. The current pilot contract is J1–J8 and G1–G7. Events are now

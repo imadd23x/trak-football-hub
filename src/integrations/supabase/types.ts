@@ -439,6 +439,30 @@ export type Database = {
         }
         Relationships: []
       }
+      event_absences: {
+        Row: {
+          event_id: string
+          reason: string | null
+          reported_at: string
+          reported_by: string
+          squad_player_id: string
+        }
+        Insert: {
+          event_id: string
+          reason?: string | null
+          reported_at?: string
+          reported_by: string
+          squad_player_id: string
+        }
+        Update: {
+          event_id?: string
+          reason?: string | null
+          reported_at?: string
+          reported_by?: string
+          squad_player_id?: string
+        }
+        Relationships: []
+      }
       matches: {
         Row: {
           age_group: string
@@ -844,6 +868,14 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       is_club_admin: { Args: never; Returns: boolean }
+      report_cant_make_it: {
+        Args: { p_event_id: string; p_child: string; p_reason?: string | null }
+        Returns: undefined
+      }
+      undo_cant_make_it: {
+        Args: { p_event_id: string; p_child: string }
+        Returns: undefined
+      }
       record_parental_consent: {
         Args: {
           p_player_user_id: string

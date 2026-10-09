@@ -1,126 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your approval is needed</title>
-</head>
-<!--
-  Supabase -> Authentication -> Emails -> "Invite user".
-
-  The first thing a parent of a child ever receives from TRAK, doing two jobs at
-  once: the invitation, and the first layer of the transparency notice GDPR
-  Art. 12-14 requires. Who is asking, about what, what happens next.
-
-  Light design and HTML entities only, for the same reasons as
-  confirm-signup.html - see the note there.
-
-  `.ConfirmationURL` is correct HERE, unlike confirm-signup.html. The parent
-  has no password yet, and setting one requires a session.
-
-  Deliberately no `.Data` variables. They depend on metadata passed at invite
-  time, and a variable that renders blank in a parent's inbox looks broken. The
-  child's name appears on the approval screen after the link is clicked.
--->
-<body style="margin:0;padding:0;background-color:#F4F4F5;">
-
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-    Your child needs your approval before their coach can record anything.
-  </div>
-
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F4F4F5"
-         style="background-color:#F4F4F5;padding:32px 16px;">
-    <tr>
-      <td align="center">
-        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:460px;">
-
-          <!-- Wordmark -->
-          <tr>
-            <td align="center" style="padding-bottom:28px;">
-              <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:300;color:#0A0A0B;letter-spacing:-0.02em;line-height:1;">TRAK</p>
-              <p style="margin:3px 0 0;font-family:Georgia,serif;font-size:12px;color:#6B8E23;letter-spacing:0.16em;font-style:italic;">football</p>
-            </td>
-          </tr>
-
-          <!-- Card -->
-          <tr>
-            <td bgcolor="#FFFFFF" style="background-color:#FFFFFF;border:1px solid #E4E4E7;border-radius:14px;padding:36px 32px;">
-
-              <p style="margin:0 0 12px;font-family:Helvetica,Arial,sans-serif;font-size:20px;font-weight:600;color:#0A0A0B;line-height:1.3;">
-                Your approval is needed
-              </p>
-              <p style="margin:0 0 24px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#52525B;line-height:1.6;">
-                Your child signed up for TRAK, the app their football academy uses to record how
-                they&rsquo;re developing. They&rsquo;re under 15, so nothing can be recorded about
-                them until a parent or guardian approves it.
-              </p>
-
-              <!-- What you'll be asked -->
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;">
-                <tr>
-                  <td bgcolor="#F7FBEF" style="background-color:#F7FBEF;border:1px solid #D8EBB0;border-radius:10px;padding:20px;">
-                    <p style="margin:0 0 10px;font-family:Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;color:#3F6212;letter-spacing:0.1em;text-transform:uppercase;">
-                      What you&rsquo;ll be asked
-                    </p>
-                    <p style="margin:0 0 10px;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#3F3F46;line-height:1.6;">
-                      To confirm you&rsquo;re their parent or guardian, and to choose what their
-                      coach may record &mdash; their training assessments, any awards, and whether
-                      you can see their progress.
-                    </p>
-                    <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#3F3F46;line-height:1.6;">
-                      Each choice is separate. You can decline any of the optional ones, and it
-                      will not affect your child&rsquo;s place at the academy or how their coach
-                      treats them.
-                    </p>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- CTA -->
-              <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
-                <tr>
-                  <td bgcolor="#0A0A0B" style="background-color:#0A0A0B;border-radius:10px;">
-                    <a href="{{ .ConfirmationURL }}"
-                       style="display:inline-block;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#FFFFFF;text-decoration:none;padding:14px 30px;">
-                      Review and approve
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin:0 0 24px;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#71717A;line-height:1.6;">
-                You&rsquo;ll set a password and create your own parent account. It is separate from
-                your child&rsquo;s &mdash; you will not be signed in as them. You can withdraw your
-                approval at any time from your profile.
-              </p>
-
-              <p style="margin:0 0 6px;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#A1A1AA;line-height:1.5;">
-                Or paste this link into your browser:
-              </p>
-              <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:12px;word-break:break-all;line-height:1.5;">
-                <a href="{{ .ConfirmationURL }}" style="color:#3F6212;text-decoration:underline;">{{ .ConfirmationURL }}</a>
-              </p>
-
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td align="center" style="padding-top:24px;">
-              <p style="margin:0 0 6px;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#A1A1AA;letter-spacing:0.04em;">
-                TRAK Football &middot; trakfootball.com
-              </p>
-              <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#A1A1AA;line-height:1.6;">
-                If you weren&rsquo;t expecting this, please ignore it. Nothing is approved and
-                nothing is recorded until someone completes the steps above.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-
-</body>
-</html>
+<div style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#111111;">
+  <p style="font-size:18px;font-weight:700;letter-spacing:3px;margin:0 0 24px;">TRAK</p>
+{{ if eq (printf "%v" .Data.invited_as) "player" }}
+  <p style="font-size:16px;margin:0 0 12px;">Hi{{ if .Data.child_first_name }} {{ .Data.child_first_name }}{{ end }},</p>
+  <p style="font-size:15px;line-height:1.5;margin:0 0 12px;">{{ if .Data.academy_name }}{{ .Data.academy_name }}{{ else }}Your academy{{ end }} has added you to Trak, where you'll see your coach's assessments and the matches you play.</p>
+{{ else }}
+  <p style="font-size:16px;margin:0 0 12px;">Hello,</p>
+  <p style="font-size:15px;line-height:1.5;margin:0 0 12px;">{{ if .Data.academy_name }}{{ .Data.academy_name }}{{ else }}Your academy{{ end }} has added you to Trak as {{ if .Data.child_first_name }}{{ .Data.child_first_name }}'s{{ else }}a child's{{ end }} parent or guardian.</p>
+  <p style="font-size:15px;line-height:1.5;margin:0 0 12px;">On Trak, {{ if .Data.child_first_name }}{{ .Data.child_first_name }}'s{{ else }}your child's{{ end }} coach records assessments and matches. The coach can't record anything until you approve it, and you can withdraw at any time.</p>
+{{ end }}
+  <p style="font-size:15px;line-height:1.5;margin:24px 0 8px;">Your code to set up your account:</p>
+  <p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:0 0 16px;">{{ .Token }}</p>
+  <p style="margin:0 0 24px;"><a href="{{ .SiteURL }}/auth/code?type=invite&email={{ .Email }}&redirect_to={{ .RedirectTo }}" style="background:#C8F25A;color:#0A0A0B;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:600;display:inline-block;">Set up your account</a></p>
+  <p style="font-size:13px;color:#444444;line-height:1.5;margin:0 0 12px;">Tap the button, then type the code. It works once and expires after an hour.</p>
+  <p style="font-size:12px;color:#666666;line-height:1.5;margin:24px 0 0;">You're receiving this because {{ if .Data.academy_name }}{{ .Data.academy_name }}{{ else }}your academy{{ end }} gave Trak this email address. If you weren't expecting it, ignore this email and nothing happens.</p>
+  <p style="font-size:12px;color:#666666;line-height:1.5;margin:8px 0 0;">To keep Trak emails out of spam, add <strong>noreply@trakfootball.com</strong> to your contacts.</p>
+</div>

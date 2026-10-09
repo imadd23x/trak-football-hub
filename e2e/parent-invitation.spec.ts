@@ -104,6 +104,8 @@ async function invitationsFixture(page: Page, context: BrowserContext, initialAc
         }
         // TRAK-77: Matches lists the selected child's training (a read, over POST).
         if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
+        // TRAK-131 (J8.8): Home and Matches read the selected child's events (a read, over POST).
+        if (url.pathname === '/rest/v1/rpc/child_events') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_my_child_logins') return json([]);
         if (url.pathname === '/rest/v1/rpc/get_my_approved_children_awaiting_signup') return json([]);
@@ -246,6 +248,8 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
       if (url.pathname === '/rest/v1/rpc/get_my_child_credentials') return json([]);
       // TRAK-77: Matches lists the selected child's training (a read, over POST).
       if (url.pathname === '/rest/v1/rpc/family_training_history') return json([]);
+      // TRAK-131 (J8.8): Home and Matches read the selected child's events (a read, over POST).
+      if (url.pathname === '/rest/v1/rpc/child_events') return json([]);
       if (url.pathname === '/rest/v1/rpc/get_my_pending_parent_invites') return json(linked.has(zaraId) ? [] : [{
         invite_id: zaraInvite, player_user_id: zaraId, player_name: children[1].name,
         parent_email: parentEmail, expires_at: new Date(Date.now() + 86_400_000).toISOString(),
@@ -396,7 +400,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   const allowedPosts = new Set([
     '/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/get_my_approved_children_awaiting_signup',
     '/rest/v1/rpc/get_my_pending_parent_invites', '/rest/v1/rpc/get_parent_invite_by_token',
-    '/rest/v1/rpc/accept_parent_invite', '/rest/v1/rpc/family_training_history',
+    '/rest/v1/rpc/accept_parent_invite', '/rest/v1/rpc/family_training_history', '/rest/v1/rpc/child_events',
   ]);
   expect(observed.requests.filter(request => request.method !== 'GET')
     .every(request => request.method === 'POST' && allowedPosts.has(request.path))).toBe(true);

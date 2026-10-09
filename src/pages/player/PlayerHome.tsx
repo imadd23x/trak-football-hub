@@ -7,7 +7,8 @@ import { CardSkeleton, MatchCardSkeleton, Skeleton } from '@/components/trak'
 import { BANDS, type BandType } from '@/lib/types'
 import { bandForScore, scoreToBand } from '@/lib/rating-engine'
 import { dedupeMatches } from '@/lib/match-dedupe'
-import { displayEventTime } from '@/lib/event-time'
+import { isChanged, noteEventsShown, readSeenSequences, toPlayerEvent, upcomingEventsFilter, type PlayerEvent } from '@/lib/player-events'
+import { UpcomingEventCard } from '@/components/player/UpcomingEventCard'
 import { parseDisplayDate } from '@/lib/calendar'
 import { trackEvent } from '@/lib/telemetry'
 import CardRevealModal from '@/components/player/CardRevealModal'
@@ -64,7 +65,7 @@ export default function PlayerHome() {
   const [details, setDetails] = useState<any>(null)
   const [coachAssessment, setCoachAssessment] = useState<any>(null)
   const [coachName, setCoachName] = useState('')
-  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
+  const [upcomingEvents, setUpcomingEvents] = useState<PlayerEvent[]>([])
   const [consent, setConsent] = useState<{ required: boolean; invited_parent: string | null } | null>(null)
 
   // Under the digital-consent age nothing can be recorded about this player
@@ -257,7 +258,7 @@ export default function PlayerHome() {
             // it happens. Filtered on the calendar day instead, with the
             // instant kept as the fallback for rows written before the
             // backfill.
-            .or(`event_date.gte.${new Date().toLocaleDateString('en-CA')},and(event_date.is.null,starts_at.gte.${new Date().toISOString()})`)
+            .or(upcomingEventsFilter())
             .order('event_date', { ascending: true, nullsFirst: false })
             .order('starts_at', { ascending: true })
             .limit(5)
@@ -266,7 +267,7 @@ export default function PlayerHome() {
           // player is told they have no sessions coming up, which is a
           // statement about their week, not about the network.
           if (evsError) { fail(); return }
-          setUpcomingEvents(evs || [])
+          setUpcomingEvents((evs || []).map(r => toPlayerEvent(r as Record<string, unknown>)).filter((e): e is PlayerEvent => e !== null))
         }
       })
 
@@ -290,6 +291,13 @@ export default function PlayerHome() {
 
     return () => { cancelled = true }
   }, [user, reloadKey])
+
+  // TRAK-130: the next event, and what this player had seen of it before this
+  // render. Recording happens after render, so an event seen for the first time
+  // is its own baseline and never reads as "Changed".
+  const nextUp = upcomingEvents[0] ?? null
+  const seenEvents = user ? readSeenSequences(user.id) : {}
+  useEffect(() => { if (user && nextUp) noteEventsShown(user.id, [nextUp]) }, [user, nextUp])
 
   const getBandDistribution = () => {
     const dist: Record<string, number> = {}
@@ -632,52 +640,6 @@ export default function PlayerHome() {
           )
         })()}
 
-        {/* Upcoming Events */}
-        {upcomingEvents.length > 0 && (
-          <div className="mt-5">
-            <MetadataLabel text="UPCOMING" />
-            <div className="mt-2.5 space-y-2">
-              {upcomingEvents.map(ev => {
-                const typeColors: Record<string, string> = {
-                  match: '#fbbf24',
-                  training: '#C8F25A',
-                  tournament: '#c084fc',
-                  other: 'rgba(255,255,255,0.4)',
-                }
-                const typeLabels: Record<string, string> = {
-                  match: 'MATCH', training: 'TRAINING', tournament: 'TOURNAMENT', other: 'OTHER',
-                }
-                const color = typeColors[ev.event_type] || typeColors.other
-                const label = typeLabels[ev.event_type] || 'EVENT'
-                const shown = displayEventTime(ev)
-                const d = parseDisplayDate(shown.date) ?? new Date(ev.starts_at)
-                const dayStr = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-                // The wall clock the coach typed, rendered as-is. Formatting it
-                // through a Date would reintroduce the timezone conversion the
-                // calendar columns exist to avoid.
-                const timeStr = shown.time ?? 'TBC'
-                return (
-                  <div key={ev.id}
-                    className="flex items-center gap-3 rounded-[14px] p-3.5"
-                    style={{ background: '#101012', border: '1px solid rgba(255,255,255,0.06)' }}
-                  >
-                    <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: color, minHeight: 32 }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium truncate" style={{ color: 'rgba(255,255,255,0.88)' }}>{ev.title}</p>
-                      <p className="text-[9px] mt-0.5 tracking-[0.06em]"
-                        style={{ fontFamily: "'DM Mono', monospace", color: 'rgba(255,255,255,0.35)' }}>
-                        {label} · {dayStr} · {timeStr}
-                        {ev.venue ? ` · ${ev.venue}` : ''}
-                        {ev.opponent ? ` · vs ${ev.opponent}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Coach Assessment */}
         {coachAssessment && (
           <div className="mt-5">
@@ -743,6 +705,17 @@ export default function PlayerHome() {
                   </div>
                 ) : null}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Next up (TRAK-130): one card, below the coach's message so it never
+            pushes the message off the first screen. The full list is in Sessions. */}
+        {nextUp && user && (
+          <div className="mt-5">
+            <MetadataLabel text="NEXT UP" />
+            <div className="mt-2.5">
+              <UpcomingEventCard event={nextUp} changed={isChanged(nextUp, seenEvents)} nextUp />
             </div>
           </div>
         )}

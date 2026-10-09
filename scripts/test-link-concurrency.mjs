@@ -157,6 +157,39 @@ try {
     results.push(result);
     console.log(`[link-concurrency] ${JSON.stringify(result)}`);
   }
+  // TRAK-149: two one-goal scorers saved at the same moment for one 1-0 match.
+  // Each check passes alone, so only the match lock stops both rows landing.
+  // The control connection holds a table lock that blocks INSERT, so both
+  // saves are in flight at once; exactly one may store its row.
+  await query(`DELETE FROM squad_players WHERE coach_user_id='${uid(1)}';
+    INSERT INTO squad_players(coach_user_id,player_name,linked_player_id,status) VALUES
+      ('${uid(1)}','Race Player','${uid(3)}','active'),('${uid(1)}','Race Player','${uid(4)}','active');`);
+  await control.sql('BEGIN; LOCK TABLE public.matches IN SHARE ROW EXCLUSIVE MODE');
+  const saves = [3, 4].map((player, index) => query(`
+    SET application_name='trak_link_race_${index}';
+    BEGIN;
+    SET LOCAL statement_timeout='15s';
+    SELECT set_config('request.jwt.claims','{"sub":"${uid(1)}","role":"authenticated"}',true);
+    SELECT public.log_match_for_player('${uid(player)}','Race United',1,0,'League','Home','ST','U12',90,1,0,'None','Fresh','Good',6.5,'2026-10-01');
+    COMMIT;
+  `).then(() => ({ ok: true }), error => ({ ok: false, error: error.message })));
+  let matchWaiting = 0, matchWaits = [];
+  for (let attempt = 0; attempt < 100; attempt++) {
+    await control.sql('SELECT pg_stat_clear_snapshot()');
+    matchWaits = JSON.parse(await control.sql("SELECT coalesce(json_agg(json_build_object('client',application_name,'wait_type',wait_event_type,'wait_event',wait_event)), '[]'::json) FROM pg_stat_activity WHERE application_name IN ('trak_link_race_0','trak_link_race_1')"));
+    matchWaiting = matchWaits.filter(state => state.wait_type === 'Lock').length;
+    if (matchWaiting === 2) break;
+    await new Promise(resolve => setTimeout(resolve, 30));
+  }
+  await control.sql('COMMIT');
+  const saved = await Promise.all(saves);
+  if (matchWaiting !== 2) throw new Error(`match_total_race: did not observe both saves waiting; schedule unproven. Last wait states=${JSON.stringify(matchWaits)}; responses=${JSON.stringify(saved)}`);
+  const stored = JSON.parse((await query(`SELECT json_build_object('rows', count(*), 'goals', coalesce(sum(goals),0)) FROM matches WHERE logged_by='${uid(1)}' AND opponent='Race United';`)).stdout.trim());
+  const matchResult = { name: 'match_total_race', matchWaits, saved, stored,
+    passed: saved.filter(s => s.ok).length === 1 && saved.some(s => !s.ok && s.error.includes('2 goals entered, but the team scored 1'))
+      && stored.rows === 1 && stored.goals === 1 };
+  results.push(matchResult);
+  console.log(`[link-concurrency] ${JSON.stringify(matchResult)}`);
   if (results.some(result => !result.passed)) throw new Error('Concurrent link safety assertions failed; duplicates/errors above are unresolved.');
   if (historical) throw new Error('Historical link RPC unexpectedly passed its concurrency safety assertions.');
 } catch (error) {

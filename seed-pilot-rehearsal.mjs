@@ -390,7 +390,15 @@ async function seed() {
 
     if (existingAssessments && existingAssessments > 0) {
       log(`matches and assessments already present (${existingAssessments}) — skipping`)
-    } else
+    } else {
+    /* One score per fixture, shared by every player in it, with at least as
+       many team goals as its scorers: the database refuses anything else
+       since TRAK-149 (a match's rows must add up). Scorers are the same
+       (n + f) % 5 rule the per-player goals below use. */
+    const fixtureScore = fixtureDays.map((_, f) => {
+      const scorers = claimed.filter((_, n) => (n + f) % 6 !== 0 && (n + f) % 5 === 0).length
+      return { team: scorers + (f % 2), opponent: (f * 2) % 3 }
+    })
     for (let n = 0; n < claimed.length; n++) {
       const r = claimed[n]
       /* PlayerHome shows the feedback card only for the LATEST assessment
@@ -409,8 +417,8 @@ async function seed() {
         const { error } = await supabase.rpc('log_match_for_player', {
           p_user_id: r.linked_player_id,
           p_opponent: pick(OPPONENTS, f),
-          p_team_score: (f + n) % 4,
-          p_opponent_score: (f * 2 + n) % 3,
+          p_team_score: fixtureScore[f].team,
+          p_opponent_score: fixtureScore[f].opponent,
           p_competition: 'League',
           p_venue: f % 2 === 0 ? 'Home' : 'Away',
           p_position: r.position ?? 'Midfielder',
@@ -464,6 +472,7 @@ async function seed() {
           }
         }
       }
+    }
     }
     log(`matches: ${created.matches}, assessments: ${created.assessments}`)
 

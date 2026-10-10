@@ -6,10 +6,15 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { handleCalendarFeedRequest, lookupFromRpc } from './handler.ts';
 
+// As in send-parent-invite: a malformed key setting reads as "not configured"
+// (503) instead of throwing before the handler runs.
+const defaultKey = (raw: string | undefined): string | undefined => {
+  try { return (JSON.parse(raw ?? '') as Record<string, string>).default || undefined; } catch { return undefined; }
+};
+
 serve(async (req) => {
   const url = Deno.env.get('SUPABASE_URL');
-  const secretRaw = Deno.env.get('SUPABASE_SECRET_KEYS');
-  const secretKey = secretRaw ? (JSON.parse(secretRaw) as Record<string, string>).default : undefined;
+  const secretKey = defaultKey(Deno.env.get('SUPABASE_SECRET_KEYS'));
   if (!url || !secretKey) {
     console.error('calendar-feed: not configured');
     return new Response('Calendar temporarily unavailable', { status: 503, headers: { 'Retry-After': '300' } });

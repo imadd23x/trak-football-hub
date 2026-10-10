@@ -43,8 +43,9 @@ $fn$;
 -- squad), so the phone removes the events on its next refresh. Otherwise the
 -- owner's published events from 60 days ago onwards, in the shape the
 -- endpoint validates (lookupFromRpc): no title, no cancel reason, no coach
--- notes, because free text can name a child. child_names lets the endpoint
--- drop any remaining detail that mentions one (J8 check 6).
+-- notes, because free text can name a child. child_names (every child in
+-- those squads) lets the endpoint drop any remaining detail that mentions
+-- one (J8 check 6).
 CREATE FUNCTION public.calendar_feed_for_token(p_token text)
 RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER
@@ -103,6 +104,9 @@ BEGIN
       ) e
       WHERE e.day >= current_date - 60
     ), '[]'::jsonb),
+    -- Every child in the squads this feed shows, not only the owner's own:
+    -- a coach's note can name a squad-mate ("Lucas brings the bibs"), and
+    -- that must not reach every other family's calendar (Imad, #258).
     'child_names', coalesce((
       SELECT jsonb_agg(DISTINCT sp.player_name)
       FROM public.squad_players sp
@@ -110,7 +114,8 @@ BEGIN
         AND (sp.linked_player_id = v_link.user_id
              OR EXISTS (SELECT 1 FROM public.player_parent_links ppl
                         WHERE ppl.player_user_id = sp.linked_player_id
-                          AND ppl.parent_user_id = v_link.user_id))
+                          AND ppl.parent_user_id = v_link.user_id)
+             OR trak_private.family_reads_event_for(v_link.user_id, sp.coach_user_id, sp.organization_id))
     ), '[]'::jsonb)
   );
 END;

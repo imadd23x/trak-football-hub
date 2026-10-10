@@ -172,6 +172,15 @@ SELECT pg_temp.cf_check(
   pg_temp.cf_event(pg_temp.cf_feed('player'), 504)::text);
 SELECT pg_temp.cf_check(pg_temp.cf_feed('player')->'child_names' ? 'Omar Haddad',
   'the answer names the child, so the endpoint can drop any detail that mentions them');
+-- Imad's #258 review: coach free text can name ANOTHER child in the squad
+-- ("Lucas brings the bibs"), and that would reach every other family's
+-- calendar. So the names cover every child in the squads the feed shows.
+SELECT pg_temp.cf_check(pg_temp.cf_feed('player')->'child_names' ? 'Feed Unconsented',
+  'the answer also names squad-mates, so a detail naming another child in the squad is dropped too',
+  (pg_temp.cf_feed('player')->'child_names')::text);
+SELECT pg_temp.cf_check(NOT (pg_temp.cf_feed('player')->'child_names' ? 'Feed Child Y'),
+  'it does not hand over names from another academy''s squad',
+  (pg_temp.cf_feed('player')->'child_names')::text);
 
 -- ── 3. The parent's link shows the same; other readers see their own ────────
 SELECT pg_temp.cf_check(pg_temp.cf_ids(pg_temp.cf_feed('parent')) = '500,504,506', 'the parent''s link shows the child''s events',
@@ -227,8 +236,8 @@ DO $test$
 DECLARE failed integer; total integer;
 BEGIN
   SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO failed, total FROM pg_temp.cf_results;
-  IF total <> 23 THEN
-    RAISE EXCEPTION 'Calendar feed: % assertions ran; expected exactly 23 (% failed: %)', total, failed,
+  IF total <> 25 THEN
+    RAISE EXCEPTION 'Calendar feed: % assertions ran; expected exactly 25 (% failed: %)', total, failed,
       (SELECT string_agg(description || ' [' || coalesce(detail, '') || ']', ' || ') FROM pg_temp.cf_results WHERE NOT passed);
   END IF;
   IF failed > 0 THEN

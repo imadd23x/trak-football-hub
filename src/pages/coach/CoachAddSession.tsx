@@ -54,6 +54,8 @@ const DEFAULT_DETAIL: PlayerDetail = {
 
 const MATCH_POSITIONS = ['Goalkeeper', 'Defender', 'Midfielder', 'Attacker'] as const
 
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+
 /** The roster's age group ('U14'), else the legacy integer age. Never invented. */
 function rosterAgeGroup(p: SquadPlayer): string | null {
   return p.age_group ?? (p.age != null ? String(p.age) : null)
@@ -339,6 +341,8 @@ export default function CoachAddSession() {
     // Collected rather than thrown, so one player's rejection does not abandon
     // the rest. Reported by name at the end — silently dropping them is the bug.
     const failures: string[] = []
+    // Refused by a database rule; pressing save again can't change the answer.
+    const refusals: string[] = []
 
     if (isMatch) {
       // Collect players who played
@@ -449,7 +453,14 @@ export default function CoachAddSession() {
 
         if (rpcErr) {
           console.error(`Match log failed for ${p.player_name}:`, rpcErr)
-          failures.push(p.player_name)
+          // TRAK-151: a rule refusal (P0001, or 42501 consent) carries a
+          // sentence for the coach, and saving again gets the same answer, so
+          // show it. The database names the child by id; the coach knows a name.
+          if (rpcErr.code === 'P0001' || rpcErr.code === '42501') {
+            refusals.push(`${p.player_name}: ${rpcErr.message.replace(UUID, p.player_name)}`)
+          } else {
+            failures.push(p.player_name)
+          }
         } else {
           nowLogged.add(p.linked_player_id!)
         }
@@ -487,13 +498,13 @@ export default function CoachAddSession() {
     // way, so the coach stays on this screen with their input intact and can
     // press save again; the guards above make that finish the job rather than
     // duplicate it.
-    if (failures.length > 0) {
-      const names = failures.join(', ')
-      toast.error(
-        `Saved, but ${failures.length} of these did not record: ${names}. ` +
-          `Press save again to retry just those — nothing will be duplicated.`,
-        { duration: 12000 },
-      )
+    if (failures.length > 0 || refusals.length > 0) {
+      const parts = [`Saved, but ${failures.length + refusals.length} of these did not record:`]
+      if (refusals.length > 0) parts.push(`${refusals.join('; ')}.`)
+      if (failures.length > 0) {
+        parts.push(`${failures.join(', ')}. Press save again to retry just those — nothing will be duplicated.`)
+      }
+      toast.error(parts.join(' '), { duration: 12000 })
       setSaving(false)
       return
     }

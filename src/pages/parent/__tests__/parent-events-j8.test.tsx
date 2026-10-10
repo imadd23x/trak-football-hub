@@ -159,6 +159,15 @@ describe('TRAK-131: the parent\'s home "Next up"', () => {
     expect(card).toHaveAttribute('href', '/parent/event/ev-alex')
     expect(screen.queryByText('Later training')).not.toBeInTheDocument()
   })
+
+  // Tarek's #259 review: without this, replacing the error branch with
+  // `return null` kept every test green (UC-X02: never a false empty state).
+  it('says a failed read failed on home too, instead of silently showing no "Next up"', async () => {
+    EVENTS.Alex = 'fail'
+    renderAt('/parent/home')
+    expect(await screen.findByText("Couldn't load upcoming events.")).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /next up/i })).not.toBeInTheDocument()
+  })
 })
 
 describe('TRAK-131: the parent\'s event page', () => {

@@ -1,6 +1,6 @@
 project_id = "xbykbqolvqyqmipikuae"
 
-# All eight functions are declared explicitly. `supabase functions deploy` applies
+# All nine functions are declared explicitly. `supabase functions deploy` applies
 # what is written here, so anything left out silently falls back to the CLI
 # default (verify_jwt = true) and a deploy can flip a setting that was changed in
 # the dashboard. Declaring every function keeps this file the source of truth.
@@ -45,4 +45,10 @@ verify_jwt = true
 # send-roster-invites, the secret key on apikey can't pass the gateway's JWT
 # check, so the handler checks it and refuses everyone else (handler.ts).
 [functions.send-email]
+verify_jwt = false
+
+# TRAK-132 (J8.9): phone calendar apps fetch the feed with no login, so the
+# gateway's JWT check would refuse every one. The 256-bit token in the path is
+# the credential; the handler and calendar_feed_for_token check it.
+[functions.calendar-feed]
 verify_jwt = false

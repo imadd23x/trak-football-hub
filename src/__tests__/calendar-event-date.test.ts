@@ -19,12 +19,15 @@ import { join } from 'node:path'
 
 const MIGRATIONS = join(process.cwd(), 'supabase', 'migrations')
 
+// The migration that ADDS the columns, not merely the newest one that mentions
+// them: later migrations read event_date too (TRAK-132's calendar feed), and
+// picking "the newest mention" checked the wrong file for this backfill.
 function calendarMigration(): string {
   const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
   let latest = ''
   for (const f of files) {
     const sql = readFileSync(join(MIGRATIONS, f), 'utf8')
-    if (sql.includes('coach_calendar_events') && sql.includes('event_date')) latest = sql
+    if (sql.includes('coach_calendar_events') && /ADD COLUMN(?: IF NOT EXISTS)?\s+event_date\b/i.test(sql)) latest = sql
   }
   return latest
 }

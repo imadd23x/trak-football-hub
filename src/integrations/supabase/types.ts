@@ -815,7 +815,13 @@ export type Database = {
           status: string
         }[]
       }
+      create_my_calendar_link: { Args: never; Returns: string }
       delete_my_account: { Args: never; Returns: undefined }
+      my_calendar_link: {
+        Args: never
+        Returns: { created_at: string; last_fetched_at: string | null }[]
+      }
+      revoke_my_calendar_link: { Args: never; Returns: boolean }
       feature_on: { Args: { p_feature: string }; Returns: boolean }
       get_children_awaiting_consent: {
         Args: never

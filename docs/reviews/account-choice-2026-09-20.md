@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # UT-22: choose a remembered account before continuing
 
 September 20, 2026. Incremental fix on staff admission PR74 `c910829a088c0debaaf15c61ad897b1a77f00f84`; canonical main `4335e89` is an ancestor. This branch changes the landing-page consumer, one password-reset success message, focused tests and browser test registration. It does not redefine household admission or edit a peer-owned contract.

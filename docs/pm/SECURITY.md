@@ -1,5 +1,7 @@
 # Security Notes
 
+> **Update (TRAK-96, Oct 2026):** the app now uses the new API keys: `sb_publishable_…` in the browser, `sb_secret_…` for operators and edge functions. The legacy anon and service_role JWTs below are deactivated as TRAK-96's last step.
+
 ## Item 01 — Supabase Anon Key in Git History
 
 **Status:** ✅ Resolved — key rotated 2026-05-30. Old key invalidated.
@@ -22,8 +24,10 @@ git log --all --full-history -p -- .env | grep SERVICE_ROLE
 # in Supabase Dashboard → Project Settings → API → service_role key → Rotate
 ```
 
-**Pre-commit protection going forward:**
-`.env` is in `.gitignore`. Consider adding [gitleaks](https://github.com/gitleaks/gitleaks) as a pre-commit hook to prevent future accidental commits of secrets.
+**Credential protection at push:**
+`.env` stays in `.gitignore`. The credential-only `.husky/pre-push` guard scans
+outgoing history; keep GitHub secret scanning and push protection enabled.
+Feature tests run at the final [merge gate](../release/merge-gate.md).
 
 ---
 

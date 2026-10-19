@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # UT-20: password visibility
 
 Imad's September 20 user-testing notes ask for password show/hide controls. Inspection found existing toggles on login/reset, but none on player, coach and academy signup or parent invitation sign-in/setup.

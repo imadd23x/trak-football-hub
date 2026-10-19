@@ -8,7 +8,7 @@ const DEV_MODE = import.meta.env.DEV
  *  usually a provisioning failure during signup. Fail closed:
  *  never render role-gated pages without a verified role. */
 function ProfileMissingScreen() {
-  const { refreshProfile, signOut } = useAuth()
+  const { refreshProfile, signOut, profileError } = useAuth()
   const [retrying, setRetrying] = useState(false)
 
   const retry = async () => {
@@ -20,11 +20,10 @@ function ProfileMissingScreen() {
   return (
     <div className="min-h-screen bg-[#0A0A0B] flex flex-col items-center justify-center px-8 text-center">
       <h1 className="text-[20px] font-semibold text-white/90 mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        Finishing account setup
+        {profileError ? 'Could not load account access' : 'Finishing account setup'}
       </h1>
-      <p className="text-[13px] text-white/45 mb-8 max-w-[300px]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        Your account isn't fully set up yet. This can happen if something
-        interrupted sign-up. Tap retry to finish setting up your account.
+      <p role={profileError ? 'alert' : undefined} className="text-[13px] text-white/45 mb-8 max-w-[300px]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        {profileError ?? "Your account isn't fully set up yet. This can happen if something interrupted sign-up. Tap retry to finish setting up your account."}
       </p>
       <button
         onClick={retry}
@@ -53,7 +52,7 @@ export function RouteGuard({ allowedRole, children }: { allowedRole: string; chi
     return <>{children}</>
   }
 
-  if (loading) return <div className="min-h-screen bg-[#0A0A0B]" />
+  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center px-6"><p role="status" aria-label="Account access" className="text-sm text-muted-foreground">Checking your account…</p></div>
 
   if (!user) return <Navigate to="/" replace />
 

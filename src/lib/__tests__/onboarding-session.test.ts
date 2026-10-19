@@ -14,7 +14,7 @@ const session = (id: string) => ({
 }) as Session;
 
 describe('onboarding uses a captured token with the real Supabase SDK', () => {
-  it('binds verification, provisioning, email and metadata cleanup to A after the browser holds B', async () => {
+  it.each([false, true])('binds verification, provisioning, email and metadata cleanup to A after the browser holds B (cancellable=%s)', async cancellable => {
     const requests: { path: string; authorization: string | null; body?: unknown }[] = [];
     server.use(
       http.get(`${url}/auth/v1/user`, ({ request }) => {
@@ -34,7 +34,7 @@ describe('onboarding uses a captured token with the real Supabase SDK', () => {
         return HttpResponse.json(user('a'));
       }),
     );
-    const account = await createOnboardingSession(session('a'));
+    const account = await createOnboardingSession(session('a'), cancellable ? new AbortController().signal : undefined);
     const browserSession = JSON.stringify(session('b'));
     localStorage.setItem('sb-test-auth-token', browserSession);
 

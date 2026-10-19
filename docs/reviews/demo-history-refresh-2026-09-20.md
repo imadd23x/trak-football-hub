@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # PR36: synthetic demo with academy-history convergence
 
 September 20, 2026. Integrates PR34 `5af5ac2c7d5e4e2643a2e78274833bcbffad2ef5`, including PR44 `8e72e80` and main `4335e8984777b7b704e8706d3fe277352658c9ed`, into PR36's existing `efb7b0a` branch. No new schema migration or application code is added relative to PR34. The entire migration directory is byte-identical to that dependency; original PR36 migration bytes also remain unchanged.

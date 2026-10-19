@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # PR36: refresh onto main and PR34
 
 September 18, 2026. Merged tested PR34 `805ccb2da36a044f33abb8f4d575a781c19c6723` (including main `00910940f596d9fe9a7cd416dc741943d1df2cc9`) into PR36 `0c883c652461a9912205f611d4b2e85cc2857996` on `shared/S2-demo-review`.

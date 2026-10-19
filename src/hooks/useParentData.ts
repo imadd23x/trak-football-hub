@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import {
-  fetchAwaitingConsent, fetchParentDevelopment, fetchParentMatchActivity,
+  fetchAwaitingConsent, fetchParentDevelopment, fetchParentMatchActivity, fetchParentMatchDetail,
   fetchParentMatchPage, fetchParentMatchSummary, fetchParentRecentMatches, type ParentMatchCursor,
 } from '@/lib/parent-data'
 
@@ -115,6 +115,21 @@ export function useChildrenAwaitingConsent() {
     queryFn: ({ signal }) => fetchAwaitingConsent(signal),
     enabled: !!parentId,
     staleTime: 0,
+    networkMode: 'always',
+  })
+}
+
+
+export function useParentMatchDetail(matchId: string) {
+  const { parentId, selectedChild } = useParentChildren()
+  const childId = selectedChild?.id
+  return useQuery({
+    queryKey: ['parent', parentId, childId, 'match-detail', matchId],
+    queryFn: ({ signal }) => fetchParentMatchDetail(childId!, matchId, signal),
+    enabled: !!parentId && !!childId && !!matchId,
+    // Each opening checks access again. Closing cancels and discards its data.
+    staleTime: 0,
+    gcTime: 0,
     networkMode: 'always',
   })
 }

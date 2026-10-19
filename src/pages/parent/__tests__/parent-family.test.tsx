@@ -474,3 +474,148 @@ describe('bounded parent match history', () => {
     expect(screen.queryByText('No matches yet.')).not.toBeInTheDocument()
   })
 })
+
+
+describe('parent record details from user testing', () => {
+  const detail = (child: string) => ({ ...match(child), goals: 0, assists: 0,
+    minutes_played: 73, position: 'mid', age_group: 'U15' })
+  const requests: URL[] = []
+  function detailsHandler(reply: (child: string) => Response | Promise<Response> = child => HttpResponse.json([detail(child)])) {
+    server.use(http.get(endpoint('matches'), ({ request }) => {
+      const url = new URL(request.url)
+      const child = url.searchParams.get('user_id')?.slice(3) ?? ''
+      if (!url.searchParams.has('id')) return HttpResponse.json([match(child)])
+      requests.push(url)
+      return reply(child)
+    }))
+  }
+  beforeEach(() => { requests.length = 0; detailsHandler() })
+
+  it.each(['/parent/home', '/parent/matches', '/parent/alerts'])(
+    'opens a child-scoped match from %s and restores keyboard focus on close', async route => {
+      const user = userEvent.setup()
+      renderFamily(route)
+      const trigger = await screen.findByRole('button', { name: /View match.*Alex opposition/ })
+      trigger.focus()
+      await user.keyboard('{Enter}')
+      const dialog = await screen.findByRole('dialog', { name: 'Match details' })
+      expect(await within(dialog).findByText('73')).toBeInTheDocument()
+      expect(within(dialog).getByLabelText('Goals')).toHaveTextContent('0')
+      expect(within(dialog).getByLabelText('Assists')).toHaveTextContent('0')
+      expect(within(dialog).getByText('0–0')).toBeInTheDocument()
+      expect(within(dialog).getByText('Difficult')).toBeInTheDocument()
+      expect(requests).toHaveLength(1)
+      expect(requests[0].searchParams.get('user_id')).toBe('eq.Alex')
+      expect(requests[0].searchParams.get('id')).toBe('eq.match-Alex')
+      const projection = requests[0].searchParams.get('select')!
+      expect(projection).not.toContain('*')
+      expect(projection).not.toMatch(/self_rating|body_condition|card_received|notes/)
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(trigger).toHaveFocus()
+    },
+  )
+
+  it('opens the exact assessment in an alert, preserving zero and missing scores', async () => {
+    server.use(http.get(endpoint('coach_assessments'), () => HttpResponse.json([
+      { ...assessment('Alex'), work_rate: null, tactical: 8 },
+      { ...assessment('Alex'), id: 'older', coach_rating: 9, created_at: '2026-09-10T10:00:00Z' },
+    ])))
+    renderFamily('/parent/alerts')
+    const triggers = await screen.findAllByRole('button', { name: /View coach assessment/ })
+    await userEvent.click(triggers[1])
+    let dialog = screen.getByRole('dialog', { name: 'Coach assessment' })
+    expect(within(dialog).getByText('10 Sept')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Overall assessment')).toHaveTextContent('Exceptional')
+    await userEvent.keyboard('{Escape}')
+    await userEvent.click(triggers[0])
+    dialog = screen.getByRole('dialog', { name: 'Coach assessment' })
+    expect(within(dialog).getByLabelText('Overall assessment')).toHaveTextContent('Difficult')
+    expect(within(dialog).getByLabelText('Work Rate')).toHaveTextContent('Not assessed')
+    expect(within(dialog).getByLabelText('Tactical')).toHaveTextContent('Standout')
+  })
+
+  it('opens recognition from an alert', async () => {
+    renderFamily('/parent/alerts')
+    await userEvent.click(await screen.findByRole('button', { name: /View recognition/ }))
+    expect(within(screen.getByRole('dialog', { name: 'Recognition' })).getByText('Alex teamwork')).toBeInTheDocument()
+  })
+
+  it('retries a failed detail query without showing invented or stale facts', async () => {
+    detailsHandler(() => fail())
+    renderFamily('/parent/matches')
+    await userEvent.click(await screen.findByRole('button', { name: /View match/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent("Couldn't load match details")
+    expect(within(dialog).queryByLabelText('Goals')).not.toBeInTheDocument()
+    detailsHandler()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Retry' }))
+    expect(await within(dialog).findByLabelText('Goals')).toHaveTextContent('0')
+  })
+
+  it.each(['absent', 'wrong child', 'wrong match', 'malformed'])(
+    'does not show detail data when the response is %s', async variant => {
+      detailsHandler(() => HttpResponse.json(variant === 'absent' ? [] : [{ ...detail('Alex'),
+        ...(variant === 'wrong child' ? { user_id: 'Zara' } : {}),
+        ...(variant === 'wrong match' ? { id: 'other' } : {}),
+        ...(variant === 'malformed' ? { goals: '2' } : {}),
+      }]))
+      renderFamily('/parent/matches')
+      await userEvent.click(await screen.findByRole('button', { name: /View match/ }))
+      const dialog = screen.getByRole('dialog')
+      expect(await within(dialog).findByRole('alert')).toBeInTheDocument()
+      expect(within(dialog).queryByLabelText('Goals')).not.toBeInTheDocument()
+    },
+  )
+
+  it('preserves unknown match facts instead of converting them to zero', async () => {
+    detailsHandler(() => HttpResponse.json([{ ...detail('Alex'), goals: null, assists: null,
+      minutes_played: null, computed_rating: null, team_score: null, opponent_score: null }]))
+    renderFamily('/parent/matches')
+    await userEvent.click(await screen.findByRole('button', { name: /View match/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(await within(dialog).findByLabelText('Goals')).toHaveTextContent('Not recorded')
+    expect(within(dialog).getByLabelText('Assists')).toHaveTextContent('Not recorded')
+    expect(within(dialog).getByText('Score not recorded')).toBeInTheDocument()
+    expect(within(dialog).getByText('Not rated')).toBeInTheDocument()
+  })
+
+  it('closes details immediately when the account changes during a delayed request', async () => {
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    detailsHandler(async child => { await pending; return HttpResponse.json([detail(child)]) })
+    const view = renderFamily('/parent/matches')
+    await userEvent.click(await screen.findByRole('button', { name: /View match/ }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Loading')
+    auth.parentId = 'parent-b'
+    view.rerender(view.tree())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await act(async () => { release(); await pending })
+    expect(await screen.findByText('Sam opposition')).toBeInTheDocument()
+    expect(screen.queryByText('Alex opposition')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('closes the detail when the selected child link is removed', async () => {
+    const view = renderFamily('/parent/matches')
+    await userEvent.selectOptions(await screen.findByRole('combobox'), 'Zara')
+    await userEvent.click(await screen.findByRole('button', { name: /View match.*Zara opposition/ }))
+    expect(await within(screen.getByRole('dialog')).findByText('73')).toBeInTheDocument()
+    server.use(http.get(endpoint('player_parent_links'), () => HttpResponse.json([{ player_user_id: 'Alex' }])))
+    await act(async () => { await view.client.invalidateQueries({ queryKey: ['parent', 'parent-a', 'children'] }) })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
+  })
+
+  it('removes previously visible details after a failed permission refresh', async () => {
+    const view = renderFamily('/parent/matches')
+    await userEvent.click(await screen.findByRole('button', { name: /View match/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(await within(dialog).findByText('73')).toBeInTheDocument()
+    detailsHandler(() => fail())
+    await act(async () => { await view.client.invalidateQueries({ queryKey: ['parent', 'parent-a', 'Alex', 'match-detail'] }) })
+    expect(await within(dialog).findByRole('alert')).toBeInTheDocument()
+    expect(within(dialog).queryByText('73')).not.toBeInTheDocument()
+  })
+})

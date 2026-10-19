@@ -4,6 +4,7 @@ import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoadin
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { useChildrenAwaitingConsent, useParentDevelopment, useParentMatchSummary, useParentRecentMatches } from '@/hooks/useParentData'
 import { formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
+import { ParentMatchRecord, ParentAssessmentRecord } from '@/components/parent/ParentRecordDetails'
 import { BANDS } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
 
@@ -101,6 +102,9 @@ export default function ParentHome() {
                           </div>
                         })}
                       </div>
+                      <ParentAssessmentRecord assessment={assessment} coachName={(assessment.coach_user_id && development?.coachNames[assessment.coach_user_id]) || 'Coach'} className="mt-3 px-3 border border-border text-sm">
+                        View assessment details
+                      </ParentAssessmentRecord>
                     </div>
                   ) : <p className="py-4 text-sm text-muted-foreground">No coach assessments yet.</p>}
                 </section>
@@ -116,7 +120,7 @@ export default function ParentHome() {
                 <section className="mt-5" aria-label="Recent matches">
                   <MetadataLabel text="RECENT MATCHES" />
                   {matches.length ? <div className="rounded-xl mt-2 bg-card border border-border divide-y divide-border">
-                    {matches.map(match => <div key={match.id} className="flex items-center gap-3 p-4">
+                    {matches.map(match => <ParentMatchRecord key={match.id} match={match} className="flex items-center gap-3 p-4">
                       <span className="w-5 text-xs text-muted-foreground">{matchResult(match) ?? '—'}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground truncate">{match.opponent || match.competition || 'Match'}</p>
@@ -125,7 +129,7 @@ export default function ParentHome() {
                         </p>
                       </div>
                       <ParentRating rating={match.computed_rating} />
-                    </div>)}
+                    </ParentMatchRecord>)}
                   </div> : <p className="py-4 text-sm text-muted-foreground">{summary?.total_count === 0
                     ? 'No matches yet. Matches recorded by the coach will appear here.' : 'No recent matches available.'}</p>}
                   <button onClick={() => navigate('/parent/matches')} className="mt-3 min-h-11 px-4 rounded-lg border border-border text-sm text-foreground focus-visible:ring-2 focus-visible:ring-primary">

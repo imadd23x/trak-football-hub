@@ -4,6 +4,7 @@ import { MobileShell, NavBar } from '@/components/trak'
 import { ParentChildSelector, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
 import { useParentMatchHistory, useParentMatchSummary } from '@/hooks/useParentData'
 import { formatParentDate, matchResult } from '@/lib/parent-data'
+import { ParentMatchRecord } from '@/components/parent/ParentRecordDetails'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
 
 export default function ParentMatches() {
@@ -44,7 +45,7 @@ export default function ParentMatches() {
                 {matches.length === 0
                   ? <p className="text-sm text-muted-foreground text-center py-12">{summary.data?.total_count === 0 ? 'No matches yet.' : 'No matches on this page.'}</p>
                   : <div className="divide-y divide-border" aria-label="Match history">
-                  {matches.map(match => <div key={match.id} className="flex items-center gap-3 py-4">
+                  {matches.map(match => <ParentMatchRecord key={match.id} match={match} className="flex items-center gap-3 py-4">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-foreground truncate">{match.opponent || match.competition || 'Match'}</p>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -56,7 +57,7 @@ export default function ParentMatches() {
                       <p className="text-xs text-muted-foreground mt-1">{matchResult(match)
                         ? `${matchResult(match)} ${match.team_score}–${match.opponent_score}` : 'Score not recorded'}</p>
                     </div>
-                  </div>)}
+                  </ParentMatchRecord>)}
                   </div>}
                 {history.nextPageError && <ParentLoadError message="Couldn't load the next page. Your current matches are still shown." onRetry={() => { void history.nextPage() }} />}
                 {history.isLoadingPage && <p role="status" className="py-3 text-sm text-muted-foreground">Loading next page…</p>}

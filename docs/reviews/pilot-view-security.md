@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Operational view access review
 
 Status: implemented and verified in disposable PGlite on September 18, 2026. Not deployed. Native PostgreSQL 17, advisor, fork CI and deployed synthetic-role verification are separate checks; their results must be recorded before release.

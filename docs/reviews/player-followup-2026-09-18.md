@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # PR42 follow-up runtime review — 18 September 2026
 
 Exact head: `46518d79234bfa60c74f54330d8d78ec78f5d9d2`. This reruns the two findings reproduced at `c9d99b8b31d00644d9f72d75ec4fd087a15fbb30` against the newer calendar-caller candidate. Only an opt-in test and this document were added.

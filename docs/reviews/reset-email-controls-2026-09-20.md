@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Reset-email controls — implementation record
 
 Scope: compose #48 `43db21e` with fork #6 `5c4fb07`, then fix the existing Landing and Settings reset-email actions. Reuse Settings' keyed account form, verified identity, operation guard and stale-result handling. Keep the dependency merge explicit. No household/child credential schema, email templates, provider settings, live account or production changes.

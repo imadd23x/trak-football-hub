@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Parent Profile consent withdrawal
 
 Scope: add the withdrawal promised by the existing notice, using the existing own-consent RPC. No migration or retention/purpose-policy change. Based on parent selection f3a6aad.

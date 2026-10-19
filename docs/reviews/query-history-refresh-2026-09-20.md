@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # PR37: assessment index with academy-history convergence
 
 September 20, 2026. Integrates PR34 `5af5ac2c7d5e4e2643a2e78274833bcbffad2ef5`, including PR44 `8e72e80` and canonical main `4335e8984777b7b704e8706d3fe277352658c9ed`, into PR37's existing `b8c3a19` branch. No application code is changed relative to PR34. Both dependencies still need release review and authorization.

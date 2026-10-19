@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Password recovery callback and account boundary
 
 Standalone scope: canonical main `9114f4c` has a reset form that accepted any cached session, ignored recovery URL errors, waited indefinitely after its one retry, and submitted through the mutable shared Auth client. This follow-up changes the reset page, its Auth lifecycle integration, a small eagerly registered client hook, and focused tests. It changes no database, backend configuration, API key, invitation, or consent contract.

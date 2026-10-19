@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Player follow-up runtime review — 18 September 2026
 
 Reviewed exact commit `c9d99b8b31d00644d9f72d75ec4fd087a15fbb30`, compared with merged PR30 head `e5c5b41`. Only this evidence document and an opt-in test were added; no application, schema, hosted data, or provider changes.

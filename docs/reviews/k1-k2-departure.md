@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # K1/K2 departure review and regressions
 
 Reviewed September 18, 2026. The original six findings below describe the initial K1/K2 baseline. Subsequent upstream and fork changes are recorded separately here; this document is **not deployment or pilot approval**. No shared Supabase database was modified during this work.

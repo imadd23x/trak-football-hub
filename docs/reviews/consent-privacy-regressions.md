@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Executable consent and private-note audit
 
 Status: **unresolved, intentionally failing audit**. These are existing defects in integration `b66abcb`, not regressions introduced by the parent-family, invitation, authentication or academy-departure fixes. The [P4 boundary review](p4-feedback-contract.md) describes the UI/edge paths and ownership; the [P2 plan](../plans/p2-academy-consent.md) covers the larger academy-specific design.

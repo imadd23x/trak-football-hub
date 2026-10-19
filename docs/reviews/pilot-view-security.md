@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Operational view access review
 
 Status: implemented and verified in disposable PGlite and PostgreSQL 17.11 on September 18, 2026. Not deployed. The combined 60-migration replay passes every parent, academy, report and deletion suite; the unchanged Supabase CLI security advisor reports **No issues found**, exit 0. Fork CI and deployed synthetic-role verification are separate checks.

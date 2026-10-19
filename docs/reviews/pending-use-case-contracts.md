@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Pending athlete use-case contracts
 
 Status reviewed at integration commit `4c3f35d`, September 18, 2026. This bounded source review explains the three previously recorded UC-A02 failures and one UC-A04 failure; it did not rerun the suite or change app code, tests, or registry contracts.

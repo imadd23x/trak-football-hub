@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Coach assessment query performance — synthetic investigation
 
 The additive coach/date index is implemented for review in `20260918080430_index_coach_assessment_history.sql`. It improves the bounded recent-assessment feed; the unbounded squad/Home analytics histories remain separate work. No production change was made. The [scope and rollout plan](../plans/coach-assessment-index.md) records lock/storage costs and the existing timestamp-tie limitation.

@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # PR #66 — current-head scorecard review
 
 Reviewed September 20, 2026, using native PostgreSQL 17.11 and synthetic data only. Exact PR head: `404e729a1f7cae728e14e61ba4424fb96b7c9ef9`. Main: `4335e8984777b7b704e8706d3fe277352658c9ed`. No remote database/Auth access, peer-branch edits, production deployment or merge approval.

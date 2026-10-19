@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Independent recheck of #44 at 8e72e80
 
 Scope: clear the two previously raised assessment-state/migration-history holds and inspect their integration hunks. This is not a complete new review of all accumulated #44 features, production approval, or proof of pilot readiness.

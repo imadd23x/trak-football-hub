@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # P2 development-write boundary — draft checkpoint
 
 Base: committed authority #70 (`8467ecd`) plus released main `4335e89`, integrated at `78e48bf`. This persistent worktree reconstructs the required boundary from real source; the lost temporary draft and its old test results are not reused.

@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # P2 development-read boundary — draft checkpoint
 
 The write boundary alone left existing SELECT policies able to return records after withdrawal and despite a declined parent-visibility choice. Existing player access to private coach notes was also not corrected by consent writes. The new forward migration adds a restrictive SELECT policy to matches, assessments, private notes, awards, attendance and meeting requests. Existing audience/ownership policies still have to allow the row.

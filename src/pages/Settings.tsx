@@ -1,3 +1,4 @@
+import { OwnAvatar } from '@/components/profile/OwnAvatar'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
@@ -217,6 +218,9 @@ function AccountSettings({ userId }: { userId: string }) {
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    e.target.value = ''
+    if (!file.size) { toast.error('Choose a non-empty image'); return }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) { toast.error('Choose a JPEG, PNG, WebP or GIF image'); return }
     if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return }
     if (!begin('avatar')) return
     try {
@@ -225,14 +229,13 @@ function AccountSettings({ userId }: { userId: string }) {
         .upload(userId, file, { upsert: true, contentType: file.type })
       if (uploadError) throw uploadError
       await assertSettingsAccount(userId, isCurrent)
-      const { data: { publicUrl } } = client.storage.from('avatars').getPublicUrl(userId)
-      const urlWithBust = `${publicUrl}?t=${Date.now()}`
-      const { data, error } = await client.from('profiles').update({ avatar_url: urlWithBust })
+      const avatarReference = `avatars/${userId}?v=${Date.now()}`
+      const { data, error } = await client.from('profiles').update({ avatar_url: avatarReference })
         .eq('user_id', userId).select('user_id').maybeSingle()
       if (error) throw error
       if (data?.user_id !== userId) throw new Error('Profile photo save was not confirmed')
       await assertSettingsAccount(userId, isCurrent)
-      setAvatarUrl(urlWithBust)
+      setAvatarUrl(avatarReference)
       await refreshProfile()
       if (isCurrent()) toast.success('Profile photo updated')
     } catch (error) {
@@ -281,12 +284,9 @@ function AccountSettings({ userId }: { userId: string }) {
               className="w-[72px] h-[72px] rounded-[22px] overflow-hidden flex items-center justify-center"
               style={{ background: '#202024', border: '1px solid rgba(200,242,90,0.18)' }}
             >
-              {avatarUrl
-                ? <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-                : <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 26, fontWeight: 600, color: '#C8F25A' }}>
+              <OwnAvatar reference={avatarUrl} fallback={<span style={{ fontFamily: "'DM Mono', monospace", fontSize: 26, fontWeight: 600, color: '#C8F25A' }}>
                     {(displayName || '?').charAt(0).toUpperCase()}
-                  </span>
-              }
+                  </span>} />
             </div>
             <button
               onClick={() => fileInputRef.current?.click()}

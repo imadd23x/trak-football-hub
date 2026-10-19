@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # PR42 calendar caller review — 18 September 2026
 
 Reviewed exact head `d0de05760bbba008139f2a72426c62b8a3d20583`. The original four runtime regressions pass. Two additional desired-behavior tests fail: the player Upcoming list includes clearly ended sessions, and the fallback for rows without a calendar date can hide an imminent event behind later sessions.

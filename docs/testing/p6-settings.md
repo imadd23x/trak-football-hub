@@ -20,7 +20,7 @@ September 18, 2026, integration base `a7d96b9` plus this change:
 - `npm run test:browser`: production build and four intercepted browser scenarios passed. Parent Settings verified at 390×844; screenshot inspection showed both children and account controls without the ineffective settings sections.
 - Separate integration parent SQL suite: 58 migrations replayed and invitation assertions passed. P6 itself changes no SQL.
 
-The browser tests use synthetic intercepted backend responses. This is not live email, production deployment, physical-phone, or full account-deletion verification. Branch-specific CI and independent human review are still required before upstream merge.
+The browser tests use synthetic intercepted backend responses. This is not live email, production deployment, physical-phone, or full account-deletion verification. Submit the final candidate with current main to the automated merge gate; record live outcomes separately from implementation completion.
 
 The isolated upstream-review branch starts from `ff9d713` and includes the S4 fork guards plus this P6 fix. Its source suite passes 171 assertions and its harness passes 17; typecheck and production build pass. Full lint has zero errors and 140 existing warnings. `uc:check` passes its two enforced use cases but reports four pending failures: three obsolete player match-logging assertions and one player-history failed-load assertion. These are separate Tarek-owned paths, not a claim of a fully passing application. The larger integration/browser result above is recorded separately because that branch also contains parent-security follow-ups.
 

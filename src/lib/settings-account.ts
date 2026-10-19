@@ -12,9 +12,9 @@ export async function assertSettingsAccount(expectedUserId: string, isCurrent: (
   return data.session
 }
 
-export async function getSettingsAccount(expectedUserId: string, isCurrent: () => boolean) {
+export async function getSettingsAccount(expectedUserId: string, isCurrent: () => boolean, signal?: AbortSignal) {
   const session = await assertSettingsAccount(expectedUserId, isCurrent)
-  const account = await createOnboardingSession(session)
+  const account = await createOnboardingSession(session, signal)
   await assertSettingsAccount(expectedUserId, isCurrent)
   return account
 }

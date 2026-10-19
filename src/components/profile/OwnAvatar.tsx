@@ -27,8 +27,18 @@ function PrivateImage({ userId, fallback }: { userId: string; fallback: ReactNod
     let objectUrl: string | null = null
     setImage(null)
     setFailed(false)
+    // Bound the whole read, including Auth verification and response-body
+    // consumption. Abandon this attempt before aborting so late results cannot
+    // replace a retry or publish a blob after the error is visible.
+    const deadline = setTimeout(() => {
+      if (!active) return
+      active = false
+      clearTimeout(deadline)
+      controller.abort()
+      setFailed(true)
+    }, 20_000)
     void (async () => {
-      const { client } = await getSettingsAccount(userId, () => active)
+      const { client } = await getSettingsAccount(userId, () => active, controller.signal)
       const { data, error } = await client.storage.from('avatars').download(userId, {}, {
         signal: controller.signal, cache: 'no-store',
       })
@@ -40,9 +50,13 @@ function PrivateImage({ userId, fallback }: { userId: string; fallback: ReactNod
       }
       objectUrl = URL.createObjectURL(data)
       setImage(objectUrl)
-    })().catch(() => { if (active) setFailed(true) })
+    })().catch(() => { if (active) setFailed(true) }).finally(() => {
+      active = false
+      clearTimeout(deadline)
+    })
     return () => {
       active = false
+      clearTimeout(deadline)
       controller.abort()
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }

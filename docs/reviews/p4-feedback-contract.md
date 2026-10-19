@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # P4 feedback and consent boundary
 
 Reviewed September 18, 2026 at integration `b66abcb`. This is an unresolved source/runtime review, not pilot approval. The independent reviewer replayed all 60 migrations in a disposable PGlite database and used actual authenticated database roles. No live report rows or account data were accessed.

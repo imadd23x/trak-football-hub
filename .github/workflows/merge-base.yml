@@ -18,6 +18,7 @@ name: Merge base
 on:
   pull_request:
     branches: ['**']
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 
 permissions:
   contents: read
@@ -25,10 +26,11 @@ permissions:
 jobs:
   base-reaches-main:
     name: Base branch still reaches main
+    if: '!github.event.pull_request.draft'
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Ancestry is the whole question here, so the full history is needed.
           fetch-depth: 0

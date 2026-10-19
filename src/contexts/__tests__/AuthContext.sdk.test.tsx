@@ -41,6 +41,7 @@ function Controls() {
   return <>
     <output data-testid="identity">{account?.id ?? '-'}:{profile?.user_id ?? '-'}</output>
     <button onClick={async () => observations.logout(await signOut())}>Sign out</button>
+    <button onClick={async () => observations.logout(await signOut('a'))}>Sign out A only</button>
     <button onClick={async () => observations.login(await signIn('b@example.test', 'password-b'))}>Sign in B</button>
     <button onClick={async () => {
       const { error } = await signUp('b@example.test', 'password-b')
@@ -78,6 +79,45 @@ async function mount() {
 }
 
 describe('auth transitions with the real persistent Supabase SDK', () => {
+  it('rejects a queued A-only logout after B finishes signing in, without touching B or its cache', async () => {
+    const loginResponse = deferred<void>()
+    const requests: string[] = []
+    server.use(
+      http.post(`${url}/auth/v1/token`, async () => { requests.push('login:b'); await loginResponse.promise; return HttpResponse.json(session('b')) }),
+      http.post(`${url}/auth/v1/logout`, () => { requests.push('logout'); return new HttpResponse(null, { status: 204 }) }),
+    )
+    await mount()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === 'SIGNED_IN' && next?.user.id === 'b') queryClient.setQueryData(['private-b'], 'synthetic-b')
+    })
+    subscriptions.push(subscription)
+    fireEvent.click(screen.getByText('Sign in B'))
+    await waitFor(() => expect(requests).toEqual(['login:b']))
+    fireEvent.click(screen.getByText('Sign out A only'))
+    await act(async () => { loginResponse.resolve(); await loginResponse.promise })
+    await waitFor(() => expect(screen.getByTestId('identity')).toHaveTextContent('b:b'))
+    await waitFor(() => expect(observations.logout).toHaveBeenCalledWith({ error: expect.objectContaining({ message: 'Your account changed. Please try again.' }) }))
+    expect(requests).toEqual(['login:b'])
+    expect(queryClient.getQueryData(['private-b'])).toBe('synthetic-b')
+    expect((await supabase.auth.getSession()).data.session?.user.id).toBe('b')
+    expect(observations.error).not.toHaveBeenCalled()
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('allows an A-only logout while A is still the current account', async () => {
+    const tokens: (string | null)[] = []
+    server.use(http.post(`${url}/auth/v1/logout`, ({ request }) => {
+      tokens.push(request.headers.get('Authorization')); return new HttpResponse(null, { status: 204 })
+    }))
+    await mount()
+    queryClient.setQueryData(['private-a'], 'synthetic-a')
+    fireEvent.click(screen.getByText('Sign out A only'))
+    await waitFor(() => expect(observations.logout).toHaveBeenCalledWith({ error: null }))
+    expect(tokens).toEqual(['Bearer token-a'])
+    expect((await supabase.auth.getSession()).data.session).toBeNull()
+    expect(queryClient.getQueryData(['private-a'])).toBeUndefined()
+  })
+
   it.each(['Sign in B', 'Create B'])('finishes A logout before %s and leaves the invitation route intact', async action => {
     const logoutResponse = deferred<void>()
     const requests: string[] = []

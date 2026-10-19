@@ -7,7 +7,12 @@ The academy briefing and risk disclosures have not yet happened.
 
 Tracks the P0 journeys and guarantees in [MVP Requirements](../../MVP%20Requirements) and what has been proven for each one. That file defines the scope. This file only records progress. Current assignments, dependencies and delivery status live in the [Linear pilot project](https://linear.app/trak-football/project/trak-first-real-child-pilot-38b7cba7d7ff). This index records deployed journey evidence; it is not a second task board.
 
-A row passes only on the **deployed** build, under real roles. Record evidence as `commit · deployment · device · identity · date` (see the [merge gate](../release/merge-gate.md)). An open PR, a green branch or a passing local test is not evidence. In Linear, merge moves work into Verifying; the owner moves it to Done once the deployed proof is on the issue.
+A journey row passes only on the **deployed** build, under real roles. Record
+evidence as `commit · deployment · device · synthetic role · date`. This launch
+evidence is separate from issue completion: implementation complete moves the
+Linear issue directly to **Done**. Live-test failures get new linked bug issues;
+completed feature issues stay Done. Verifying is retired. See the
+[delivery process](../release/merge-gate.md).
 
 | Journey | Owner | Registry use cases | Deployed evidence |
 |---|---|---|---|

@@ -2,7 +2,11 @@
 
 ## Before changing the product
 
-Read [MVP Requirements](MVP%20Requirements) and the assigned Linear issue.
+**Delivery policy:** before starting work on any branch, read the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). It governs branch work, completion, merging and deployment across Linear, PR descriptions and historical plans. Use issue descriptions for product acceptance and explicit scope holds. Historical process instructions are reference material, not delivery requirements.
+
+Read the assigned issue’s current description and relevant requirements in
+[MVP Requirements](MVP%20Requirements). Fetch comments only to resolve a
+specific missing fact; follow links on demand instead of loading their history.
 The first real-child pilot requires J1–J8 and G1–G7; J8 events are required
 but still await implementation and rehearsal. A configured date never admits
 children. [PILOT-INDEX](docs/use-cases/PILOT-INDEX.md) separates required scope
@@ -10,12 +14,18 @@ from recorded deployment evidence.
 
 Agents work their human's assigned issues. Use a task branch and one PR per
 issue, with its `TRAK-#` and J/G or scope/launch-gate purpose in the title.
-Follow [the release gate](docs/release/merge-gate.md) before review, merge or
-release. Imad coordinates the merge queue in #coding-agents-at-work. The owner
-moves merged work to Verifying, then Done after recording deployed proof.
-**Announce migrations and shared-file changes in #coding-agents-at-work before
-editing them**, so two agents don't change the same tables or files at once.
-Commit only green; never bypass the pre-commit hook.
+Work and commit freely on personal branches. Local tests are optional debugging
+tools. Draft PRs are work in progress; mark ready when submitting the final
+candidate to the [automated merge gate](docs/release/merge-gate.md). No teammate,
+non-author, agent-review or verification sign-off is required. These project
+rules replace generic skill requirements for per-step tests and approval loops.
+Credential checks block pushes, including secrets removed in a later commit.
+
+Mark an issue **Done when implementation is complete**, with a short result,
+PR/commit link and honest merge/deployment status. Live-test afterward. A failure
+gets a **new linked bug issue** with its own reproduction and acceptance; the
+completed issue stays Done. Verifying is retired from the delivery workflow.
+Coordinate actual shared-file collisions without waiting for routine sign-off.
 
 This repository is public. Keep academy identities, competitor analysis and
 private meeting/artifact links out of new documentation and evidence. Use
@@ -64,21 +74,15 @@ remains hidden; the pilot uses `/coach/assess`. Existing AI handlers return
 
 Use Node 22.15+ within 22.x and the npm version in `package.json`.
 
-```sh
-npm ci --legacy-peer-deps
-cp .env.example .env  # configure a disposable development project
-npm run dev          # localhost:8080
-npm test             # source tests, once
-npm run test:watch    # watch mode
-npm run test:harness
-npm run typecheck
-npm run lint
-npm run uc:check
-npm run build
-```
+Install with `npm ci --legacy-peer-deps`; start with `npm run dev`.
+See README for setup and `package.json` for optional checks.
 
-`package.json` and `.github/workflows/ci.yml` define the current commands and
-full CI checks. Run checks appropriate to the change and the release gate.
+`package.json` lists optional local commands. `.github/workflows/ci.yml` runs
+the complete required suite once for the final non-draft PR candidate. Reuse
+that result rather than running a separate author/reviewer/verification suite.
+Workflow actions must run on Node 24: `ci-action-runtimes.test.ts` lists each
+action's first such major, and Dependabot opens a weekly grouped PR for newer
+ones, reviewed like any other change.
 Pending use cases report failures without blocking; they are not passes.
 Edit `registry.yaml`, then regenerate its README with `npm run uc:report`.
 Preserve enforced contracts and the registry lock/version rules.
@@ -95,21 +99,21 @@ historical migrations cannot safely be rerun. New public tables start without
 `anon`/`authenticated` privileges; grant only operations backed by policies.
 
 Production is `trakfootball.com` on Vercel, with Supabase as the backend.
-The canonical main workflow applies pending migrations and deploys functions
-before deploying the frontend. Vercel's Git integration is disabled, so the
-frontend ships only after `test` passes. **Migrations and edge functions also
-wait for main's tests now.** Until 9 October, Supabase's GitHub integration
-applied them about a minute after a merge. Kostas switched its production
-deploy off at 14:10 UTC that day (TRAK-148). The next migration, #254's, was
-absent while main's `test` ran and arrived from the `supabase` job after it
-passed, about 12 minutes after the merge. A failed `test` on main therefore
-stops the database change too, but a merged migration still goes live without
-a further approval. A PR preview shares the backend; there is no separate staging
-environment. Use reviewed deployments for production changes, never
-development SQL on the shared project.
+The canonical main workflow first matches its contents to successful final-PR
+test evidence, then applies pending migrations and deploys functions before
+the frontend. It reuses the merge-gate result instead of rerunning the suite.
+Vercel's Git integration and Supabase's automatic Git deployment stay disabled.
+A PR preview shares the backend; there is no separate staging environment.
+Use the deployment workflow for production changes, never development SQL on
+the shared project. Operational recovery lives in the release runbooks.
 
 `supabase/config.toml` controls function JWT settings. `vercel.json` controls
 rewrites, caching and CSP; verify allowed origins when adding an integration.
+The one CSP exception is `/trainings/*`: the static training pages there may
+run inline scripts and be framed by this site only, for the Trainings tab
+(`src/pages/TrainingsPage.tsx`). The rest of the site still blocks inline
+scripts and refuses to be framed; a test in
+`src/pages/__tests__/trainings-tab.test.tsx` guards both.
 Email templates run in the Supabase dashboard; CI never deploys them. Read the
 email-template notes in the [README](README.md) before touching them. Since
 TRAK-142 (#252) the repository copies equal the live ones, and a test guards

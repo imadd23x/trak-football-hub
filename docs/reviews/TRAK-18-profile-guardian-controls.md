@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # TRAK-18: Profile guardian controls
 
 Profile previously let a player create a parent invitation by entering any email whenever no pending invitation existed. This slice removes that creation path and tells the player to contact their academy for guardian additions or corrections. Profile retains this guidance when empty; Home still hides an empty invitation card. Existing invitation addresses remain read-only, with the same expiry, share, resend, retry and account-change safeguards.

@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Academy history: #34 / #44 convergence repair
 
 September 20, 2026. This candidate combines Imad's #34 `805ccb2` and Kostas's #44 `8e72e80` (which includes main `4335e89`), then adds one forward migration. The published migration files match both parents byte for byte. No production database, Auth account, configuration or deployed artifact was changed.

@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Rehearsal seed completion — 21 September 2026
 
 Baseline: `910a7e0`, including #92's latest-note backfill. This change repairs the synthetic rehearsal CLI; it does not change consent policy, migrations, application authorization or the purge path.

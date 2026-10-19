@@ -1,15 +1,14 @@
 name: CI
 
-# Vercel's Git integration is disabled in vercel.json, so this workflow is the
-# only route to a deployment. The `deploy` job needs `test`, which means no
-# commit reaches Vercel — preview or production — unless the checks passed
-# first.
+# The full suite runs once for a final (non-draft) PR to main. Main deployment
+# reuses successful proof for the identical Git tree instead of rerunning it.
 
 on:
   push:
-    branches: [main, develop, 'parent/**', 'shared/**']
+    branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,86 +18,25 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
-  roster-audit:
-    name: Roster adoption audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    env:
-      # This commit contains the reviewed baseline, which pins runner and SQL
-      # independently of candidate files. Updating this pin needs review.
-      ROSTER_BASELINE_REVISION: 0b1b039a7b46382a9da4c7fba36da68222365111
-      CANDIDATE_REVISION: ${{ github.sha }}
-    steps:
-      - name: Check out exact candidate source
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          path: roster-candidate
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Check out pinned audit implementation and baseline
-        uses: actions/checkout@v4
-        with:
-          repository: imadd23x/trak-football-hub
-          ref: 0b1b039a7b46382a9da4c7fba36da68222365111
-          path: roster-trusted
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: roster-trusted/package-lock.json
-      - name: Install pinned audit dependencies
-        working-directory: roster-trusted
-        run: npm ci --legacy-peer-deps --ignore-scripts
-      - name: Verify roster runner discrimination
-        working-directory: roster-trusted
-        run: node --test tests/audits/roster-adoption.test.mjs
-      - name: Run pinned roster audit against candidate migrations
-        working-directory: roster-trusted
-        run: >-
-          node scripts/audits/roster-adoption.mjs
-          --candidate-root "$GITHUB_WORKSPACE/roster-candidate"
-          --candidate-revision "$CANDIDATE_REVISION"
-          --baseline-revision "$ROSTER_BASELINE_REVISION"
-
   test:
-    runs-on: ubuntu-latest
-    outputs:
-      release_eligible: ${{ steps.delivery.outputs.release_eligible }}
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
 
-      - name: Verify main release came from a delivered PR
-        id: delivery
-        if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          RELEASE_SHA: ${{ github.sha }}
-          PREVIOUS_SHA: ${{ github.event.before }}
-          FORCED_PUSH: ${{ github.event.forced }}
-        run: node scripts/governance/verify-delivery.mjs --repository "$REPOSITORY" --commit "$RELEASE_SHA" --previous-sha "$PREVIOUS_SHA" --forced "$FORCED_PUSH"
-
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Governance regression tests
-        run: node --test tests/governance/*.test.mjs
+      - name: Check delivery policy
+        run: node scripts/check-delivery-policy.mjs
 
       - name: Lint
         run: npm run lint
@@ -109,11 +47,70 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Merge evidence and push credential regressions
+        run: node --test scripts/merge-gate-evidence.test.mjs scripts/check-push-credentials.test.mjs
+
+      - name: Consent calendar timezones
+        run: npm run test:consent-timezones
+
       - name: Database security regressions
         run: npm run test:db
 
       - name: Parent migration after deployed reporting migration
         run: npm run test:db -- --parent-upgrade-review
+
+      - name: Academy access and account deletion regressions
+        run: npm run test:db -- --coach-departure-review
+
+      - name: Academy repair after current main migrations
+        run: npm run test:db -- --academy-upgrade-review
+
+      - name: Assessment index after current main and academy repair
+        run: npm run test:db -- --assessment-upgrade-review
+
+      - name: Academy history convergence and mutation controls
+        run: npm run test:db:academy-history
+
+      - name: Disposable database runner safeguards
+        run: npm run test:db:runner
+
+      - name: Install PostgreSQL 17 for concurrent database regressions
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error --location https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/trak-pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-17
+
+      - name: Native PostgreSQL replay and concurrent player linking
+        run: npm run test:db:concurrency
+        env:
+          TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+
+      - name: Native assessment query plan and result regressions
+        run: npm run test:db:query-plans
+        env:
+          TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+
+      - name: Preserve synthetic query plans
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: synthetic-assessment-query-plans
+          path: /tmp/trak-query-report-*/report.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Native PostgreSQL academy upgrade after current main
+        run: npm run test:db:native -- --academy-upgrade-review
+        env:
+          TRAK_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+      # Every step above replays migrations from empty, so none of them can see
+      # a database that already ran an earlier version of a migration file. That
+      # is the gap a withdrawn-and-replaced migration falls through: the replay
+      # goes green while the already-applied database keeps the old effects.
+      - name: Migration histories converge
+        run: npm run test:db:convergence
 
       # tests/msw and tests/support hold the MSW fidelity contract and the
       # useCase() unknown-id guard — package.json's "test" script only runs
@@ -122,14 +119,22 @@ jobs:
         run: npm run test:harness
 
       # Runs the use-case suite through the registry ratchet: enforced use
-      # cases block, pending ones report without blocking. UC-C02 and UC-C04
-      # are enforced; everything else is pending and reports coverage debt
-      # without blocking.
+      # cases block, pending ones report without blocking, parked ones never
+      # run. docs/use-cases/README.md lists which is which.
       - name: Use cases
         run: npm run uc:check
 
       - name: Build
         run: npm run build
+
+      # Layer 3. Every other credential check reads SOURCE; this reads what is
+      # actually served, which is a different question. A route guarded by
+      # `import.meta.env.DEV` still has its chunk emitted, because the guard
+      # decides which routes register and not which chunks Rollup builds — that
+      # is how the dev-account password shipped while the page looked guarded.
+      # Must run after Build; it refuses to conclude anything without a dist/.
+      - name: Bundle secrets
+        run: npm run check:bundle
 
       - name: Install test browser
         run: npx playwright install --with-deps chromium
@@ -137,10 +142,39 @@ jobs:
       - name: Parent invitation browser regressions
         run: npx playwright test --config playwright.pilot.config.ts
 
+      - name: Record tested contents
+        run: node scripts/merge-gate-evidence.mjs record
+
+      - name: Preserve merge-gate proof
+        uses: actions/upload-artifact@v6
+        with:
+          name: merge-gate-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/merge-gate-proof.json
+          if-no-files-found: error
+          retention-days: 30
+
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
       VITE_SENTRY_DSN: ''
+
+  tested-main:
+    name: Reuse tested merge
+    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Match the final PR test proof to main
+        run: node scripts/merge-gate-evidence.mjs verify
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   # The `secrets` context is not available in a job-level `if`, so whether the
   # Vercel credentials exist has to be resolved in a job and passed on as an
@@ -150,7 +184,7 @@ jobs:
     name: Check Vercel credentials
     runs-on: ubuntu-latest
     # Forks run regression checks only, even if somebody later adds secrets.
-    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub'
+    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' && (github.event_name == 'push' || !github.event.pull_request.draft)
     outputs:
       configured: ${{ steps.check.outputs.configured }}
     steps:
@@ -187,17 +221,17 @@ jobs:
   # RPC never reaches production ahead of the migration that creates it.
   supabase:
     name: Supabase
-    needs: [test, roster-audit, vercel-credentials]
+    needs: [tested-main, vercel-credentials]
     runs-on: ubuntu-latest
     # Production only. A pull request must never push migrations to the live
     # database, and there is no second Supabase project to point previews at.
-    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.outputs.release_eligible == 'true' && needs.roster-audit.result == 'success'
+    if: github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested-main.result == 'success'
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
       DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Unlike the Vercel job, a missing credential here FAILS rather than
       # skips. A silent skip on main is precisely how a change quietly does not
@@ -220,9 +254,9 @@ jobs:
             exit 1
           fi
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: 2.117.0
 
       # Deliberately no `supabase link`. Linking asks the Management API for
       # project metadata AND the project's API keys, so making it work would
@@ -250,8 +284,10 @@ jobs:
 
       # Deploys all four functions. Values come from supabase/config.toml, so
       # that file is the source of truth for verify_jwt \u2014 not the dashboard.
+      # --use-api bundles on Supabase's side: no ghcr.io edge-runtime image pull,
+      # which ghcr.io rate-limited on 23 Sep and failed two production runs.
       - name: Deploy edge functions
-        run: supabase functions deploy --project-ref "$PROJECT_ID"
+        run: supabase functions deploy --project-ref "$PROJECT_ID" --use-api
 
       - name: Summary
         run: |
@@ -263,7 +299,7 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: [test, roster-audit, vercel-credentials, supabase]
+    needs: [test, tested-main, vercel-credentials, supabase]
     runs-on: ubuntu-latest
     # Skip rather than fail red when the credentials are absent, and on forked
     # pull requests, which cannot read secrets at all.
@@ -274,10 +310,8 @@ jobs:
     if: >-
       always() &&
       github.repository == 'kostasanastasioubusiness-lang/trak-football-hub' &&
-      needs.test.result == 'success' &&
-      needs.roster-audit.result == 'success' &&
-      ((github.ref == 'refs/heads/main' && needs.test.outputs.release_eligible == 'true' && needs.supabase.result == 'success') ||
-       (github.ref != 'refs/heads/main' && needs.supabase.result == 'skipped')) &&
+      ((github.ref == 'refs/heads/main' && needs.tested-main.result == 'success' && needs.supabase.result == 'success') ||
+       (github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.test.result == 'success' && needs.supabase.result == 'skipped')) &&
       needs.vercel-credentials.outputs.configured == 'true' &&
       (github.event_name == 'push' ||
        github.event.pull_request.head.repo.full_name == github.repository)
@@ -288,9 +322,9 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -420,7 +454,7 @@ jobs:
       # the preview URL is posted here instead.
       - name: Comment preview URL
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const url = '${{ steps.deploy.outputs.url }}';

@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Calendar consumer runtime audit
 
 Reviewed **18 September 2026**, base `cae7471b5d5b6487eefc21dd8cc4afa3efb37561`

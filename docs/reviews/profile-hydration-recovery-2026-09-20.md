@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Profile hydration recovery — scope and evidence
 
 Base: fork #7 `c0999f9`. Initial runtime reproduction held the Auth user lookup after the SDK supplied a remembered session: the built app still displayed “Checking your account…” with zero buttons after 21 seconds; releasing that response immediately restored account choice. No unexpected request or browser exception occurred. Source: AuthContext's profile operation awaits `createOnboardingSession`, profile reads and existing pending-profile repair without a deadline.

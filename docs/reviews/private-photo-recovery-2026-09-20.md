@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Private photo read recovery
 
 Base: fork #10 `ca36554`. Scope: OwnAvatar, its optional abort signal through the existing account helper, and regression/browser tests. No Storage policies, uploads, other Settings actions or authentication rules change.

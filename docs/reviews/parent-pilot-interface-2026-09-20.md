@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Parent pilot interface integration
 
 Status: integrated and locally verified in the fork; exact-head CI and peer review pending. No production change. Base: fork #9 `74a4a35e6d2633eff35cc6bbf71cf6e6b5a7e482`, on canonical main `4335e8984777b7b704e8706d3fe277352658c9ed`.

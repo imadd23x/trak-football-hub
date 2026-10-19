@@ -43,6 +43,10 @@ Without nvm, install Node 22 some other way. npm refuses a different Node major 
 
 ## Running Tests
 
+These are optional local development commands. The required suite runs once
+when a completed draft PR is marked ready to merge; individual branch commits
+need no test run or teammate approval. See [the process](docs/release/merge-gate.md).
+
 ```bash
 npm test            # source tests, once (used in CI)
 npm run test:watch  # watch mode
@@ -61,16 +65,11 @@ npm run build     # Vite production build → dist/
 
 Production is **trakfootball.com**, hosted on Vercel. Vercel's own Git integration is
 disabled (`git.deploymentEnabled: false` in `vercel.json`), so `.github/workflows/ci.yml`
-is the only route for the **frontend** — the `deploy` job needs `test`, so no
-frontend reaches production unless lint, typecheck, tests and build all passed.
-
-**Database migrations and edge functions now wait for main's tests too.** Until
-9 October, Supabase's own GitHub integration applied them about a minute after a
-merge to `main`, before the tests finished. Kostas switched its production
-deploy off at 14:10 UTC that day (TRAK-148). The next migration, #254's
-(merged 17:33:18 UTC), was absent while `test` ran and arrived from the
-`supabase` job (17:44:50 to 17:45:13) after it passed. A merged migration still
-goes live with no further approval, so review database changes as deployments.
+is the deployment route. The complete automated suite runs on the final
+non-draft PR to main. After merge, `Reuse tested merge` checks that successful
+PR evidence matches main's exact file contents; it does not rerun the suite.
+Missing or different evidence blocks backend and frontend deployment.
+Supabase's automatic Git deployment remains disabled (TRAK-148).
 
 The Supabase half of the app ships separately from the frontend, and
 forgetting this is the usual reason a merged change appears to do nothing:
@@ -78,15 +77,14 @@ forgetting this is the usual reason a merged change appears to do nothing:
 | What changed | How it ships |
 |---|---|
 | `src/**` | `deploy` job, on merge to `main` |
-| `supabase/migrations/*.sql` | `supabase` job (`db push`), after `test` passes on `main` |
-| `supabase/functions/**` | `supabase` job (`functions deploy`), after `test` passes on `main` |
+| `supabase/migrations/*.sql` | `supabase` job (`db push`), after final-PR evidence matches main |
+| `supabase/functions/**` | `supabase` job (`functions deploy`), after final-PR evidence matches main |
 | `email-templates/*.html` | Supabase dashboard → Authentication → Emails → Templates, **by hand**. The files equal the live templates as of 8 Oct 2026; see below. |
 
 Merging to `main` ships the frontend *and* the backend. The `supabase` job runs
 before `deploy`, so a build that calls a new RPC can't reach production ahead of
 the migration that creates it, and a failed migration stops the frontend from
-shipping. It does not stop a bad migration that the earlier path already
-applied.
+shipping. It cannot undo a migration that already applied.
 
 The `supabase` job deliberately does not run `supabase link`: linking fetches the
 project's API keys, which would mean giving the CI token read access to the
@@ -99,7 +97,7 @@ the token needs only Edge Functions and Migrations. Required secrets:
 The four files in `email-templates/` equal the live Supabase templates as
 exported by Kostas on 8 October 2026 (after his 17:19 UTC dashboard fixes;
 TRAK-142). The dashboard is where they run: CI does not deploy them. Change a
-template in the dashboard and in its file together, in one reviewed PR.
+template in the dashboard and in its file together, in one PR.
 
 | File | Dashboard template | Subject |
 |---|---|---|
@@ -191,7 +189,14 @@ child photos remain outside the pilot.
 
 ## Contributing
 
-Read [AGENTS.md](AGENTS.md) and [the release gate](docs/release/merge-gate.md)
-before editing. Work on the assigned issue in a branch, record checks and
-limitations, and obtain an independent review. The CI workflow defines its
-triggered branches and checks; a local commit alone does not run it.
+Read [AGENTS.md](AGENTS.md), the current issue description and the relevant
+requirements. Work and commit freely on your branch. Local tests are optional;
+draft PRs do not run the required suite. Submit the final PR to the
+[automated merge gate](docs/release/merge-gate.md); no teammate or non-author
+approval is required. The pre-push credential guard and GitHub push protection
+keep credentials out of the public repository.
+
+Mark the issue **Done when implementation is complete**, with a short result
+and PR/commit link, even if merge/deployment is still pending. Live-test after
+deployment. Any failure becomes a **new linked bug issue**; completed feature
+issues stay Done. Read comments only when a specific question needs them.

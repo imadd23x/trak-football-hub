@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # TRAK-47 parked-feature boundary implementation plan
 
 > **For agentic workers:** Use superpowers:subagent-driven-development for the bounded SQL implementation and sequential spec/quality reviews. Parent owns UI, integration and release gates.

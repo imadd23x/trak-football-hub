@@ -216,7 +216,7 @@ the applicable G1–G7 guarantees and record every failure.
 
 ```text
 Run type: rehearsal / incident recovery
-Owner and independent reviewer:
+Owner and recovery operator:
 Source commit, workflow and served build:
 Start/end timestamps (UTC):
 Source and restored project refs:

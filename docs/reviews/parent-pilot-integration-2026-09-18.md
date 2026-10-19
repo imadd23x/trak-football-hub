@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Parent pilot integration — September 18, 2026
 
 Branch `parent/P3-pilot-integration` starts at green history candidate `a2bda4b9cc08a9113c614efecc330f57c91d3cc4`, including canonical main `00910940f596d9fe9a7cd416dc741943d1df2cc9` and PR49's retained/null-coach handling. This is local integration evidence, not deployment or pilot approval.

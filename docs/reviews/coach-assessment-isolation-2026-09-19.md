@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Full assessment form: player and account isolation
 
 Reviewed #44 at `a9211cb`. The current form could send an UPDATE targeting

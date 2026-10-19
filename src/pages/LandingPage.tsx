@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { AccountLoading } from '@/components/layout/AccountLoading';
 import { useResetEmail } from '@/hooks/useResetEmail';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -38,7 +39,7 @@ const normalizedEmail = (email: string | undefined) => email?.trim().toLowerCase
 export default function LandingPage() {
   const navigate = useNavigate();
   const [view, setView] = useState<View>('signin');
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, sessionError } = useAuth();
 
   const [signedInEmail, setSignedInEmail] = useState<string | null>(null);
 
@@ -109,7 +110,7 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {loading ? <p role="status" className="text-sm text-muted-foreground">Checking your account…</p>
+        {loading ? <AccountLoading error={sessionError} />
           : user ? <AccountChoice key={user.id} onSwitch={() => { setSignedInEmail(null); setView('signin'); }} />
           : view === 'signin' ? <SignInForm onCreateAccount={() => setView('register')}
             onSignedIn={email => setSignedInEmail(normalizedEmail(email))} />

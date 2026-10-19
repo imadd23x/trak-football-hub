@@ -47,6 +47,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   profileError: string | null;
+  sessionError: string | null;
   signUp: (email: string, password: string, pendingProfile?: PendingProfileData) => Promise<{ user: User | null; error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: (expectedUserId?: string) => Promise<{ error: Error | null }>;
@@ -175,6 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const activeSession = useRef<Session | null>(null);
   const generation = useRef(0);
   const mounted = useRef(false);
@@ -264,13 +266,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     discardLegacyPendingProfile();
     let disposed = false;
     let receivedAuthEvent = false;
+    let receivedLiveAuthEvent = false;
     let initialized = false;
     const initialGeneration = generation.current;
+    const restoreTimer = setTimeout(() => {
+      if (!disposed && !initialized) setSessionError('We could not restore your account yet. Check your connection and try again.');
+    }, 20_000);
     const acceptSession = (session: Session | null) => {
       if (disposed) return;
       const previousUserId = activeSession.current?.user.id;
       const sameAccount = initialized && activeSession.current?.user.id === session?.user.id;
       initialized = true;
+      clearTimeout(restoreTimer);
+      setSessionError(null);
       activeSession.current = session;
       setUser(session?.user ?? null);
       // Token refresh, tab refocus and metadata changes must not unmount a
@@ -287,6 +295,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // INITIAL_SESSION may finish after a newer interactive/cross-tab event.
+      // Its old failure must not erase the account that already won.
+      if (event === 'INITIAL_SESSION' && receivedLiveAuthEvent) return;
+      if (event !== 'INITIAL_SESSION') receivedLiveAuthEvent = true;
       receivedAuthEvent = true;
       // Email confirmation now uses its own non-persistent Auth client.
       // Keep hydrating the app session on that route so returning to account
@@ -317,11 +329,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (disposed || receivedAuthEvent || generation.current !== initialGeneration) return;
       acceptSession(session);
     }).catch(() => {
-      if (!disposed && !receivedAuthEvent && generation.current === initialGeneration) setLoading(false);
+      if (!disposed && !receivedAuthEvent && generation.current === initialGeneration) {
+        setSessionError('We could not restore your account yet. Check your connection and try again.');
+      }
     });
 
     return () => {
       disposed = true;
+      clearTimeout(restoreTimer);
       mounted.current = false;
       generation.current += 1;
       hydration.current?.controller.abort();
@@ -398,7 +413,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, profileError, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, profileError, sessionError, signUp, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

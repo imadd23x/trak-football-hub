@@ -1,3 +1,4 @@
+import { AccountLoading } from './AccountLoading'
 import { useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
@@ -43,7 +44,7 @@ function ProfileMissingScreen() {
 }
 
 export function RouteGuard({ allowedRole, children }: { allowedRole: string; children: React.ReactNode }) {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, sessionError } = useAuth()
   const [params] = useSearchParams()
 
   // Dev bypass: add ?dev=player or ?dev=coach or ?dev=parent to skip auth
@@ -52,7 +53,7 @@ export function RouteGuard({ allowedRole, children }: { allowedRole: string; chi
     return <>{children}</>
   }
 
-  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center px-6"><p role="status" aria-label="Account access" className="text-sm text-muted-foreground">Checking your account…</p></div>
+  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center px-6"><AccountLoading error={sessionError} /></div>
 
   if (!user) return <Navigate to="/" replace />
 

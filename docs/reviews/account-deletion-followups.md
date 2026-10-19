@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Account deletion: remaining scope beyond the academy fix
 
 September 18, 2026. The academy-continuity regression suite tests actual deletion by each account role with synthetic committed fixtures. It does not establish that every category of personal data is erased or that U10 is complete.

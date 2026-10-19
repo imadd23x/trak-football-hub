@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Email confirmation recovery — implementation record
 
 Scope: incremental UT-22 on fork #4 `d306355`; email confirmation only. Existing session choice, staff admission and household contracts remain dependencies. Password-reset recovery is a separate outstanding slice.

@@ -1,3 +1,6 @@
+<!-- delivery-policy: historical -->
+> Historical record. Development and delivery follow the [current canonical delivery policy](https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/main/docs/release/merge-gate.md). Process instructions recorded below are superseded; product facts, explicit scope holds and test observations remain evidence.
+
 # Auth network recovery: scope and acceptance
 
 Base: fork #8 `84ea139`. A separate built-app probe on that commit held the SDK refresh of an expired synthetic remembered session for 21 seconds. The page still showed “Checking your account…” with zero buttons and zero profile reads; releasing the token response immediately restored account choice. All backend traffic was intercepted. This failure precedes the profile-operation deadline.

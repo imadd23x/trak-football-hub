@@ -29,7 +29,7 @@ async function fixture(page: Page, context: BrowserContext, options: { remembere
     const current = request.headers().authorization === `Bearer ${parentB.access_token}` ? parentB : parentA;
     if (url.pathname === '/auth/v1/user' && request.method() === 'GET') return json(current.user);
     if (url.pathname === '/auth/v1/user' && request.method() === 'PUT') {
-      expect(request.postDataJSON()).toEqual({ password: 'SyntheticPass1!', code_challenge: null, code_challenge_method: null }); writes.push('password-update'); return json(current.user);
+      expect(request.postDataJSON()).toEqual({ password: 'SyntheticPass1!' }); writes.push('password-update'); return json(current.user);
     }
     if (url.pathname === '/auth/v1/logout') {
       writes.push('logout'); if (logoutFails) { logoutFails = false; return json({ message: 'Temporarily unavailable' }, 503); }

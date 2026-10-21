@@ -87,7 +87,8 @@ UPDATE public.squad_players SET status='coach_departed' WHERE id=pg_temp.r136id(
 INSERT INTO public.academy_features(organization_id,feature) VALUES(pg_temp.r136id(100),'events') ON CONFLICT DO NOTHING;
 -- Events. In 2 days: A's training 700 and match 701 (published, at 17:00 and
 -- 19:00: a coach's live events can't overlap, TRAK-158), A's cancelled 702,
--- A's draft 703, B's training 710. In 3 days: A's 704. Today: A's 705.
+-- A's draft 703, B's training 710. In 3 days: A's 704. Tomorrow: A's 705
+-- (not today: a started event can't be cancelled, TRAK-230, so a 17:00 "today" failed after 13:00 UTC).
 INSERT INTO public.coach_calendar_events(id,coach_user_id,title,event_type,starts_at,event_date,start_time,venue,published,status)
  SELECT pg_temp.r136id(id), pg_temp.r136id(coach), 'Reminder '||id, kind,
   pg_temp.r136at(d, CASE WHEN id = 701 THEN time '19:00' ELSE time '17:00' END), pg_temp.r136day(d),
@@ -95,7 +96,7 @@ INSERT INTO public.coach_calendar_events(id,coach_user_id,title,event_type,start
  FROM (VALUES (700,10,'training',2,true,'scheduled'),(701,10,'match',2,true,'scheduled'),
               (702,10,'training',2,true,'cancelled'),(703,10,'training',2,false,'scheduled'),
               (710,11,'training',2,true,'scheduled'),(704,10,'training',3,true,'scheduled'),
-              (705,10,'training',0,true,'scheduled')) v(id,coach,kind,d,pub,st);
+              (705,10,'training',1,true,'scheduled')) v(id,coach,kind,d,pub,st);
 
 -- Consent through each parent's own RPC; 32 then withdraws.
 SET LOCAL ROLE authenticated;

@@ -155,6 +155,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(coming.getByRole('article', { name: /Receiving under pressure$/ }).getByRole('button')).toHaveText(['View plan', 'Edit plan'])
     await expect(page.getByRole('button', { name: 'New session' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Last week' }).getByRole('link')).toHaveCount(1)
+    // TRAK-311: a training last week has the same buttons.
+    await expect(page.getByRole('region', { name: 'Last week' }).getByRole('article', { name: /Pressing zones$/ }).getByRole('button'))
+      .toHaveText(['View plan', 'Edit plan'])
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`training-sessions-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)

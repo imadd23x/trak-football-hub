@@ -100,9 +100,12 @@ describe('TRAK-295: planning a training from Training home', { timeout: 20_000 }
     // No New session: every training coming up has its own Create plan.
     expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
 
+    // Kostas, 29 Oct: View plan opens View, the screen the training's own View button opens; back goes to Training.
     await user.click(within(card('Training later')).getByRole('button', { name: 'View plan' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/later'))
-    await user.click(await screen.findByRole('link', { name: 'Training' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/later/view'))
+    expect(await screen.findByRole('list', { name: 'Practices to run' })).toHaveTextContent('Rondos 4v1')
+    await user.click(screen.getByRole('link', { name: 'Back to Training' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training'))
     await user.click(await within(await screen.findByRole('article', { name: /Training later$/ })).findByRole('button', { name: 'Edit plan' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/later/plan'))
   })

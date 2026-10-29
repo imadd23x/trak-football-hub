@@ -181,16 +181,39 @@ describe('TRAK-298: View', { timeout: 30_000 }, () => {
 })
 
 describe('TRAK-298: Last week', { timeout: 30_000 }, () => {
-  it('says which trainings closed, and opens each one’s page', async () => {
+  it('says which trainings closed, with View plan and Edit plan, or Create plan, on the right', async () => {
+    const user = userEvent.setup()
     const now = Date.now()
     database([training('tue', onTheMinute(now - 5 * DAY), { title: 'Pressing zones' }), training('thu', onTheMinute(now - 2 * DAY), { title: 'Finishing' })],
-      {}, { tue: 'session-tue' })
+      { tue: [practice(1, 'Pressing 3v2')] }, { tue: 'session-tue' })
     renderApp('/coach/training')
     const lastWeek = await screen.findByRole('region', { name: 'Last week' })
     await waitFor(() => expect(within(lastWeek).getByText('Closed')).toBeInTheDocument())
-    const links = within(lastWeek).getAllByRole('link')
-    expect(links.map(link => link.getAttribute('href'))).toEqual(['/coach/training/thu', '/coach/training/tue'])
-    expect(links[0]).toHaveTextContent('No register')
-    expect(links[1]).toHaveTextContent('Closed')
+    const [thu, tue] = within(lastWeek).getAllByRole('article')
+    expect(thu).toHaveAccessibleName(/Finishing$/)
+    expect(thu).toHaveTextContent('No register')
+    expect(tue).toHaveTextContent('Closed')
+    // Its day and title still open its own page, where the register and the log are.
+    expect(within(thu).getByRole('link')).toHaveAttribute('href', '/coach/training/thu')
+    expect(within(tue).getByRole('link')).toHaveAttribute('href', '/coach/training/tue')
+
+    // Kostas, 29 Oct: a training that's over has the same two buttons as one coming up.
+    expect(await within(thu).findByRole('button', { name: 'Create plan' })).toBeInTheDocument()
+    expect(within(thu).queryByRole('button', { name: 'View plan' })).toBeNull()
+    await user.click(within(tue).getByRole('button', { name: 'View plan' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/tue/view'))
+    expect(await screen.findByRole('list', { name: 'Practices to run' })).toHaveTextContent('Pressing 3v2')
+    await user.click(screen.getByRole('link', { name: 'Back to Training' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training'))
+    await user.click(await within(await screen.findByRole('article', { name: /Pressing zones$/ })).findByRole('button', { name: 'Edit plan' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/tue/plan'))
+  })
+
+  it('Create plan on a training that’s over asks how to plan it', async () => {
+    database([training('thu', onTheMinute(Date.now() - 2 * DAY), { title: 'Finishing' })], {})
+    renderApp('/coach/training')
+    const thu = await within(await screen.findByRole('region', { name: 'Last week' })).findByRole('article', { name: /Finishing$/ })
+    await userEvent.click(await within(thu).findByRole('button', { name: 'Create plan' }))
+    expect(await screen.findByRole('dialog', { name: 'How do you want to plan it?' })).toBeInTheDocument()
   })
 })

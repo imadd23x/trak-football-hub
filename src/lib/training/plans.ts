@@ -10,6 +10,10 @@ export const PLAN_MAX = 12
 
 /** Write my own, for one training. */
 export const planPath = (eventId: string) => `/coach/training/${eventId}/plan`
+/** View: the plan read at the pitch side (TRAK-309). */
+export const viewPath = (eventId: string) => `/coach/training/${eventId}/view`
+/** What View opens with: from Training home's View plan (TRAK-310), its back link goes back there. */
+export type ViewState = { back?: 'training' } | null
 /** What the planner can open with: a drill sent from Training › Drills (TRAK-296), or a past session's practices to
  *  copy (TRAK-297). */
 export type PlannerState = { addDrill?: Drill; copy?: SavedPractice[]; copiedFrom?: string } | null

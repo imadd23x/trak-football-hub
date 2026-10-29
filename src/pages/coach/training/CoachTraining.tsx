@@ -7,7 +7,7 @@ import { localTodayISO, phoneEventTime } from '@/lib/event-time'
 import { LIBRARIES, SESSIONS, libraryPath } from '@/lib/library/library'
 import { ON_LIBRARY } from '@/lib/fixed-colours'
 import { searchDrills, splitTrainings, trainingMinutes, type Drill } from '@/lib/training/sessions'
-import { planPath, type PlannerState } from '@/lib/training/plans'
+import { planPath, viewPath, type PlannerState, type ViewState } from '@/lib/training/plans'
 import { gameWhen } from '@/components/coach/games/useGames'
 import { useDrills, usePlannedTrainings, useRegisters, useTrainings, type Training } from '@/components/coach/training/useTraining'
 import { DrillSheet } from '@/components/coach/training/DrillSheet'
@@ -27,7 +27,8 @@ import SegmentedControl from '@/components/arc/segmented-control/segmented-contr
    it's planned; Plan this session and New session ask how (PlanWaySheet), and a plan has its own pages. TRAK-296: a
    drill can be added to the next training not planned yet. TRAK-298: Last week says which trainings are closed (ended
    with their register taken) and opens each one's page. TRAK-310 (Kostas, 29 Oct): a training coming up has View plan
-   and Edit plan, or Create plan, and New session is gone, since every training coming up has its own Create plan. */
+   and Edit plan, or Create plan, and New session is gone, since every training coming up has its own Create plan.
+   TRAK-311 (Kostas, 29 Oct): View plan opens View, and a training last week has the same buttons. */
 
 export const TRAINING_PATH = '/coach/training'
 /** Schedule's quick hand-over (TRAK-182 part 8): New event, on its first step, with Training picked. */
@@ -119,21 +120,10 @@ function SessionsView() {
           {lastWeek.length > 0 && <section aria-labelledby="last-week" className="grid gap-3">
             <h2 id="last-week" className="text-lg font-medium text-ink">Last week</h2>
             <ul className="divide-y divide-line rounded-2xl border border-line bg-surface px-5">
-              {lastWeek.map(training => {
-                const { day } = gameWhen(training)
+              {lastWeek.map(training => <li key={training.id}><LastWeek training={training} showSquad={everySquad}
                 // Every training here is over, so it is closed once its register is taken; unknown while that's read.
-                const closed = registers.data ? registers.data.has(training.id) : null
-                return <li key={training.id}>
-                  <Link to={`${TRAINING_PATH}/${training.id}`}
-                    className="arc flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-1 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
-                    <span className="flex min-w-0 flex-col">
-                      <span className="text-[15px] text-ink"><span className="font-medium">{day}</span> · {training.title}</span>
-                      {everySquad && training.squad && <span className="text-sm text-ink-3">{training.squad}</span>}
-                    </span>
-                    {closed !== null && <Badge size="sm" tone={closed ? 'success' : 'warning'}>{closed ? 'Closed' : 'No register'}</Badge>}
-                  </Link>
-                </li>
-              })}
+                closed={registers.data ? registers.data.has(training.id) : null}
+                planned={planned.data ? !!isPlanned(training) : null} onPlan={() => setPlanning({ training, open: true })} /></li>)}
             </ul>
           </section>}
         </div>}
@@ -142,11 +132,9 @@ function SessionsView() {
   )
 }
 
-/** One training coming up: when and where, its title and length, and on its right View plan and Edit plan, or Create
-    plan when it isn't planned yet (nothing while that's read, `planned` null). TRAK-310: the buttons say whether it's
-    planned, so no Planned badge, and Schedule has its own tab, so no Open in Schedule. */
+/** One training coming up: when and where, its title and length, and its plan buttons on the right. TRAK-310: the
+    buttons say whether it's planned, so no Planned badge, and Schedule has its own tab, so no Open in Schedule. */
 function ComingUp({ training, showSquad, planned, onPlan }: { training: Training; showSquad: boolean; planned: boolean | null; onPlan: () => void }) {
-  const navigate = useNavigate()
   const { day, time, academy } = gameWhen(training)
   const today = phoneEventTime(training).date === localTodayISO()
   const minutes = trainingMinutes(training)
@@ -160,13 +148,42 @@ function ComingUp({ training, showSquad, planned, onPlan }: { training: Training
         <p className="text-sm text-ink-3">{[minutes ? `${minutes} min` : null, showSquad ? training.squad : null,
           training.published ? null : 'Not published yet', academy].filter(Boolean).join(' · ')}</p>
       </div>
-      {planned !== null && <div className="flex flex-wrap gap-2">
-        {planned ? <>
-          <Button size="sm" variant="secondary" onClick={() => navigate(`${TRAINING_PATH}/${training.id}`)}>View plan</Button>
-          <Button size="sm" variant="secondary" onClick={() => navigate(planPath(training.id))}>Edit plan</Button>
-        </> : <Button size="sm" onClick={onPlan}>Create plan</Button>}
-      </div>}
+      <PlanButtons training={training} planned={planned} onPlan={onPlan} />
     </article>
+  )
+}
+
+/** One training last week: its day and title, Closed or No register (nothing while the registers are read), and on its
+    right the same plan buttons as one coming up (Kostas, 29 Oct). The day and title still open the training's page,
+    where its register and log are (TRAK-298). */
+function LastWeek({ training, showSquad, closed, planned, onPlan }: { training: Training; showSquad: boolean; closed: boolean | null; planned: boolean | null; onPlan: () => void }) {
+  const { day } = gameWhen(training)
+  return (
+    <article aria-label={`${day}, ${training.title}`} className="arc flex min-h-14 flex-wrap items-center gap-x-6 gap-y-2 py-3">
+      <div className="grid min-w-0 flex-[1_1_16rem] justify-items-start gap-1">
+        <Link to={`${TRAINING_PATH}/${training.id}`} className="rounded text-[15px] text-ink break-words underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <span className="font-medium">{day}</span> · {training.title}</Link>
+        {showSquad && training.squad && <p className="text-sm text-ink-3">{training.squad}</p>}
+        {closed !== null && <Badge size="sm" tone={closed ? 'success' : 'warning'}>{closed ? 'Closed' : 'No register'}</Badge>}
+      </div>
+      <PlanButtons training={training} planned={planned} onPlan={onPlan} past />
+    </article>
+  )
+}
+
+/** View plan and Edit plan, or Create plan when the training isn't planned yet; nothing while that's read (`planned`
+    null). Kostas, 29 Oct: View plan opens View, as the training's own View button does. A training that's over has
+    had its moment to be planned, so its Create plan is the quieter kind. */
+function PlanButtons({ training, planned, onPlan, past = false }: { training: Training; planned: boolean | null; onPlan: () => void; past?: boolean }) {
+  const navigate = useNavigate()
+  if (planned === null) return null
+  return (
+    <div className="flex flex-wrap gap-2">
+      {planned ? <>
+        <Button size="sm" variant="secondary" onClick={() => navigate(viewPath(training.id), { state: { back: 'training' } satisfies ViewState })}>View plan</Button>
+        <Button size="sm" variant="secondary" onClick={() => navigate(planPath(training.id))}>Edit plan</Button>
+      </> : <Button size="sm" variant={past ? 'secondary' : 'primary'} onClick={onPlan}>Create plan</Button>}
+    </div>
   )
 }
 

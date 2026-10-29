@@ -9,7 +9,7 @@ import { DRILL_DETAILS, DRILL_LIMITS, drillProblem, trainingEnd, trainingMinutes
 import { loopNote, loopState, practiceStarts } from '@/lib/training/loop'
 import {
   PLAN_MAX, blankPractice, fromDrill, fromSaved, minutesLine, move, overTime, planPath, plannedMinutes, roomFor, sourceLabel,
-  type PlannerState, type Practice,
+  viewPath, type PlannerState, type Practice, type ViewState,
 } from '@/lib/training/plans'
 import { gameWhen } from '@/components/coach/games/useGames'
 import { usePlan, useRegisters, useSavePlan, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
@@ -305,7 +305,7 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
   // Who's here opens as the register does everywhere else: published, not cancelled, started.
   const registerWhy = registerProblem({ ...training, event_type: 'training' }, new Date(now))
   const canRegister = !!registers.data && !sessionId && !registerWhy
-  const view = () => navigate(`${TRAINING_PATH}/${training.id}/view`)
+  const view = () => navigate(viewPath(training.id))
 
   return <>
     <Header training={training}>
@@ -373,9 +373,11 @@ function PitchView({ training, plan }: { training: Training; plan: Plan | null }
   const practices = fromSaved(plan?.practices ?? [])
   const { day, time } = gameWhen(training)
   const starts = practiceStarts(time || null, practices)
-  const back = `${TRAINING_PATH}/${training.id}`
+  // Opened from Training home's View plan, it goes back there; from the training's page, back to that.
+  const fromList = (useLocation().state as ViewState)?.back === 'training'
+  const back = fromList ? TRAINING_PATH : `${TRAINING_PATH}/${training.id}`
   return <div className="mx-auto grid max-w-[720px] gap-5 pt-5">
-    <Link to={back} className={`inline-flex min-h-11 items-center gap-1 justify-self-start ${linkClass}`}><ChevronLeft size={16} aria-hidden />Back to the plan</Link>
+    <Link to={back} className={`inline-flex min-h-11 items-center gap-1 justify-self-start ${linkClass}`}><ChevronLeft size={16} aria-hidden />{fromList ? 'Back to Training' : 'Back to the plan'}</Link>
     <header className="grid gap-1">
       <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">View</p>
       <h1 className="text-[28px] font-medium leading-tight text-ink">{[day, time].filter(Boolean).join(' · ')}</h1>

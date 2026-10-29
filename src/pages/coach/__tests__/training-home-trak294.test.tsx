@@ -133,9 +133,12 @@ describe('TRAK-294: Training home', { timeout: 20_000 }, () => {
     // TRAK-310: the buttons say whether it's planned; Schedule is its own tab.
     expect(within(first).queryByText(/Planned|Not planned/)).toBeNull()
     expect(within(first).queryByRole('link', { name: 'Open in Schedule' })).toBeNull()
-    const lastWeek = within(screen.getByRole('region', { name: 'Last week' })).getAllByRole('link').map(link => link.getAttribute('href'))
-    // TRAK-298: a training of last week opens its own page.
-    expect(lastWeek).toEqual(['/coach/training/last-thu', '/coach/training/last-tue'])
+    const lastWeek = () => within(screen.getByRole('region', { name: 'Last week' })).getAllByRole('article').map(row => row.getAttribute('aria-label'))
+    // Newest first. TRAK-298: its day and title open its own page. TRAK-311: and it has the plan buttons too.
+    expect(lastWeek()).toEqual([expect.stringMatching(/Training last-thu$/), expect.stringMatching(/Training last-tue$/)])
+    expect(within(screen.getByRole('region', { name: 'Last week' })).getAllByRole('link').map(link => link.getAttribute('href')))
+      .toEqual(['/coach/training/last-thu', '/coach/training/last-tue'])
+    expect(within(screen.getByRole('region', { name: 'Last week' })).getAllByRole('button', { name: 'Create plan' })).toHaveLength(2)
 
     // Only the coach's own trainings, never a cancelled one, from about a week ago.
     const read = asked.find(url => url.searchParams.get('event_type') === 'eq.training')!
@@ -147,7 +150,7 @@ describe('TRAK-294: Training home', { timeout: 20_000 }, () => {
     await user.click(within(screen.getByRole('group', { name: 'Age group' })).getByRole('button', { name: 'U14' }))
     await waitFor(() => expect(comingUp()).toHaveLength(1))
     expect(comingUp()[0]).toMatch(/Training later$/)
-    expect(within(screen.getByRole('region', { name: 'Last week' })).getAllByRole('link')).toHaveLength(1)
+    expect(lastWeek()).toHaveLength(1)
   })
 
   it("with no training coming up, Add a training opens Schedule's New event", async () => {

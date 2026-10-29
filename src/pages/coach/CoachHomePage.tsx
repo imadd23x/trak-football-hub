@@ -65,10 +65,10 @@ export default function CoachHomePage() {
   // Imad, 24 Oct: events the week marks "Needs you" are in Needs you too, with the week's own next step.
   const client = useQueryClient()
   const eventsOn = useFeature('events')
-  const owed = useOwedEvents(user?.id, everySquad ? () => true : coachSquad.eventInSquad, eventsOn)
   // TRAK-284: a match a week out or less, its logistics shared, without a shared plan. TRAK-286: or with changes since
-  // it was shared that wait for "Share the changes".
+  // it was shared that wait for "Share the changes". TRAK-288: a played match is evaluated, not logged.
   const gamesOn = useFeature('games')
+  const owed = useOwedEvents(user?.id, everySquad ? () => true : coachSquad.eventInSquad, eventsOn, gamesOn)
   const trainingOn = useFeature('training')
   const showToday = trainingOn || gamesOn
   const games = useGames(gamesOn)
@@ -101,7 +101,8 @@ export default function CoachHomePage() {
       title: event ? eventHeading(event) : item.title,
       when: `${format(parseISO(item.date), 'EEE d MMM')}${item.time ? ` · ${item.time}` : ''}`,
       squad: coachSquad.squads.length >= 2 ? squadName(item.source.squad) : null,
-      reason: item.kind === 'match' ? 'Played, not logged yet' : 'Started, no register yet',
+      reason: item.step === 'evaluate' ? 'Played, not evaluated yet' : item.step === 'publish-evaluation' ? 'Evaluation draft · only you see it'
+        : item.kind === 'match' ? 'Played, not logged yet' : 'Started, no register yet',
       action: <NextStep item={item} coachId={user.id} roster={undefined} onChanged={owedChanged} />,
     }
   })

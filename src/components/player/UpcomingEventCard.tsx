@@ -15,8 +15,9 @@ export function UpcomingEventCard({ event, changed, nextUp = false, linkBase = '
   nextUp?: boolean
   /** The event page's route; parents open /parent/event (J8.8). */
   linkBase?: string
-  /** TRAK-286: the coach shared a game plan, or a later share changed it for this reader (planBadge). */
-  plan?: 'shared' | 'updated' | null
+  /** TRAK-286: the coach shared a game plan, or a later share changed it for this reader (planBadge). TRAK-289: or
+   *  published their review of the game, which says so instead. */
+  plan?: 'shared' | 'updated' | 'review' | null
 }) {
   const cancelled = event.status === 'cancelled'
   const heading = eventHeading(event)
@@ -34,7 +35,7 @@ export function UpcomingEventCard({ event, changed, nextUp = false, linkBase = '
           {cancelled && <span className="text-[10px] font-semibold text-danger">Cancelled</span>}
           {changed && <span className="text-[10px] font-semibold text-brand">Changed</span>}
           {plan && !cancelled && <span className="arc"><Badge size="sm" tone={plan === 'updated' ? 'info' : 'success'}>
-            {plan === 'updated' ? 'Updated' : 'Plan shared'}</Badge></span>}
+            {plan === 'review' ? 'Coach’s review' : plan === 'updated' ? 'Updated' : 'Plan shared'}</Badge></span>}
         </div>
         <p className={`text-[13px] font-medium truncate ${cancelled ? 'line-through text-ink-2' : 'text-ink'}`}>{heading}</p>
         <p className="text-[11px] mt-0.5 text-ink-2">{eventDay(event)} · {eventTime(event)}</p>

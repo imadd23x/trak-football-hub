@@ -62,7 +62,8 @@ function fixtures() {
     // TRAK-176: a new event waits for the coach's squads.
     table('squad_players', []),
     // TRAK-294: Training off, so its nav tab doesn't add a second "Training" to the page.
-    rpc('feature_on', ({ p_feature }) => p_feature !== 'training'),
+    // TRAK-288: Games off too: with it on, a new match asks its competition.
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'training' && p_feature !== 'games'),
     http.post(EVENTS, write('post')),
     http.patch(EVENTS, write('patch')),
     http.delete(EVENTS, write('delete')),

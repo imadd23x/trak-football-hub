@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, MatchCard, LoadError } from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
+import { fetchReviews } from '@/lib/games/reviews'
 import { TrainingHistory } from '@/components/player/TrainingHistory'
 import { UpcomingEvents } from '@/components/player/UpcomingEvents'
 
@@ -68,6 +69,16 @@ export default function PlayerMatches() {
   }
 
   const retry = () => { setLoading(true); setFailed(false); fetchPage(0, false) }
+
+  // TRAK-289: a Games match's row carries no rating; its review is on the match's event page. A failed read only
+  // leaves the review badges off.
+  const [reviewed, setReviewed] = useState<Map<string, string>>(new Map())
+  useEffect(() => {
+    if (!user) return
+    const abort = new AbortController()
+    fetchReviews(user.id, abort.signal).then(reviews => setReviewed(reviews.bySession), () => {})
+    return () => abort.abort()
+  }, [user])
 
   useEffect(() => {
     if (!user) return
@@ -143,8 +154,9 @@ export default function PlayerMatches() {
                 scoreUs={m.team_score}
                 scoreThem={m.opponent_score}
                 competition={m.competition}
-                band={scoreToBand(m.computed_rating ?? 6.5)}
-                onClick={() => navigate(`/player/match/${m.id}`)}
+                band={m.computed_rating == null ? null : scoreToBand(m.computed_rating)}
+                review={reviewed.has(m.session_id)}
+                onClick={() => navigate(reviewed.has(m.session_id) ? `/player/event/${reviewed.get(m.session_id)}` : `/player/match/${m.id}`)}
               />
             ))}
           </div>

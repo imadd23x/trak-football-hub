@@ -8,6 +8,8 @@ import { TrainingHistory } from '@/components/player/TrainingHistory'
 import { ParentUpcomingEvents } from '@/components/parent/ParentEvents'
 import { formatParentDate, parentMatchHref, matchResult } from '@/lib/parent-data'
 import { EVENT_COLOR } from '@/lib/coach-events'
+import { useReviews } from '@/lib/games/reviews'
+import { Badge } from '@/components/arc/badge/badge'
 
 export default function ParentMatches() {
   const navigate = useNavigate()
@@ -15,6 +17,9 @@ export default function ParentMatches() {
   const query = useParentMatches()
   const matches = query.data ?? []
   const { selectedChild } = useParentChildren()
+  // TRAK-289: a Games match has no rating; its coach's review is on the match's event page.
+  const reviews = useReviews(selectedChild?.id)
+  const reviewOf = (match: { session_id?: string | null }) => match.session_id ? reviews.data?.bySession.get(match.session_id) : undefined
   return (
     <MobileShell>
       <div className="pt-3 pb-4">
@@ -32,7 +37,7 @@ export default function ParentMatches() {
               {query.isError ? <ParentLoadError message="Couldn't load matches." onRetry={() => { void query.refetch() }} />
                 : query.isPending ? <ParentLoading />
                   : matches.length === 0 ? <p className="text-sm text-muted-foreground">No matches yet.</p>
-                    : <SeeMoreList items={matches} render={match => <Link key={match.id} to={parentMatchHref(match)}
+                    : <SeeMoreList items={matches} render={match => <Link key={match.id} to={reviewOf(match) ? `/parent/event/${reviewOf(match)}` : parentMatchHref(match)}
                       state={{ matchId: match.id, childId: selectedChild?.id }}
                       className="flex items-stretch gap-3 rounded-[14px] p-3.5"
                       style={{ background: 'rgb(var(--t-surface))', border: '1px solid rgb(var(--t-line))' }}>
@@ -44,7 +49,8 @@ export default function ParentMatches() {
                         </p>
                       </div>
                       <div className="text-right shrink-0 self-center">
-                        <ParentRating rating={match.computed_rating} />
+                        {reviewOf(match) ? <span className="arc"><Badge size="sm" tone="success">Coach’s review</Badge></span>
+                          : <ParentRating rating={match.computed_rating} />}
                         <p className="text-[11px] text-ink-2 mt-1">{matchResult(match)
                           ? `${matchResult(match)} ${match.team_score}–${match.opponent_score}` : 'Score not recorded'}</p>
                       </div>

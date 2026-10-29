@@ -61,7 +61,8 @@ function fixtures() {
     http.get(`${SUPABASE_URL}/rest/v1/session_attendance`, () => HttpResponse.json(attendance)),
     table('squad_players', SQUAD),
     table('event_absences', [{ squad_player_id: 'sp-2', reason: 'Ill' }, { squad_player_id: 'sp-4', reason: null }]),
-    rpc('feature_on', () => true),
+    // TRAK-288: Games off, so a match is still logged as today.
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'games'),
     rpc('coach_squad_player_consent_required', args => args.p_squad_player_id === 'sp-6'),
     rpc('take_event_register', args => { saved.push(args); return registerReply() }),
   )

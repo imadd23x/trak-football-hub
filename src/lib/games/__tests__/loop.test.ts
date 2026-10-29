@@ -40,11 +40,32 @@ describe('gameState (TRAK-283)', () => {
     expect(LOOP_STEPS[STATE.fullTime.step]).toBe('Evaluation')
   })
 
-  it('offers one next action before kick-off, and none after it until the evaluation exists', () => {
+  it('offers one next action before kick-off, none while the match is on, and the evaluation from full time (TRAK-288)', () => {
     expect(STATE.logistics.action).toEqual({ label: 'Share the logistics', tab: 'logistics' })
     expect(STATE.plan.action).toEqual({ label: 'Write the plan', tab: 'plan' })
     expect(STATE.locked.action).toBeUndefined()
-    expect(STATE.fullTime.action).toBeUndefined()
+    expect(STATE.fullTime.action).toEqual({ label: 'Evaluate', tab: 'evaluation' })
+  })
+})
+
+describe('an evaluation draft (TRAK-288)', () => {
+  it('after full time a saved evaluation is a draft only the coach sees, and publishing it is next', () => {
+    expect(gameState(game(), Date.parse('2026-10-31T10:30:00Z'), { evaluated: true })).toBe('evaluationDraft')
+    expect(STATE.evaluationDraft).toMatchObject({ label: 'Evaluation draft', tone: 'warning', action: { label: 'Publish', tab: 'evaluation' } })
+    expect(LOOP_STEPS[STATE.evaluationDraft.step]).toBe('Evaluation')
+  })
+
+  it('it can\'t be one before full time', () => {
+    expect(gameState(game(), Date.parse('2026-10-31T10:29:59Z'), { evaluated: true })).toBe('locked')
+  })
+})
+
+describe('a published evaluation (TRAK-289)', () => {
+  it('closes the loop: Published, with nothing left to do', () => {
+    expect(gameState(game(), Date.parse('2026-10-31T12:00:00Z'), { evaluated: true, published: true })).toBe('published')
+    expect(STATE.published).toMatchObject({ label: 'Published', tone: 'success' })
+    expect(LOOP_STEPS[STATE.published.step]).toBe('Published')
+    expect(STATE.published.action).toBeUndefined()
   })
 })
 

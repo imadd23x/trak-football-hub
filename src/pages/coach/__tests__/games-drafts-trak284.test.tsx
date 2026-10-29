@@ -52,6 +52,10 @@ beforeEach(() => {
     table('notification_settings', []),
     rpc('coach_squad_player_consent_required', () => false),
     rpc('feature_on', () => true),
+    // TRAK-288: no evaluation yet.
+    table('game_evaluations', []),
+    table('game_evaluation_players', []),
+    table('game_evaluation_notes', []),
     table('game_plans', []),
     table('game_shares', []),
     rpc('game_plan_changes', () => []),

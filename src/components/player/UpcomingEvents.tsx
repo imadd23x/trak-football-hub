@@ -4,6 +4,7 @@ import { MetadataLabel, LoadError } from '@/components/trak'
 import { isChanged, noteEventsShown, readSeenSequences, toPlayerEvent, upcomingEventsFilter, type PlayerEvent } from '@/lib/player-events'
 import { UpcomingEventCard } from './UpcomingEventCard'
 import { fetchSharedPlans, planBadge } from '@/lib/games/shared-plans'
+import { fetchReviews } from '@/lib/games/reviews'
 import { SeeMoreList } from '@/components/trak/SeeMoreList'
 
 /**
@@ -35,9 +36,12 @@ export function UpcomingEvents({ playerUserId }: { playerUserId: string }) {
 
   // TRAK-286: which matches have a shared plan. A failed read only leaves the badges off.
   const [plans, setPlans] = useState<Map<string, boolean>>(new Map())
+  // TRAK-289: and which have the coach's review.
+  const [reviewed, setReviewed] = useState<Set<string>>(new Set())
   useEffect(() => {
     const abort = new AbortController()
     fetchSharedPlans(playerUserId, true, abort.signal).then(setPlans, () => {})
+    fetchReviews(playerUserId, abort.signal).then(reviews => setReviewed(reviews.events), () => {})
     return () => abort.abort()
   }, [playerUserId, reloadKey])
 
@@ -57,7 +61,7 @@ export function UpcomingEvents({ playerUserId }: { playerUserId: string }) {
           <p className="text-[12px] text-ink-3">Nothing scheduled yet.</p>
         ) : (
           <SeeMoreList items={events} render={e => <UpcomingEventCard key={e.id} event={e} changed={isChanged(e, seen)}
-            plan={planBadge(plans.get(e.id), e)} />} />
+            plan={reviewed.has(e.id) ? 'review' : planBadge(plans.get(e.id), e)} />} />
         )}
       </div>
     </section>

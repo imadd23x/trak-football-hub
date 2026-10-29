@@ -1,6 +1,7 @@
 import { draftClashes, isCancelled, type EventRow } from '@/lib/coach-events'
 import { hasStarted, registerProblem } from '@/lib/event-register'
 import { phoneEventTime } from '@/lib/event-time'
+import { fullTime } from '@/lib/games/loop'
 
 /* TRAK-262 (Imad, 22 Oct): coach Home's week in Tarek's colour key (TRAK-255).
    The type is a colour; the state is a shape: a draft is dashed and only the
@@ -8,10 +9,11 @@ import { phoneEventTime } from '@/lib/event-time'
    event is solid, a cancelled one is a hollow red ring. Anything waiting for
    the coach is amber, by the same rule as Schedule's corner: a published event
    that has started with no register (training, other) or no match log (match).
-   Each event offers one next step; Details opens the event sheet for the rest. */
+   Each event offers one next step; Details opens the event sheet for the rest. TRAK-288: where Games is on, a match
+   is evaluated from full time on its game page instead of logged. */
 
 export type WeekState = 'draft' | 'clash' | 'published' | 'needs-you' | 'logged' | 'cancelled'
-export type NextStep = 'publish' | 'share' | 'register' | 'log' | 'view'
+export type NextStep = 'publish' | 'share' | 'register' | 'log' | 'view' | 'evaluate' | 'publish-evaluation' | 'review'
 
 /** A completed session: a logged training or match, linked to its event or not. */
 export type WeekSession = {
@@ -48,12 +50,16 @@ const kindOf = (type: string | null | undefined): WeekItem['kind'] =>
   type === 'match' || type === 'training' ? type : 'other'
 
 /** The week's items by date, in time order. `inView` is the squad filter; clashes count every squad, as the database does. */
-export function coachWeek({ dates, events, sessions, inView, now = new Date() }: {
+export function coachWeek({ dates, events, sessions, inView, now = new Date(), evaluated = null, published }: {
   dates: string[]
   events: EventRow[]
   sessions: WeekSession[]
   inView: (squad: string | null | undefined) => boolean
   now?: Date
+  /** TRAK-288: where Games is on, the matches with an evaluation draft; null where it's off. */
+  evaluated?: Set<string> | null
+  /** TRAK-289: the matches whose evaluation is published: their session opens the review, never the old log. */
+  published?: Set<string>
 }): Map<string, WeekItem[]> {
   const clashes = draftClashes(events)
   const done = new Set(sessions.map(s => s.event_id).filter(Boolean))
@@ -72,6 +78,11 @@ export function coachWeek({ dates, events, sessions, inView, now = new Date() }:
     else if (!row.published && clash) items.push({ ...base, state: 'clash', note: `Clashes with ${clash.title} ${clash.start}–${clash.end}`, step: null })
     else if (!row.published) items.push({ ...base, state: 'draft', note: 'Draft · only you see it', step: 'publish' })
     else if (!hasStarted(row, now)) items.push({ ...base, state: 'published', note: 'Published', step: 'share' })
+    else if (kind === 'match' && evaluated) {
+      if (now.getTime() < fullTime({ ...row, ends_at: row.ends_at ?? null })) items.push({ ...base, state: 'published', note: 'Published', step: null })
+      else if (evaluated.has(row.id)) items.push({ ...base, state: 'needs-you', note: 'Evaluation draft', step: 'publish-evaluation' })
+      else items.push({ ...base, state: 'needs-you', note: 'Evaluate the match', step: 'evaluate' })
+    }
     else if (kind === 'match') items.push({ ...base, state: 'needs-you', note: 'Log the match', step: 'log' })
     else if (!registerProblem(row, now)) items.push({ ...base, state: 'needs-you', note: 'Take the register', step: 'register' })
     else items.push({ ...base, state: 'published', note: 'Published', step: null })
@@ -89,9 +100,11 @@ export function coachWeek({ dates, events, sessions, inView, now = new Date() }:
       id: `session:${session.id}`, published: true, title: session.title || 'Session', event_date: session.session_date, squad: session.squad,
       ...(session.venue && { venue: session.venue }), event_type: kind,
     }
+    const reviewed = !!session.event_id && !!published?.has(session.event_id)
     items.push({
       id: source.id, date: session.session_date, kind, title: source.title, time: event ? phoneEventTime(event).time : null,
-      state: 'logged', note: 'Logged', step: 'view', source, sessionId: session.id,
+      state: 'logged', note: reviewed ? 'Published' : 'Logged', step: reviewed ? 'review' : 'view', source, sessionId: session.id,
+      ...(reviewed && linked && { row: linked }),
     })
   }
 

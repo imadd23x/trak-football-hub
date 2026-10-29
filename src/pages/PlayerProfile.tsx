@@ -55,12 +55,14 @@ const PlayerProfile = () => {
     supabase.from('matches').select('*').eq('user_id', user.id)
       .then(({ data }) => {
         const matches = data || [];
+        // TRAK-289: the average reads rated matches only; a Games match has no rating.
+        const rated = matches.filter(m => m.computed_rating != null);
         setStats({
           matches: matches.length,
           goals: matches.reduce((s, m) => s + (m.goals || 0), 0),
           assists: matches.reduce((s, m) => s + (m.assists || 0), 0),
-          avgRating: matches.length > 0
-            ? Math.round(matches.reduce((s, m) => s + Number(m.computed_rating), 0) / matches.length * 10) / 10
+          avgRating: rated.length > 0
+            ? Math.round(rated.reduce((s, m) => s + Number(m.computed_rating), 0) / rated.length * 10) / 10
             : null,
           wins: matches.filter(m => m.team_score > m.opponent_score).length,
           losses: matches.filter(m => m.team_score < m.opponent_score).length,

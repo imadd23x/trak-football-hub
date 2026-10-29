@@ -6,7 +6,7 @@ export type DedupableMatch = {
   competition: string
   match_date: string | null
   created_at: string | null
-  computed_rating: number
+  computed_rating: number | null
 }
 
 /**

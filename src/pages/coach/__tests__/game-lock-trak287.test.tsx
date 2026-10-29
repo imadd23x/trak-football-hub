@@ -72,6 +72,10 @@ beforeEach(() => {
     table('notification_settings', []),
     table('training_plans', []),
     rpc('feature_on', () => true),
+    // TRAK-288: no evaluation yet.
+    table('game_evaluations', []),
+    table('game_evaluation_players', []),
+    table('game_evaluation_notes', []),
   )
 })
 afterEach(() => { vi.useRealTimers(); cleanup(); localStorage.clear() })

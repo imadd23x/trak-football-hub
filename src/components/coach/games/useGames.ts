@@ -120,6 +120,42 @@ export function useGamePlayers(eventId: string | undefined) {
   })
 }
 
+/** TRAK-288: when each of the coach's evaluations was last saved, by match; TRAK-289: and published, if it was. The
+ *  database returns only their own. */
+export function useGameEvaluations(enabled = true) {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['coach', user?.id, 'game-evaluations'],
+    enabled: !!user && enabled,
+    queryFn: async (): Promise<Map<string, { savedAt: string; publishedAt: string | null }>> => {
+      const { data, error } = await supabase.from('game_evaluations').select('event_id, saved_at, published_at')
+      if (error) throw error
+      return new Map((data ?? []).map(row => [row.event_id, { savedAt: row.saved_at, publishedAt: row.published_at }]))
+    },
+  })
+}
+
+/** TRAK-288: one match's evaluation: the result, each player listed and the notes. Only the match's coach reads them (the
+ *  database's rule); `evaluation` is null before the first save. */
+export function useGameEvaluation(eventId: string | undefined) {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['coach', user?.id, 'game-evaluation', eventId],
+    enabled: !!user && !!eventId,
+    queryFn: async () => {
+      const [evaluation, players, notes] = await Promise.all([
+        supabase.from('game_evaluations').select('our_score, their_score, goals, how_they_scored, plan_worked, saved_at, published_at')
+          .eq('event_id', eventId!).maybeSingle(),
+        supabase.from('game_evaluation_players').select('squad_player_id, played, did_job, against_expectation').eq('event_id', eventId!),
+        supabase.from('game_evaluation_notes').select('squad_player_id, note').eq('event_id', eventId!),
+      ])
+      const error = evaluation.error ?? players.error ?? notes.error
+      if (error) throw error
+      return { evaluation: evaluation.data, players: players.data ?? [], notes: notes.data ?? [] }
+    },
+  })
+}
+
 export type Candidate = AvailPlayer & { confirmed: boolean; absent: boolean }
 
 /** TRAK-285: who can come to a match, as Squad > Availability shows it: the match's squad, consented children only (a

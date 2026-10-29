@@ -9,6 +9,7 @@ import { changesSinceSeen, markEventOpened, toPlayerEvent, type PlayerEvent as E
 import { EventDetails } from '@/components/player/EventDetails'
 import { CantMakeIt } from '@/components/parent/CantMakeIt'
 import { SharedGamePlan } from '@/components/player/SharedGamePlan'
+import { SharedGameReview } from '@/components/player/SharedGameReview'
 import { useEventBack } from '@/lib/event-back'
 
 /**
@@ -77,6 +78,8 @@ export default function PlayerEvent() {
   } else {
     body = <>
       <EventDetails event={current.event} changes={current.changes} />
+      {/* TRAK-289: once the coach publishes, After the game, with the coach's note to them. */}
+      {user && <SharedGameReview event={current.event} childId={user.id} childName="" as="player" />}
       {/* TRAK-286: the coach's game plan, once shared: the goals, their job and the note to them. */}
       {user && <SharedGamePlan event={current.event} childId={user.id} childName="" as="player" />}
       {forThemselves && user && <CantMakeIt event={current.event} child={{ id: user.id, name: 'you' }} self />}

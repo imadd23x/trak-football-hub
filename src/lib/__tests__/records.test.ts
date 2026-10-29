@@ -138,4 +138,18 @@ describe('calculateRecords', () => {
     const result = calculateRecords(matches)
     expect(result.longestGoodStreak).toBe(2)
   })
+
+  // TRAK-289: a Games match has no rating (Imad, 28 Oct).
+  it('a match with no rating counts its goals and neither extends nor breaks a streak', () => {
+    const matches = [
+      makeMatch({ id: 'm1', computed_rating: 7.5, created_at: '2025-03-01T10:00:00Z' }),
+      { ...makeMatch({ id: 'games', goals: 1, created_at: '2025-03-08T10:00:00Z' }), computed_rating: null },
+      makeMatch({ id: 'm3', computed_rating: 7.8, created_at: '2025-03-15T10:00:00Z' }),
+    ]
+    const result = calculateRecords(matches)
+    expect(result.longestGoodStreak).toBe(2)
+    expect(result.highestRating?.matchId).toBe('m3')
+    expect(result.totalGoals).toBe(1)
+    expect(result.totalMatches).toBe(3)
+  })
 })

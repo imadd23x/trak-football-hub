@@ -11,14 +11,14 @@ const DAYS = 14
  * Imad, 24 Oct: the week marked an event "Needs you" (a register or a match log owed) but Home's Needs you listed only
  * players. These are the events of the last two weeks still waiting, by the week's own rule (coachWeek), oldest first.
  */
-export function useOwedEvents(coachId: string | undefined, inView: (squad: string | null | undefined) => boolean, enabled: boolean) {
+export function useOwedEvents(coachId: string | undefined, inView: (squad: string | null | undefined) => boolean, enabled: boolean, games = false) {
   const read = useQuery({
-    queryKey: ['coach', coachId, 'owed-events'],
+    queryKey: ['coach', coachId, 'owed-events', games],
     enabled: !!coachId && enabled,
     queryFn: async () => {
       const today = new Date()
       const dates = Array.from({ length: DAYS }, (_, i) => format(addDays(today, i - (DAYS - 1)), 'yyyy-MM-dd'))
-      return { dates, ...(await loadWeek(coachId!, dates[0], dates[DAYS - 1])) }
+      return { dates, ...(await loadWeek(coachId!, dates[0], dates[DAYS - 1], games)) }
     },
   })
   const items = useMemo<WeekItem[] | null>(() => read.data

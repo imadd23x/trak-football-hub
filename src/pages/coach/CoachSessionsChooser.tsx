@@ -1,12 +1,15 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
+import { useFeature } from '@/components/trak/parked'
 import { ChevronLeft, History } from 'lucide-react'
 import { IconMatch, IconSessions } from '@/components/icons/TrakIcons'
 
 export default function CoachSessionsChooser() {
   const navigate = useNavigate()
   const location = useLocation()
+  // TRAK-288: where Games is on, a match is evaluated on its game page, so the quick match log goes.
+  const games = useFeature('games')
 
   return (
     <MobileShell>
@@ -40,7 +43,7 @@ export default function CoachSessionsChooser() {
       {/* TRAK-252: side by side on a coach's tablet or laptop. */}
       <div className="flex-1 flex flex-col justify-center py-6 gap-4 tablet:grid tablet:grid-cols-2">
         {/* Quick Match Log */}
-        <button
+        {!games && <button
           onClick={() => navigate('/coach/sessions/quick')}
           className="w-full bg-surface border border-brand/[0.18] rounded-[24px] p-7 text-left active:scale-[0.98] transition-transform"
         >
@@ -60,7 +63,7 @@ export default function CoachSessionsChooser() {
           <span className="text-xs text-ink-3 leading-relaxed block">
             Opponent, score and who played. Capture the result at full-time.
           </span>
-        </button>
+        </button>}
 
         {/* Full Session */}
         <button

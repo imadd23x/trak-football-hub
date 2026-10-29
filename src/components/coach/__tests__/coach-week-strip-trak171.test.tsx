@@ -23,8 +23,8 @@ const database = vi.hoisted(() => ({
   rpc: vi.fn<(name: string) => Promise<Reply>>(async () => ({ data: [], error: null })),
 }))
 
-// The feature switch is independent of how the enabled strip loads its week.
-vi.mock('@/components/trak/parked', () => ({ useFeature: () => true }))
+// The feature switch is independent of how the enabled strip loads its week. TRAK-288: Games off, so a match is logged.
+vi.mock('@/components/trak/parked', () => ({ useFeature: (feature?: string) => feature !== 'games' }))
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     rpc: (name: string) => database.rpc(name),

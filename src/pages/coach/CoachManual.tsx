@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { MobileShell, NavBar } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
+import { useFeature } from '@/components/trak/parked'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   IconOverview, IconSquad, IconMatch, IconTraining,
@@ -72,6 +73,14 @@ function ContentSquad() {
 }
 
 function ContentMatches() {
+  // TRAK-288: where Games is on, a match is evaluated on its game page instead of logged.
+  const games = useFeature('games')
+  if (games) return (
+    <div className="space-y-4 text-[13px] leading-relaxed text-ink-2">
+      <p>Each match has its page in <b className="text-ink">Games</b>: the logistics, your game plan and, from full time, its evaluation. On Home's week a played match offers <b className="text-ink">Evaluate</b>.</p>
+      <Rule>The evaluation is a draft only you see. Save it and sleep on it: nothing reaches players or families until you publish it.</Rule>
+    </div>
+  )
   return (
     <div className="space-y-4 text-[13px] leading-relaxed text-ink-2">
       <p>There are two ways to log a match. On Home's week, a match that has kicked off offers <b className="text-ink">Log it</b>; or tap the <b className="text-ink">+</b>:</p>

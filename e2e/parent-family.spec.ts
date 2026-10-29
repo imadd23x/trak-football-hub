@@ -50,7 +50,7 @@ await context.route('**/*',async route=>{
  if(u.pathname==='/rest/v1/squad_players') return json([{id:u.searchParams.get('linked_player_id')?.slice(3)}]);
  if(u.pathname==='/rest/v1/coach_assessments') return json([{id:'assessment',created_at:'2026-09-01T12:00:00Z',coach_user_id:coach,coach_rating:0,work_rate:0,tactical:0,attitude:0,technical:0,physical:0,coachability:0}]);
  if(u.pathname==='/rest/v1/recognition_awards') return json([]);
- if(u.pathname==='/rest/v1/game_for_family') return json([]); // TRAK-286: no shared game plan
+ if(u.pathname==='/rest/v1/game_for_family'||u.pathname==='/rest/v1/game_review_for_family') return json([]); // TRAK-286, TRAK-289: no shared plan, no review
  if(u.pathname==='/rest/v1/matches') {
    if(failMatches) return json({message:'Synthetic network error'},503);
    return json([{id:'match-'+u.searchParams.get('user_id'),match_date:'2026-09-01',created_at:'2026-09-18T12:00:00Z',opponent:u.searchParams.get('user_id')===`eq.${zara}`?'Zara Opposition':'Alex Opposition',team_score:0,opponent_score:0,computed_rating:0,competition:'Synthetic League',venue:'Test Pitch'}]);
@@ -183,7 +183,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         // TRAK-262: notification_settings is coach Home's Needs you switch (no row: on).
         if (['matches', 'player_details', 'coach_details', 'recognition_awards', 'session_attendance', 'event_absences', 'notification_settings',
           // TRAK-286: no game plan, shared or not.
-          'game_plans', 'game_shares', 'game_for_family', 'game_for_player', 'training_plans', 'training_plan_practices'].some(name => url.pathname === `/rest/v1/${name}`)) return json([])
+          'game_plans', 'game_shares', 'game_evaluations', 'game_evaluation_players', 'game_evaluation_notes', 'game_for_family', 'game_for_player', 'game_review_for_family', 'game_review_for_player', 'training_plans', 'training_plan_practices'].some(name => url.pathname === `/rest/v1/${name}`)) return json([])
         unexpected.push(`${req.method()} ${url.pathname}`)
         return route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"Unmocked request blocked"}' })
       })

@@ -62,6 +62,10 @@ beforeEach(() => {
     table('coach_assessments', []),
     rpc('coach_squad_player_consent_required', () => false),
     rpc('feature_on', () => true),
+    // TRAK-288: no evaluation yet.
+    table('game_evaluations', []),
+    table('game_evaluation_players', []),
+    table('game_evaluation_notes', []),
     table('game_shares', []),
     rpc('game_plan_changes', () => []),
   )
@@ -103,7 +107,8 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
 
     await user.keyboard('{ArrowRight}')
     expect(screen.getByRole('tab', { name: 'Evaluation' })).toHaveFocus()
-    expect(await screen.findByRole('heading', { name: 'Evaluate it after full time' })).toBeInTheDocument()
+    // TRAK-288: until full time it says when it opens.
+    expect(await screen.findByRole('heading', { name: /^Opens at full time, \d\d:\d\d$/ })).toBeInTheDocument()
     expect(window.location.search).toBe('?tab=evaluation')
 
     cleanup()

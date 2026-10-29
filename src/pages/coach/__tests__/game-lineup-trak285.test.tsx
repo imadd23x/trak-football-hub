@@ -79,6 +79,10 @@ beforeEach(() => {
     table('session_attendance', []),
     table('coach_calendar_events', [game()]),
     rpc('feature_on', () => true),
+    // TRAK-288: no evaluation yet.
+    table('game_evaluations', []),
+    table('game_evaluation_players', []),
+    table('game_evaluation_notes', []),
     table('game_shares', []),
     rpc('game_plan_changes', () => []),
   )

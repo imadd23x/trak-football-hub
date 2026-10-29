@@ -1,34 +1,37 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
-import { ChevronLeft, ClipboardCheck } from 'lucide-react'
+import { format } from 'date-fns'
+import { ChevronLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { publishEvent } from '@/lib/event-publish'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { rowToForm, startedLocked, type EventRow } from '@/lib/coach-events'
 import { STATE, fullTime, gameState, type GameTab } from '@/lib/games/loop'
-import { planToForm, type PlanForm } from '@/lib/games/plan'
+import { formToPlan, planToForm, type PlanForm } from '@/lib/games/plan'
+import { evaluationToForm, type EvaluationForm } from '@/lib/games/evaluation'
 import type { Tables } from '@/integrations/supabase/types'
-import { gameTitle, gameWhen, useGame, useGamePlan, useGamePlanChanges, useGamePlayers, useGameShares } from '@/components/coach/games/useGames'
+import { gameTitle, gameWhen, useGame, useGameEvaluation, useGamePlan, useGamePlanChanges, useGamePlayers, useGameShares } from '@/components/coach/games/useGames'
 import { GamePlan } from '@/components/coach/games/GamePlan'
+import { Evaluation } from '@/components/coach/games/Evaluation'
 import { EventSummary } from '@/components/coach/EventSummary'
 import { LoadError } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { Countdown } from '@/components/arc/countdown/countdown'
-import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/arc/tabs/tabs'
 
 /* TRAK-283 (Games 1/8): a game's page. Its header says where it is in the loop; Logistics, Game plan and
-   Evaluation are peer panels of the one game (Arc tabs), and the panel lives in the URL (?tab=). Evaluation
-   (TRAK-288) says what will happen there until it's built. TRAK-284 to TRAK-286: the Game plan (GamePlan). */
+   Evaluation are peer panels of the one game (Arc tabs), and the panel lives in the URL (?tab=). TRAK-284 to
+   TRAK-286: the Game plan (GamePlan). TRAK-288: the Evaluation, from full time. */
 
 const TABS: { id: GameTab; label: string }[] = [
   { id: 'logistics', label: 'Logistics' }, { id: 'plan', label: 'Game plan' }, { id: 'evaluation', label: 'Evaluation' },
 ]
 type Plan = UseQueryResult<Tables<'game_plans'> | null>
 type Players = UseQueryResult<Pick<Tables<'game_plan_players'>, 'squad_player_id' | 'role' | 'slot' | 'job' | 'note' | 'context' | 'expectation'>[]>
+type Evaluated = ReturnType<typeof useGameEvaluation>
 const linkClass = 'rounded text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
 export default function CoachGame() {
@@ -38,44 +41,55 @@ export default function CoachGame() {
   const plan = useGamePlan(eventId)
   const players = useGamePlayers(eventId)
   const shares = useGameShares()
+  const evaluation = useGameEvaluation(eventId)
   return (
     <div className="min-h-screen bg-ground pb-24">
       <div className="mx-auto w-full max-w-[960px] px-5 tablet:px-8">
         <Link to="/coach/games" className={`mt-5 inline-flex items-center gap-1 ${linkClass}`}><ChevronLeft size={16} aria-hidden="true" />Games</Link>
         {game.error || shares.error ? <div className="pt-6"><LoadError what="this game" onRetry={() => { void game.refetch(); void shares.refetch() }}
             retrying={game.isFetching || shares.isFetching} /></div>
-          : game.isPending || plan.isPending || players.isPending || shares.isPending ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading the game…</p>
+          : game.isPending || plan.isPending || players.isPending || shares.isPending || evaluation.isPending
+            ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading the game…</p>
           : !game.data ? <p className="pt-10 text-[15px] text-ink-2">This game isn’t in your games.</p>
           // Keyed by match: a route that only changes :eventId must never carry one match's typing into another's.
-          : <Game key={game.data.id} row={game.data} plan={plan} players={players} sharedAt={shares.data.get(game.data.id) ?? null} />}
+          : <Game key={game.data.id} row={game.data} plan={plan} players={players} sharedAt={shares.data.get(game.data.id) ?? null} evaluation={evaluation} />}
       </div>
     </div>
   )
 }
 
-function Game({ row, plan, players, sharedAt }: { row: EventRow; plan: Plan; players: Players; sharedAt: string | null }) {
+function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; plan: Plan; players: Players; sharedAt: string | null; evaluation: Evaluated }) {
   const { user } = useAuth()
   const coachSquad = useCoachSquad(user?.id)
   const [params, setParams] = useSearchParams()
   const tab = TABS.find(t => t.id === params.get('tab'))?.id ?? 'logistics'
   const [now, setNow] = useState(() => Date.now())
-  // TRAK-287: the page reads the clock again at kick-off itself, so the plan locks with no reload even when the header's
-  // countdown never ticked on screen. A wait past setTimeout's limit (24 days) just wakes early and waits again.
+  const whistle = fullTime({ ...row, ends_at: row.ends_at ?? null })
+  // TRAK-287, TRAK-288: the page reads the clock again at kick-off and at full time itself, so the plan locks and the
+  // evaluation opens with no reload, even when the header's countdown never ticked on screen. A wait past setTimeout's
+  // limit (24 days) just wakes early and waits again.
   useEffect(() => {
-    const left = Date.parse(row.starts_at) - now
-    if (left <= 0) return
+    const left = [Date.parse(row.starts_at), whistle].map(at => at - now).find(wait => wait > 0)
+    if (left === undefined) return
     const timer = setTimeout(() => setNow(Date.now()), Math.min(left + 50, 2 ** 31 - 1))
     return () => clearTimeout(timer)
-  }, [row.starts_at, now])
+  }, [row.starts_at, whistle, now])
   const cancelled = row.status === 'cancelled'
   // TRAK-286: who a share would change now. Only asked once the plan is shared; a failed read shows no changes.
   const changes = useGamePlanChanges([row.id], !!sharedAt && !cancelled).data?.get(row.id) ?? []
   const state = STATE[gameState({ ...row, ends_at: row.ends_at ?? null }, now,
-    { drafted: !!plan.data, shared: !!sharedAt, changes: changes.length })]
+    { drafted: !!plan.data, shared: !!sharedAt, changes: changes.length, evaluated: !!evaluation.data?.evaluation,
+      published: !!evaluation.data?.evaluation?.published_at })]
   // The plan as typed, and its step, live here, above the tabs: Arc unmounts a panel that isn't shown. Until the coach
   // types, it is the saved plan, so a retried read still fills the form. Needs you's "Share the changes" opens Share.
   const [typed, setTyped] = useState<PlanForm | null>(null)
   const [planStep, setPlanStep] = useState(() => params.get('step') === 'share' ? 2 : 0)
+  // TRAK-288: the evaluation as entered, and its step, kept here for the same reason; until the coach enters anything,
+  // the saved draft.
+  const [entered, setEntered] = useState<EvaluationForm | null>(null)
+  const [evaluationStep, setEvaluationStep] = useState(0)
+  // The evaluation reads against the plan as it locked at kick-off.
+  const lockedPlan = planToForm(plan.data ?? null, players.data ?? [])
   const { day, time, academy } = gameWhen(row)
   // TRAK-287: at kick-off the plan locks, on the event's instant (the academy's clock), never the device's.
   const locked = !cancelled && now >= Date.parse(row.starts_at)
@@ -110,8 +124,14 @@ function Game({ row, plan, players, sharedAt }: { row: EventRow; plan: Plan; pla
                   step={planStep} onStep={setPlanStep} sharedAt={sharedAt} changes={changes} lockedAt={locked ? time : null} />}
           </TabsContent>
           <TabsContent value="evaluation">
-            <EmptyState icon={<ClipboardCheck size={24} strokeWidth={1.5} />} title="Evaluate it after full time"
-              description="The result, whether the plan worked, and each player against what you expected. Only you see it until you publish it." />
+            {(evaluation.isError && evaluation.data === undefined) || (plan.isError && plan.data === undefined) || (players.isError && players.data === undefined)
+              ? <div className="pt-4"><LoadError what="the evaluation" onRetry={() => { void evaluation.refetch(); void plan.refetch(); void players.refetch() }}
+                  retrying={evaluation.isFetching || plan.isFetching || players.isFetching} /></div>
+              : <Evaluation game={row} opensAt={now < whistle ? format(new Date(whistle), 'HH:mm') : null}
+                  plans={lockedPlan.players} planGoals={formToPlan(lockedPlan).goals.map((goal, i) => goal.title || goal.looks_like || `Goal ${i + 1}`)}
+                  form={entered ?? evaluationToForm(evaluation.data ?? { evaluation: null, players: [], notes: [] })} onFormChange={setEntered}
+                  step={evaluationStep} onStep={setEvaluationStep} savedAt={evaluation.data?.evaluation?.saved_at ?? null}
+                  publishedAt={evaluation.data?.evaluation?.published_at ?? null} planCreatedAt={plan.data?.created_at ?? null} />}
           </TabsContent>
         </Tabs>
       </div>

@@ -28,7 +28,8 @@ export default function PlayerProfilePage() {
     supabase.from('player_details').select('*').eq('user_id', user.id).maybeSingle().then(({ data }) => setDetails(data))
     supabase.from('matches').select('computed_rating, created_at').eq('user_id', user.id).order('created_at', { ascending: true }).then(({ data }) => {
       if (!data) return
-      setMatchHistory(data.map((m) => ({ created_at: m.created_at ?? '', computed_rating: m.computed_rating })))
+      // TRAK-289: the rating trend reads rated matches only; a Games match has no rating.
+      setMatchHistory(data.flatMap(m => m.computed_rating == null ? [] : [{ created_at: m.created_at ?? '', computed_rating: m.computed_rating }]))
     })
     // Coach assessments, newest first — via squad_players, since
     // coach_assessments.squad_player_id is a row ID, not a user ID.

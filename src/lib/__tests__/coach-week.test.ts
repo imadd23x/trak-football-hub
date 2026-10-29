@@ -42,6 +42,45 @@ describe('coach week', () => {
     expect(one([event('m', '2026-10-20', '18:00', { event_type: 'match' })])).toMatchObject({ state: 'needs-you', step: 'log' })
   })
 
+  // TRAK-288: where Games is on (`evaluated` is given), the evaluation replaces the match log.
+  describe('where Games is on', () => {
+    const games = (events: EventRow[], evaluated: string[] = []) =>
+      [...coachWeek({ dates, events, sessions: [], inView: all, now, evaluated: new Set(evaluated) }).values()].flat()[0]
+
+    it('a match still being played waits for full time', () => {
+      expect(games([event('m', '2026-10-21', '11:00', { event_type: 'match', ends_at: '2026-10-21T12:30:00Z' })]))
+        .toMatchObject({ state: 'published', step: null })
+    })
+
+    it('from full time it needs you: evaluate it', () => {
+      expect(games([event('m', '2026-10-21', '10:00', { event_type: 'match', ends_at: '2026-10-21T11:30:00Z' })]))
+        .toMatchObject({ state: 'needs-you', note: 'Evaluate the match', step: 'evaluate' })
+      // No end: 90 minutes after kick-off, to the minute.
+      expect(games([event('m', '2026-10-21', '10:31', { event_type: 'match' })])).toMatchObject({ state: 'published', step: null })
+      expect(games([event('m', '2026-10-21', '10:30', { event_type: 'match' })])).toMatchObject({ state: 'needs-you', step: 'evaluate' })
+    })
+
+    it('with a draft saved, publishing it is next', () => {
+      expect(games([event('m', '2026-10-20', '18:00', { event_type: 'match' })], ['m']))
+        .toMatchObject({ state: 'needs-you', note: 'Evaluation draft', step: 'publish-evaluation' })
+    })
+
+    it('once published (TRAK-289) the match is done: its session says Published and opens the review, not the old log', () => {
+      const items = [...coachWeek({ dates, events: [event('m', '2026-10-20', '18:00', { event_type: 'match' })],
+        sessions: [session('s', '2026-10-20', { event_id: 'm', session_type: 'match' })], inView: all, now, evaluated: new Set(),
+        published: new Set(['m']) }).values()].flat()
+      expect(items).toHaveLength(1)
+      expect(items[0]).toMatchObject({ state: 'logged', note: 'Published', step: 'review' })
+    })
+
+    it('a match logged the old way stays logged', () => {
+      const items = [...coachWeek({ dates, events: [event('m', '2026-10-20', '18:00', { event_type: 'match' })],
+        sessions: [session('s', '2026-10-20', { event_id: 'm', session_type: 'match' })], inView: all, now, evaluated: new Set() }).values()].flat()
+      expect(items).toHaveLength(1)
+      expect(items[0]).toMatchObject({ state: 'logged' })
+    })
+  })
+
   it('a started draft never needs you: families were never told', () => {
     expect(one([event('d', '2026-10-20', '18:00', { published: false })])).toMatchObject({ state: 'draft' })
   })

@@ -7,6 +7,7 @@ import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { useParentEvents } from '@/hooks/useParentData'
 import { isChanged, noteEventsShown, readSeenSequences, type PlayerEvent } from '@/lib/player-events'
 import { planBadge, useSharedPlans } from '@/lib/games/shared-plans'
+import { useReviews } from '@/lib/games/reviews'
 
 /**
  * The selected child's events (TRAK-131, J8.8), with the player's own card
@@ -19,7 +20,9 @@ export function ParentUpcomingEvents({ nextUpOnly = false }: { nextUpOnly?: bool
   const query = useParentEvents()
   // TRAK-286: which matches have a shared plan. A failed read only leaves the badges off.
   const plans = useSharedPlans(selectedChild?.id, false)
-  const plan = (e: PlayerEvent) => planBadge(plans.data?.get(e.id), e)
+  // TRAK-289: once the coach publishes their review, the card says so instead.
+  const reviews = useReviews(selectedChild?.id)
+  const plan = (e: PlayerEvent) => reviews.data?.events.has(e.id) ? 'review' as const : planBadge(plans.data?.get(e.id), e)
   const events = nextUpOnly ? (query.data ?? []).slice(0, 1) : query.data ?? []
   // Read before this render's events are recorded as seen.
   const seen = parentId ? readSeenSequences(parentId) : {}

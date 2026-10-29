@@ -296,6 +296,7 @@ export type Database = {
         Row: {
           cancel_reason: string | null
           coach_user_id: string
+          competition: string | null
           created_at: string
           ends_at: string | null
           end_time: string | null
@@ -326,6 +327,7 @@ export type Database = {
         Insert: {
           cancel_reason?: string | null
           coach_user_id: string
+          competition?: string | null
           created_at?: string
           ends_at?: string | null
           end_time?: string | null
@@ -356,6 +358,7 @@ export type Database = {
         Update: {
           cancel_reason?: string | null
           coach_user_id?: string
+          competition?: string | null
           created_at?: string
           ends_at?: string | null
           end_time?: string | null
@@ -610,6 +613,81 @@ export type Database = {
         }
         Relationships: []
       }
+      game_evaluation_notes: {
+        Row: {
+          event_id: string
+          note: string
+          squad_player_id: string
+        }
+        Insert: {
+          event_id: string
+          note: string
+          squad_player_id: string
+        }
+        Update: {
+          event_id?: string
+          note?: string
+          squad_player_id?: string
+        }
+        Relationships: []
+      }
+      game_evaluation_players: {
+        Row: {
+          against_expectation: string
+          did_job: string
+          event_id: string
+          played: boolean
+          squad_player_id: string
+        }
+        Insert: {
+          against_expectation?: string
+          did_job?: string
+          event_id: string
+          played: boolean
+          squad_player_id: string
+        }
+        Update: {
+          against_expectation?: string
+          did_job?: string
+          event_id?: string
+          played?: boolean
+          squad_player_id?: string
+        }
+        Relationships: []
+      }
+      game_evaluations: {
+        Row: {
+          event_id: string
+          goals: Json
+          how_they_scored: string
+          our_score: number | null
+          plan_worked: (string | null)[]
+          published_at: string | null
+          saved_at: string
+          their_score: number | null
+        }
+        Insert: {
+          event_id: string
+          goals?: Json
+          how_they_scored?: string
+          our_score?: number | null
+          plan_worked?: (string | null)[]
+          published_at?: string | null
+          saved_at?: string
+          their_score?: number | null
+        }
+        Update: {
+          event_id?: string
+          goals?: Json
+          how_they_scored?: string
+          our_score?: number | null
+          plan_worked?: (string | null)[]
+          published_at?: string | null
+          saved_at?: string
+          their_score?: number | null
+        }
+        Relationships: []
+      }
       game_for_family: {
         Row: {
           changed_at: string | null
@@ -748,6 +826,72 @@ export type Database = {
         }
         Relationships: []
       }
+      game_review_for_family: {
+        Row: {
+          against_expectation: string
+          coach_name: string
+          context: string[]
+          did_job: string
+          event_id: string
+          expectation: string
+          has_note: boolean
+          job: string
+          our_score: number
+          published_at: string
+          session_id: string | null
+          squad_player_id: string
+          their_score: number
+        }
+        Insert: {
+          against_expectation: string
+          coach_name?: string
+          context?: string[]
+          did_job: string
+          event_id: string
+          expectation: string
+          has_note?: boolean
+          job?: string
+          our_score: number
+          published_at?: string
+          session_id?: string | null
+          squad_player_id: string
+          their_score: number
+        }
+        Update: {
+          against_expectation?: string
+          coach_name?: string
+          context?: string[]
+          did_job?: string
+          event_id?: string
+          expectation?: string
+          has_note?: boolean
+          job?: string
+          our_score?: number
+          published_at?: string
+          session_id?: string | null
+          squad_player_id?: string
+          their_score?: number
+        }
+        Relationships: []
+      }
+      game_review_for_player: {
+        Row: {
+          event_id: string
+          note: string
+          squad_player_id: string
+        }
+        Insert: {
+          event_id: string
+          note: string
+          squad_player_id: string
+        }
+        Update: {
+          event_id?: string
+          note?: string
+          squad_player_id?: string
+        }
+        Relationships: []
+      }
       game_shares: {
         Row: {
           changed: number
@@ -776,7 +920,7 @@ export type Database = {
           body_condition: string | null
           card_received: string | null
           competition: string
-          computed_rating: number
+          computed_rating: number | null
           created_at: string | null
           goals: number
           id: string
@@ -799,7 +943,7 @@ export type Database = {
           body_condition?: string | null
           card_received?: string | null
           competition: string
-          computed_rating?: number
+          computed_rating?: number | null
           created_at?: string | null
           goals?: number
           id?: string
@@ -822,7 +966,7 @@ export type Database = {
           body_condition?: string | null
           card_received?: string | null
           competition?: string
-          computed_rating?: number
+          computed_rating?: number | null
           created_at?: string | null
           goals?: number
           id?: string
@@ -1328,6 +1472,22 @@ export type Database = {
       share_game_plan: {
         Args: { p_event_id: string; p_talked?: boolean }
         Returns: number
+      }
+      publish_game_evaluation: {
+        Args: { p_event_id: string; p_competition?: string | null; p_home_away?: string | null }
+        Returns: Json
+      }
+      save_game_evaluation: {
+        Args: {
+          p_event_id: string
+          p_our_score: number
+          p_their_score: number
+          p_goals: Json
+          p_how_they_scored: string
+          p_plan_worked: (string | null)[]
+          p_players: Json
+        }
+        Returns: string
       }
       get_children_awaiting_consent: {
         Args: never

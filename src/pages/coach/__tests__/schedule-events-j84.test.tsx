@@ -64,7 +64,8 @@ function fixtures() {
     http.get(EVENTS, () => HttpResponse.json(rows)),
     table('coach_sessions', []),
     table('squad_players', []), // TRAK-139: the squad label for the WhatsApp message
-    rpc('feature_on', () => true),
+    // TRAK-288: Games off unless a test turns it on: with it on, a new match asks its competition.
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'games'),
     // TRAK-286: no game plan, shared or not.
     table('game_plans', []),
     table('game_shares', []),
@@ -403,8 +404,10 @@ describe('TRAK-283: a match just published offers its game plan', { timeout: 20_
   afterEach(() => { server.events.removeAllListeners(); vi.useRealTimers() })
   beforeEach(() => {
     atMorningToday()
-    signInAs(COACH)
+    // TRAK-288: Games on. The app keeps a switch's answer for 30 s, so the academy with Games is another coach's.
+    signInAs({ id: 'coach-1-games' })
     fixtures()
+    server.use(rpc('feature_on', () => true))
     rows = [DRAFT, row({ id: 'match-1', title: 'vs Parkview Athletic', event_type: 'match', opponent: 'Parkview Athletic',
       starts_at: toInstant(today, '20:00'), start_time: '20:00:00' })]
   })
@@ -429,6 +432,8 @@ describe('TRAK-283: a match just published offers its game plan', { timeout: 20_
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await userEvent.click(within(sheet).getByRole('button', { name: 'Match' }))
     await userEvent.type(within(sheet).getByLabelText('Opponent'), 'Synthetic United')
+    // TRAK-288: with Games on, New event asks a match's competition.
+    await userEvent.click(within(within(sheet).getByRole('group', { name: 'Competition' })).getByRole('button', { name: 'League' }))
     await eventStep(sheet, 'When')
     await pickTime(userEvent, 'Kickoff', '16:00')
     await saveEventWith(sheet, 'Publish')

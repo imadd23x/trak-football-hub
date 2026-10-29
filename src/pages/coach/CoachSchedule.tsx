@@ -19,9 +19,10 @@ import { askToEmailFamilies } from '@/lib/event-emails'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, LoadError } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
+import { useGameEvaluations } from '@/components/coach/games/useGames'
 import { useFeature, useParked } from '@/components/trak/parked'
 import {
-  CANCELLED_COLOR, DURATIONS, clashMessage, draftClashes, EVENT_COLOR, lockedMessage, STARTED_LOCKED, startedLocked, EVENT_KINDS, FAMILY_NOTE_MAX, NO_TIME_COLOR, WEEKDAYS, blankForm, blankRepeat, canDelete, cancelPatch, dateAsDay, dayAsDate, formatEventDay, formProblem, formToRow, newDraftFields,
+  CANCELLED_COLOR, COMPETITIONS, DURATIONS, clashMessage, draftClashes, EVENT_COLOR, lockedMessage, STARTED_LOCKED, startedLocked, EVENT_KINDS, FAMILY_NOTE_MAX, NO_TIME_COLOR, WEEKDAYS, blankForm, blankRepeat, canDelete, cancelPatch, dateAsDay, dayAsDate, formatEventDay, formProblem, formToRow, newDraftFields,
   isCancelled, pastDateProblem, repeatProblem, rowToForm, savedVenues, seriesDates, seriesRows, thisAndFollowing, whatProblem,
   type Clash, type EventForm, type EventKind, type EventRow, type Repeat,
 } from '@/lib/coach-events'
@@ -211,15 +212,23 @@ const EVENT_STEPS = [
 ]
 const REVIEW = EVENT_STEPS.length - 1
 
-/** TRAK-127: a past date on New event, or moved to on an edit. */
-function pastProblem(form: EventForm, editing: EventRow | null) {
+/** TRAK-127: a past date on New event, or moved to on an edit. TRAK-288: where Games is on, a new match that has
+ *  been played is saved to be evaluated instead (Imad, 28 Oct), so its date isn't a problem. */
+function pastProblem(form: EventForm, editing: EventRow | null, games = false) {
+  if (playedMatch(form, editing, games)) return null
   return pastDateProblem(form.date, localTodayISO(), editing ? rowToForm(editing).date : null)
 }
+const playedMatch = (form: EventForm, editing: EventRow | null, games: boolean) =>
+  games && !editing && form.kind === 'match' && pastDateProblem(form.date, localTodayISO()) !== null
+
+/** TRAK-288: where Games is on, New event asks a match's competition, so publishing its evaluation can read it. */
+const competitionProblem = (form: EventForm, editing: EventRow | null, games: boolean) =>
+  games && !editing && form.kind === 'match' && !form.competition ? 'Pick the competition' : null
 
 /** What stops Next on a step: only what that step can fix. */
-function stepProblem(step: number, form: EventForm, repeat: Repeat, editing: EventRow | null) {
-  if (step === 0) return whatProblem(form)
-  if (step === 1) return formProblem(form) ?? pastProblem(form, editing) ?? (editing ? null : repeatProblem(form, repeat))
+function stepProblem(step: number, form: EventForm, repeat: Repeat, editing: EventRow | null, games: boolean) {
+  if (step === 0) return whatProblem(form) ?? competitionProblem(form, editing, games)
+  if (step === 1) return formProblem(form) ?? pastProblem(form, editing, games) ?? (editing ? null : repeatProblem(form, repeat))
   return null
 }
 
@@ -261,6 +270,8 @@ export default function CoachSchedule() {
   // TRAK-85: parked, so actions say "Coming soon" and send nothing.
   const { parked, comingSoon } = useParked()
   const games = useFeature('games')
+  // TRAK-289: a published evaluation is final, so its match opens the review, never the match log's editor.
+  const evaluations = useGameEvaluations(games)
   const navigate = useNavigate()
   // TRAK-275: a card's actions carry words only where the side menu shows (a laptop).
   const wide = useSideMenuScreen()
@@ -332,7 +343,8 @@ export default function CoachSchedule() {
   // TRAK-161: tell the coach as they type when families won't see the note.
   const noteProblem = sheet.kind === 'edit' ? familyNoteProblem(sheet.form.familyNote, squad.childNames) : null
   // TRAK-127: said as soon as a past day is picked, with the two logs.
-  const datePassed = sheet.kind === 'edit' ? pastProblem(sheet.form, sheet.row) : null
+  const datePassed = sheet.kind === 'edit' ? pastProblem(sheet.form, sheet.row, games) : null
+  const played = sheet.kind === 'edit' && playedMatch(sheet.form, sheet.row, games)
   const logInstead = (to: 'match' | 'training') => {
     if (sheet.kind !== 'edit') return
     const { date, opponent, homeAway } = sheet.form
@@ -460,11 +472,13 @@ export default function CoachSchedule() {
       return { ...s, repeat: { ...s.repeat, days }, error: null }
     })
 
-  const saveEvent = async (publishNow = false) => {
+  /** `evaluate`: a match already played (TRAK-288), published and opened on its evaluation. */
+  const saveEvent = async (publishNow = false, evaluate = false) => {
     if (parked) return comingSoon()
     if (!user || sheet.kind !== 'edit') return
     const { row: editing, form, repeat, scope } = sheet
-    const problem = formProblem(form) ?? pastProblem(form, editing) ?? (editing ? null : repeatProblem(form, repeat))
+    const problem = formProblem(form) ?? competitionProblem(form, editing, games) ?? pastProblem(form, editing, games)
+      ?? (editing ? null : repeatProblem(form, repeat))
     if (problem) { setSheet({ ...sheet, error: problem }); return }
 
     // This and following weeks: each week keeps its own date and takes the rest.
@@ -514,7 +528,7 @@ export default function CoachSchedule() {
     if (failed(error, data) || (!editing && data!.length !== rows.length)) { setSheet({ ...sheet, error: clashMessage(error) ?? lockedMessage(error) ?? SAVE_FAILED }); return }
     setSheet({ kind: 'closed' })
     setSelected(form.date)
-    if (publishNow && !editing?.published) return publishSaved(editing ? [editing.id] : data!.map(r => r.id), form.kind)
+    if (publishNow && !editing?.published) return publishSaved(editing ? [editing.id] : data!.map(r => r.id), form.kind, evaluate)
     loadData()
     if (editing?.published) askToEmailFamilies()
     toast.success(editing
@@ -531,7 +545,7 @@ export default function CoachSchedule() {
   /** Review's Publish: what was just saved goes out, as the list's Publish does.
       The save stands either way; a refused publish (a clash, TRAK-158) leaves
       drafts, published later from the list. */
-  const publishSaved = async (ids: string[], kind?: EventKind) => {
+  const publishSaved = async (ids: string[], kind?: EventKind, evaluate = false) => {
     const { data, error } = await supabase.from('coach_calendar_events').update({ published: true }).in('id', ids).select('id')
     const rows = await loadData()
     // TRAK-218: one update, so a refusal publishes none of the series. Say
@@ -545,14 +559,16 @@ export default function CoachSchedule() {
       toast.error(`Saved as ${ids.length > 1 ? 'drafts' : 'a draft'}, not published. ${clashMessage(error) ?? 'Tap Publish on the event to try again.'}`)
       return
     }
-    askToEmailFamilies() // TRAK-135: publishing emails families too
+    askToEmailFamilies() // TRAK-135: publishing emails families too; never for one that has started
+    // TRAK-288: a game with an empty plan, straight to its evaluation.
+    if (evaluate) return navigate(`/coach/games/${ids[0]}?tab=evaluation`)
     publishedToast(ids.length > 1 ? `Published ${ids.length} events to the squad` : 'Published to the squad', ids.length === 1 && kind === 'match' ? ids[0] : undefined)
   }
 
   const toStep = (step: number) => setSheet(s => s.kind === 'edit' ? { ...s, step, error: null } : s)
   const nextStep = () => {
     if (sheet.kind !== 'edit') return
-    const problem = stepProblem(sheet.step, sheet.form, sheet.repeat, sheet.row)
+    const problem = stepProblem(sheet.step, sheet.form, sheet.repeat, sheet.row, games)
     if (problem) setSheet({ ...sheet, error: problem })
     else toStep(sheet.step + 1)
   }
@@ -824,8 +840,12 @@ export default function CoachSchedule() {
                   if (!row.published && !cancelled) items.push({ id: 'publish', label: `Publish ${row.title}`, content: 'Publish', icon: <Send />, onSelect: () => publish(row) })
                   if (!registerProblem(row)) items.push({ id: 'register', label: `${sessionId ? 'Edit register' : 'Take register'} for ${row.title}`,
                     content: sessionId ? 'Edit register' : 'Take register', icon: <ClipboardCheck />, onSelect: guarded(() => setSheet({ kind: 'register', row })) })
-                  if (row.event_type === 'match' && row.published && !cancelled && started) items.push(sessionId
+                  if (row.event_type === 'match' && row.published && !cancelled && started) items.push(games && evaluations.data?.get(row.id)?.publishedAt
+                    ? { id: 'match', label: `View review of ${row.title}`, content: 'View review', icon: <ClipboardList />, onSelect: () => navigate(`/coach/games/${row.id}?tab=evaluation`) }
+                    : sessionId
                     ? { id: 'match', label: `Edit match for ${row.title}`, content: 'Edit match', icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${sessionId}`) }
+                    // TRAK-288: where Games is on, the match's evaluation replaces the match log.
+                    : games ? { id: 'match', label: `Evaluate ${row.title}`, content: 'Evaluate', icon: <ClipboardList />, onSelect: () => navigate(`/coach/games/${row.id}?tab=evaluation`) }
                     : { id: 'match', label: `Log match for ${row.title}`, content: 'Log match', icon: <ClipboardList />, onSelect: guarded(() => navigate('/coach/sessions/quick', {
                         state: { fromEvent: { eventId: row.id, date: row.event_date, opponent: row.opponent, homeAway: row.home_away, squad: row.squad ?? null } },
                       })) })
@@ -1007,6 +1027,10 @@ export default function CoachSchedule() {
                     <Chip on={sheet.form.homeAway === 'home'} onClick={() => setForm({ homeAway: sheet.form.homeAway === 'home' ? '' : 'home' })}>Home</Chip>
                     <Chip on={sheet.form.homeAway === 'away'} onClick={() => setForm({ homeAway: sheet.form.homeAway === 'away' ? '' : 'away' })}>Away</Chip>
                   </div>
+                  {/* TRAK-288: asked here, so publishing the evaluation reads it from the match (Imad, 28 Oct). */}
+                  {games && <div className="flex gap-2 flex-wrap" role="group" aria-label="Competition">
+                    {COMPETITIONS.map(c => <Chip key={c.value} on={sheet.form.competition === c.value} onClick={() => setForm({ competition: c.value })}>{c.label}</Chip>)}
+                  </div>}
                 </>
               )}
 
@@ -1150,7 +1174,8 @@ export default function CoachSchedule() {
               <div role="alert" className="rounded-[12px] p-3 space-y-2 border border-danger/30 bg-danger/[0.06]">
                 <p className="text-[12px] text-danger" style={font}>{datePassed}</p>
                 <div className="flex gap-2">
-                  <Button size="md" variant="secondary" className="flex-1" onClick={() => logInstead('match')}>Log match</Button>
+                  {/* TRAK-288: where Games is on, a played match is a New event Match, evaluated on its game page. */}
+                  {!games && <Button size="md" variant="secondary" className="flex-1" onClick={() => logInstead('match')}>Log match</Button>}
                   <Button size="md" variant="secondary" className="flex-1" onClick={() => logInstead('training')}>Log training</Button>
                 </div>
               </div>
@@ -1172,6 +1197,8 @@ export default function CoachSchedule() {
                 </Button>
                 {sheet.row?.published ? (
                   <Button size="lg" className="flex-1" loading={saving} disabled={!!datePassed} onClick={() => void saveEvent()}>Save changes</Button>
+                ) : played ? (
+                  <Button size="lg" className="flex-1" loading={saving} onClick={() => void saveEvent(true, true)}>Save and evaluate</Button>
                 ) : <>
                   <Button size="lg" variant="secondary" className="flex-1" loading={saving} disabled={!!datePassed} onClick={() => void saveEvent()}>
                     {seriesCount(sheet) > 1 ? `Save ${seriesCount(sheet)} drafts` : 'Save draft'}

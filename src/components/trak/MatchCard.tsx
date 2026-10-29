@@ -1,4 +1,5 @@
 import { BandPill } from './BandPill'
+import { Badge } from '@/components/arc/badge/badge'
 import type { BandType } from '@/lib/types'
 import { parseDisplayDate } from '@/lib/calendar'
 
@@ -7,12 +8,14 @@ interface MatchCardProps {
   date: string
   scoreUs: number | null
   scoreThem: number | null
-  band: BandType
+  /** TRAK-289: a Games match has no rating, so no band; its coach's review says so instead. */
+  band: BandType | null
+  review?: boolean
   competition?: string
   onClick?: () => void
 }
 
-export function MatchCard({ opponent, date, scoreUs, scoreThem, band, competition, onClick }: MatchCardProps) {
+export function MatchCard({ opponent, date, scoreUs, scoreThem, band, review = false, competition, onClick }: MatchCardProps) {
   // A date-only value is a calendar day, not UTC midnight — see parseDisplayDate.
   const parsed = parseDisplayDate(date)
   const formattedDate = parsed
@@ -42,7 +45,7 @@ export function MatchCard({ opponent, date, scoreUs, scoreThem, band, competitio
             {result} {scoreUs}–{scoreThem}
           </span>
         )}
-        <BandPill band={band} />
+        {band ? <BandPill band={band} /> : review && <span className="arc"><Badge size="sm" tone="success">Coach’s review</Badge></span>}
       </div>
     </button>
   )

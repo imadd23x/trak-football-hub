@@ -8,7 +8,8 @@ import { sharedPlan, type SharedPlan } from './share'
    opens only that child's copies, and the note to the child alone (game_for_family, game_for_player); a match that's
    cancelled, or an academy with Games off, opens none. Read through the child's roster rows, as "Can't make it" is. */
 
-async function rosterRows(childId: string, signal: AbortSignal) {
+/** The child's roster rows: their copies are keyed by these. Also read by the reviews (TRAK-289). */
+export async function rosterRows(childId: string, signal: AbortSignal) {
   const { data, error } = await supabase.from('squad_players').select('id').eq('linked_player_id', childId)
     .abortSignal(signal).retry(false)
   if (error) throw error

@@ -60,7 +60,8 @@ export function calculateRecords(matches: MatchRecord[]): PersonalRecords {
       mostGoalsInMatch = { value: goals, matchId: m.id, date: m.created_at }
     }
 
-    // Good+ streak (rating >= 7.2)
+    // Good+ streak (rating >= 7.2). TRAK-289: a Games match has no rating; it neither extends nor breaks a streak.
+    if (m.computed_rating == null) continue
     if (rating >= 7.2) {
       currentStreak++
       if (currentStreak > longestGoodStreak) {

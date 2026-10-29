@@ -3,11 +3,11 @@
    the device's time zone never matters: the database sets both instants on the academy's clock (TRAK-175). */
 
 export type GameEvent = { id: string; published: boolean; starts_at: string; ends_at: string | null }
-export type GameState = 'logistics' | 'plan' | 'planDraft' | 'shared' | 'changes' | 'locked' | 'fullTime'
+export type GameState = 'logistics' | 'plan' | 'planDraft' | 'shared' | 'changes' | 'locked' | 'fullTime' | 'evaluationDraft' | 'published'
 export type GameTab = 'logistics' | 'plan' | 'evaluation'
 /** Where the plan is: saved as a draft (TRAK-284), shared, and how many players' copies an edit since would change
- *  (TRAK-286). */
-export type PlanProgress = { drafted?: boolean; shared?: boolean; changes?: number }
+ *  (TRAK-286). And whether an evaluation draft is saved (TRAK-288). */
+export type PlanProgress = { drafted?: boolean; shared?: boolean; changes?: number; evaluated?: boolean; published?: boolean }
 /** The next action opens a tab; `step: 'share'` opens the plan's Share step. */
 export type GameAction = { label: string; tab: GameTab; step?: 'share' }
 
@@ -27,8 +27,12 @@ export const STATE: Record<GameState, {
   // TRAK-286: edits after sharing wait until the coach shares them.
   changes: { label: 'Changes not shared', tone: 'warning', step: 2, action: { label: 'Share the changes', tab: 'plan', step: 'share' } },
   locked: { label: 'Locked at kick-off', tone: 'info', step: 3 },
-  // ponytail: no action until the evaluation exists (TRAK-288), which also decides which past matches still need one.
-  fullTime: { label: 'Full time', tone: 'neutral', step: 4 },
+  // TRAK-288: the evaluation opens at full time. Which past matches still owe one is the week's rule (coachWeek).
+  fullTime: { label: 'Full time', tone: 'neutral', step: 4, action: { label: 'Evaluate', tab: 'evaluation' } },
+  // TRAK-288: a draft only the coach sees, until it's published (TRAK-289).
+  evaluationDraft: { label: 'Evaluation draft', tone: 'warning', step: 4, action: { label: 'Publish', tab: 'evaluation' } },
+  // TRAK-289: the loop closes.
+  published: { label: 'Published', tone: 'success', step: 5 },
 }
 
 /** Full time: the event's end, or 90 minutes after kick-off when it has none, as the database reads it (event_wall_end). */
@@ -41,7 +45,7 @@ export function gameState(game: GameEvent, now: number, plan: PlanProgress = {})
   if (now < Date.parse(game.starts_at)) {
     return plan.shared ? (plan.changes ? 'changes' : 'shared') : plan.drafted ? 'planDraft' : 'plan'
   }
-  return now < fullTime(game) ? 'locked' : 'fullTime'
+  return now < fullTime(game) ? 'locked' : plan.published ? 'published' : plan.evaluated ? 'evaluationDraft' : 'fullTime'
 }
 
 /** The game page's address for a next action. */

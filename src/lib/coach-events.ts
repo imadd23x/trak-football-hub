@@ -66,7 +66,14 @@ export type EventForm = {
   theme: TrainingTheme | ''
   /** Imad, 24 Oct: a new event's squad, chosen in the form; null is the whole roster, undefined the squad last picked. */
   squad?: string | null
+  /** TRAK-288: a match's competition, asked in New event where Games is on (Imad, 28 Oct); '' when not asked. */
+  competition: Competition | ''
 }
+
+export type Competition = 'league' | 'tournament' | 'friendly'
+export const COMPETITIONS: { value: Competition; label: string }[] = [
+  { value: 'league', label: 'League' }, { value: 'tournament', label: 'Tournament' }, { value: 'friendly', label: 'Friendly' },
+]
 
 export type EventRow = {
   id: string
@@ -92,10 +99,11 @@ export type EventRow = {
   cancel_reason?: string | null
   series_id?: string | null
   training_theme?: string | null
+  competition?: string | null
 }
 
 export function blankForm(date: string): EventForm {
-  return { kind: 'training', title: '', date, time: '', duration: 90, venue: '', meetTime: '', opponent: '', homeAway: '', kit: '', kitSnapshot: null, familyNote: '', theme: '' }
+  return { kind: 'training', title: '', date, time: '', duration: 90, venue: '', meetTime: '', opponent: '', homeAway: '', kit: '', kitSnapshot: null, familyNote: '', theme: '', competition: '' }
 }
 
 const minutes = (hhmm: string) => {
@@ -183,6 +191,8 @@ export function formToRow(form: EventForm) {
     kit_snapshot: form.kitSnapshot ? readKitSnapshot(form.kitSnapshot) : null,
     family_note: form.familyNote.trim() || null,
     training_theme: form.kind === 'training' && form.theme ? form.theme : null,
+    // TRAK-288: only when picked, so an academy without Games sends what it always has.
+    ...(isMatch && form.competition && { competition: form.competition }),
   }
 }
 
@@ -208,6 +218,7 @@ export function rowToForm(row: EventRow): EventForm {
     kitSnapshot: readKitSnapshot(row.kit_snapshot),
     familyNote: row.family_note ?? '',
     theme: trainingThemeFrom(row.training_theme),
+    competition: COMPETITIONS.find(c => c.value === row.competition)?.value ?? '',
   }
 }
 

@@ -31,12 +31,13 @@ Row rules (RLS) open or close whole rows; they can't hide a column. So:
    reads them.
 2. **Players and families read copies**, written only by two database functions: Share (the plan) and Publish (the
    evaluation). Each copy table holds exactly what its audience may read:
-   - `game_for_family`: read by the player and their guardians.
-   - `game_for_player`: read by the player only. It holds the coach's notes.
+   - `game_for_family` and `game_review_for_family`: read by the player and their guardians.
+   - `game_for_player` and `game_review_for_player`: read by the player only. They hold the coach's notes.
 
 Copies are what make TRAK-282's "changes made after sharing are held back until the coach shares them" possible: if
 players read the working rows, every edit would be live. They also meet TRAK-285 and TRAK-288's "the note lives in
-its own table": the player's copy of every note sits in `game_for_player`, which no guardian rule opens.
+its own table": the player's copy of every note sits in `game_for_player` or `game_review_for_player`, which no
+guardian rule opens.
 
 ## Tables
 
@@ -51,17 +52,21 @@ CASCADE`. Every text field has a length limit, and every list a maximum length.
 | `game_plans` | `event_id` | `strength` (weaker, similar or stronger), `their_formation` (a shape such as 4-4-2), `key_players` (shirt number 1 to 99 or blank, position, note; at most 11; no names, because they are other clubs' children), `scouting`, `goals` (title, what it looks like; at most 3). The two lists are JSON the database checks (`trak_private.valid_key_players`, `valid_game_goals`). No one deletes a plan: it goes with its match. Then format (11, 9, 7 or 5 a side; default 11) and formation (285). A plan is shared once `game_shares` has a row for it (286). | 284 |
 | `game_plan_players` | `event_id, squad_player_id` | `role` (starter, bench or not selected; bench by default, Imad 28 Oct), `slot` (starters only: 1 is the keeper, then each line from the back, left to right; one player per slot, checked at the end of each statement so two starters can swap), `job`, `note`, `context` (the five tags, never a diagnosis), `expectation` (stretch, usual or lead; usual by default). A player left out keeps only the note. Written only for a consented child on the coach's current roster in the match's squad (`trak_private.game_plan_player_ok`). No one deletes a row. `game_plans` gains `format` (11, 9, 7 or 5; default 11) and a `formation` that must fit it. | 285 |
 | `game_shares` | `id` | One row per share (`event_id`, `shared_at`), with how many children's copies it wrote, changed or took back. Only the match's coach reads it; only Share writes it. A share that changes nothing isn't logged. Feeds the timeline ("Changes shared to 3"). | 286 |
-| `game_evaluations` | `event_id` | Our score, their score, our goals (scorer and optional assist each; no more than our score), how they scored, "Did the plan work?" (one answer per plan goal), `saved_at`, `published_at`. | 288 |
-| `game_evaluation_players` | `event_id, squad_player_id` | Played, came on, minute (optional), did the job (yes, partly or not yet; default yes), against expectation (below, met or above; default met), note. | 288 |
+| `game_evaluations` | `event_id` | Our score, their score, our goals (scorer and optional assist each, players who played; no more than our score; nobody assists their own goal), how they scored, "Did the plan work?" (one answer per plan goal: didnt, partly or worked), `saved_at`, `published_at`. | 288 |
+| `game_evaluation_players` | `event_id, squad_player_id` | One row per player listed: played (a starter not unticked, or a bench player who came on; no minutes, Imad 29 Oct), did the job (yes, partly or not yet; default yes), against expectation (below, met or above; default met). Someone who didn't play keeps the defaults. Only for a consented child on the coach's roster in the match's squad (`trak_private.game_plan_player_ok`). | 288 |
+| `game_evaluation_notes` | `event_id, squad_player_id` | The coach's note to a player who played, in its own table so only that player can be let read it (289). | 288 |
 
 **Copies players and families read (written only by Share and Publish):**
 
 | Table | Key | Read by | Holds |
 |---|---|---|---|
-| `game_for_family` | `event_id, squad_player_id` | That player and their guardians | `role` (starter, bench or not selected), `job`, `has_note`, `coach_name` (TRAK-300: a player can't read their coach's profile, so Share copies the name; a new name refreshes on the next share without marking anyone Updated), `shared_at`, `changed_at` (drives "Updated" until kick-off). After Publish: played, the score, did the job, the expectation and context, against expectation. |
-| `game_for_player` | `event_id, squad_player_id` | That player only | The goals, the plan note, `shared_at`, `changed_at`; later the evaluation note. |
+| `game_for_family` | `event_id, squad_player_id` | That player and their guardians | `role` (starter, bench or not selected), `job`, `has_note`, `coach_name` (TRAK-300: a player can't read their coach's profile, so Share copies the name; a new name refreshes on the next share without marking anyone Updated), `shared_at`, `changed_at` (drives "Updated" until kick-off). |
+| `game_for_player` | `event_id, squad_player_id` | That player only | The goals, the plan note, `shared_at`, `changed_at`. |
+| `game_review_for_family` | `event_id, squad_player_id` | That player and their guardians | Written by Publish (289) for each child who played: the score, their job, the expectation and context as the plan locked, did the job, against expectation, `has_note`, `coach_name`, `published_at`, and `session_id` (the match session Publish made, so the child's match history can tell a Games match without reading the coach's sessions). |
+| `game_review_for_player` | `event_id, squad_player_id` | That player only | The coach's note to them (289). It goes with its family row. |
 
-The evaluation columns stay empty until Publish writes them, so before the game a family reads only what Share wrote.
+Publish writes the review in its own tables, so nothing a family read before the game changes, and no review row
+exists before it's published.
 
 **Who gets copies (286):** every child the line-up may hold (`game_plan_player_ok`'s rules) who can come, placed or on
 the bench by default, and a starter who said they can't make it (their slot is flagged until the coach moves them).
@@ -88,7 +93,7 @@ are the match log's checks. "Can't make it" is read as who, never `reason`.
 **A guardian** reads their child's `game_for_family` rows (`player_parent_links`). No rule ever opens
 `game_for_player` to a guardian.
 
-**Every player and guardian read** goes through one helper, `trak_private.family_reads_game_row(event, squad
+**Every player and guardian read** goes through one helper, `trak_private.family_reads_game_copy(event, squad
 player, guardian allowed)`. It is security definer, with `search_path = ''`, and makes the checks family event reads
 make today (`family_reads_event_for`) for that one child:
 
@@ -123,17 +128,26 @@ Players and guardians get no insert, update or delete grant on any Games table.
   counting what wasn't shared, for the lock's note. Imad, 28 Oct: the note sits in the lock's alert ("2 players didn't
   get your last changes", or "It wasn't shared, so only you saw it"); the History timeline comes with 289 and reads
   the same facts.
-- **Evaluation window** (288), on both evaluation tables: writes are accepted only after the event's `ends_at` and
-  never once `published_at` is set. Published is final.
-- **`publish_game_evaluation(event_id, match)`** (289). Security definer, one transaction. It refuses unless the
-  caller is the event's coach, the switch is on, full time has passed, every "Did the plan work?" answer is in and
-  the scorers are no more than the score. It then:
-  - writes the evaluation into the copy tables for consented, current-roster children who played;
-  - creates the match's `coach_sessions` row and attendance;
-  - calls `log_match_for_player` for each child with an account.
+- **Evaluation window** (288). `save_game_evaluation` is the only write path: app roles hold SELECT only, so a save
+  is one transaction and the rules across the three tables hold. It refuses before full time (the event's `ends_at`,
+  or 90 minutes after kick-off, as `loop.ts` works it out), with the switch off, for a cancelled match, for a child
+  who can't be recorded (42501), and once `published_at` is set. Published is final.
+- **`publish_game_evaluation(event_id, competition, home_away)`** (289,
+  `20261029170000_game_publish.sql`). Security definer, one transaction, the only way a review is written. It refuses
+  unless the caller is the event's coach and the switch is on (42501), and the event is an uncancelled match past full
+  time with a saved draft that isn't published, a score, an answer to "Did the plan work?" for every plan goal, and a
+  competition and home or away (from the event, or passed in and saved on it; that change emails nobody, as the event
+  notice fires only on date, time, venue or cancel). It also refuses a match already logged the old way. It then:
+  - sets `published_at`, which ends every later save;
+  - creates the match's `coach_sessions` row and marks who played present;
+  - writes the review copies for each child who played and can still be recorded (`game_plan_player_ok`);
+  - calls `log_match_for_player` for each of them with an account: goals and assists from the evaluation, the
+    competition and venue, position and age group, and no rating (open question 1).
 
-  It skips children without consent and says who. `match` carries what the app works out today: each player's
-  position and rating (see open question 1).
+  It returns how many reviews it wrote, how many matches it logged, and the children it skipped (no longer on the
+  roster, or waiting for consent); the app says how many. `matches.computed_rating` becomes nullable for it, and every
+  rating reader counts rated matches only. `edit_logged_match` is replaced with the same body plus one refusal: a
+  match whose evaluation is published can't be edited. Published is final.
 
 Every function: `search_path = ''`; `EXECUTE` revoked from `PUBLIC` and `anon`; explicit `auth.uid()` checks.
 Security definer functions skip the tables' own rules, so they repeat every check those rules make. Errors name
@@ -175,9 +189,10 @@ Where the code goes:
     count and clock;
   - `formations.ts`: one small constant list per format, with slot positions;
   - `words.ts`: the words players and families read, and the coach's plain labels.
-- Player and parent: `src/components/player/GamePlanSection.tsx` (286; After the game comes with 289). `PlayerEvent`,
-  `ParentEvent` and the coach's Share preview all render it, and the preview's words come from `previewOf`, so the
-  preview can't drift from the real page (a test compares them).
+- Player and parent: `src/components/player/GamePlanSection.tsx` (286) and `GameReviewSection.tsx` (289, After the
+  game). `PlayerEvent`, `ParentEvent` and the coach's Share and Publish previews render them, and the previews' words
+  come from `previewOf` and `previewReview`, so a preview can't drift from the real page (tests compare them). The
+  child's reads live in `src/lib/games/shared-plans.ts` and `reviews.ts`.
 
 Arc: each step uses TRAK-282's picks. Before each slice, every component it adds is read with the Arc MCP
 (`whenToUse`, `whenNotToUse`) and checked for React 19-only APIs. Fifteen free components and one Pro block are new to
@@ -212,10 +227,15 @@ like its neighbours, not Arc's `card`, which is for browsable items and lifts on
 - `CoachFrame`, `coach-places.ts`, `App.tsx` and `parked.ts` (`Feature` gains `'games'`).
 - `EventSummary` moves out of `CoachSchedule.tsx` into its own file, so Games doesn't load the Schedule page's code.
 - Schedule offers "Write the game plan" after a match is published (283). For Games academies, Evaluate replaces "Log
-  match" and "log it instead" (288).
+  match", and a match dated in the past is saved, published (families aren't emailed about a started event) and
+  opened on its evaluation instead of "log it instead"; the "+" Log match opens New event with Match picked (288).
 - `CoachSessionsChooser` hides Quick match log for Games academies (288).
 - Needs you: `coach-week.ts`, `useOwedEvents`, `NeedsYou`.
 - The player and parent event pages and cards: `PlayerEvent`, `ParentEvent`, `UpcomingEventCard`, `ParentEvents`.
+- Match history (289): `MatchCard`, `PlayerMatches`, `PlayerMatchDetail` and `ParentMatches` show a Games match as
+  "Coach's review" with no band and open its event page. The rating readers (`PlayerHome`, `PlayerProfile`,
+  `PlayerProfilePage`, `PlayerEvolutionCard`, `records.ts`) count rated matches only. Schedule and Home's week offer
+  View review for a published Games match, never the old match editor.
 - `docs/rehearsal-script.html` (289), and AGENTS.md's Squad views row (283).
 
 **Retired:** Squad › Games, for everyone: `GamesTab.tsx`, its tab and its test cases, with `useSeason.ts` and
@@ -238,7 +258,7 @@ One PR per issue, from fresh main, never stacked. Every migration is a new file,
 | 286 | `game_for_family`, `game_for_player`, `game_shares`, `share_game_plan`, `unshared_game_changes` | Share step, the player and parent Game plan section, preview, Updated, badges |
 | 287 | Kick-off lock triggers | Read-only plan, countdown flips to Locked |
 | 288 | `game_evaluations`, `game_evaluation_players`, the evaluation window | Evaluation draft; the old match log's entry points retired for Games academies |
-| 289 | `publish_game_evaluation` | Publish, After the game, loop closed, timeline, rehearsal script |
+| 289 | `game_review_for_family`, `game_review_for_player`, `publish_game_evaluation`; `matches.computed_rating` nullable; `edit_logged_match` refuses a published match | Publish, After the game, match history, loop closed, timeline, rehearsal script |
 | 290 | A share time on the copies and in `share_game_plan` | Share at…, the 09:00 nudge |
 
 ## Testing
@@ -315,21 +335,25 @@ npm run build && npx playwright test --config playwright.pilot.config.ts
   rules close every copy to its families at once.
 - **Frontend:** redeploy the previous build.
 - **Database:** these migrations only add tables, functions and triggers, and widen one check, so a frontend
-  rollback leaves them unused and harmless. Removing them would take a new migration, written only if needed.
+  rollback leaves them unused and harmless. Removing them would take a new migration, written only if needed. One
+  exception (289): a published Games match is a `matches` row with no rating. A frontend from before 289 would read it
+  with its old fallback, so after the first publish, fix forward rather than roll the frontend back.
 
 ## Open questions, each for the slice that needs it
 
-1. **Match rating (288, 289).** Today's match log also stores an automatic rating worked out from goals, assists and
-   the score. Players and parents see it as a band, a trend and an average. A Games match would carry one too, which
-   pulls against "after a game there is no number". To ask with the list of match readers before slice 6.
+1. **Match rating (288, 289). Decided (Imad, 28 Oct): no rating for a Games match.** Publish writes the result
+   without one, so it stays out of bands, trends and averages; 289 checks every rating reader copes with none.
 2. **Unplaced players (285). Decided (Imad, 28 Oct): Bench.** Leaving a child out is always a deliberate choice.
 3. **Formations (285). Decided (Imad, 28 Oct):** 11 a side: 4-4-2, 4-3-3, 4-2-3-1, 4-1-4-1, 4-4-1-1, 3-5-2, 3-4-3,
    5-3-2, 5-4-1. 9 a side: 3-3-2, 3-2-3, 2-4-2, 3-4-1. 7 a side: 2-3-1, 3-2-1, 2-1-2-1, 3-1-2. 5 a side: 2-2, 1-2-1,
    3-1. The same list feeds "their formation" (`src/lib/games/formations.ts`).
-4. **Competition (289).** The match log stores league, cup or friendly, and the evaluation doesn't ask. A default,
-   or one more question?
-5. **Data export.** `export_my_account` should include a child's Games rows, as it includes their matches. A
-   follow-up issue.
+4. **Competition. Decided (Imad, 28 Oct): New event asks it** for a match (League, Tournament or Friendly), and it
+   lives on the event (`coach_calendar_events.competition`, 288); publish reads it from there. **Matches made before
+   288 (Imad, 29 Oct): the Publish step asks it**, Publish stays off until it's picked, and publishing saves it on the
+   match. The match log also needs home or away, which an older match may lack, so the Publish step asks that the same
+   way.
+5. **Data export.** `export_my_account` should include a child's Games rows (the review copies, as it includes their
+   matches). A follow-up issue; the published result is already in their exported matches.
 
 ## Done when
 

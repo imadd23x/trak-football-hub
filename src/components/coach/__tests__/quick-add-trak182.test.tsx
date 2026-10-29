@@ -40,7 +40,8 @@ beforeEach(() => {
     table('squad_players', []),
     table('session_attendance', []),
     table('event_absences', []),
-    rpc('feature_on', () => eventsOn),
+    // TRAK-288: Games off, so Log match is still the quick match log.
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'games' && eventsOn),
   )
 })
 afterEach(() => { server.events.removeAllListeners() })

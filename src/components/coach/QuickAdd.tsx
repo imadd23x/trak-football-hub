@@ -74,6 +74,8 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
   // Events switched off for the academy (TRAK-124): New event and the register
   // say "Coming soon", as Schedule does; logging is not an events feature.
   const eventsOn = useFeature('events')
+  // TRAK-288: where Games is on, a match is logged as a New event Match and evaluated on its game page (Imad, 28 Oct).
+  const games = useFeature('games')
   const { comingSoon } = useParked()
   const [view, setView] = useState<View>('fab')
   const [register, setRegister] = useState<EventRow | null>(null)
@@ -130,6 +132,7 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
   // would otherwise stay open over the sheet it hands to (Tarek, #319).
   const go = (to: string, options?: NavigateOptions) => { close(); navigate(to, options) }
   const moreDetails = () => go('/coach/schedule', { state: { quickEvent: eventForm() } })
+  const logMatch = () => games ? go('/coach/schedule', { state: { quickEvent: { ...eventForm(), kind: 'match' } } }) : show('match')
   const continueMatch = () => {
     if (!opponent.trim() || scoreUs === '' || scoreThem === '') { setError('Add the opponent and the score.'); return }
     if (!homeAway) { setError('Say whether it was home or away.'); return }
@@ -142,7 +145,7 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
     if (id === 'register' && register) go(`/coach/schedule?register=${register.id}`)
     else if (id === 'training') go('/coach/sessions/add')
     else if (id === 'assess') go('/coach/assess')
-    else if (id === 'match') show('match')
+    else if (id === 'match') logMatch()
     else if (id === 'event') { if (eventsOn) show('event'); else { close(); comingSoon() } }
   }
   const rows: MorphRow[] = [
@@ -184,7 +187,7 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
       <div role="alert" className="space-y-2">
         <p className="text-[12px] text-danger">{datePassed}</p>
         <div className="flex gap-2">
-          <Button size="md" variant="secondary" className="flex-1" onClick={() => show('match')}>Log match</Button>
+          <Button size="md" variant="secondary" className="flex-1" onClick={logMatch}>Log match</Button>
           <Button size="md" variant="secondary" className="flex-1" onClick={() => go('/coach/sessions/add', { state: { logDate: date } })}>Log training</Button>
         </div>
       </div>

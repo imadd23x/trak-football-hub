@@ -51,7 +51,7 @@ test('coach saves squad kits, publishes a kit event and reopens its announcement
     // TRAK-262: notification_settings is coach Home's Needs you switch (no row: on).
     if (['coach_sessions', 'coach_assessments', 'event_absences', 'session_attendance', 'coach_shared_feedback', 'matches', 'recognition_awards', 'notification_settings',
       // TRAK-286: no game plan, shared or not.
-      'game_plans', 'game_shares', 'training_plans', 'training_plan_practices'].some(t => path === `/rest/v1/${t}`)) return json([])
+      'game_plans', 'game_shares', 'game_evaluations', 'game_evaluation_players', 'game_evaluation_notes', 'game_review_for_family', 'game_review_for_player', 'training_plans', 'training_plan_practices'].some(t => path === `/rest/v1/${t}`)) return json([])
     if (path === '/rest/v1/telemetry_events') return json(null)
     // TRAK-261: the coach's notification switches (the bell's "Can't make it"); no row means on.
     if (path === '/rest/v1/notification_settings') return json([])
@@ -68,6 +68,8 @@ test('coach saves squad kits, publishes a kit event and reopens its announcement
   const form = page.getByRole('dialog', { name: 'New event' })
   await form.getByRole('button', { name: 'Match', exact: true }).click()
   await form.getByLabel('Opponent').fill('Synthetic United')
+  // TRAK-288: with Games on, New event asks a match's competition.
+  await form.getByRole('group', { name: 'Competition' }).getByRole('button', { name: 'League' }).click()
   await form.getByRole('button', { name: 'Next', exact: true }).click()
   await form.getByRole('button', { name: /^Kickoff\b/ }).click()
   await page.getByRole('option', { name: '4:00 PM', exact: true }).click()

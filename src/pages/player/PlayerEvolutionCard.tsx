@@ -146,15 +146,18 @@ function computePositionQuests(
 
   // ── Shared helpers ────────────────────────────────────────────────────────
 
+  // TRAK-289: rating quests read rated matches only; a Games match has no rating and breaks no streak.
+  const rated = sorted.filter(m => m.computed_rating != null)
+
   // Count matches where computed_rating ≥ threshold
   const ratingCount = (threshold: number) =>
-    sorted.filter(m => (m.computed_rating ?? 0) >= threshold).length
+    rated.filter(m => (m.computed_rating ?? 0) >= threshold).length
 
   // Length of the current trailing streak of matches ≥ threshold
   const ratingStreak = (threshold: number) => {
     let streak = 0
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      if ((sorted[i].computed_rating ?? 0) >= threshold) streak++
+    for (let i = rated.length - 1; i >= 0; i--) {
+      if ((rated[i].computed_rating ?? 0) >= threshold) streak++
       else break
     }
     return streak

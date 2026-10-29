@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, BandPill, MetadataLabel, NavBar, LoadError } from '@/components/trak'
 import { scoreToBand } from '@/lib/rating-engine'
 import { parentMatchHref } from '@/lib/parent-data'
+import { useReviews } from '@/lib/games/reviews'
 import { ChevronLeft } from 'lucide-react'
 
 /* Also the parent's match detail (TRAK-73): `role` picks the nav and the way
@@ -20,6 +21,8 @@ export default function PlayerMatchDetail({ role = 'player', limitedFor, playerU
   const navigate = useNavigate()
   const { user } = useAuth()
   const ownerId = role === 'parent' ? playerUserId : user?.id
+  // TRAK-289: a Games match has no rating; its coach's review is on the match's event page.
+  const reviews = useReviews(ownerId)
   const [reloadKey, setReloadKey] = useState(0)
   const [result, setResult] = useState<{
     id: string
@@ -75,7 +78,8 @@ export default function PlayerMatchDetail({ role = 'player', limitedFor, playerU
   )
 
   const limited = limitedFor?.(match.user_id) ?? false
-  const band = scoreToBand(match.computed_rating || 6.5)
+  const band = match.computed_rating == null ? null : scoreToBand(match.computed_rating)
+  const reviewEvent = match.session_id ? reviews.data?.bySession.get(match.session_id) : undefined
   const resultLabel = match.team_score > match.opponent_score ? 'W'
     : match.team_score < match.opponent_score ? 'L' : 'D'
   const resultColor = resultLabel === 'W' ? 'rgb(var(--t-success))' : resultLabel === 'L' ? 'rgb(var(--t-danger))' : 'rgb(var(--t-info))'
@@ -114,10 +118,14 @@ export default function PlayerMatchDetail({ role = 'player', limitedFor, playerU
                   </p>
                 )}
               </div>
-              <BandPill band={band} />
+              {band && <BandPill band={band} />}
             </div>
           </div>
         </div>
+
+        {reviewEvent && <Link to={`/${role}/event/${reviewEvent}`}
+          className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-primary">
+          See the coach’s review</Link>}
 
         {/* Match info */}
         <div className="rounded-[18px] p-4 space-y-3"
@@ -158,7 +166,7 @@ export default function PlayerMatchDetail({ role = 'player', limitedFor, playerU
           ))}
         </div>}
 
-        {role === 'parent' && (match.session_id
+        {role === 'parent' && !reviewEvent && (match.session_id
           ? <Link to={parentMatchHref(match)} state={{ matchId: match.id, childId: ownerId }}
               className="inline-flex min-h-11 items-center text-sm text-primary focus-visible:ring-2 focus-visible:ring-primary">Coach assessment</Link>
           : <p className="text-sm text-muted-foreground">No assessment link is available for this match.</p>)}

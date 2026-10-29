@@ -42,7 +42,9 @@ async function signedInCoach(page: Page) {
     if (url.pathname === '/rest/v1/telemetry_events') return route.fulfill({ status: 201, body: '' })
     if (url.pathname === '/rest/v1/profiles') return json([{ id: coach, user_id: coach, role: 'coach', full_name: 'Synthetic Coach', avatar_url: null }])
     if (url.pathname === '/rest/v1/coach_details') return json([{ user_id: coach, organization_id: null, team: 'U14' }])
-    if (url.pathname === '/rest/v1/rpc/feature_on' || url.pathname === '/rest/v1/rpc/my_session_is_live') return json(true)
+    // TRAK-288: Games off, so the session screen still offers the match log this measures.
+    if (url.pathname === '/rest/v1/rpc/feature_on') return json(request.postDataJSON()?.p_feature !== 'games')
+    if (url.pathname === '/rest/v1/rpc/my_session_is_live') return json(true)
     // Read-only screens: the rest of the reads (GET) are empty lists.
     if (request.method() === 'GET') return json([])
     unexpected.push(`${request.method()} ${url.pathname}`)

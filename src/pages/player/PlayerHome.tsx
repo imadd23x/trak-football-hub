@@ -168,17 +168,19 @@ export default function PlayerHome() {
         const deduped = dedupeMatches(data)
         setMatches(deduped)
 
-        // Card reveal — show once when new matches have been logged since last visit
+        // Card reveal — show once when new matches have been logged since last visit. TRAK-289: only rated matches; a
+        // Games match has no number (Imad, 28 Oct).
+        const ratedCount = deduped.filter(m => m.computed_rating != null).length
         try {
           const storageKey = `trak_last_match_count_${user.id}`
           const stored = localStorage.getItem(storageKey)
           if (stored === null) {
             // First ever open — record count silently, no reveal
-            localStorage.setItem(storageKey, String(deduped.length))
+            localStorage.setItem(storageKey, String(ratedCount))
           } else {
             const lastSeen = parseInt(stored, 10)
-            if (deduped.length > lastSeen) {
-              setNewMatchCount(deduped.length - lastSeen)
+            if (ratedCount > lastSeen) {
+              setNewMatchCount(ratedCount - lastSeen)
               setShowReveal(true)
             }
           }
@@ -319,18 +321,20 @@ export default function PlayerHome() {
     return () => { cancelled = true }
   }, [user, reloadKey])
 
+  // TRAK-289: a Games match has no rating, so bands, streaks and trends read only the rated ones.
+  const rated = matches.filter((m): m is typeof m & { computed_rating: number } => m.computed_rating != null)
   const getBandDistribution = () => {
     const dist: Record<string, number> = {}
     BANDS.forEach(b => { dist[b.word.toLowerCase()] = 0 })
-    matches.forEach(m => {
-      const band = scoreToBand(m.computed_rating || 6.5)
+    rated.forEach(m => {
+      const band = scoreToBand(m.computed_rating)
       dist[band] = (dist[band] || 0) + 1
     })
     return dist
   }
 
   const getSeasonBand = (): BandType => {
-    if (matches.length === 0) return 'steady'
+    if (rated.length === 0) return 'steady'
     const dist = getBandDistribution()
     let maxBand: BandType = 'steady'
     let maxCount = 0
@@ -349,7 +353,7 @@ export default function PlayerHome() {
   const nextMilestone = (() => {
     const BAND_ORDER: BandType[] = ['difficult', 'developing', 'mixed', 'steady', 'good', 'standout', 'exceptional']
     const currentIdx = BAND_ORDER.indexOf(seasonBand)
-    if (currentIdx >= BAND_ORDER.length - 1 || matches.length === 0) return null
+    if (currentIdx >= BAND_ORDER.length - 1 || rated.length === 0) return null
     const nextBand = BAND_ORDER[currentIdx + 1]
     const currentCount = distribution[seasonBand] || 0
     const nextCount = distribution[nextBand] || 0
@@ -361,7 +365,7 @@ export default function PlayerHome() {
   const handleRevealDismiss = () => {
     if (!user) return
     setShowReveal(false)
-    localStorage.setItem(`trak_last_match_count_${user.id}`, String(matches.length))
+    localStorage.setItem(`trak_last_match_count_${user.id}`, String(rated.length))
   }
 
   const totalGoals = matches.reduce((s, m) => s + (m.goals || 0), 0)
@@ -370,8 +374,8 @@ export default function PlayerHome() {
   // Consistency streak — consecutive matches at Steady+ (≥ 6.0) from most recent
   const streakCount = (() => {
     let count = 0
-    for (const m of matches) {
-      if ((m.computed_rating ?? 0) >= 6.0) count++
+    for (const m of rated) {
+      if (m.computed_rating >= 6.0) count++
       else break
     }
     return count
@@ -379,13 +383,13 @@ export default function PlayerHome() {
   const lastMatch = matches[0]
 
   // Trend: calculate last 5 match ratings normalized to bar heights
-  const trendMatches = matches.slice(0, 5).reverse()
+  const trendMatches = rated.slice(0, 5).reverse()
   const trendHeights = trendMatches.map((m, i) => {
-    const r = m.computed_rating || 6.5
+    const r = m.computed_rating
     return Math.max(20, Math.min(100, ((r - 4) / 6) * 100))
   })
   const isImproving = trendMatches.length >= 2 &&
-    (trendMatches[trendMatches.length - 1]?.computed_rating || 0) > (trendMatches[0]?.computed_rating || 0)
+    trendMatches[trendMatches.length - 1].computed_rating > trendMatches[0].computed_rating
 
   // Band summary abbreviations
   const bandAbbrev = [
@@ -481,7 +485,7 @@ export default function PlayerHome() {
           <div className="flex items-start justify-between mb-4 relative z-10">
             <div>
               <MetadataLabel text="THIS SEASON" />
-              {matches.length > 0 ? (
+              {rated.length > 0 ? (
                 <>
                   <p className="text-[52px] leading-none mt-2" style={{
                     fontFamily: 'var(--t-font)', fontWeight: 300, letterSpacing: '-0.04em',
@@ -570,7 +574,7 @@ export default function PlayerHome() {
           </div>
 
           {/* Band summary strip */}
-          {matches.length > 0 && (
+          {rated.length > 0 && (
             <div className="flex items-center justify-between px-3 py-2.5 rounded-[10px] relative z-10"
               style={{ background: 'rgb(var(--t-raised))' }}>
               <div className="flex items-center gap-[7px]">
@@ -589,7 +593,7 @@ export default function PlayerHome() {
           )}
 
           {/* Next milestone */}
-          {matches.length > 0 && (
+          {rated.length > 0 && (
             <div className="flex items-center justify-between px-3 py-2 mt-1.5 rounded-[10px] relative z-10"
               style={{ background: 'rgb(var(--t-raised))' }}>
               <span className="text-[9px] tracking-[0.06em] text-ink-3"

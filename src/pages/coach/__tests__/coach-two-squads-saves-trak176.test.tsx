@@ -50,7 +50,8 @@ function fixtures(events: Record<string, unknown>[] = []) {
     http.get(EVENTS, () => HttpResponse.json(events)),
     table('squad_players', ROSTER),
     table('event_absences', []),
-    rpc('feature_on', () => true),
+    // TRAK-288: Games off, so a match is still logged as today.
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'games'),
     rpc('coach_squad_player_consent_required', () => false),
     rpc('coach_match_score_clash', () => null),
     rpc('log_match_for_player', () => 'match-row'),

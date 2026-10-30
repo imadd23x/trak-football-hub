@@ -22,6 +22,8 @@ exactly as today, except that Squad › Games is removed for everyone.
 - **Times are the academy's.** An event's date, start and end time are its academy's wall clock, and the database
   sets the instants `starts_at` and `ends_at` from them (TRAK-175). Lock, full time and the 09:00 nudge use those,
   never the device's zone.
+- **A scheduled plan goes out as saved** (Imad, 29 Oct). Saving before the share time rewrites what waits; nobody has
+  read it, so nobody reads "Updated" and a waiting plan has no "Changes not shared".
 
 ## Privacy model: working rows and shared copies
 
@@ -101,14 +103,20 @@ make today (`family_reads_event_for`) for that one child:
 - the roster row is current (not `coach_departed`) and belongs to the event's coach, academy and squad;
 - the event is published, a match and not cancelled;
 - the academy's `games` switch is on, so the switch is also a kill switch for what families see;
-- from 290, the share time has passed: `least(visible_from, starts_at) <= now()`, so a match moved earlier than a
+- from 290, the copy is out (`trak_private.game_copy_out`: `least(shared_at, starts_at) <= now()`; each copy carries
+  its share time, so there is no new column), so a match moved earlier than a
   scheduled share still shows the plan at kick-off.
 
 Players and guardians get no insert, update or delete grant on any Games table.
 
 ## Database functions and triggers
 
-- **`share_game_plan(event_id, talked)`** (286; 290 adds a share time). Security definer. It refuses unless the
+- **`schedule_game_plan(event_id, talked, at)`** (290). Security definer. The same checks as Share
+  (`trak_private.game_to_share`), then a time on the academy's clock (`at`, a wall-clock timestamp), turned into the
+  moment with `trak_private.academy_time_zone`. It must be in the future and before kick-off. It writes the copies at
+  once with that time (`trak_private.write_game_copies`, which Share uses too) and logs one waiting share; with no
+  `at`, it rewrites a waiting plan for the time it has (Save draft while it waits). It refuses once the plan is out.
+- **`share_game_plan(event_id, talked)`** (286; from 290 a waiting share goes out now). Security definer. It refuses unless the
   caller is the event's coach, the switch is on, the event is a published, uncancelled match, kick-off hasn't
   passed and a plan is saved; the first share also needs `talked` (the face-to-face tick). It writes the copies
   (`trak_private.game_copies`), deletes copies nobody may read any more, sets `changed_at` only on copies whose
@@ -116,7 +124,8 @@ Players and guardians get no insert, update or delete grant on any Games table.
 - **`game_plan_changes(event_ids)`** (286). Security definer, because the coach never reads the copies: for the
   caller's own shared matches before kick-off, the children whose copies a share would change now
   (`trak_private.game_copy_changes`). It drives "Changes not shared · N" and the Share step's alert. A child who
-  left or lost consent isn't a change: they read nothing already.
+  left or lost consent isn't a change: they read nothing already. From 290 a plan that waits for its time has none:
+  it goes out as saved.
 - **`trak_private.family_reads_game_copy(event, squad row, guardian)`** (286): the copies' read rule. A published,
   uncancelled match in an academy with the switch on; the child on the coach's current roster in the match's squad,
   with consent; the caller is the child or, for `game_for_family` only, a guardian.
@@ -160,7 +169,8 @@ nobody: the app swaps ids for names, as the match log does.
 - **Times on screen:** the phone's clock, with the academy's own time beside it when the two differ (Imad, 23 Oct:
   `phoneEventTime`, `academyClock`), as every event screen shows them. Logistics shows Schedule's Review rows, which
   are the academy's clock, as forms are.
-- **The 09:00 nudge (290):** the first 09:00 after the draft's `saved_at`, in `organizations.time_zone`, worked out
+- **The 09:00 nudge (290):** the first 09:00 after the draft's `saved_at`, in `organizations.time_zone`, stamped on each
+  save as `game_evaluations.remind_at` (a trigger, so Athens' clock change can't move it) and compared with the clock
   when the page is read. No timed job.
 - **A moved match:** the lock reads `starts_at` live, so it moves with the match.
 
@@ -205,7 +215,14 @@ take their ref through `forwardRef`. TRAK-286: `release-readiness` is adapted as
 the coach ticks one check (face to face, Arc's `checkbox`); the other three are worked out from the plan and show a
 mark; only the logistics and the tick hold Share now back (Imad, 28 Oct). No owners and no notify switch: sharing is
 in the app only. Alert's Swap takes `forwardRef` too. The coach's note on the player's page is a tinted Trak panel
-like its neighbours, not Arc's `card`, which is for browsable items and lifts on hover (Imad, 28 Oct).
+like its neighbours, not Arc's `card`, which is for browsable items and lifts on hover (Imad, 28 Oct). TRAK-290: the
+readiness block's action is Arc's `split-button` when it has alternatives (Share now, then Share at… behind the
+chevron: its docs name a share action with one usual pick and variants behind the chevron), already in Trak and on
+React 18. Share at… opens Arc's `date-picker` and `time-picker` under the block, on the academy's clock as every form
+is. A scheduled plan reads "Shares Thu 19:30" (an `info` badge, this phone's clock) on the game page and Games home,
+raises no Needs you card, and its Share step offers Share now and Change time. The evaluation's draft `alert` says when
+it will remind, then "Good morning. Add anything you remembered overnight, then publish."; the draft's Needs you card
+turns urgent (a red mark, "Urgent:" for screen readers), as the player cards do.
 
 ## Existing code
 

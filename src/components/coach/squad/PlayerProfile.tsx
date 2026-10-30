@@ -18,7 +18,6 @@ import type { PlayerFacts } from './usePlayerFacts'
 const FOOT = { left: 'Left', right: 'Right', both: 'Both' } as const
 /** The assessments shown here, newest first; the player's page has them all. */
 const SHOWN = 6
-const FINE_POINTER = typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return <div className="grid grid-cols-[112px_minmax(0,1fr)] items-baseline gap-3 border-b border-line py-2.5 last:border-b-0">
@@ -114,7 +113,7 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
             {/* As ParentAssessmentCarousel: the viewport is the row, so 88% is of what's visible and the next card peeks in. */}
             {/* Imad, 24 Oct: room above and below, so a card lifted on hover keeps its edge and shadow; firm snapping only
                 under a finger: on a trackpad or wheel any snapping pulled the row back mid-swipe. */}
-            <ScrollArea orientation="horizontal" snap={FINE_POINTER ? undefined : 'x mandatory'} fade={0} label={`${first}'s assessments`} className="-mt-2 -mb-4" viewportClassName="flex gap-3 pt-2 pb-4">
+            <ScrollArea orientation="horizontal" snap="x mandatory" fade={0} label={`${first}'s assessments`} className="-mt-2 -mb-4" viewportClassName="flex gap-3 pt-2 pb-4">
               {list.slice(0, SHOWN).map((assessment, index) => <div key={assessment.id} role="group" aria-label={`Assessment ${index + 1} of ${Math.min(list.length, SHOWN)}`}
                 className="min-w-0 basis-[88%] laptop:basis-[calc(50%-6px)] shrink-0 grow-0" style={{ scrollSnapAlign: 'start' }}>
                 <CoachAssessmentCard assessment={assessment} playerName={player.name}

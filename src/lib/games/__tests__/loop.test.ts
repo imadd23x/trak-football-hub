@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { LOOP_STEPS, STATE, fullTime, gameState, needsAPlan, orderGames, type GameEvent } from '../loop'
+import { format } from 'date-fns'
+import { LOOP_STEPS, STATE, fullTime, gameState, gameStatus, needsAPlan, orderGames, type GameEvent } from '../loop'
 
 // Kick-off Sat 31 Oct 2026, 11:00 in Athens (09:00Z); the clock is an instant, so the device's zone never matters.
 const KICK_OFF = Date.parse('2026-10-31T09:00:00Z')
@@ -97,6 +98,29 @@ describe('a shared plan (TRAK-286)', () => {
 
   it('at kick-off a shared plan locks, changes or not', () => {
     expect(gameState(game(), KICK_OFF, { drafted: true, shared: true, changes: 2 })).toBe('locked')
+  })
+})
+
+describe('a scheduled plan (TRAK-290)', () => {
+  // Shares Thu 29 Oct, 19:30 in Dubai.
+  const at = '2026-10-29T15:30:00Z'
+  const scheduled = { drafted: true, shared: true, sharedAt: at }
+
+  it('waits for its time with nothing to do; the badge says when it goes out, on this phone\'s clock', () => {
+    expect(gameState(game(), Date.parse(at) - 1000, scheduled)).toBe('scheduled')
+    expect(STATE.scheduled.action).toBeUndefined()
+    expect(LOOP_STEPS[STATE.scheduled.step]).toBe('Shared')
+    expect(gameStatus(game(), Date.parse(at) - 1000, scheduled)).toMatchObject({ label: `Shares ${format(new Date(at), 'EEE HH:mm')}`, tone: 'info' })
+  })
+
+  it('from its time it is a shared plan, and later edits wait for "Share the changes"', () => {
+    expect(gameState(game(), Date.parse(at), scheduled)).toBe('shared')
+    expect(gameStatus(game(), Date.parse(at), scheduled).label).toBe('Plan shared')
+    expect(gameState(game(), Date.parse(at) + 1000, { ...scheduled, changes: 1 })).toBe('changes')
+  })
+
+  it('a plan still waiting at kick-off locks with the match', () => {
+    expect(gameState(game(), KICK_OFF, { ...scheduled, sharedAt: '2026-10-31T10:00:00Z' })).toBe('locked')
   })
 })
 

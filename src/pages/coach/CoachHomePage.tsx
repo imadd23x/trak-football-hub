@@ -96,6 +96,7 @@ export default function CoachHomePage() {
   }
   const owedEvents: OwedEvent[] = !user ? [] : (owed.items ?? []).map(item => {
     const event = toPlayerEvent(item.source)
+    const remindAt = item.step === 'publish-evaluation' ? owed.reminders?.get(item.id) : undefined
     return {
       id: item.id,
       title: event ? eventHeading(event) : item.title,
@@ -104,12 +105,14 @@ export default function CoachHomePage() {
       reason: item.step === 'evaluate' ? 'Played, not evaluated yet' : item.step === 'publish-evaluation' ? 'Evaluation draft · only you see it'
         : item.kind === 'match' ? 'Played, not logged yet' : 'Started, no register yet',
       action: <NextStep item={item} coachId={user.id} roster={undefined} onChanged={owedChanged} />,
+      // TRAK-290: from 09:00 the morning after the draft was saved (the academy's clock), worked out as Home is read.
+      urgent: remindAt !== undefined && Date.now() >= Date.parse(remindAt),
     }
   })
   // The game's own next step (Write the plan, Share the plan, Share the changes); a shared plan with nothing new has none.
   const planEvents: OwedEvent[] = soon.flatMap(game => {
     const changed = changes.data?.get(game.id)?.length ?? 0
-    const state = gameState(game, Date.now(), { drafted: plans.data?.has(game.id), shared: shares.data?.has(game.id), changes: changed })
+    const state = gameState(game, Date.now(), { drafted: plans.data?.has(game.id), shared: shares.data?.has(game.id), sharedAt: shares.data?.get(game.id), changes: changed })
     const action = STATE[state].action
     if (!action) return []
     const { day, time } = gameWhen(game)

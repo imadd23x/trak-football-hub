@@ -24,5 +24,6 @@ export function useOwedEvents(coachId: string | undefined, inView: (squad: strin
   const items = useMemo<WeekItem[] | null>(() => read.data
     ? [...coachWeek({ ...read.data, inView }).values()].flat().filter(item => item.state === 'needs-you')
     : null, [read.data, inView])
-  return { items, failed: read.isError, retry: () => { void read.refetch() } }
+  // TRAK-290: when each evaluation draft's 09:00 reminder falls.
+  return { items, reminders: read.data?.reminders, failed: read.isError, retry: () => { void read.refetch() } }
 }

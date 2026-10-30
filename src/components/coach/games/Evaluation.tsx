@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { format, isToday, isTomorrow } from 'date-fns'
 import { ClipboardCheck, Moon } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -33,7 +33,7 @@ const PUBLISH_FAILED = "Couldn't publish the evaluation. Check your connection a
 const said = (error: { code?: string; message?: string }, otherwise: string) =>
   (error.code === 'P0001' || error.code === '42501') && error.message ? error.message : otherwise
 
-export function Evaluation({ game, opensAt, plans, planGoals, form, onFormChange, step, onStep, savedAt, publishedAt, planCreatedAt }: {
+export function Evaluation({ game, opensAt, plans, planGoals, form, onFormChange, step, onStep, savedAt, remindAt, publishedAt, planCreatedAt }: {
   game: EventRow
   /** Full time as the header shows it ("12:30") while it's still to come; null once it has passed. */
   opensAt: string | null
@@ -42,6 +42,8 @@ export function Evaluation({ game, opensAt, plans, planGoals, form, onFormChange
   form: EvaluationForm; onFormChange: (form: EvaluationForm) => void; step: number; onStep: (step: number) => void
   /** When the draft was last saved, and when it was published; null before. */
   savedAt: string | null; publishedAt: string | null
+  /** TRAK-290: the first 09:00 after the last save, on the academy's clock; null before a save. */
+  remindAt: string | null
   /** For the History: when the plan was first saved; null without one. */
   planCreatedAt: string | null
 }) {
@@ -132,8 +134,11 @@ export function Evaluation({ game, opensAt, plans, planGoals, form, onFormChange
 
   return (
     <div className="grid gap-5 pt-4">
-      <Alert tone="info" icon={Moon} open={savedAt !== null} title={savedAt ? `Draft saved ${format(new Date(savedAt), 'HH:mm')}` : 'Draft saved'}>
-        Only you can see it.
+      <Alert tone="info" icon={Moon} open={savedAt !== null}
+        title={savedAt ? `Draft saved ${format(new Date(savedAt), isToday(new Date(savedAt)) ? 'HH:mm' : 'EEE HH:mm')}` : 'Draft saved'}>
+        {/* TRAK-290: the morning-after nudge, worked out as the page is read. Times are this phone's clock, as on every screen. */}
+        {remindAt && Date.now() >= Date.parse(remindAt) ? 'Good morning. Add anything you remembered overnight, then publish.'
+          : `Only you can see it.${remindAt ? ` We’ll remind you ${isToday(new Date(remindAt)) ? 'today' : isTomorrow(new Date(remindAt)) ? 'tomorrow' : format(new Date(remindAt), 'EEEE')} at ${format(new Date(remindAt), 'HH:mm')}.` : ''}`}
       </Alert>
       <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Evaluation" />
       {step === 0 ? <ResultStep form={form} onFormChange={change} starters={named(starters)} bench={named(bench)} />

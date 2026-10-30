@@ -2,16 +2,20 @@
 "use client";
 
 import { useId } from "react";
+import type { ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowRight, Circle, CircleCheck } from "lucide-react";
 import { Button } from "../../button/button";
 import { Checkbox } from "../../checkbox/checkbox";
+import { SplitButton, type SplitButtonAction } from "../../split-button/split-button";
 import { motionTokens } from "../../lib/motion-tokens";
 import styles from "./share-readiness.module.css";
 
 /* Trak (TRAK-286): the Game plan's Share step. Checks come from the caller: one the coach ticks (onCheckedChange), the
    rest worked out from the plan and shown as done or not. Only `required` checks hold the action back (Imad, 28 Oct);
-   the bar turns green when every check is done. No owners and no notify switch: sharing is in the app only. */
+   the bar turns green when every check is done. No owners and no notify switch: sharing is in the app only. TRAK-290:
+   the action may offer alternatives behind a chevron (Arc's split-button: "Share now · Share at…"), and what an
+   alternative opens sits under the footer. */
 
 export interface ReadinessCheck {
   id: string;
@@ -33,9 +37,13 @@ export interface ShareReadinessProps {
   busy?: boolean;
   /** Why the action failed; shown under the footer. */
   error?: string | null;
+  /** Close variants of the action, behind the chevron; the same checks hold them back. */
+  alternatives?: SplitButtonAction[];
+  /** What an alternative opens, under the footer. */
+  children?: ReactNode;
 }
 
-export function ShareReadiness({ title, subtitle, checks, actionLabel, onAction, busy = false, error }: ShareReadinessProps) {
+export function ShareReadiness({ title, subtitle, checks, actionLabel, onAction, busy = false, error, alternatives, children }: ShareReadinessProps) {
   const id = useId();
   const reduce = !!useReducedMotion();
   const ready = checks.filter(check => check.done).length;
@@ -83,9 +91,13 @@ export function ShareReadiness({ title, subtitle, checks, actionLabel, onAction,
 
       <footer className={styles.footer}>
         <div className={styles.footerActions}>
-          <Button size="sm" disabled={left > 0} loading={busy} onClick={onAction}>{actionLabel}<ArrowRight size={16} aria-hidden="true" /></Button>
+          {alternatives?.length
+            ? <SplitButton label={busy ? "Sharing…" : actionLabel} onClick={onAction} disabled={left > 0 || busy}
+                actions={alternatives.map(alternative => ({ ...alternative, disabled: alternative.disabled || left > 0 }))} />
+            : <Button size="sm" disabled={left > 0} loading={busy} onClick={onAction}>{actionLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
         </div>
       </footer>
+      {children && <div className={styles.extra}>{children}</div>}
 
       {/* The message opens its own row: the card grows on a spring instead of snapping taller. */}
       <AnimatePresence initial={false}>

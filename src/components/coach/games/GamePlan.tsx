@@ -18,11 +18,13 @@ import { Stepper } from '@/components/arc/stepper/stepper'
    One draft, only the coach sees it: Save draft keeps both steps, and a failed save keeps everything typed and says so,
    as Schedule's does. Sharing saves what's typed first, so what goes out is what's on screen. The game page holds what's
    typed and the step, above its tabs, so a look at Logistics never loses them. TRAK-287: at kick-off the plan locks; the
-   saved plan shows read only, Save and Share go, and the alert says what wasn't shared. */
+   saved plan shows read only, Save and Share go, and the alert says what wasn't shared. TRAK-290: Share at… schedules
+   it; until then Save draft also rewrites what's waiting, so it goes out as saved (Imad, 29 Oct). */
 
 const STEPS = [{ id: 'opponent', label: 'Opponent and goals' }, { id: 'line-up', label: 'Line-up and jobs' }, { id: 'share', label: 'Share' }]
 const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again; everything you typed is still here."
 const SHARE_FAILED = "Couldn't share the plan. Check your connection and try again; everything you typed is still here."
+const SCHEDULE_FAILED = "Couldn't schedule the plan. Check your connection and try again; everything you typed is still here."
 
 export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, changes, lockedAt = null }: {
   game: EventRow; form: PlanForm; onFormChange: (form: PlanForm) => void; step: number; onStep: (step: number) => void
@@ -76,7 +78,14 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
   ])
 
   const save = useMutation({
-    mutationFn: write,
+    mutationFn: async (sent: Exclude<ReturnType<typeof draft>, string>) => {
+      await write(sent)
+      // TRAK-290: a plan that waits for its time goes out as saved, so saving rewrites what's waiting; the time stays.
+      if (sharedAt == null || Date.now() >= Date.parse(sharedAt)) return
+      const { error } = await supabase.rpc('schedule_game_plan', { p_event_id: game.id })
+      // It went out while this saved: the edits then wait for Share the changes, as on any shared plan.
+      if (error && error.code !== 'P0001') throw error
+    },
     onSuccess: (_, sent) => {
       if (sent.version === version.current) setSavedNow(true)
       void refresh(false)
@@ -110,6 +119,26 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
     share.mutate({ sent: next, talked })
   }
 
+  // TRAK-290: Share at… and Change time. What's typed is saved first, as for Share now; the database checks the time.
+  const schedule = useMutation({
+    mutationFn: async ({ sent, talked, at }: { sent: Exclude<ReturnType<typeof draft>, string>; talked: boolean; at: string }) => {
+      await write(sent)
+      const { error } = await supabase.rpc('schedule_game_plan', { p_event_id: game.id, p_talked: talked, p_at: at })
+      if (error) throw error
+    },
+    onSuccess: async (_, { sent }) => {
+      if (sent.version === version.current) setSavedNow(true)
+      await refresh(true)
+    },
+    onError: (error: { code?: string; message?: string }) => setShareProblem(error.code === 'P0001' && error.message ? error.message : SCHEDULE_FAILED),
+  })
+  const scheduleAt = (at: string, talked: boolean) => {
+    const next = draft()
+    if (typeof next === 'string') return setShareProblem(next)
+    setShareProblem(null)
+    schedule.mutate({ sent: next, talked, at })
+  }
+
   return (
     <div className="grid gap-5 pt-4">
       {locked && <div className="arc"><Alert tone="info" icon={Lock} title={lockedAt ? `Locked at kick-off, ${lockedAt}` : 'Locked at kick-off'}>
@@ -121,7 +150,7 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
       {step === 0 ? <OpponentAndGoals eventId={game.id} opponent={game.opponent ?? null} form={form} onFormChange={change} tried={tried} locked={locked} />
         : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} />
         : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} coachName={profile?.full_name?.trim() || null}
-            onShare={shareNow} sharing={share.isPending} problem={shareProblem} locked={locked} />}
+            onShare={shareNow} onSchedule={scheduleAt} sharing={share.isPending || schedule.isPending} problem={shareProblem} locked={locked} />}
       <div className="flex flex-wrap items-center gap-3">
         {step > 0 && <Button variant="ghost" onClick={() => onStep(step - 1)}>Back</Button>}
         {!locked && <>

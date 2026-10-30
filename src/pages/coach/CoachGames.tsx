@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
-import { LOOP_STEPS, STATE, actionLink, gameState, orderGames, type GameAction } from '@/lib/games/loop'
+import { actionLink, type GameAction, gameStatus, LOOP_STEPS, orderGames } from '@/lib/games/loop'
 import { gameTitle, gameWhen, useGameEvaluations, useGamePlanChanges, useGamePlans, useGameShares, useGames, type Game } from '@/components/coach/games/useGames'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { PitchIcon } from '@/components/icons/PitchIcon'
@@ -43,9 +43,9 @@ export default function CoachGames() {
   // TRAK-286: edits since sharing, for shared matches still to kick off. A failed read shows them as shared.
   const changes = useGamePlanChanges(ordered.filter(game => shares.data?.has(game.id) && now < Date.parse(game.starts_at)).map(game => game.id))
   const open = (game: Game, action: Omit<GameAction, 'label'>) => navigate(actionLink(game.id, action))
-  const stateOf = (game: Game) => STATE[gameState(game, now,
-    { drafted: plans.data?.has(game.id), shared: shares.data?.has(game.id), changes: changes.data?.get(game.id)?.length, evaluated: evaluations.data?.has(game.id),
-      published: !!evaluations.data?.get(game.id)?.publishedAt })]
+  const stateOf = (game: Game) => gameStatus(game, now,
+    { drafted: plans.data?.has(game.id), shared: shares.data?.has(game.id), sharedAt: shares.data?.get(game.id), changes: changes.data?.get(game.id)?.length,
+      evaluated: evaluations.data?.has(game.id), published: !!evaluations.data?.get(game.id)?.publishedAt })
   // TRAK-284: a plan draft stays open until it's shared (TRAK-286) or its match kicks off and locks it (TRAK-287).
   // TRAK-288: an evaluation draft stays open until it's published (TRAK-289).
   const drafts = [
@@ -132,7 +132,7 @@ export default function CoachGames() {
 
 /** The next match: its loop, the one next action and the countdown to kick-off. A static panel, not a link. */
 function NextGame({ game, state, onOpen, onKickOff }: {
-  game: Game; state: (typeof STATE)[keyof typeof STATE]; onOpen: (game: Game, action: Omit<GameAction, 'label'>) => void; onKickOff: () => void
+  game: Game; state: ReturnType<typeof gameStatus>; onOpen: (game: Game, action: Omit<GameAction, 'label'>) => void; onKickOff: () => void
 }) {
   const { day, time, academy } = gameWhen(game)
   return (

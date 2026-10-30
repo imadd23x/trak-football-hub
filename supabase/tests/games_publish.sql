@@ -55,7 +55,7 @@ $$;
 -- Otto Rehhagel (10) coaches the U16 of an academy with Games; Fernando Santos (11) coaches there too. Otto's roster:
 -- Theodoros Zagorakis (40, player A) and Angelos Charisteas (41, player B), consented; Giorgos Karagounis (42), consent
 -- pending. Traianos Dellas (30) is player A's guardian, Michalis Kapsis (31) player B's. Match 500 (league) was two
--- days ago: Zagorakis started out of position and was asked to stretch; Charisteas was on the bench. Match 600 was
+-- days ago: Zagorakis started out of position, in goal, and was asked to stretch; Charisteas was on the bench. Match 600 was
 -- yesterday, made before New event asked the competition, with no plan.
 INSERT INTO auth.users(id,email,email_confirmed_at)
  SELECT pg_temp.g289id(n),'synthetic-'||n||'@games289.invalid',now() FROM unnest(ARRAY[1,10,11,20,21,22,30,31]) n;
@@ -79,7 +79,7 @@ INSERT INTO public.academy_features(organization_id,feature) VALUES(pg_temp.g289
 INSERT INTO public.game_plans(event_id,strength,scouting,goals,formation) VALUES(pg_temp.g289id(500),'stronger','Their 9 is quick.',
  '[{"title":"Win the second ball","looks_like":"First to it."},{"title":"Switch play early","looks_like":""}]','4-4-2');
 INSERT INTO public.game_plan_players(event_id,squad_player_id,role,slot,job,note,context,expectation) VALUES
- (pg_temp.g289id(500),pg_temp.g289id(40),'starter',4,'Stay tight to their winger.','Proud of you.','{out_of_position}','stretch'),
+ (pg_temp.g289id(500),pg_temp.g289id(40),'starter',1,'Stay tight to their winger.','Proud of you.','{out_of_position}','stretch'),
  (pg_temp.g289id(500),pg_temp.g289id(41),'bench',NULL,'','','{}','usual');
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.g289actor(g), public.record_parental_consent(pg_temp.g289id(c),'parent','{"coaching_records":true}'::jsonb,
@@ -153,8 +153,17 @@ SELECT pg_temp.g289check((SELECT count(*) FROM public.event_change_notices WHERE
 SELECT pg_temp.g289check((SELECT string_agg(m.goals || '/' || m.assists || '/' || m.team_score || '-' || m.opponent_score || '/' || m.competition
     || '/' || m.venue || '/' || m.position || '/' || COALESCE(m.computed_rating::text, 'no rating'), ', ' ORDER BY m.goals DESC)
   FROM public.matches m WHERE m.user_id IN (pg_temp.g289id(20),pg_temp.g289id(21)) AND m.opponent='Portugal')
-  = '1/0/2-1/League/Away/Midfielder/no rating, 0/1/2-1/League/Away/Attacker/no rating',
+  = '1/0/2-1/League/Away/Goalkeeper/no rating, 0/1/2-1/League/Away/Attacker/no rating',
   '4 each player''s goals and assists, the score, competition and venue, and no rating');
+-- TRAK-314: a starter is logged at the line they played (the keeper here, a midfielder by profile); who came on keeps
+-- their profile's position.
+SELECT pg_temp.g289check(trak_private.slot_line('4-4-2', 1)='Goalkeeper' AND trak_private.slot_line('4-4-2', 5)='Defender'
+  AND trak_private.slot_line('4-4-2', 6)='Midfielder' AND trak_private.slot_line('4-4-2', 11)='Forward',
+  '4 a 4-4-2 slot reads as the app''s pitch names it: keeper, back line, the lines between, front line');
+SELECT pg_temp.g289check(trak_private.slot_line('4-2-3-1', 8)='Midfielder' AND trak_private.slot_line('4-2-3-1', 11)='Forward'
+  AND trak_private.slot_line('3-1', 4)='Defender' AND trak_private.slot_line('3-1', 5)='Forward'
+  AND trak_private.slot_line('4-4-2', 12) IS NULL AND trak_private.slot_line(NULL, 4) IS NULL,
+  '4 other shapes too, and nothing for a slot the shape doesn''t have');
 SELECT pg_temp.g289check((SELECT count(*) FROM public.coach_sessions s WHERE s.event_id=pg_temp.g289id(500) AND s.session_type='match')=1
   AND (SELECT count(*) FROM public.session_attendance a JOIN public.coach_sessions s ON s.id=a.session_id
        WHERE s.event_id=pg_temp.g289id(500) AND a.status='present')=2
@@ -218,7 +227,7 @@ RESET ROLE;
 DO $$ DECLARE failures text; total integer;
 BEGIN
  SELECT count(*) INTO total FROM pg_temp.g289_results;
- IF total <> 28 THEN RAISE EXCEPTION 'Games publish: % checks ran; expected 28', total; END IF;
+ IF total <> 30 THEN RAISE EXCEPTION 'Games publish: % checks ran; expected 30', total; END IF;
  SELECT string_agg(label, E'\n') INTO failures FROM pg_temp.g289_results WHERE NOT ok;
  IF failures IS NOT NULL THEN RAISE EXCEPTION 'Games publish checks failed:%', E'\n' || failures; END IF;
  RAISE NOTICE 'Games publish: % of % passed', total, total;

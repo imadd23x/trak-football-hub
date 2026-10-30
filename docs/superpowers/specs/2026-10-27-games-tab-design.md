@@ -151,7 +151,9 @@ Players and guardians get no insert, update or delete grant on any Games table.
   - creates the match's `coach_sessions` row and marks who played present;
   - writes the review copies for each child who played and can still be recorded (`game_plan_player_ok`);
   - calls `log_match_for_player` for each of them with an account: goals and assists from the evaluation, the
-    competition and venue, position and age group, and no rating (open question 1).
+    competition and venue, position and age group, and no rating (open question 1). TRAK-314: a starter's position
+    is the line of their plan slot (`trak_private.slot_line`, the rule `lineName()` names the pitch's slots with),
+    and who came on keeps their profile's position, as the old match log recorded the position played.
 
   It returns how many reviews it wrote, how many matches it logged, and the children it skipped (no longer on the
   roster, or waiting for consent); the app says how many. `matches.computed_rating` becomes nullable for it, and every

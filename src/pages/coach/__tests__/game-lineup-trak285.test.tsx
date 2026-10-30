@@ -180,4 +180,17 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     expect(progress).toHaveAttribute('aria-valuenow', '1')
     expect(progress).toHaveAttribute('aria-valuemax', '11')
   })
+
+  it('TRAK-317: a starter expected to stretch shows yellow on the pitch, with a key and "stretch" in the slot\'s name', async () => {
+    const user = userEvent.setup()
+    store()
+    await openLineUp(user)
+    await pick(user, 3, /Zagorakis/)
+    expect(slot(3)).toHaveAccessibleName('Theodoros Zagorakis, slot 3')
+    expect(screen.queryByText('Yellow: stretch')).toBeNull()
+    await user.click(screen.getByRole('radio', { name: /^Stretch/ }))
+    expect(slot(3)).toHaveAccessibleName('Theodoros Zagorakis, slot 3, stretch')
+    expect(slot(3)).toHaveAttribute('data-stretch')
+    expect(screen.getByText('Yellow: stretch')).toBeVisible()
+  })
 })

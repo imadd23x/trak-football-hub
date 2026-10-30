@@ -3,9 +3,11 @@ import { slotsOf } from '@/lib/games/formations'
 
 /* TRAK-285 (Games 3/8): the line-up's pitch, drawn light and attacking to the right, as the mockup draws it. Each slot
    of the formation is a button: an empty one opens the player picker, a filled one the player's sheet. PitchDiagram.tsx
-   isn't reused: it's a static drill drawing in the old dark palette. */
+   isn't reused: it's a static drill drawing in the old dark palette. TRAK-317 (Imad, 30 Oct): a starter expected to
+   stretch is yellow (TRAK-270's attention yellow), so the coach sees the big asks at a glance. Coach only, like the
+   expectation itself. */
 
-export type PitchPlayer = { name: string; shirt: number | null; absent: boolean }
+export type PitchPlayer = { name: string; shirt: number | null; absent: boolean; stretch?: boolean }
 
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()
 
@@ -35,10 +37,13 @@ export function Pitch({ shape, starters, selected, onSelect }: {
       {slotsOf(shape).map(({ slot, x, y }) => {
         const player = starters.get(slot)
         const on = selected === slot
-        return <button key={slot} type="button" onClick={() => onSelect(slot)} aria-pressed={on}
-          aria-label={player ? `${player.name}, slot ${slot}${player.absent ? ", can't make it" : ''}` : `Slot ${slot}, empty`}
+        const stretch = !!player?.stretch
+        return <button key={slot} type="button" onClick={() => onSelect(slot)} aria-pressed={on} data-stretch={stretch || undefined}
+          aria-label={player ? `${player.name}, slot ${slot}${stretch ? ', stretch' : ''}${player.absent ? ", can't make it" : ''}` : `Slot ${slot}, empty`}
           className={`absolute grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-            on ? 'border-ink bg-ink text-surface' : player ? 'border-ink/60 bg-surface text-ink' : 'border-dashed border-ink/40 bg-surface/70 text-ink-3'}`}
+            on ? `border-ink bg-ink text-surface${stretch ? ' shadow-[0_0_0_3px_rgb(var(--t-attention))]' : ''}`
+              : stretch ? 'border-ink/60 bg-[rgb(var(--t-attention))] text-ink'
+              : player ? 'border-ink/60 bg-surface text-ink' : 'border-dashed border-ink/40 bg-surface/70 text-ink-3'}`}
           style={{ left: `${y}%`, top: `${x}%` }}>
           {player ? player.shirt ?? initials(player.name) : '+'}
           {player?.absent && <TriangleAlert size={14} className="absolute -right-1.5 -top-1.5 rounded-full bg-surface text-warning" aria-hidden="true" />}

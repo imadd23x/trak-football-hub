@@ -185,4 +185,35 @@ describe('TRAK-320: Previous matches', { timeout: 20_000 }, () => {
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/matches/won?tab=evaluation'))
   })
 })
+
+describe('TRAK-321: Top scorers and assists', { timeout: 20_000 }, () => {
+  it('counts this season\'s published evaluations: goals, then assists, with matches played', async () => {
+    const now = Date.now()
+    eventsRead([
+      match('won', 'U16', onTheMinute(now - 7 * DAY), { competition: 'league' }),
+      match('drew', 'U16', onTheMinute(now - 3 * DAY), { competition: 'tournament' }),
+      match('draft', 'U16', onTheMinute(now - 1 * DAY)),
+    ])
+    server.use(
+      table('game_evaluations', [
+        { event_id: 'won', saved_at: '2026-10-01T18:00:00Z', published_at: '2026-10-01T19:00:00Z', our_score: 2, their_score: 0,
+          goals: [{ scorer: 'sp-2', assist: 'sp-1' }, { scorer: 'sp-2', assist: null }] },
+        { event_id: 'drew', saved_at: '2026-10-08T18:00:00Z', published_at: '2026-10-08T19:00:00Z', our_score: 1, their_score: 1,
+          goals: [{ scorer: 'sp-1', assist: 'sp-2' }] },
+        // A draft counts for nothing until it's published.
+        { event_id: 'draft', saved_at: '2026-10-28T18:00:00Z', published_at: null, our_score: 3, their_score: 0,
+          goals: [{ scorer: 'sp-1', assist: null }, { scorer: 'sp-1', assist: null }, { scorer: 'sp-1', assist: null }] },
+      ]),
+      table('game_evaluation_players', [
+        { event_id: 'won', squad_player_id: 'sp-1', played: true }, { event_id: 'won', squad_player_id: 'sp-2', played: true },
+        { event_id: 'drew', squad_player_id: 'sp-1', played: true }, { event_id: 'drew', squad_player_id: 'sp-2', played: true },
+      ]),
+    )
+    renderApp('/coach/matches')
+    const grid = await screen.findByRole('table')
+    await waitFor(() => expect(within(grid).getAllByRole('row')).toHaveLength(3))
+    const rows = within(grid).getAllByRole('row').slice(1).map(row => row.textContent)
+    expect(rows).toEqual(['1Angelos Charisteas212', '2Giorgos Karagounis112'])
+  })
+})
 })

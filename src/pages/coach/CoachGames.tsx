@@ -1,11 +1,14 @@
 import { useState } from 'react'
+import type { UseQueryResult } from '@tanstack/react-query'
+import type { Scorer } from '@/lib/games/scorers'
 import { Link, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { COMPETITIONS } from '@/lib/coach-events'
 import { actionLink, type GameAction, gameStatus, LOOP_STEPS, orderGames } from '@/lib/games/loop'
-import { gameTitle, gameWhen, useGameEvaluations, useGamePlanChanges, useGamePlans, useGameShares, useGames, type Game } from '@/components/coach/games/useGames'
+import { gameTitle, gameWhen, useGameEvaluations, useGamePlanChanges, useGamePlans, useGameShares, useGames, useScorers, type Game } from '@/components/coach/games/useGames'
+import { seasonStart } from '@/lib/games/scorers'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { PitchIcon } from '@/components/icons/PitchIcon'
 import { Badge } from '@/components/arc/badge/badge'
@@ -17,7 +20,8 @@ import { Stepper } from '@/components/arc/stepper/stepper'
 
 /* TRAK-283 (Games 1/8): Games home. The next game with where it is in its loop and its one next action, the open
    drafts, and every match of the squad in view. Cards follow Home's Needs you pattern (Imad, 27 Oct). TRAK-320 (Imad,
-   30 Oct): a published match moves to Previous matches, newest first, with its result, and opens on its evaluation. */
+   30 Oct): a published match moves to Previous matches, newest first, with its result, and opens on its evaluation.
+   TRAK-321: the season's top scorers and assists for the squad in view, from those evaluations. */
 
 const STEPS = LOOP_STEPS.map(label => ({ id: label, label }))
 /** Schedule's quick hand-over (TRAK-182 part 8): New event, on its first step, with Match picked. */
@@ -61,6 +65,7 @@ export default function CoachGames() {
 
   const published = (game: Game) => !!evaluations.data?.get(game.id)?.publishedAt
   const previous = ordered.filter(published)
+  const scorers = useScorers(previous.filter(game => Date.parse(game.starts_at) >= seasonStart(now)).map(game => game.id))
 
   return (
     <div className="min-h-screen bg-ground pb-24">
@@ -130,6 +135,7 @@ export default function CoachGames() {
               </div>
             </div>
             {previous.length > 0 && <PreviousMatches games={previous} results={evaluations.data!} squads={everySquad} />}
+            {previous.length > 0 && <TopScorers scorers={scorers} />}
           </>}
       </div>
     </div>
@@ -194,5 +200,43 @@ function PreviousMatches({ games, results, squads }: {
         </ScrollArea>
       </div>
     </div>
+  )
+}
+
+const SHOWN = 10
+
+/** TRAK-321: who scored and assisted most this season, in the squad in view: goals, then assists. */
+function TopScorers({ scorers }: { scorers: UseQueryResult<Scorer[]> }) {
+  const [all, setAll] = useState(false)
+  const rows = scorers.data ?? []
+  const cell = 'py-2 text-right tabular-nums'
+  return (
+    <section aria-labelledby="top-scorers" className="arc mt-8 rounded-2xl border border-line bg-surface p-5">
+      <h2 id="top-scorers" className="text-lg font-medium text-ink">Top scorers and assists</h2>
+      <p className="mt-1 text-sm text-ink-3">This season, from your published evaluations.</p>
+      {scorers.error ? <div className="mt-3"><LoadError what="the scorers" onRetry={() => void scorers.refetch()} retrying={scorers.isFetching} /></div>
+        : scorers.isPending ? <p role="status" className="mt-3 text-sm text-ink-3">Loading the scorers…</p>
+        : rows.length === 0 ? <p className="mt-3 text-sm text-ink-2">No goals or assists yet this season.</p>
+        : <>
+            <table className="mt-3 w-full text-sm">
+              <thead><tr className="border-b border-line text-ink-3">
+                <th scope="col" className="py-2 text-left font-normal">Player</th>
+                <th scope="col" className="w-16 py-2 text-right font-normal">Goals</th>
+                <th scope="col" className="w-16 py-2 text-right font-normal">Assists</th>
+                <th scope="col" className="w-16 py-2 text-right font-normal">Played</th>
+              </tr></thead>
+              <tbody className="divide-y divide-line">
+                {(all ? rows : rows.slice(0, SHOWN)).map((row, i) => <tr key={row.id}>
+                  <th scope="row" className="py-2 text-left font-normal text-ink"><span className="mr-2 inline-block w-5 text-ink-3 tabular-nums">{i + 1}</span>{row.name}</th>
+                  <td className={`${cell} font-medium text-ink`}>{row.goals}</td>
+                  <td className={`${cell} text-ink-2`}>{row.assists}</td>
+                  <td className={`${cell} text-ink-3`}>{row.played}</td>
+                </tr>)}
+              </tbody>
+            </table>
+            {rows.length > SHOWN && <div className="mt-2"><Button variant="ghost" size="sm" onClick={() => setAll(!all)}>
+              {all ? `Show the top ${SHOWN}` : `Show all ${rows.length}`}</Button></div>}
+          </>}
+    </section>
   )
 }

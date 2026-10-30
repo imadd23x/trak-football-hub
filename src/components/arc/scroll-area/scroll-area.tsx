@@ -6,6 +6,10 @@ import styles from "./scroll-area.module.css";
 
 type Axis = "y" | "x";
 
+/** TRAK-316 (TRAK-279's fix, for every row): snapping is for touch. With a mouse or trackpad, mandatory snapping pulls
+ *  the row to the next stop mid-swipe and fights a scroll back, so there the row just follows the swipe. */
+const FINE_POINTER = typeof window !== "undefined" && window.matchMedia?.("(pointer: fine)").matches;
+
 /** Which edges still have content beyond them. */
 export interface ScrollAreaEdges { top: boolean; bottom: boolean; left: boolean; right: boolean }
 
@@ -26,7 +30,8 @@ export interface ScrollAreaProps extends Omit<HTMLAttributes<HTMLDivElement>, "o
   hideDelay?: number;
   /** Maximum height of the viewport, for vertical areas that should grow with their content. */
   maxHeight?: CSSProperties["maxHeight"];
-  /** Passed to the viewport's `scroll-snap-type`, for example "x mandatory". Children set their own `scroll-snap-align`. */
+  /** Passed to the viewport's `scroll-snap-type` on touch, for example "x mandatory"; a mouse or trackpad scrolls freely
+   *  (TRAK-316). Children set their own `scroll-snap-align`. */
   snap?: CSSProperties["scrollSnapType"];
   /** Accessible name. The viewport becomes a labelled, focusable region that arrow and page keys scroll. */
   label?: string;
@@ -186,7 +191,7 @@ export const ScrollArea = forwardRef<HTMLDivElement, ScrollAreaProps>(function S
 
   return <div ref={rootRef} className={[styles.root, className].filter(Boolean).join(" ")} data-orientation={orientation} data-scrollbars={scrollbars} {...rest}>
     <div ref={viewport} className={[styles.viewport, viewportClassName].filter(Boolean).join(" ")} data-fade={fade > 0 ? orientation : undefined}
-      style={{ maxHeight, scrollSnapType: snap, ...viewportStyle }} tabIndex={0} role={label ? "region" : undefined} aria-label={label} onScroll={handleScroll}>
+      style={{ maxHeight, scrollSnapType: FINE_POINTER ? undefined : snap, ...viewportStyle }} tabIndex={0} role={label ? "region" : undefined} aria-label={label} onScroll={handleScroll}>
       {children}
     </div>
     {vertical && bar("y")}

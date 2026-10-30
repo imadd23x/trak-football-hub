@@ -61,13 +61,13 @@ export default function CoachGames() {
     <div className="min-h-screen bg-ground pb-24">
       <div className={WIDE_COLUMN}>
         <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 pb-4">
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Games</h1>
+          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Matches</h1>
         </header>
 
         {games.error || plans.error || shares.error || evaluations.error
-            ? <LoadError what="your games" onRetry={() => { void games.refetch(); void plans.refetch(); void shares.refetch(); void evaluations.refetch() }}
+            ? <LoadError what="your matches" onRetry={() => { void games.refetch(); void plans.refetch(); void shares.refetch(); void evaluations.refetch() }}
                 retrying={games.isFetching || plans.isFetching || shares.isFetching || evaluations.isFetching} />
-          : games.isPending || plans.isPending || shares.isPending || evaluations.isPending ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your games…</p>
+          : games.isPending || plans.isPending || shares.isPending || evaluations.isPending ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your matches…</p>
           : ordered.length === 0 ? (
             <div className="arc pt-6">
               <EmptyState icon={<PitchIcon size={24} strokeWidth={1.5} />} title="No matches yet"
@@ -78,7 +78,7 @@ export default function CoachGames() {
             <div className="grid gap-4 laptop:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               {next ? <NextGame game={next} state={stateOf(next)} onOpen={open} onKickOff={() => setNow(Date.now())} /> : (
                 <section aria-labelledby="next-game" className="rounded-2xl border border-line bg-surface p-5">
-                  <h2 id="next-game" className="text-lg font-medium text-ink">Next game</h2>
+                  <h2 id="next-game" className="text-lg font-medium text-ink">Next match</h2>
                   <p className="mt-2 text-sm text-ink-2">No match coming up.</p>
                   <Link to="/coach/schedule" state={ADD_MATCH}
                     className="mt-3 inline-block rounded text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Add a match</Link>
@@ -102,15 +102,15 @@ export default function CoachGames() {
             </div>
 
             <div className="mt-8">
-              <h2 className="mb-2 text-lg font-medium text-ink">Your games</h2>
+              <h2 className="mb-2 text-lg font-medium text-ink">Your matches</h2>
               <div className="arc -mx-1">
-                <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="Your games">
+                <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="Your matches">
                   <ul className="flex gap-3 px-1 pb-1">
                     {ordered.map(game => {
                       const state = stateOf(game)
                       const { day, time } = gameWhen(game)
                       return <li key={game.id} className="w-[248px] flex-none" style={{ scrollSnapAlign: 'start' }}>
-                        <Link to={`/coach/games/${game.id}`}
+                        <Link to={`/coach/matches/${game.id}`}
                           className="flex h-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                           <span className="grid min-w-0">
                             <span className="truncate text-base font-medium text-ink">{gameTitle(game)}</span>
@@ -138,7 +138,7 @@ function NextGame({ game, state, onOpen, onKickOff }: {
   return (
     <section aria-labelledby="next-game" className="arc flex min-w-0 flex-col gap-4 rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="next-game" className="text-lg font-medium text-ink">Next game</h2>
+        <h2 id="next-game" className="text-lg font-medium text-ink">Next match</h2>
         <Badge tone={state.tone}>{state.label}</Badge>
       </div>
       <div className="grid min-w-0 gap-1">
@@ -146,10 +146,10 @@ function NextGame({ game, state, onOpen, onKickOff }: {
         <p className="text-sm text-ink-2">{[day, details(game, time)].filter(Boolean).join(' · ')}</p>
         {academy && <p className="text-sm text-ink-3">{academy}</p>}
       </div>
-      <Stepper steps={STEPS} current={state.step} label="Where this game is" />
+      <Stepper steps={STEPS} current={state.step} label="Where this match is" />
       <div className="flex flex-wrap items-center gap-3">
         {state.action && <Button size="lg" onClick={() => onOpen(game, state.action!)}>{state.action.label}</Button>}
-        {state.step > 0 && <Link to={`/coach/games/${game.id}?tab=logistics`}
+        {state.step > 0 && <Link to={`/coach/matches/${game.id}?tab=logistics`}
           className="text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">Logistics</Link>}
         <Countdown variant="compact" units={['days', 'hours', 'minutes']} target={game.starts_at}
           label="Kick-off in" completeLabel="Locked" onComplete={onKickOff} className="ml-auto" />

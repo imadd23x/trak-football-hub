@@ -77,11 +77,11 @@ const row = (term: string) => screen.getByText(term, { selector: 'dt' }).nextEle
 describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
   it("shows where the game is and its logistics, as Schedule's Review rows; only the coach's own match is asked for", async () => {
     const asked = events([game(soon())])
-    renderApp('/coach/games/g1')
+    renderApp('/coach/matches/g1')
     expect(await screen.findByRole('heading', { level: 1, name: 'vs Parkview Athletic' })).toBeInTheDocument()
     expect(screen.getByText('Plan not written')).toBeInTheDocument()
     expect(screen.getByRole('timer', { name: 'Kick-off in' })).toBeInTheDocument()
-    const tabs = screen.getByRole('tablist', { name: 'This game' })
+    const tabs = screen.getByRole('tablist', { name: 'This match' })
     expect(within(tabs).getAllByRole('tab').map(t => t.textContent)).toEqual(['Logistics', 'Game plan', 'Evaluation'])
     expect(within(tabs).getByRole('tab', { name: 'Logistics' })).toHaveAttribute('aria-selected', 'true')
 
@@ -100,7 +100,7 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
   it('Game plan opens its first step (TRAK-284) and Evaluation says what will happen there; the panel is in the URL and the keyboard moves between them', async () => {
     const user = userEvent.setup()
     events([game(soon())])
-    renderApp('/coach/games/g1')
+    renderApp('/coach/matches/g1')
     await user.click(await screen.findByRole('tab', { name: 'Game plan' }))
     expect(await screen.findByRole('heading', { name: 'Your goals' })).toBeInTheDocument()
     expect(window.location.search).toBe('?tab=plan')
@@ -112,7 +112,7 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     expect(window.location.search).toBe('?tab=evaluation')
 
     cleanup()
-    renderApp('/coach/games/g1?tab=plan')
+    renderApp('/coach/matches/g1?tab=plan')
     expect(await screen.findByRole('tab', { name: 'Game plan' })).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -131,7 +131,7 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
       }),
       http.post(`${SUPABASE_URL}/functions/v1/send-event-emails`, () => { emails += 1; return HttpResponse.json({}) }),
     )
-    renderApp('/coach/games/g1')
+    renderApp('/coach/matches/g1')
     expect(await screen.findByText('Draft')).toBeInTheDocument()
     expect(screen.getByText('Logistics not shared')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Publish' }))
@@ -142,12 +142,12 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     expect(patches[0].body).toEqual({ published: true })
     expect(patches[0].url.searchParams.get('id')).toBe('eq.g1')
     await waitFor(() => expect(emails).toBe(1))
-    expect(window.location.pathname).toBe('/coach/games/g1')
+    expect(window.location.pathname).toBe('/coach/matches/g1')
   })
 
   it('once it has kicked off: locked, the countdown says so until full time (TRAK-287), and no edit', async () => {
     events([game(Date.now() - 30 * MINUTE)])
-    renderApp('/coach/games/g1')
+    renderApp('/coach/matches/g1')
     expect(await screen.findByText('Locked at kick-off')).toBeInTheDocument()
     // jsdom never shows a past countdown's label (it can't tell the countdown is on screen); the TRAK-287 test sees it flip.
     expect(screen.getByRole('timer', { name: 'Kick-off in' })).toBeInTheDocument()
@@ -157,14 +157,21 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
 
   it('a cancelled match says so; a match that is not the coach\'s own does not open', async () => {
     events([game(soon(), { status: 'cancelled' })])
-    renderApp('/coach/games/g1')
+    renderApp('/coach/matches/g1')
     expect(await screen.findByText('This match was cancelled.')).toBeInTheDocument()
     expect(screen.getByText('Cancelled')).toBeInTheDocument()
-    expect(screen.queryByRole('tablist', { name: 'This game' })).toBeNull()
+    expect(screen.queryByRole('tablist', { name: 'This match' })).toBeNull()
 
     cleanup()
     events([])
-    renderApp('/coach/games/someone-elses')
-    expect(await screen.findByText('This game isn’t in your games.')).toBeInTheDocument()
+    renderApp('/coach/matches/someone-elses')
+    expect(await screen.findByText('This match isn’t in your matches.')).toBeInTheDocument()
+  })
+
+  it('TRAK-315: an old Games link opens the same match, tab and step under Matches', async () => {
+    events([game(Date.now() + DAY)])
+    renderApp('/coach/games/g1?tab=plan&step=share')
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/matches/g1?tab=plan&step=share'))
+    expect(await screen.findByRole('tablist', { name: 'This match' })).toBeInTheDocument()
   })
 })

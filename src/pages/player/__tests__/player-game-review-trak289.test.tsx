@@ -1,5 +1,5 @@
 /**
- * TRAK-289 (Games 7/8): once the coach publishes the evaluation, the player's event page shows After the game: their
+ * TRAK-289 (Games 7/8): once the coach publishes the evaluation, the player's event page shows After the match: their
  * job, how it went against what was asked in TRAK-282's words, and the coach's note to them, drawn by the same section
  * the coach's Publish step previews. The event card says Coach's review. In match history the game shows Coach's
  * review, not a band, and opens its event page. Nothing shows before it's published. Test people are named after
@@ -63,11 +63,11 @@ function setup({ reviews = [REVIEW], notes = [NOTE], matches = [] as object[] } 
 beforeEach(() => { PLAYER = { id: `zagorakis-user-${++n}` }; signInAs(PLAYER) })
 afterEach(() => cleanup())
 
-describe('TRAK-289: After the game on the player\'s pages', { timeout: 30_000 }, () => {
+describe('TRAK-289: After the match on the player\'s pages', { timeout: 30_000 }, () => {
   it('shows their job, how it went in TRAK-282\'s words and the note just for them, exactly as the coach\'s preview does', async () => {
     setup()
     renderApp('/player/event/g1')
-    const section = await screen.findByRole('region', { name: 'After the game' })
+    const section = await screen.findByRole('region', { name: 'After the match' })
     expect(section).toHaveTextContent('Final score 2–1')
     expect(within(section).getByText('Your job')).toBeInTheDocument()
     expect(within(section).getByText('Stay tight to their winger.')).toBeInTheDocument()
@@ -85,7 +85,7 @@ describe('TRAK-289: After the game on the player\'s pages', { timeout: 30_000 },
       notes: [{ squad_player_id: 'zagorakis', note: 'Brave all game.' }] }) }
     const plans = { zagorakis: { role: 'starter' as const, slot: 4, job: 'Stay tight to their winger.', note: '', context: ['out_of_position'], expectation: 'stretch' as const } }
     render(<GameReviewSection as="player" childName="Theodoros" review={previewReview(form, 'zagorakis', plans, 'Otto Rehhagel', 'player')} />)
-    expect(screen.getByRole('region', { name: 'After the game' }).textContent).toBe(page)
+    expect(screen.getByRole('region', { name: 'After the match' }).textContent).toBe(page)
   })
 
   it('the event card says Coach\'s review', async () => {
@@ -105,10 +105,10 @@ describe('TRAK-289: After the game on the player\'s pages', { timeout: 30_000 },
     await waitFor(() => expect(window.location.pathname).toBe('/player/event/g1'))
   })
 
-  it('before it\'s published there is no After the game and no badge', async () => {
+  it('before it\'s published there is no After the match and no badge', async () => {
     setup({ reviews: [], notes: [] })
     renderApp('/player/event/g1')
     await screen.findByRole('heading', { name: /Parkview/ })
-    expect(screen.queryByRole('region', { name: 'After the game' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'After the match' })).toBeNull()
   })
 })

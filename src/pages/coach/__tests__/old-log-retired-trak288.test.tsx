@@ -88,7 +88,7 @@ describe('TRAK-288: with Games on, the evaluation replaces the match log', { tim
     renderApp('/coach/schedule')
     await userEvent.click(await screen.findByRole('button', { name: 'Evaluate vs Synthetic Rovers' }))
     expect(screen.queryByRole('button', { name: 'Log match for vs Synthetic Rovers' })).toBeNull()
-    await waitFor(() => expect(path()).toBe('/coach/games/match-1?tab=evaluation'))
+    await waitFor(() => expect(path()).toBe('/coach/matches/match-1?tab=evaluation'))
   })
 
   it('New event asks a match\'s competition before it moves on, and saves it', async () => {
@@ -127,7 +127,7 @@ describe('TRAK-288: with Games on, the evaluation replaces the match log', { tim
     expect(within(sheet).queryByRole('button', { name: 'Save draft' })).toBeNull()
     expect(within(sheet).queryByRole('button', { name: 'Publish' })).toBeNull()
     await userEvent.click(within(sheet).getByRole('button', { name: 'Save and evaluate' }))
-    await waitFor(() => expect(path()).toBe('/coach/games/new-1?tab=evaluation'))
+    await waitFor(() => expect(path()).toBe('/coach/matches/new-1?tab=evaluation'))
     expect(posts).toHaveLength(1)
     expect(posts[0]).toMatchObject({ event_type: 'match', event_date: YESTERDAY, competition: 'friendly' })
     expect(patches.map(p => p.body)).toEqual([{ published: true }])
@@ -164,7 +164,7 @@ describe('TRAK-288: with Games on, the evaluation replaces the match log', { tim
     // Gone once the switch answers; a tap before that lands on the redirect below.
     await waitFor(() => expect(screen.queryByText(/Quick/)).toBeNull())
     renderApp('/coach/sessions/quick')
-    await waitFor(() => expect(path()).toBe('/coach/games'))
+    await waitFor(() => expect(path()).toBe('/coach/matches'))
   })
 
   it('Home: a played match needs an evaluation; once a draft is saved, publishing it is next', async () => {
@@ -173,7 +173,7 @@ describe('TRAK-288: with Games on, the evaluation replaces the match log', { tim
     const needs = await screen.findByRole('region', { name: /Needs you/ }, { timeout: 5000 })
     expect(await within(needs).findByText('Played, not evaluated yet')).toBeInTheDocument()
     await userEvent.click(within(needs).getByRole('button', { name: 'Evaluate' }))
-    await waitFor(() => expect(path()).toBe('/coach/games/match-1?tab=evaluation'))
+    await waitFor(() => expect(path()).toBe('/coach/matches/match-1?tab=evaluation'))
   })
 
   it('Home: with a draft saved, the card says so and offers Publish', async () => {
@@ -183,6 +183,6 @@ describe('TRAK-288: with Games on, the evaluation replaces the match log', { tim
     expect(await within(needs).findByText('Evaluation draft · only you see it')).toBeInTheDocument()
     expect(within(needs).queryByRole('button', { name: 'Log it' })).toBeNull()
     await userEvent.click(within(needs).getByRole('button', { name: 'Publish' }))
-    await waitFor(() => expect(path()).toBe('/coach/games/match-1?tab=evaluation'))
+    await waitFor(() => expect(path()).toBe('/coach/matches/match-1?tab=evaluation'))
   })
 })

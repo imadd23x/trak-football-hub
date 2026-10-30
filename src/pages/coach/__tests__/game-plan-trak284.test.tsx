@@ -90,7 +90,7 @@ describe('TRAK-284: plan step 1, opponent and goals', { timeout: 30_000 }, () =>
   it('saves a draft only the coach sees, and it comes back when the page opens again', async () => {
     const user = userEvent.setup()
     const { saves } = plans()
-    renderApp('/coach/games/g1?tab=plan')
+    renderApp('/coach/matches/g1?tab=plan')
     expect(await screen.findByRole('heading', { name: 'Your goals' })).toBeInTheDocument()
     expect(screen.getByText('Plan not written')).toBeInTheDocument()
     const steps = screen.getByRole('navigation', { name: 'Game plan' })
@@ -123,7 +123,7 @@ describe('TRAK-284: plan step 1, opponent and goals', { timeout: 30_000 }, () =>
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeInTheDocument()
 
     cleanup()
-    renderApp('/coach/games/g1?tab=plan')
+    renderApp('/coach/matches/g1?tab=plan')
     expect(await screen.findByDisplayValue('Win it back in their half')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /Stronger/ })).toBeChecked()
     expect(screen.getByRole('combobox', { name: 'Their formation' })).toHaveTextContent('4-3-3')
@@ -135,7 +135,7 @@ describe('TRAK-284: plan step 1, opponent and goals', { timeout: 30_000 }, () =>
   it('takes up to three goals: a fourth can\'t be added, and one can be removed', async () => {
     const user = userEvent.setup()
     plans()
-    renderApp('/coach/games/g1?tab=plan')
+    renderApp('/coach/matches/g1?tab=plan')
     await user.click(await screen.findByRole('button', { name: 'Add a goal' }))
     await user.click(screen.getByRole('button', { name: 'Add a goal' }))
     expect(screen.getAllByRole('group', { name: /^Goal \d$/ })).toHaveLength(3)
@@ -151,7 +151,7 @@ describe('TRAK-284: plan step 1, opponent and goals', { timeout: 30_000 }, () =>
   it('a failed save keeps everything typed and says so; saving again works', async () => {
     const user = userEvent.setup()
     const { saves, state } = plans({ failSaves: true })
-    renderApp('/coach/games/g1?tab=plan')
+    renderApp('/coach/matches/g1?tab=plan')
     await user.type(within(await screen.findByRole('group', { name: 'Goal 1' })).getByLabelText('Goal'), 'Switch play to the free side')
     await user.click(screen.getByRole('button', { name: 'Save draft' }))
 
@@ -169,7 +169,7 @@ describe('TRAK-284: plan step 1, opponent and goals', { timeout: 30_000 }, () =>
   it('a shirt number is 1 to 99 or blank; a 0 stops the save and says where', async () => {
     const user = userEvent.setup()
     const { saves } = plans()
-    renderApp('/coach/games/g1?tab=plan')
+    renderApp('/coach/matches/g1?tab=plan')
     await user.click(await screen.findByRole('button', { name: 'Add a key player' }))
     await user.type(within(keyPlayer(1)).getByLabelText('Number'), '0')
     await user.click(screen.getByRole('button', { name: 'Save draft' }))

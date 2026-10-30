@@ -423,7 +423,7 @@ describe('TRAK-283: a match just published offers its game plan', { timeout: 20_
     await userEvent.click(screen.getByRole('button', { name: 'Publish vs Parkview Athletic' }))
     expect(await screen.findByText('Published to the squad')).toBeInTheDocument()
     await takeNextStep()
-    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/games/match-1?tab=plan'))
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/matches/match-1?tab=plan'))
   })
 
   it("Review's Publish of a new match offers it too", async () => {
@@ -438,7 +438,7 @@ describe('TRAK-283: a match just published offers its game plan', { timeout: 20_
     await pickTime(userEvent, 'Kickoff', '16:00')
     await saveEventWith(sheet, 'Publish')
     await takeNextStep()
-    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/games/written?tab=plan'))
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/matches/written?tab=plan'))
   })
 
   it('a training gets the usual toast only', async () => {

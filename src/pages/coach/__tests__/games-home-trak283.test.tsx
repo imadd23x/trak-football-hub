@@ -73,7 +73,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals() })
 
-const cards = () => within(screen.getByRole('region', { name: 'Your games' })).getAllByRole('link')
+const cards = () => within(screen.getByRole('region', { name: 'Your matches' })).getAllByRole('link')
   .map(card => card.getAttribute('href'))
 
 describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
@@ -86,11 +86,11 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
       match('past-new', null, onTheMinute(now - 3 * DAY)),
       match('soon', 'U16', onTheMinute(now + 3 * DAY), { opponent: 'Parkview Athletic' }),
     ])
-    renderApp('/coach/games')
-    await screen.findByRole('region', { name: 'Your games' })
+    renderApp('/coach/matches')
+    await screen.findByRole('region', { name: 'Your matches' })
     // All squads (TRAK-266): every match, soonest first, then past ones newest first.
-    expect(cards()).toEqual(['/coach/games/soon', '/coach/games/later', '/coach/games/past-new', '/coach/games/past-old'])
-    const next = screen.getByRole('region', { name: 'Next game' })
+    expect(cards()).toEqual(['/coach/matches/soon', '/coach/matches/later', '/coach/matches/past-new', '/coach/matches/past-old'])
+    const next = screen.getByRole('region', { name: 'Next match' })
     expect(within(next).getByText('vs Parkview Athletic')).toBeInTheDocument()
     expect(within(next).getByText('Plan not written')).toBeInTheDocument()
     expect(within(next).getAllByRole('button').filter(button => button.textContent === 'Write the plan')).toHaveLength(1)
@@ -102,11 +102,11 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
 
     // U14: its own match and the whole roster's; the next game follows.
     await user.click(within(screen.getByRole('group', { name: 'Age group' })).getByRole('button', { name: 'U14' }))
-    await waitFor(() => expect(cards()).toEqual(['/coach/games/later', '/coach/games/past-new']))
-    expect(within(screen.getByRole('region', { name: 'Next game' })).getByText('vs Opponent later')).toBeInTheDocument()
+    await waitFor(() => expect(cards()).toEqual(['/coach/matches/later', '/coach/matches/past-new']))
+    expect(within(screen.getByRole('region', { name: 'Next match' })).getByText('vs Opponent later')).toBeInTheDocument()
 
-    await user.click(within(screen.getByRole('region', { name: 'Your games' })).getByRole('link', { name: /vs Opponent past-new/ }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/games/past-new'))
+    await user.click(within(screen.getByRole('region', { name: 'Your matches' })).getByRole('link', { name: /vs Opponent past-new/ }))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/matches/past-new'))
   })
 
   it("counts down to the event's instant whatever the phone's zone, and shows the academy's own time", async () => {
@@ -120,8 +120,8 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
     })
     const kickOff = onTheMinute(Date.now() + 3 * DAY + 2 * HOUR + 5 * MINUTE)
     eventsRead([match('soon', 'U16', kickOff, { opponent: 'Parkview Athletic', published: false })])
-    renderApp('/coach/games')
-    const next = await screen.findByRole('region', { name: 'Next game' })
+    renderApp('/coach/matches')
+    const next = await screen.findByRole('region', { name: 'Next match' })
     expect(within(next).getByText('Logistics not shared')).toBeInTheDocument()
     expect(within(next).getByRole('button', { name: 'Share the logistics' })).toBeInTheDocument()
     await waitFor(() => expect(within(next).getByRole('timer', { name: 'Kick-off in' })).toHaveTextContent(/3 days, 2 hours, [45] minutes/))
@@ -129,12 +129,12 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
     expect(within(next).getByText(new RegExp(`${at.hour}:${at.minute} Athens time$`))).toBeInTheDocument()
 
     await userEvent.click(within(next).getByRole('button', { name: 'Share the logistics' }))
-    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/games/soon?tab=logistics'))
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/matches/soon?tab=logistics'))
   })
 
   it("with no match, Add a match opens Schedule's New event with Match picked", async () => {
     eventsRead([])
-    renderApp('/coach/games')
+    renderApp('/coach/matches')
     await userEvent.click(await screen.findByRole('button', { name: 'Add a match' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/schedule'))
     const sheet = await screen.findByRole('dialog', { name: 'New event' }, { timeout: 5000 })
@@ -143,7 +143,7 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
 
   it('a failed read says so with Retry, never "No matches yet"', async () => {
     server.use(tableError('coach_calendar_events', 500, { message: 'unavailable' }))
-    renderApp('/coach/games')
+    renderApp('/coach/matches')
     const failure = await screen.findByRole('alert', {}, { timeout: 5000 })
     expect(within(failure).getByRole('button', { name: /Retry/ })).toBeInTheDocument()
     expect(screen.queryByText('No matches yet')).toBeNull()
@@ -152,7 +152,7 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
   it('with the switch off, Games is parked like any other screen', async () => {
     server.use(rpc('feature_on', ({ p_feature }) => p_feature === 'events'))
     eventsRead([])
-    renderApp('/coach/games')
+    renderApp('/coach/matches')
     expect(await screen.findByRole('note', { name: 'This screen is coming soon' })).toBeInTheDocument()
   })
 })

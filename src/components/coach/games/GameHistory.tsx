@@ -23,7 +23,7 @@ export function GameHistory({ game, planCreatedAt, savedAt, publishedAt }: {
       return data ?? []
     },
   })
-  if (shares.error) return <LoadError what="this game’s history" onRetry={() => void shares.refetch()} />
+  if (shares.error) return <LoadError what="this match’s history" onRetry={() => void shares.refetch()} />
   if (shares.isPending) return <p role="status" className="text-[13px] text-ink-3">Loading the history…</p>
   const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
   const events = [

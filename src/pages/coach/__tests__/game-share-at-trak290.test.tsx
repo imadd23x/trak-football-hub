@@ -111,7 +111,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); cleanup(); localStorage.clear() })
 
-const shareStep = () => renderApp('/coach/games/g1?tab=plan&step=share')
+const shareStep = () => renderApp('/coach/matches/g1?tab=plan&step=share')
 
 describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
   it('sits behind Share now\'s chevron: it waits for the tick, saves what is typed, then schedules on the academy\'s clock', async () => {

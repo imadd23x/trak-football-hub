@@ -19,7 +19,7 @@ export function GameReviewSection({ review, as, childName }: {
   return (
     <section aria-labelledby={id} className="arc grid gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id={id} className="text-[17px] font-medium text-ink">After the game</h2>
+        <h2 id={id} className="text-[17px] font-medium text-ink">After the match</h2>
         <span className="text-[13px] text-ink-2">Final score {review.ourScore}–{review.theirScore}</span>
       </div>
       {review.job && <div className={panel}>

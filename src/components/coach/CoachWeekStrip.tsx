@@ -124,7 +124,7 @@ function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, label
         {item.step === 'review' && item.row
           ? <div className="grid gap-3">
               <p className="text-[14px] text-ink-2">The evaluation is published, so the result is final.</p>
-              <Link to={`/coach/games/${item.row.id}?tab=evaluation`}
+              <Link to={`/coach/matches/${item.row.id}?tab=evaluation`}
                 className="flex min-h-11 w-full items-center justify-center rounded-xl bg-raised text-[14px] font-medium text-ink focus-visible:ring-2 focus-visible:ring-primary">
                 Open the review</Link>
             </div>
@@ -177,7 +177,7 @@ export function NextStep({ item, coachId, roster, onChanged }: {
     return go(action.label, () => navigate(actionLink(row.id, action)))
   }
   // TRAK-289: a published evaluation is final; it's read on the game page, never in the old log's editor.
-  if (item.step === 'review' && row) return go('View review', () => navigate(`/coach/games/${row.id}?tab=evaluation`))
+  if (item.step === 'review' && row) return go('View review', () => navigate(`/coach/matches/${row.id}?tab=evaluation`))
   if (item.step === 'log' && row) return go('Log it', () => navigate('/coach/sessions/quick', {
     state: { fromEvent: { eventId: row.id, date: row.event_date, opponent: row.opponent, homeAway: row.home_away, squad: row.squad ?? null } },
   }))

@@ -3,7 +3,7 @@
 export type CoachScreen = 'home' | 'calendar' | 'squad' | 'games' | 'training' | 'library' | 'settings'
 
 export const COACH_SCREEN_PATH: Record<CoachScreen, string> = {
-  home: '/coach/home', calendar: '/coach/schedule', squad: '/coach/squad', games: '/coach/games', training: '/coach/training', library: '/coach/trainings', settings: '/settings',
+  home: '/coach/home', calendar: '/coach/schedule', squad: '/coach/squad', games: '/coach/matches', training: '/coach/training', library: '/coach/trainings', settings: '/settings',
 }
 
 /** Which nav row a path belongs to, and the name in the laptop's top bar. */
@@ -12,7 +12,7 @@ const PLACES: [prefix: string, screen: CoachScreen | null, title: string][] = [
   ['/coach/schedule', 'calendar', 'Schedule'], // TRAK-255
   ['/coach/squad', 'squad', 'Squad'],
   ['/coach/player', 'squad', 'Player'],
-  ['/coach/games', 'games', 'Games'], // TRAK-283: Games home and each game's page
+  ['/coach/matches', 'games', 'Matches'], // TRAK-283: Games home and each game's page
   ['/coach/training', 'training', 'Training'], // TRAK-294: Training home, its drills and plans
   ['/coach/trainings', 'library', 'Library'],
   ['/settings', 'settings', 'Settings'],

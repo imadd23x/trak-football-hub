@@ -70,19 +70,19 @@ describe('TRAK-284: plan drafts on Games home and in Needs you', { timeout: 30_0
       table('coach_calendar_events', [game('g1', 'Parkview Athletic', 5), game('g2', 'Riverside Rovers', 8), game('g0', 'Harbour Town', -1)]),
       table('game_plans', [plan('g1'), plan('g0')]),
     )
-    renderApp('/coach/games')
+    renderApp('/coach/matches')
     const drafts = await screen.findByRole('region', { name: 'Open drafts' })
     expect(within(drafts).getAllByRole('listitem')).toHaveLength(1)
     expect(within(drafts).getByText('vs Parkview Athletic')).toBeInTheDocument()
     expect(within(drafts).getByText('Game plan · saved Tue 27 Oct, 21:40')).toBeInTheDocument()
 
-    const next = screen.getByRole('region', { name: 'Next game' })
+    const next = screen.getByRole('region', { name: 'Next match' })
     expect(within(next).getByText('Plan not shared')).toBeInTheDocument()
-    const strip = screen.getByRole('region', { name: 'Your games' })
+    const strip = screen.getByRole('region', { name: 'Your matches' })
     expect(within(within(strip).getByRole('link', { name: /Riverside Rovers/ })).getByText('Plan not written')).toBeInTheDocument()
 
     await user.click(within(drafts).getByRole('button', { name: 'Open the plan, vs Parkview Athletic' }))
-    expect(window.location.pathname + window.location.search).toBe('/coach/games/g1?tab=plan')
+    expect(window.location.pathname + window.location.search).toBe('/coach/matches/g1?tab=plan')
   })
 
   it('Needs you lists a shared match kicking off within 7 days: "Plan not shared · Write the plan"', async () => {
@@ -93,7 +93,7 @@ describe('TRAK-284: plan drafts on Games home and in Needs you', { timeout: 30_0
     const needs = await screen.findByRole('region', { name: /Needs you/ }, { timeout: 5000 })
     const card = (await within(needs).findByText('vs Parkview Athletic')).closest('li')!
     expect(within(card).getByText('Plan not shared')).toBeInTheDocument()
-    expect(within(card).getByRole('link', { name: 'Write the plan' })).toHaveAttribute('href', '/coach/games/g1?tab=plan')
+    expect(within(card).getByRole('link', { name: 'Write the plan' })).toHaveAttribute('href', '/coach/matches/g1?tab=plan')
     expect(within(needs).queryByText('vs Riverside Rovers')).toBeNull()
     expect(within(needs).queryByText('vs Harbour Town')).toBeNull()
   })

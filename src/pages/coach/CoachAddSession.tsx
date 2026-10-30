@@ -677,7 +677,7 @@ export default function CoachAddSession() {
   return (
     <MobileShell width="read">
       {/* TRAK-288: an old link or Back that would open the match log goes to the match's evaluation, or to Games. */}
-      {games && type === 'match' && <Navigate replace to={eventId ? `/coach/games/${eventId}?tab=evaluation` : '/coach/games'} />}
+      {games && type === 'match' && <Navigate replace to={eventId ? `/coach/matches/${eventId}?tab=evaluation` : '/coach/matches'} />}
       {/* Topbar */}
       <div className="flex items-center justify-between pt-3 pb-2 border-b border-line">
         <button onClick={() => navigate(-1)} aria-label="Back"

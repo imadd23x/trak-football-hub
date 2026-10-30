@@ -65,14 +65,14 @@ afterEach(() => { vi.useRealTimers(); cleanup(); localStorage.clear() })
 describe('TRAK-290: the morning-after nudge', { timeout: 30_000 }, () => {
   it('the draft alert says when it will remind, then from 09:00 the next morning says good morning', async () => {
     vi.setSystemTime(EVENING)
-    renderApp('/coach/games/match-1?tab=evaluation')
+    renderApp('/coach/matches/match-1?tab=evaluation')
     expect(await screen.findByText('Draft saved 17:40')).toBeInTheDocument()
     expect(screen.getByText('Only you can see it. We’ll remind you tomorrow at 09:00.')).toBeInTheDocument()
     expect(screen.queryByText(/Good morning/)).toBeNull()
     cleanup()
 
     vi.setSystemTime(MORNING)
-    renderApp('/coach/games/match-1?tab=evaluation')
+    renderApp('/coach/matches/match-1?tab=evaluation')
     expect(await screen.findByText('Draft saved Wed 17:40')).toBeInTheDocument()
     expect(screen.getByText('Good morning. Add anything you remembered overnight, then publish.')).toBeInTheDocument()
   })

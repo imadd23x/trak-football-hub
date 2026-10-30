@@ -90,7 +90,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); localStorage.clear() })
 
 async function openLineUp(user: ReturnType<typeof userEvent.setup>) {
-  renderApp('/coach/games/g1?tab=plan')
+  renderApp('/coach/matches/g1?tab=plan')
   await user.click(await screen.findByRole('button', { name: 'Next: Line-up and jobs' }))
   return screen.findByRole('heading', { name: '4-4-2' })
 }

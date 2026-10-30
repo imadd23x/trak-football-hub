@@ -145,7 +145,7 @@ describe('TRAK-304: today’s plan on coach Home', { timeout: 20_000 }, () => {
     const match = await within(await today()).findByRole('article', { name: 'Match, vs Everton' })
     await waitFor(() => expect(within(match).getByText('4-3-3')).toBeInTheDocument())
     expect(within(match).getByText('Win it back in 5 seconds')).toBeInTheDocument()
-    expect(within(match).getByRole('link', { name: 'Open the game plan' })).toHaveAttribute('href', '/coach/games/m1?tab=plan')
+    expect(within(match).getByRole('link', { name: 'Open the game plan' })).toHaveAttribute('href', '/coach/matches/m1?tab=plan')
   })
 
   it('a training earlier today stays on the card, closed, as a reminder of what was done', async () => {

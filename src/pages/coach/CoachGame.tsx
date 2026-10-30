@@ -45,12 +45,12 @@ export default function CoachGame() {
   return (
     <div className="min-h-screen bg-ground pb-24">
       <div className="mx-auto w-full max-w-[960px] px-5 tablet:px-8">
-        <Link to="/coach/games" className={`mt-5 inline-flex items-center gap-1 ${linkClass}`}><ChevronLeft size={16} aria-hidden="true" />Games</Link>
-        {game.error || shares.error ? <div className="pt-6"><LoadError what="this game" onRetry={() => { void game.refetch(); void shares.refetch() }}
+        <Link to="/coach/matches" className={`mt-5 inline-flex items-center gap-1 ${linkClass}`}><ChevronLeft size={16} aria-hidden="true" />Matches</Link>
+        {game.error || shares.error ? <div className="pt-6"><LoadError what="this match" onRetry={() => { void game.refetch(); void shares.refetch() }}
             retrying={game.isFetching || shares.isFetching} /></div>
           : game.isPending || plan.isPending || players.isPending || shares.isPending || evaluation.isPending
-            ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading the game…</p>
-          : !game.data ? <p className="pt-10 text-[15px] text-ink-2">This game isn’t in your games.</p>
+            ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading the match…</p>
+          : !game.data ? <p className="pt-10 text-[15px] text-ink-2">This match isn’t in your matches.</p>
           // Keyed by match: a route that only changes :eventId must never carry one match's typing into another's.
           : <Game key={game.data.id} row={game.data} plan={plan} players={players} sharedAt={shares.data.get(game.data.id) ?? null} evaluation={evaluation} />}
       </div>
@@ -112,7 +112,7 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
     {cancelled ? <p className="pt-4 text-[15px] text-ink-2">This match was cancelled.</p> : (
       <div className="arc pt-4">
         <Tabs value={tab} onValueChange={next => setParams({ tab: next }, { replace: true })}>
-          <TabsList aria-label="This game">
+          <TabsList aria-label="This match">
             {TABS.map(t => <TabsTrigger key={t.id} value={t.id}>{t.label}</TabsTrigger>)}
           </TabsList>
           <TabsContent value="logistics"><Logistics row={row} squad={squad} /></TabsContent>

@@ -102,7 +102,7 @@ describe('TRAK-289: publishing the evaluation', { timeout: 30_000 }, () => {
   it('waits for every "Did the plan work?" answer before it publishes', async () => {
     const user = userEvent.setup()
     backend()
-    renderApp('/coach/games/g1?tab=evaluation')
+    renderApp('/coach/matches/g1?tab=evaluation')
     await user.click(await screen.findByRole('button', { name: 'Next: Team' }))
     await user.click(screen.getByRole('button', { name: 'Next: Players' }))
     await user.click(screen.getByRole('button', { name: 'Next: Publish' }))
@@ -125,7 +125,7 @@ describe('TRAK-289: publishing the evaluation', { timeout: 30_000 }, () => {
   it('asks the competition and home or away of a match made without them, and publishes them', async () => {
     const user = userEvent.setup()
     backend({ competition: null, home_away: null }, ['worked', 'partly'])
-    renderApp('/coach/games/g1?tab=evaluation')
+    renderApp('/coach/matches/g1?tab=evaluation')
     await user.click(await screen.findByRole('button', { name: 'Next: Team' }))
     await user.click(screen.getByRole('button', { name: 'Next: Players' }))
     await user.click(screen.getByRole('button', { name: 'Next: Publish' }))
@@ -143,7 +143,7 @@ describe('TRAK-289: publishing the evaluation', { timeout: 30_000 }, () => {
   it('once published, the loop is closed: the History, the preview, and nothing left to edit', async () => {
     const user = userEvent.setup()
     backend({}, ['worked', 'partly'])
-    renderApp('/coach/games/g1?tab=evaluation')
+    renderApp('/coach/matches/g1?tab=evaluation')
     await user.click(await screen.findByRole('button', { name: 'Next: Team' }))
     await user.click(screen.getByRole('button', { name: 'Next: Players' }))
     await user.click(screen.getByRole('button', { name: 'Next: Publish' }))
@@ -159,23 +159,23 @@ describe('TRAK-289: publishing the evaluation', { timeout: 30_000 }, () => {
 
     // A reload still shows it closed.
     cleanup()
-    renderApp('/coach/games/g1?tab=evaluation')
+    renderApp('/coach/matches/g1?tab=evaluation')
     expect(await screen.findByText('Published to 2 players and their families. The loop is closed.')).toBeInTheDocument()
   })
 
   it('the preview shows each player what they\'ll read, and their parent the same without the note', async () => {
     const user = userEvent.setup()
     backend({}, ['worked', 'partly'])
-    renderApp('/coach/games/g1?tab=evaluation')
+    renderApp('/coach/matches/g1?tab=evaluation')
     await user.click(await screen.findByRole('button', { name: 'Next: Team' }))
     await user.click(screen.getByRole('button', { name: 'Next: Players' }))
     await user.click(screen.getByRole('button', { name: 'Next: Publish' }))
     const preview = screen.getByRole('region', { name: 'Preview' })
     // It opens on the first player in line-up order, Dellas.
-    expect(within(preview).getByRole('region', { name: 'After the game' })).toHaveTextContent('You did your job')
+    expect(within(preview).getByRole('region', { name: 'After the match' })).toHaveTextContent('You did your job')
     await user.click(within(preview).getByRole('combobox', { name: 'Player' }))
     await user.click(await screen.findByRole('option', { name: 'Theodoros Zagorakis' }))
-    const after = within(preview).getByRole('region', { name: 'After the game' })
+    const after = within(preview).getByRole('region', { name: 'After the match' })
     expect(after).toHaveTextContent('Final score 2–1')
     expect(after).toHaveTextContent('Your job')
     expect(after).toHaveTextContent('You did part of your job')
@@ -185,7 +185,7 @@ describe('TRAK-289: publishing the evaluation', { timeout: 30_000 }, () => {
     expect(after).toHaveTextContent('Brave all game.')
 
     await user.click(within(preview).getByRole('button', { name: 'As the parent' }))
-    const parent = within(preview).getByRole('region', { name: 'After the game' })
+    const parent = within(preview).getByRole('region', { name: 'After the match' })
     expect(parent).toHaveTextContent('Theodoros’s job')
     expect(parent).not.toHaveTextContent('Brave all game.')
     expect(parent).toHaveTextContent('Coach Otto Rehhagel’s note is just for Theodoros.')

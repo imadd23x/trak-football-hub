@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,6 +39,12 @@ const DevSetupPage = import.meta.env.DEV
 const DevSwitcher = import.meta.env.DEV
   ? lazy(() => import("@/components/trak/DevSwitcher").then(m => ({ default: m.DevSwitcher })))
   : null;
+
+/** TRAK-315: /coach/games… is now /coach/matches…, with the same tab and step. */
+function OldGamesLink() {
+  const { pathname, search } = useLocation();
+  return <Navigate replace to={pathname.replace(/^\/coach\/games/, "/coach/matches") + search} />;
+}
 
 const PlayerHome = lazy(() => import("./pages/player/PlayerHome"));
 const PlayerMatches = lazy(() => import("./pages/player/PlayerMatches"));
@@ -180,8 +186,10 @@ const App = () => (
             <Route path="/coach/recognition" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachRecognition /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/award" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachAwardPlayer /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/schedule" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="events"><CoachSchedule /></ParkedScreen></RouteGuard>} />
-            <Route path="/coach/games" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="games"><CoachGames /></ParkedScreen></RouteGuard>} />
-            <Route path="/coach/games/:eventId" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="games"><CoachGame /></ParkedScreen></RouteGuard>} />
+            <Route path="/coach/matches" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="games"><CoachGames /></ParkedScreen></RouteGuard>} />
+            <Route path="/coach/matches/:eventId" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="games"><CoachGame /></ParkedScreen></RouteGuard>} />
+            {/* TRAK-315: Games became Matches; an old link or bookmark still opens the same match. */}
+            <Route path="/coach/games/*" element={<OldGamesLink />} />
             {/* TRAK-294: the Training tab (TRAK-293), behind the academy's training switch. */}
             <Route path="/coach/training/*" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="training"><CoachTraining /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/assistant" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachAssistant /></ParkedScreen></RouteGuard>} />

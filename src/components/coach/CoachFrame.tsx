@@ -87,7 +87,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
     { id: 'calendar', label: 'Schedule', icon: CalendarDays }, // TRAK-255: the coach's is called Schedule
     { id: 'squad', label: 'Squad', icon: Users },
     // TRAK-306 (Kostas, 28 Oct): Imad's pitch (TRAK-265) for Games; a cone for Training, and for Library in its place.
-    ...(games ? [{ id: 'games', label: 'Games', icon: PitchIcon }] : []),
+    ...(games ? [{ id: 'games', label: 'Matches', icon: PitchIcon }] : []),
     training ? { id: 'training', label: 'Training', icon: TrafficCone } : { id: 'library', label: 'Library', icon: TrafficCone },
   ]
   const select = (id: string) => { if (id in TO) navigate(TO[id as Screen]) }
@@ -113,7 +113,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
         items={[
           { value: 'home', label: 'Home', icon: <House /> },
           { value: 'squad', label: 'Squad', icon: <Users /> },
-          ...(games ? [{ value: 'games', label: 'Games', icon: <PitchIcon /> }] : []),
+          ...(games ? [{ value: 'games', label: 'Matches', icon: <PitchIcon /> }] : []),
           training ? { value: 'training', label: 'Training', icon: <TrafficCone /> } : { value: 'library', label: 'Library', icon: <TrafficCone /> },
         ]}
         actionNode={<CoachCreate placement="bar" onSaved={saved} />} />

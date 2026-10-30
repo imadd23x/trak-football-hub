@@ -108,7 +108,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); localStorage.clear() })
 
-const shareStep = () => renderApp('/coach/games/g1?tab=plan&step=share')
+const shareStep = () => renderApp('/coach/matches/g1?tab=plan&step=share')
 
 describe('TRAK-286: the Share step', { timeout: 30_000 }, () => {
   it('Share now waits for the face-to-face tick, saves what is typed, then shares', async () => {
@@ -205,7 +205,7 @@ describe('TRAK-286: the Share step', { timeout: 30_000 }, () => {
   it('a starter whose family says they can\'t make it is flagged in Everyone\'s job, and still reads the plan', async () => {
     const user = userEvent.setup()
     store({ lineUp: [...LINE_UP, row('nikopolidis', { role: 'starter', slot: 1, job: 'Command the box on crosses.' })] })
-    renderApp('/coach/games/g1?tab=plan')
+    renderApp('/coach/matches/g1?tab=plan')
     await user.click(await screen.findByRole('button', { name: 'Next: Line-up and jobs' }))
     const jobs = await screen.findByRole('region', { name: 'Everyone’s job' })
     const keeper = within(jobs).getByRole('button', { name: /Antonios Nikopolidis/ }).closest('li')!
@@ -237,24 +237,24 @@ describe('TRAK-286: Needs you and Games home follow the share', { timeout: 30_00
     await within(needs).findByText('vs Parkview Athletic')
     expect(within(card('vs Parkview Athletic')).getByText('Changes not shared · 2 players')).toBeInTheDocument()
     expect(within(card('vs Parkview Athletic')).getByRole('link', { name: 'Share the changes' }))
-      .toHaveAttribute('href', '/coach/games/g1?tab=plan&step=share')
+      .toHaveAttribute('href', '/coach/matches/g1?tab=plan&step=share')
     expect(within(needs).queryByText('vs Riverside Rovers')).toBeNull()
     expect(within(card('vs Harbour Town')).getByText('Plan not shared')).toBeInTheDocument()
-    expect(within(card('vs Harbour Town')).getByRole('link', { name: 'Share the plan' })).toHaveAttribute('href', '/coach/games/g3?tab=plan&step=share')
-    expect(within(card('vs Northgate United')).getByRole('link', { name: 'Write the plan' })).toHaveAttribute('href', '/coach/games/g4?tab=plan')
+    expect(within(card('vs Harbour Town')).getByRole('link', { name: 'Share the plan' })).toHaveAttribute('href', '/coach/matches/g3?tab=plan&step=share')
+    expect(within(card('vs Northgate United')).getByRole('link', { name: 'Write the plan' })).toHaveAttribute('href', '/coach/matches/g4?tab=plan')
   })
 
   it('Games home: a shared plan leaves Open drafts; the next game offers Share the changes', async () => {
     const user = userEvent.setup()
     games({ g1: ['charisteas'] })
-    renderApp('/coach/games')
+    renderApp('/coach/matches')
     const drafts = await screen.findByRole('region', { name: 'Open drafts' })
     expect(within(drafts).getAllByRole('listitem').map(item => item.textContent)).toEqual([expect.stringContaining('vs Harbour Town')])
-    const next = screen.getByRole('region', { name: 'Next game' })
+    const next = screen.getByRole('region', { name: 'Next match' })
     expect(await within(next).findByText('Changes not shared')).toBeInTheDocument()
-    const strip = screen.getByRole('region', { name: 'Your games' })
+    const strip = screen.getByRole('region', { name: 'Your matches' })
     expect(within(within(strip).getByRole('link', { name: /Riverside Rovers/ })).getByText('Plan shared')).toBeInTheDocument()
     await user.click(within(next).getByRole('button', { name: 'Share the changes' }))
-    expect(window.location.pathname + window.location.search).toBe('/coach/games/g1?tab=plan&step=share')
+    expect(window.location.pathname + window.location.search).toBe('/coach/matches/g1?tab=plan&step=share')
   })
 })

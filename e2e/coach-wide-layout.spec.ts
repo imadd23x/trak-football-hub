@@ -348,7 +348,7 @@ const drawnEdges = (page: Page) => page.evaluate(() => {
 // Each page's column is the same, its content starts at the margin, and nothing sits in the margins.
 const MENU_PAGES = [
   ['Home', '/coach/home', ['events', 'games', 'training']], ['Schedule', '/coach/schedule', ['events', 'games', 'training']],
-  ['Squad', '/coach/squad', ['events', 'games', 'training']], ['Games', '/coach/games', ['events', 'games', 'training']],
+  ['Squad', '/coach/squad', ['events', 'games', 'training']], ['Matches', '/coach/matches', ['events', 'games', 'training']],
   ['Training', '/coach/training', ['events', 'games', 'training']], ['Drills', '/coach/training/drills', ['events', 'games', 'training']],
   ['Settings', '/settings', ['events', 'games', 'training']], ['Library', '/coach/trainings', ['events']], // Library: Training off
 ] as const

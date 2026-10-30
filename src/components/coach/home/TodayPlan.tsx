@@ -56,7 +56,7 @@ export function TodayPlan({ trainingOn, gamesOn, inView }: {
       </ul>
       : next ? <div className="mt-4 grid gap-2">
         <p className="text-[15px] text-ink-2">Next up</p>
-        <Link to={next.kind === 'training' ? `/coach/training/${next.event.id}` : `/coach/games/${next.event.id}`}
+        <Link to={next.kind === 'training' ? `/coach/training/${next.event.id}` : `/coach/matches/${next.event.id}`}
           className="flex items-center gap-3 rounded-xl bg-raised px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           <CalendarCheck aria-hidden size={20} className="flex-none text-brand" />
           <span className="min-w-0">
@@ -114,7 +114,7 @@ function TodayMatch({ game, named }: { game: Game; named: boolean }) {
   return <article aria-label={`Match, ${gameTitle(game)}`} className="grid gap-2">
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
       <p className="min-w-0 text-sm font-medium text-brand break-words">{['Game plan', named ? gameTitle(game) : null].filter(Boolean).join(' · ')}</p>
-      <Link to={`/coach/games/${game.id}?tab=plan`} className={linkClass}>{plan.data ? 'Open the game plan' : 'Write the game plan'}</Link>
+      <Link to={`/coach/matches/${game.id}?tab=plan`} className={linkClass}>{plan.data ? 'Open the game plan' : 'Write the game plan'}</Link>
     </div>
     {plan.data && (plan.data.formation || goals.length > 0) ? <dl className="grid gap-1 text-[15px]">
       {plan.data.formation && <div className="flex gap-3"><dt className="w-20 flex-none text-sm text-ink-3">Formation</dt><dd className="text-ink">{plan.data.formation}</dd></div>}

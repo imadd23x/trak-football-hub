@@ -539,7 +539,7 @@ export default function CoachSchedule() {
 
   /** TRAK-283: with Games on, a match just published offers its next step, which opens its game page. */
   const publishedToast = (text: string, matchId?: string) => toast.success(text, games && matchId
-    ? { duration: 10_000, action: { label: 'Write the game plan', onClick: () => navigate(`/coach/games/${matchId}?tab=plan`) } }
+    ? { duration: 10_000, action: { label: 'Write the game plan', onClick: () => navigate(`/coach/matches/${matchId}?tab=plan`) } }
     : undefined)
 
   /** Review's Publish: what was just saved goes out, as the list's Publish does.
@@ -561,7 +561,7 @@ export default function CoachSchedule() {
     }
     askToEmailFamilies() // TRAK-135: publishing emails families too; never for one that has started
     // TRAK-288: a game with an empty plan, straight to its evaluation.
-    if (evaluate) return navigate(`/coach/games/${ids[0]}?tab=evaluation`)
+    if (evaluate) return navigate(`/coach/matches/${ids[0]}?tab=evaluation`)
     publishedToast(ids.length > 1 ? `Published ${ids.length} events to the squad` : 'Published to the squad', ids.length === 1 && kind === 'match' ? ids[0] : undefined)
   }
 
@@ -841,11 +841,11 @@ export default function CoachSchedule() {
                   if (!registerProblem(row)) items.push({ id: 'register', label: `${sessionId ? 'Edit register' : 'Take register'} for ${row.title}`,
                     content: sessionId ? 'Edit register' : 'Take register', icon: <ClipboardCheck />, onSelect: guarded(() => setSheet({ kind: 'register', row })) })
                   if (row.event_type === 'match' && row.published && !cancelled && started) items.push(games && evaluations.data?.get(row.id)?.publishedAt
-                    ? { id: 'match', label: `View review of ${row.title}`, content: 'View review', icon: <ClipboardList />, onSelect: () => navigate(`/coach/games/${row.id}?tab=evaluation`) }
+                    ? { id: 'match', label: `View review of ${row.title}`, content: 'View review', icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
                     : sessionId
                     ? { id: 'match', label: `Edit match for ${row.title}`, content: 'Edit match', icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${sessionId}`) }
                     // TRAK-288: where Games is on, the match's evaluation replaces the match log.
-                    : games ? { id: 'match', label: `Evaluate ${row.title}`, content: 'Evaluate', icon: <ClipboardList />, onSelect: () => navigate(`/coach/games/${row.id}?tab=evaluation`) }
+                    : games ? { id: 'match', label: `Evaluate ${row.title}`, content: 'Evaluate', icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
                     : { id: 'match', label: `Log match for ${row.title}`, content: 'Log match', icon: <ClipboardList />, onSelect: guarded(() => navigate('/coach/sessions/quick', {
                         state: { fromEvent: { eventId: row.id, date: row.event_date, opponent: row.opponent, homeAway: row.home_away, squad: row.squad ?? null } },
                       })) })

@@ -77,7 +77,7 @@ function ContentMatches() {
   const games = useFeature('games')
   if (games) return (
     <div className="space-y-4 text-[13px] leading-relaxed text-ink-2">
-      <p>Each match has its page in <b className="text-ink">Games</b>: the logistics, your game plan and, from full time, its evaluation. On Home's week a played match offers <b className="text-ink">Evaluate</b>.</p>
+      <p>Each match has its page in <b className="text-ink">Matches</b>: the logistics, your game plan and, from full time, its evaluation. On Home's week a played match offers <b className="text-ink">Evaluate</b>.</p>
       <Rule>The evaluation is a draft only you see. Save it and sleep on it: nothing reaches players or families until you publish it.</Rule>
     </div>
   )

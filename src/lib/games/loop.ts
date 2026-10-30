@@ -64,7 +64,7 @@ export function gameStatus(game: GameEvent, now: number, plan: PlanProgress = {}
 
 /** The game page's address for a next action. */
 export const actionLink = (eventId: string, action: Omit<GameAction, 'label'>) =>
-  `/coach/games/${eventId}?tab=${action.tab}${action.step ? `&step=${action.step}` : ''}`
+  `/coach/matches/${eventId}?tab=${action.tab}${action.step ? `&step=${action.step}` : ''}`
 
 const WEEK = 7 * 24 * 60 * 60_000
 

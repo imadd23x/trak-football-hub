@@ -24,15 +24,19 @@ import { ShareReadiness } from '@/components/arc/blocks/release-readiness/share-
    and the parent's own Game plan section. In the app only: no email, no push. TRAK-287: locked at kick-off, nothing
    is shared any more; the lock's alert says what wasn't. TRAK-290: Share at… behind Share now's chevron (Arc's
    split-button: Share now is the usual pick, a time is its variant). A scheduled plan waits with "Shares Thu 19:30";
-   the coach can move the time or share it now, and what's saved by then goes out (Imad, 29 Oct). */
+   the coach can move the time or share it now, and what's saved by then goes out (Imad, 29 Oct). TRAK-318 (Imad, 30 Oct):
+   before the first share, the face-to-face tick and Share now sit in the plan's bottom bar beside Save draft (GamePlan),
+   so both choices are where the coach ends up; this card lists what's ready. */
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
 const first = (name: string) => name.split(/\s+/)[0] || name
 const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
 const list = (names: string[]) => names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 
-export function ShareStep({ game, form, who, sharedAt, changes, coachName, onShare, onSchedule, sharing, problem, locked = false }: {
+export function ShareStep({ game, form, who, sharedAt, changes, coachName, onShare, onSchedule, sharing, problem, talked = false, locked = false }: {
   game: EventRow; form: PlanForm; who: ReturnType<typeof useWhoCanCome>; locked?: boolean
+  /** TRAK-318: the face-to-face tick, ticked in the plan's bottom bar beside Share now. */
+  talked?: boolean
   /** When the plan was first shared, or goes out if that's still to come (TRAK-290); null while it's a draft. */
   sharedAt: string | null
   /** The squad rows whose copies a share would change now (game_plan_changes). */
@@ -45,7 +49,6 @@ export function ShareStep({ game, form, who, sharedAt, changes, coachName, onSha
   sharing: boolean
   problem: string | null
 }) {
-  const [talked, setTalked] = useState(false)
   const [picking, setPicking] = useState(false)
   // A new share time (scheduled, moved or gone out now) closes the picker.
   useEffect(() => setPicking(false), [sharedAt])
@@ -75,8 +78,6 @@ export function ShareStep({ game, form, who, sharedAt, changes, coachName, onSha
         ) : sharedAt == null ? (
           <div className="arc">
             <ShareReadiness title="Share the plan" subtitle={`${players(reading.length)} and their families, in the app only`}
-              actionLabel="Share now" onAction={() => onShare(talked)} busy={sharing && !picking} error={problem}
-              alternatives={[{ label: 'Share at…', onSelect: () => setPicking(true) }]}
               checks={[
                 { id: 'logistics', label: 'Logistics shared with families', required: true, done: game.published,
                   detail: game.published ? 'Families have the time and the place.' : 'Publish the match in Logistics first.' },
@@ -84,12 +85,9 @@ export function ShareStep({ game, form, who, sharedAt, changes, coachName, onSha
                   detail: `${placed} of ${form.format} placed.${placed === form.format ? '' : ' You can share before it’s complete.'}` },
                 { id: 'jobs', label: 'Every starter has a job', done: placed > 0 && withJob === placed,
                   detail: placed === 0 ? 'Nobody is on the pitch yet.' : `${withJob} of ${placed} starters have one.${withJob === placed ? '' : ' You can still share.'}` },
-                { id: 'talked', label: 'I’ve talked selection through with the players, face to face', required: true, done: talked,
-                  detail: 'Before this goes out. Players should hear it from you first.', onCheckedChange: setTalked },
-              ]}>
-              {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta={when => when ? `Schedule for ${when}` : 'Schedule'} busy={sharing}
-                ready={talked && game.published} onSchedule={at => onSchedule(at, talked)} onCancel={() => setPicking(false)} />}
-            </ShareReadiness>
+                { id: 'talked', label: 'Talked selection through, face to face', required: true, done: talked,
+                  detail: talked ? 'Ticked beside Share now.' : 'Tick it at the bottom, beside Share now.' },
+              ]} />
           </div>
         ) : waiting && sharedAt ? (
           <section aria-labelledby="plan-scheduled" className={`arc ${card}`}>
@@ -155,7 +153,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, coachName, onSha
 
 /** TRAK-290: Share at… The day and time are the academy's clock, as every form's are; the database turns them into
  *  the moment it goes out, and refuses one that has passed or isn't before kick-off. */
-function ShareAt({ game, initial, cta, busy, ready, onSchedule, onCancel }: {
+export function ShareAt({ game, initial, cta, busy, ready, onSchedule, onCancel }: {
   game: EventRow; initial: { day: string; time: string }; busy: boolean
   /** The button's words, given the day and time picked ("Thu 19:30"), or null until both are. */
   cta: (when: string | null) => string

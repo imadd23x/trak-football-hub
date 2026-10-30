@@ -123,10 +123,10 @@ describe('TRAK-286: the Share step', { timeout: 30_000 }, () => {
     const checks = within(block).getByRole('list', { name: 'Before you share' })
     expect(within(checks).getByText('1 of 11 placed. You can share before it’s complete.')).toBeInTheDocument()
     expect(within(checks).getByText('1 of 1 starters have one.')).toBeInTheDocument()
-    const shareNow = within(block).getByRole('button', { name: 'Share now' })
+    const shareNow = screen.getByRole('button', { name: 'Share now' })
     expect(shareNow).toBeDisabled()
 
-    await user.click(within(block).getByRole('checkbox', { name: 'I’ve talked selection through with the players, face to face' }))
+    await user.click(screen.getByRole('checkbox', { name: 'I’ve talked selection through with the players, face to face' }))
     expect(within(block).getByText('Ready to share')).toBeInTheDocument()
     await user.click(shareNow)
 
@@ -136,6 +136,27 @@ describe('TRAK-286: the Share step', { timeout: 30_000 }, () => {
     expect(within(shared).getByText('Shared Thu 19:30')).toBeInTheDocument()
     expect(within(shared).getByText(/Edits stay with you until you share them\./)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Share the plan' })).toBeNull()
+  })
+
+  it('TRAK-318: before the first share, the bottom bar offers Save draft and Share now together, and says what holds Share back', async () => {
+    const user = userEvent.setup()
+    const calls = store()
+    shareStep()
+    await screen.findByRole('region', { name: 'Share the plan' })
+    const saveDraft = screen.getByRole('button', { name: 'Save draft' })
+    const shareNow = screen.getByRole('button', { name: 'Share now' })
+    // Side by side, in the bar at the bottom of the step.
+    expect(saveDraft.parentElement).toContainElement(shareNow)
+    expect(screen.getByText('Tick “I’ve talked selection through” to share')).toBeInTheDocument()
+    expect(shareNow).toBeDisabled()
+
+    await user.click(saveDraft)
+    await waitFor(() => expect(calls.map(call => call.fn)).toEqual(['save plan', 'save line-up']))
+    expect(await screen.findByRole('button', { name: 'Saved' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: /talked selection through/ }))
+    expect(screen.queryByText('Tick “I’ve talked selection through” to share')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Share now' })).toBeEnabled()
   })
 
   it('edits after sharing wait: the alert names who changed, and Share the changes goes to them without a new tick', async () => {
@@ -161,10 +182,10 @@ describe('TRAK-286: the Share step', { timeout: 30_000 }, () => {
       HttpResponse.json({ code: 'P0001', message: 'This match has kicked off, so its plan can\'t be shared' }, { status: 400 })))
     shareStep()
     const block = await screen.findByRole('region', { name: 'Share the plan' })
-    await user.click(within(block).getByRole('checkbox', { name: /talked selection through/ }))
-    await user.click(within(block).getByRole('button', { name: 'Share now' }))
-    expect(await within(block).findByRole('alert')).toHaveTextContent('This match has kicked off, so its plan can\'t be shared')
-    expect(within(block).getByRole('checkbox', { name: /talked selection through/ })).toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: /talked selection through/ }))
+    await user.click(screen.getByRole('button', { name: 'Share now' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('This match has kicked off, so its plan can\'t be shared')
+    expect(screen.getByRole('checkbox', { name: /talked selection through/ })).toBeChecked()
   })
 
   it('the preview shows what the player and the parent read: the note is the player\'s alone', async () => {

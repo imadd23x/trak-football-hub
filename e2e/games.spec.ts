@@ -76,11 +76,12 @@ async function backend(context: BrowserContext, unexpected: string[], plans: Pla
       const id = url.searchParams.get('id')?.replace(/^eq\./, '')
       return json(MATCHES.filter(m => m.published && (!id || m.id === id)))
     }
+    // TRAK-319: the family's copy holds the role only; the job is in the child's own copy, and a starter gets no note.
     if (path === '/rest/v1/game_for_family') return json(plans.has('share:m-next') ? [{ event_id: 'm-next', squad_player_id: 'sq-1',
-      role: 'starter', job: 'Stay tight to their winger.', has_note: true, changed_at: null, coach_name: 'Fernando Santos' }] : [])
+      role: 'starter', job: '', has_note: false, changed_at: null, coach_name: 'Fernando Santos' }] : [])
     if (path === '/rest/v1/game_for_player') return json(plans.has('share:m-next') ? [{ event_id: 'm-next', squad_player_id: 'sq-1',
       goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }],
-      note: 'Second game at right-back. Proud of you.', changed_at: null }] : [])
+      job: 'Stay tight to their winger.', note: '', changed_at: null }] : [])
     // TRAK-288: the evaluation draft as save_game_evaluation keeps it, under `evaluation:<match>`.
     if (path === '/rest/v1/rpc/save_game_evaluation') {
       const body = req.postDataJSON() as Record<string, unknown>
@@ -102,10 +103,12 @@ async function backend(context: BrowserContext, unexpected: string[], plans: Pla
         ?.find(p => p.id === 'sq-1' && p.played)
       if (!draft || !own) return json([])
       const line = (plans.get(`line-up:${draft.p_event_id}:sq-1`) ?? {}) as { job?: string; context?: string[]; expectation?: string }
-      return json(path.endsWith('for_player') ? (own.note ? [{ event_id: draft.p_event_id, squad_player_id: 'sq-1', note: own.note }] : [])
+      // TRAK-319: the job, did the job and the note are in the child's own row; the family's has neither.
+      return json(path.endsWith('for_player') ? [{ event_id: draft.p_event_id, squad_player_id: 'sq-1', note: own.note ?? '',
+          job: line.job ?? '', did_job: own.did_job ?? 'yes' }]
         : [{ event_id: draft.p_event_id, session_id: 'session-1', squad_player_id: 'sq-1', our_score: draft.p_our_score, their_score: draft.p_their_score,
-          job: line.job ?? '', did_job: own.did_job ?? 'yes', expectation: line.expectation ?? 'usual', context: line.context ?? [],
-          against_expectation: own.against_expectation ?? 'met', has_note: !!own.note, coach_name: 'Fernando Santos', published_at: draft.published_at }])
+          job: '', did_job: null, expectation: line.expectation ?? 'usual', context: line.context ?? [],
+          against_expectation: own.against_expectation ?? 'met', has_note: false, coach_name: 'Fernando Santos', published_at: draft.published_at }])
     }
     if (path.startsWith('/rest/v1/game_evaluation')) {
       const drafts = [...plans.entries()].filter(([key]) => key.startsWith('evaluation:')).map(([, draft]) => draft)
@@ -392,15 +395,16 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.waitForTimeout(400)
     await page.screenshot({ path: testInfo.outputPath(`share-bar-${width}.png`) })
     const preview = page.getByRole('region', { name: 'Preview' })
-    await expect(preview.getByRole('heading', { name: 'From Coach Fernando Santos · just for you' })).toBeVisible()
+    // TRAK-319: a starter reads their job; a note to a selected player doesn't go out.
+    await expect(preview.getByText('Stay tight to their winger.')).toBeVisible()
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`share-step-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
 
     await preview.getByRole('button', { name: 'As the player' }).focus()
     await page.keyboard.press('ArrowRight')
-    await expect(preview.getByText('Theodoros’s job')).toBeVisible()
-    await expect(preview.getByText('Coach Fernando Santos’s note is just for Theodoros.')).toBeVisible()
+    await expect(preview.getByText('Theodoros: Starting')).toBeVisible()
+    await expect(preview.getByText('Stay tight to their winger.')).toHaveCount(0)
     await expect(preview.getByText('Second game at right-back. Proud of you.')).toHaveCount(0)
 
     const tick = page.getByRole('checkbox', { name: /talked selection through/ })
@@ -478,7 +482,7 @@ test("the player's event page at 390 px: the shared game plan", async ({ page, c
   await expect(section).toBeVisible()
   await expect(section.getByText('1 · Win it back in their half')).toBeVisible()
   await expect(section.getByText('Your job')).toBeVisible()
-  await expect(section.getByRole('heading', { name: 'From Coach Fernando Santos · just for you' })).toBeVisible()
+  await expect(section.getByText('Stay tight to their winger.')).toBeVisible()
   await page.waitForTimeout(500)
   await page.screenshot({ path: testInfo.outputPath('player-game-plan-390.png'), fullPage: true })
   expect(await sideways(page)).toBeLessThanOrEqual(0)
@@ -510,7 +514,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(keyboard.count).toBeGreaterThan(3)
     expect(keyboard.missed).toEqual([])
     await page.getByRole('button', { name: 'Next: Line-up and jobs' }).click()
-    await expect(page.getByText('Tap a player to see their job and note.')).toBeVisible()
+    await expect(page.getByText('Tap a player to see their job.')).toBeVisible()
     await page.waitForTimeout(400)
     await page.screenshot({ path: testInfo.outputPath(`locked-line-up-${width}.png`) })
     expect(await sideways(page)).toBeLessThanOrEqual(0)

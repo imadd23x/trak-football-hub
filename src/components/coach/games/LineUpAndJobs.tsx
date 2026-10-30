@@ -105,7 +105,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
           <Pitch shape={shape} starters={onPitch} selected={target?.kind === 'slot' ? target.slot
             : target ? playerPlan(form.players, target.id).slot : null}
             onSelect={slot => setTarget(starters.has(slot) ? { kind: 'player', id: starters.get(slot)!.id } : { kind: 'slot', slot })} />
-          <p className="text-sm text-ink-3">{locked ? 'Tap a player to see their job and note.' : 'Tap a slot to pick who plays there, or a player to give them a job.'}</p>
+          <p className="text-sm text-ink-3">{locked ? 'Tap a player to see their job.' : 'Tap a slot to pick who plays there, or a player to give them a job.'}</p>
           {[...onPitch.values()].some(player => player.stretch) && <p className="flex items-center gap-2 text-sm text-ink-3">
             <span aria-hidden="true" className="size-3 rounded-full border border-ink/60 bg-[rgb(var(--t-attention))]" />Yellow: stretch</p>}
         </section>
@@ -132,7 +132,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
 
       {leftOut.length > 0 && <section aria-labelledby="plan-left-out" className={card}>
         <h2 id="plan-left-out" className="text-lg font-medium text-ink">Not selected</h2>
-        <p className="text-sm text-ink-3">Their families see “Not in the squad this week”. Each gets your note.</p>
+        <p className="text-sm text-ink-3">Their families see “Not in the squad this week”. Each player reads your note.</p>
         <ul className="divide-y divide-line">{leftOut.map(player => row(player, ''))}</ul>
       </section>}
 

@@ -729,6 +729,7 @@ export type Database = {
           changed_at: string | null
           event_id: string
           goals: Json
+          job: string
           note: string
           shared_at: string
           squad_player_id: string
@@ -737,6 +738,7 @@ export type Database = {
           changed_at?: string | null
           event_id: string
           goals?: Json
+          job?: string
           note?: string
           shared_at?: string
           squad_player_id: string
@@ -745,6 +747,7 @@ export type Database = {
           changed_at?: string | null
           event_id?: string
           goals?: Json
+          job?: string
           note?: string
           shared_at?: string
           squad_player_id?: string
@@ -834,7 +837,7 @@ export type Database = {
           against_expectation: string
           coach_name: string
           context: string[]
-          did_job: string
+          did_job: string | null
           event_id: string
           expectation: string
           has_note: boolean
@@ -849,7 +852,7 @@ export type Database = {
           against_expectation: string
           coach_name?: string
           context?: string[]
-          did_job: string
+          did_job?: string | null
           event_id: string
           expectation: string
           has_note?: boolean
@@ -864,7 +867,7 @@ export type Database = {
           against_expectation?: string
           coach_name?: string
           context?: string[]
-          did_job?: string
+          did_job?: string | null
           event_id?: string
           expectation?: string
           has_note?: boolean
@@ -879,17 +882,23 @@ export type Database = {
       }
       game_review_for_player: {
         Row: {
+          did_job: string | null
           event_id: string
+          job: string
           note: string
           squad_player_id: string
         }
         Insert: {
+          did_job?: string | null
           event_id: string
-          note: string
+          job?: string
+          note?: string
           squad_player_id: string
         }
         Update: {
+          did_job?: string | null
           event_id?: string
+          job?: string
           note?: string
           squad_player_id?: string
         }

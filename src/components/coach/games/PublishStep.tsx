@@ -10,7 +10,7 @@ import SegmentedControl from '@/components/arc/segmented-control/segmented-contr
 import { Select } from '@/components/arc/select/select'
 
 /* TRAK-289 (Games 7/8): the evaluation's Publish step (TRAK-282). The summary, who sees what, and a preview drawn by
-   the player's and the parent's own After the game section, as Share previews the plan. "Publish to N players and
+   the player's and the parent's own After the match section, as Share previews the plan. "Publish to N players and
    families" waits for every "Did the plan work?" answer, and for the competition and home or away when the match has
    none (Imad, 29 Oct). In the app only: no email, no push. */
 
@@ -62,7 +62,7 @@ export function PublishStep({ eventId, form, listed, plans, goals, coachName, as
             <li className="grid gap-0.5 py-3"><span className="text-sm font-medium text-ink">Each player</span>
               <span className="text-sm text-ink-3">Their job, how it went, what you expected and how they did against it, and your note.</span></li>
             <li className="grid gap-0.5 py-3"><span className="text-sm font-medium text-ink">Families</span>
-              <span className="text-sm text-ink-3">The same, without your note. That’s the player’s business.</span></li>
+              <span className="text-sm text-ink-3">The score, what you expected and how they did against it. Never the job, whether they did it, or your note.</span></li>
             <li className="grid gap-0.5 py-3"><span className="flex items-center gap-1.5 text-sm font-medium text-ink">Only you<Lock size={14} aria-hidden="true" /></span>
               <span className="text-sm text-ink-3">How strong they were, scouting and how they scored, always.</span></li>
           </ul>
@@ -73,7 +73,7 @@ export function PublishStep({ eventId, form, listed, plans, goals, coachName, as
   )
 }
 
-/** What each player and their parent read, drawn by their own After the game section. Also the published view's. */
+/** What each player and their parent read, drawn by their own After the match section. Also the published view's. */
 export function ReviewPreview({ eventId, form, listed, plans, coachName }: {
   eventId: string; form: EvaluationForm; listed: Listed[]; plans: PlayerPlans; coachName: string | null
 }) {

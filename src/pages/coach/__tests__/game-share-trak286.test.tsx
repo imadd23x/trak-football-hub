@@ -188,7 +188,7 @@ describe('TRAK-286: the Share step', { timeout: 30_000 }, () => {
     expect(screen.getByRole('checkbox', { name: /talked selection through/ })).toBeChecked()
   })
 
-  it('the preview shows what the player and the parent read: the note is the player\'s alone', async () => {
+  it('the preview shows what the player and the parent read: the job and the note are the player\'s alone (TRAK-319)', async () => {
     const user = userEvent.setup()
     store()
     shareStep()
@@ -198,13 +198,13 @@ describe('TRAK-286: the Share step', { timeout: 30_000 }, () => {
     expect(within(section()).getByText('First to every loose ball in midfield.')).toBeInTheDocument()
     expect(within(section()).getByText('Your job')).toBeInTheDocument()
     expect(within(section()).getByText('Stay tight to their winger.')).toBeInTheDocument()
-    expect(within(section()).getByRole('heading', { name: 'From Coach Otto Rehhagel · just for you' })).toBeInTheDocument()
-    expect(within(section()).getByText('Second game at right-back. Proud of you.')).toBeInTheDocument()
+    // One box per player: a note left on a selected player before TRAK-319 doesn't go out.
+    expect(within(section()).queryByText('Second game at right-back. Proud of you.')).toBeNull()
 
     await user.click(within(preview).getByRole('button', { name: 'As the parent' }))
-    expect(within(section()).getByText('Theodoros’s job')).toBeInTheDocument()
-    expect(within(section()).getByText('Coach Otto Rehhagel’s note is just for Theodoros.')).toBeInTheDocument()
-    expect(within(section()).queryByText('Second game at right-back. Proud of you.')).toBeNull()
+    expect(within(section()).getByText('Theodoros: Starting')).toBeInTheDocument()
+    expect(within(section()).queryByText('Stay tight to their winger.')).toBeNull()
+    expect(within(section()).queryByText(/note is just for/)).toBeNull()
     expect(within(section()).queryByText('1 · Win the second ball')).toBeNull()
 
     // Expectation, context, how strong they are and scouting are never in it.
@@ -213,8 +213,9 @@ describe('TRAK-286: the Share step', { timeout: 30_000 }, () => {
     await user.click(within(preview).getByRole('combobox', { name: 'Player' }))
     await user.click(await screen.findByRole('option', { name: 'Angelos Charisteas · not selected' }))
     expect(within(section()).getByText('Not in the squad this week')).toBeInTheDocument()
-    expect(within(section()).getByText('Coach Otto Rehhagel’s note is just for Angelos.')).toBeInTheDocument()
+    expect(within(section()).queryByText('Not this week. Your chance comes on Tuesday.')).toBeNull()
     await user.click(within(preview).getByRole('button', { name: 'As the player' }))
+    expect(within(section()).getByRole('heading', { name: 'From Coach Otto Rehhagel · just for you' })).toBeInTheDocument()
     expect(within(section()).getByText('Not this week. Your chance comes on Tuesday.')).toBeInTheDocument()
     expect(within(section()).getByText('1 · Win the second ball')).toBeInTheDocument()
     // Who can't make it and isn't placed reads nothing, so isn't in the preview.

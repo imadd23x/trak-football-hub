@@ -5,7 +5,7 @@ import type { PlayerEvent } from '@/lib/player-events'
 import { sharedPlan, type SharedPlan } from './share'
 
 /* TRAK-286 (Games 4/8): a child's shared game plans, read as the child or as one of their guardians. The database
-   opens only that child's copies, and the note to the child alone (game_for_family, game_for_player); a match that's
+   opens only that child's copies, and the job and the note to the child alone (game_for_family, game_for_player); a match that's
    cancelled, or an academy with Games off, opens none. Read through the child's roster rows, as "Can't make it" is. */
 
 /** The child's roster rows: their copies are keyed by these. Also read by the reviews (TRAK-289). */
@@ -22,11 +22,11 @@ export async function fetchSharedPlan(childId: string, eventId: string, asPlayer
   Promise<{ plan: SharedPlan; coachName: string | null } | null> {
   const rows = await rosterRows(childId, signal)
   if (!rows.length) return null
-  const { data: family, error } = await supabase.from('game_for_family').select('squad_player_id, role, job, has_note, changed_at, coach_name')
+  const { data: family, error } = await supabase.from('game_for_family').select('squad_player_id, role, changed_at, coach_name')
     .eq('event_id', eventId).in('squad_player_id', rows.map(row => row.id)).abortSignal(signal).retry(false).maybeSingle()
   if (error) throw error
   if (!family) return null
-  const player = asPlayer ? await supabase.from('game_for_player').select('goals, note, changed_at').eq('event_id', eventId)
+  const player = asPlayer ? await supabase.from('game_for_player').select('goals, job, note, changed_at').eq('event_id', eventId)
     .eq('squad_player_id', family.squad_player_id).abortSignal(signal).retry(false).maybeSingle() : null
   if (player?.error) throw player.error
   return { plan: sharedPlan(family, player?.data ?? null), coachName: family.coach_name.trim() || null }

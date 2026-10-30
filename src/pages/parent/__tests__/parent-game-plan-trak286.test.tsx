@@ -38,7 +38,8 @@ let FAMILY: Record<string, unknown>[]
 let askedForPlayerCopy: string[]
 
 beforeEach(() => {
-  FAMILY = [{ event_id: 'g1', squad_player_id: 'zagorakis-squad', role: 'starter', job: 'Stay tight to their winger.', has_note: true,
+  // TRAK-319: Share writes the family's copy with the role only.
+  FAMILY = [{ event_id: 'g1', squad_player_id: 'zagorakis-squad', role: 'starter', job: '', has_note: false,
     shared_at: '2099-11-10T15:30:00Z', changed_at: null, coach_name: 'Otto Rehhagel' }]
   askedForPlayerCopy = []
   server.use(
@@ -71,13 +72,11 @@ function renderParent(element: JSX.Element, path = '/parent/event/g1') {
 }
 
 describe('TRAK-286: the shared game plan on a guardian\'s event page', () => {
-  it('shows the child\'s job and that there\'s a note, never the note or the goals, as the coach\'s preview does', async () => {
+  it('shows only that the child starts: never the job, the note or the goals, as the coach\'s preview does (TRAK-319)', async () => {
     renderParent(<ParentEvent />)
     const section = await screen.findByRole('region', { name: 'Game plan' })
-    expect(within(section).getByText('Theodoros’s job')).toBeInTheDocument()
-    expect(within(section).getByText('Stay tight to their winger.')).toBeInTheDocument()
-    expect(await within(section).findByText('Coach Otto Rehhagel’s note is just for Theodoros.')).toBeInTheDocument()
-    expect(section).not.toHaveTextContent(/Proud of you|Win the second ball/)
+    expect(within(section).getByText('Theodoros: Starting')).toBeInTheDocument()
+    expect(section).not.toHaveTextContent(/Stay tight|job|note|Proud of you|Win the second ball/)
     expect(askedForPlayerCopy).toEqual([])
     const page = section.textContent
     cleanup()

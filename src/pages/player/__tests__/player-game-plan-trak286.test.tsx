@@ -28,9 +28,10 @@ const MATCH = {
 }
 const GOALS = [{ title: 'Win the second ball', looks_like: 'First to every loose ball in midfield.' }]
 // What Share wrote for Theodoros Zagorakis (game_for_family, game_for_player).
-const FAMILY = { event_id: 'g1', squad_player_id: 'zagorakis', role: 'starter', job: 'Stay tight to their winger.', has_note: true,
+// TRAK-319: the family's copy holds the role only; the job is in the child's own copy.
+const FAMILY = { event_id: 'g1', squad_player_id: 'zagorakis', role: 'starter', job: '', has_note: false,
   shared_at: '2099-11-10T15:30:00Z', changed_at: null, coach_name: 'Otto Rehhagel' }
-const OWN = { event_id: 'g1', squad_player_id: 'zagorakis', goals: GOALS, note: 'Second game at right-back. Proud of you.',
+const OWN = { event_id: 'g1', squad_player_id: 'zagorakis', goals: GOALS, job: 'Stay tight to their winger.', note: '',
   shared_at: '2099-11-10T15:30:00Z', changed_at: null }
 
 function setup({ family = [FAMILY], own = [OWN], events = [MATCH] }: { family?: object[]; own?: object[]; events?: object[] } = {}) {
@@ -59,15 +60,13 @@ beforeEach(() => { PLAYER = { id: `zagorakis-user-${++n}` }; signInAs(PLAYER) })
 afterEach(() => cleanup())
 
 describe('TRAK-286: the shared game plan on the player\'s event page', { timeout: 30_000 }, () => {
-  it('shows the goals, their job and the note just for them, exactly as the coach\'s preview does', async () => {
+  it('shows the goals and their job from their own copy, exactly as the coach\'s preview does', async () => {
     setup()
     renderApp('/player/event/g1')
     const section = await screen.findByRole('region', { name: 'Game plan' })
     expect(within(section).getByText('1 · Win the second ball')).toBeInTheDocument()
     expect(within(section).getByText('Your job')).toBeInTheDocument()
     expect(within(section).getByText('Stay tight to their winger.')).toBeInTheDocument()
-    expect(await within(section).findByRole('heading', { name: 'From Coach Otto Rehhagel · just for you' })).toBeInTheDocument()
-    expect(within(section).getByText('Second game at right-back. Proud of you.')).toBeInTheDocument()
     expect(within(section).queryByText('Updated')).toBeNull()
     const page = section.textContent
     cleanup()

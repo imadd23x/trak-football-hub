@@ -29,11 +29,12 @@ const MATCH = {
   home_away: 'home', event_date: today, start_time: '00:01:00', starts_at: `${today}T00:01:00+04:00`, venue: 'Rehearsal Park',
   meet_time: null, kit: null, status: 'scheduled', cancel_reason: null, sequence: 0, family_note: null,
 }
-// What Publish wrote for Theodoros Zagorakis (game_review_for_family, game_review_for_player).
-const REVIEW = { event_id: 'g1', session_id: 's1', squad_player_id: 'zagorakis', our_score: 2, their_score: 1, job: 'Stay tight to their winger.',
-  did_job: 'partly', expectation: 'stretch', context: ['out_of_position'], against_expectation: 'above', has_note: true, coach_name: 'Otto Rehhagel',
+// What Publish wrote for Theodoros Zagorakis (game_review_for_family, game_review_for_player). TRAK-319: the job, did the
+// job and the note are in his own copy only.
+const REVIEW = { event_id: 'g1', session_id: 's1', squad_player_id: 'zagorakis', our_score: 2, their_score: 1, job: '',
+  did_job: null, expectation: 'stretch', context: ['out_of_position'], against_expectation: 'above', has_note: false, coach_name: 'Otto Rehhagel',
   published_at: `${today}T08:00:00Z` }
-const NOTE = { event_id: 'g1', squad_player_id: 'zagorakis', note: 'Brave all game.' }
+const NOTE = { event_id: 'g1', squad_player_id: 'zagorakis', note: 'Brave all game.', job: 'Stay tight to their winger.', did_job: 'partly' }
 // The match row publish wrote: no rating.
 const MATCH_ROW = { id: 'm1', user_id: 'x', session_id: 's1', opponent: 'Parkview Athletic', team_score: 2, opponent_score: 1, competition: 'League',
   venue: 'Home', match_date: today, created_at: `${today}T08:00:00Z`, computed_rating: null, goals: 1, assists: 0 }

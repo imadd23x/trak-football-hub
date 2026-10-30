@@ -150,7 +150,7 @@ SELECT pg_temp.g290check((SELECT count(*)=0 FROM public.game_plan_changes(ARRAY[
 SELECT pg_temp.g290check((SELECT public.schedule_game_plan(pg_temp.g290id(500),false,NULL))=1,
   '3 saving rewrites the waiting copy whose words changed');
 RESET ROLE;
-SELECT pg_temp.g290check((SELECT job='Find the pass, then run.' AND changed_at IS NULL FROM public.game_for_family
+SELECT pg_temp.g290check((SELECT job='Find the pass, then run.' AND changed_at IS NULL FROM public.game_for_player
   WHERE squad_player_id=pg_temp.g290id(40)), '3 the waiting copy has the new job and reads as new, not Updated');
 SELECT pg_temp.g290check(pg_temp.g290copiesat(500,'2054-11-06 15:30+00'),'3 it still goes out at 19:30, logged once');
 
@@ -170,7 +170,7 @@ SELECT pg_temp.g290check(pg_temp.g290family()=ARRAY[40] AND pg_temp.g290player()
 SELECT pg_temp.g290actor(21);
 SELECT pg_temp.g290check(pg_temp.g290family()=ARRAY[41] AND pg_temp.g290player()=ARRAY[41],'5 player B reads theirs');
 SELECT pg_temp.g290actor(30);
-SELECT pg_temp.g290check(pg_temp.g290family()=ARRAY[40] AND pg_temp.g290player()='{}','5 player A''s guardian reads the job, not the note');
+SELECT pg_temp.g290check(pg_temp.g290family()=ARRAY[40] AND pg_temp.g290player()='{}','5 player A''s guardian reads that A starts, never the job or the note (TRAK-319)');
 SELECT pg_temp.g290actor(11);
 SELECT pg_temp.g290check(pg_temp.g290family()='{}' AND pg_temp.g290player()='{}','5 another coach still reads nothing');
 SELECT pg_temp.g290actor(22);
@@ -183,7 +183,7 @@ SELECT pg_temp.g290check((SELECT count(*)=1 FROM public.game_plan_changes(ARRAY[
   '5 an edit after it''s out waits for "Share the changes"');
 SELECT pg_temp.g290check((SELECT public.share_game_plan(pg_temp.g290id(500),false))=1,'5 sharing the changes now reaches 1 child');
 RESET ROLE;
-SELECT pg_temp.g290check((SELECT changed_at IS NOT NULL FROM public.game_for_family WHERE squad_player_id=pg_temp.g290id(40) AND event_id=pg_temp.g290id(500)),
+SELECT pg_temp.g290check((SELECT changed_at IS NOT NULL FROM public.game_for_player WHERE squad_player_id=pg_temp.g290id(40) AND event_id=pg_temp.g290id(500)),
   '5 a copy someone could read reads Updated');
 
 -- ── 6. Share now while it waits ────────────────────────────────────────────

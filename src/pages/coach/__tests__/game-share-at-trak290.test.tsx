@@ -125,7 +125,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     await user.click(within(block).getByRole('button', { name: 'Share now more actions' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Share at…' }))
     expect(within(block).getByText('Any time before kick-off. Until then, only you see it.')).toBeInTheDocument()
-    expect(within(block).getByRole('button', { name: 'Schedule for' })).toBeDisabled()
+    expect(within(block).getByRole('button', { name: 'Schedule' })).toBeDisabled()
 
     await pickDate(user, 'Day', '2026-11-05')
     await pickTime(user, 'Time', '19:30')

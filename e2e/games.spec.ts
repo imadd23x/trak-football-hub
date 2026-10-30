@@ -365,7 +365,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const { unexpected, errors } = await open(page, context, '/coach/games/m-next?tab=plan&step=share', width, height, plans)
     const block = page.getByRole('region', { name: 'Share the plan' })
     await expect(block).toBeVisible()
-    const shareNow = block.getByRole('button', { name: 'Share now' })
+    const shareNow = block.getByRole('button', { name: 'Share now', exact: true })
     await expect(shareNow).toBeDisabled()
     const preview = page.getByRole('region', { name: 'Preview' })
     await expect(preview.getByRole('heading', { name: 'From Coach Fernando Santos · just for you' })).toBeVisible()
@@ -396,6 +396,49 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByText('Plan shared').first()).toBeVisible()
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`shared-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}
+
+// TRAK-290: Share at… sits behind Share now's chevron and opens by keyboard; its day and time pickers fit the step. A
+// scheduled plan waits with "Shares …", Change time opens the pickers on the time it has, and every control takes focus
+// from the keyboard. What's sent is the unit tests' (game-share-at-trak290).
+for (const [width, height] of [[390, 844], [1440, 900]] as const) {
+  test(`Share at… at ${width} px: the chevron by keyboard, then a scheduled plan waits`, async ({ page, context }, testInfo) => {
+    const plans = DRAFT()
+    const { unexpected, errors } = await open(page, context, '/coach/games/m-next?tab=plan&step=share', width, height, plans)
+    const block = page.getByRole('region', { name: 'Share the plan' })
+    await expect(block.getByRole('button', { name: 'Share now more actions' })).toBeDisabled()
+    await block.getByRole('checkbox', { name: /talked selection through/ }).focus()
+    await page.keyboard.press('Space')
+    await block.getByRole('button', { name: 'Share now more actions' }).focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('menuitem', { name: 'Share at…' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(block.getByRole('button', { name: /^Day\b/ })).toBeVisible()
+    await expect(block.getByRole('button', { name: /^Time\b/ })).toBeVisible()
+    await expect(block.getByRole('button', { name: 'Schedule', exact: true })).toBeDisabled()
+    await page.waitForTimeout(500)
+    await page.screenshot({ path: testInfo.outputPath(`share-at-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+
+    // Scheduled for 19:30 the day before kick-off, Dubai time.
+    const matchDay = MATCHES.find(m => m.id === 'm-next')!.event_date.slice(0, 10)
+    const at = new Date(Date.parse(`${matchDay}T19:30:00+04:00`) - 24 * 60 * MINUTE).toISOString()
+    plans.set('share:m-next', { event_id: 'm-next', shared_at: at, talked: true })
+    await page.reload()
+    const scheduled = page.getByRole('region', { name: 'Scheduled' })
+    await expect(scheduled.getByText(/^Shares \w{3} 19:30$/)).toBeVisible()
+    await expect(page.getByText(/^Shares \w{3} 19:30$/)).toHaveCount(2) // the header's badge too
+    const keyboard = await everyControlByKeyboard(page, '[role="tabpanel"]:not([hidden])', true)
+    expect(keyboard.missed).toEqual([])
+    await scheduled.getByRole('button', { name: 'Change time' }).focus()
+    await page.keyboard.press('Enter')
+    await expect(scheduled.getByRole('button', { name: /^Move to \w{3} 19:30$/ })).toBeEnabled()
+    await page.waitForTimeout(500)
+    await page.screenshot({ path: testInfo.outputPath(`scheduled-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])

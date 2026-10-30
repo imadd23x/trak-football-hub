@@ -87,7 +87,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, coachName, onSha
                 { id: 'talked', label: 'I’ve talked selection through with the players, face to face', required: true, done: talked,
                   detail: 'Before this goes out. Players should hear it from you first.', onCheckedChange: setTalked },
               ]}>
-              {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta="Schedule for" busy={sharing}
+              {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta={when => when ? `Schedule for ${when}` : 'Schedule'} busy={sharing}
                 ready={talked && game.published} onSchedule={at => onSchedule(at, talked)} onCancel={() => setPicking(false)} />}
             </ShareReadiness>
           </div>
@@ -99,7 +99,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, coachName, onSha
             </div>
             <p className="text-sm text-ink-2">{players(reading.length)} and their families read it from {format(new Date(sharedAt), 'EEE d MMM, HH:mm')}, in the app only. What you save before then goes out with it.</p>
             {picking
-              ? <ShareAt game={game} initial={shareWall(game, sharedAt)} cta="Move to" busy={sharing} ready
+              ? <ShareAt game={game} initial={shareWall(game, sharedAt)} cta={when => when ? `Move to ${when}` : 'Move'} busy={sharing} ready
                   onSchedule={at => onSchedule(at, false)} onCancel={() => setPicking(false)} />
               : <div className="flex flex-wrap gap-2">
                   <Button size="sm" loading={sharing} onClick={() => onShare(false)}>Share now</Button>
@@ -156,14 +156,16 @@ export function ShareStep({ game, form, who, sharedAt, changes, coachName, onSha
 /** TRAK-290: Share at… The day and time are the academy's clock, as every form's are; the database turns them into
  *  the moment it goes out, and refuses one that has passed or isn't before kick-off. */
 function ShareAt({ game, initial, cta, busy, ready, onSchedule, onCancel }: {
-  game: EventRow; initial: { day: string; time: string }; cta: string; busy: boolean
+  game: EventRow; initial: { day: string; time: string }; busy: boolean
+  /** The button's words, given the day and time picked ("Thu 19:30"), or null until both are. */
+  cta: (when: string | null) => string
   /** Whatever else must be true first (the face-to-face tick, the logistics). */
   ready: boolean
   onSchedule: (at: string) => void; onCancel: () => void
 }) {
   const [day, setDay] = useState(initial.day)
   const [time, setTime] = useState(initial.time)
-  const when = day && time ? ` ${format(dayAsDate(day)!, 'EEE')} ${time}` : ''
+  const when = day && time ? `${format(dayAsDate(day)!, 'EEE')} ${time}` : null
   return (
     <div className="grid gap-3">
       <DatePicker label="Day" className="arc-trak-field" value={dayAsDate(day)} clearable={false} placeholder="Pick a day"
@@ -173,7 +175,7 @@ function ShareAt({ game, initial, cta, busy, ready, onSchedule, onCancel }: {
         placeholder="Pick a time" emptyAt="19:00" />
       <p className="text-sm text-ink-3">Any time before kick-off. Until then, only you see it.</p>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={!ready || !day || !time} loading={busy} onClick={() => onSchedule(`${day}T${time}`)}>{cta}{when}</Button>
+        <Button size="sm" disabled={!ready || !day || !time} loading={busy} onClick={() => onSchedule(`${day}T${time}`)}>{cta(when)}</Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </div>

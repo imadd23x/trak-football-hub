@@ -86,17 +86,22 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
     <div className="grid gap-4">
       <section aria-labelledby="plan-shape" className={card}>
         <h2 id="plan-shape" className="text-lg font-medium text-ink">Format and formation</h2>
+        {/* TRAK-323: side by side on a laptop, so the pitch and the list start higher. */}
+        <div className="grid gap-4 laptop:grid-cols-[180px_minmax(0,1fr)] laptop:items-start">
         <div className="max-w-[220px]">{locked ? <LockedValue label="Format" value={`${form.format} a side`} />
           : <Select label="Format" options={FORMAT_OPTIONS} value={String(form.format)} onValueChange={setFormat} />}</div>
-        <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
           <p id="plan-formation" className="text-sm font-medium text-ink">Formation</p>
-          <RadioCards aria-labelledby="plan-formation" minColumnWidth={150} value={shape} disabled={locked}
+          <RadioCards aria-labelledby="plan-formation" minColumnWidth={140} value={shape} disabled={locked}
             options={FORMATIONS[form.format].map(option => ({ value: option, label: option, icon: <MiniPitch shape={option} /> }))}
             onValueChange={formation => onFormChange({ ...form, formation })} />
         </div>
+        </div>
       </section>
 
-      <div className="grid gap-4 tablet:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] tablet:items-start">
+      {/* TRAK-323 (Imad, 30 Oct): on a laptop the pitch, everyone's list and the selected player's sheet sit side by side,
+          the pitch and the sheet staying in view while the list scrolls; on a tablet the list goes under them. */}
+      <div className="grid gap-4 tablet:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] tablet:items-start laptop:grid-cols-[minmax(0,5fr)_minmax(0,4fr)_minmax(0,3fr)]">
         <section aria-labelledby="plan-pitch" className={`${card} tablet:sticky tablet:top-4`}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="plan-pitch" className="text-lg font-medium text-ink">{shape}</h2>
@@ -111,40 +116,41 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
         </section>
         {phone
           ? <BottomSheet className="arc" open={!!target} onOpenChange={open => { if (!open) setTarget(null) }} title={title} detents={[0.6, 0.92]}>{panel}</BottomSheet>
-          : <aside aria-label={target ? title : 'Selected player'} className={card}>
+          : <aside aria-label={target ? title : 'Selected player'} className={`${card} tablet:sticky tablet:top-4 laptop:order-3`}>
               {target ? <><h2 className="text-lg font-medium text-ink">{title}</h2>{panel}</>
-                : <p className="text-sm text-ink-2">Pick a slot or a player to see their job, note and expectation here.</p>}
+                : <p className="text-sm text-ink-2">Pick a slot or a player to see their job and expectation here.</p>}
             </aside>}
-      </div>
+        <div className="grid min-w-0 gap-4 tablet:col-span-2 laptop:order-2 laptop:col-span-1">
+        <section aria-labelledby="plan-jobs" className={card}>
+          <div className="grid gap-3">
+            <h2 id="plan-jobs" className="text-lg font-medium text-ink">Everyone’s job</h2>
+            <Progress label={`${withJob} of ${form.format} starters have a job`} value={withJob} max={form.format} />
+          </div>
+          {placed.length + bench.length === 0
+            ? <p className="text-sm text-ink-2">Nobody can come yet. Confirm players in Squad › Availability.</p>
+            : <ul className="divide-y divide-line">
+                {placed.map(player => row(player, ` · ${lineName(shape, plan(player).slot!)}`))}
+                {bench.map(player => row(player, ' · Bench'))}
+              </ul>}
+        </section>
 
-      <section aria-labelledby="plan-jobs" className={card}>
-        <div className="grid gap-3">
-          <h2 id="plan-jobs" className="text-lg font-medium text-ink">Everyone’s job</h2>
-          <Progress label={`${withJob} of ${form.format} starters have a job`} value={withJob} max={form.format} />
+        {leftOut.length > 0 && <section aria-labelledby="plan-left-out" className={card}>
+          <h2 id="plan-left-out" className="text-lg font-medium text-ink">Not selected</h2>
+          <p className="text-sm text-ink-3">Their families see “Not in the squad this week”. Each player reads your note.</p>
+          <ul className="divide-y divide-line">{leftOut.map(player => row(player, ''))}</ul>
+        </section>}
+
+        {cantMakeIt.length > 0 && <section aria-labelledby="plan-cant" className={card}>
+          <h2 id="plan-cant" className="text-lg font-medium text-ink">Can’t make it</h2>
+          <p className="text-sm text-ink-3">Their families said they can’t make it, so they can’t be placed.</p>
+          <ul className="grid gap-2">{cantMakeIt.map(player => <li key={player.id} className="flex items-center gap-3 px-2 py-1">
+            <Avatar name={player.name} size="sm" aria-hidden="true" />
+            <span className="flex-1 text-base text-ink-2">{player.name}</span>
+            <span className="arc"><Badge size="sm" tone="warning">Can’t make it</Badge></span>
+          </li>)}</ul>
+        </section>}
         </div>
-        {placed.length + bench.length === 0
-          ? <p className="text-sm text-ink-2">Nobody can come yet. Confirm players in Squad › Availability.</p>
-          : <ul className="divide-y divide-line">
-              {placed.map(player => row(player, ` · ${lineName(shape, plan(player).slot!)}`))}
-              {bench.map(player => row(player, ' · Bench'))}
-            </ul>}
-      </section>
-
-      {leftOut.length > 0 && <section aria-labelledby="plan-left-out" className={card}>
-        <h2 id="plan-left-out" className="text-lg font-medium text-ink">Not selected</h2>
-        <p className="text-sm text-ink-3">Their families see “Not in the squad this week”. Each player reads your note.</p>
-        <ul className="divide-y divide-line">{leftOut.map(player => row(player, ''))}</ul>
-      </section>}
-
-      {cantMakeIt.length > 0 && <section aria-labelledby="plan-cant" className={card}>
-        <h2 id="plan-cant" className="text-lg font-medium text-ink">Can’t make it</h2>
-        <p className="text-sm text-ink-3">Their families said they can’t make it, so they can’t be placed.</p>
-        <ul className="grid gap-2">{cantMakeIt.map(player => <li key={player.id} className="flex items-center gap-3 px-2 py-1">
-          <Avatar name={player.name} size="sm" aria-hidden="true" />
-          <span className="flex-1 text-base text-ink-2">{player.name}</span>
-          <span className="arc"><Badge size="sm" tone="warning">Can’t make it</Badge></span>
-        </li>)}</ul>
-      </section>}
+      </div>
     </div>
   )
 }

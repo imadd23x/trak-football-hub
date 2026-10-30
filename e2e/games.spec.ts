@@ -359,6 +359,23 @@ const DRAFT = (): Plans => new Map([
   ['line-up:m-next:sq-1', { event_id: 'm-next', squad_player_id: 'sq-1', role: 'starter', slot: 4, job: 'Stay tight to their winger.',
     note: 'Second game at right-back. Proud of you.', context: ['out_of_position'], expectation: 'stretch' }],
 ])
+// TRAK-317: a starter expected to stretch is yellow on the pitch (TRAK-270's attention yellow), with a key under it.
+for (const [width, height] of [[390, 844], [1440, 900]] as const) {
+  test(`a stretch starter at ${width} px: a yellow circle on the pitch, and the key`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', width, height, DRAFT())
+    await page.getByRole('button', { name: 'Next: Line-up and jobs' }).click()
+    const stretch = page.getByRole('button', { name: /, slot 4, stretch$/ })
+    await expect(stretch).toBeVisible()
+    expect(await stretch.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(234, 179, 8)')
+    await expect(page.getByText('Yellow: stretch')).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.getByRole('region', { name: '4-4-2' }).screenshot({ path: testInfo.outputPath(`stretch-pitch-${width}.png`) })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}
+
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   test(`a game's Share step at ${width} px: the preview by keyboard, then tick and share`, async ({ page, context }, testInfo) => {
     const plans = DRAFT()

@@ -49,7 +49,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
     const { role, slot } = plan(player)
     if (role === 'starter' && slot != null && slot <= form.format) starters.set(slot, player)
   }
-  const onPitch = new Map<number, PitchPlayer>([...starters].map(([slot, player]) => [slot, player]))
+  const onPitch = new Map<number, PitchPlayer>([...starters].map(([slot, player]) => [slot, { ...player, stretch: plan(player).expectation === 'stretch' }]))
   const placed = [...starters].sort(([a], [b]) => a - b).map(([, player]) => player)
   // Anyone who can come and isn't on the pitch or left out is on the bench.
   const bench = who.players.filter(player => !player.absent && plan(player).role !== 'not_selected' && !placed.includes(player))
@@ -106,6 +106,8 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
             : target ? playerPlan(form.players, target.id).slot : null}
             onSelect={slot => setTarget(starters.has(slot) ? { kind: 'player', id: starters.get(slot)!.id } : { kind: 'slot', slot })} />
           <p className="text-sm text-ink-3">{locked ? 'Tap a player to see their job and note.' : 'Tap a slot to pick who plays there, or a player to give them a job.'}</p>
+          {[...onPitch.values()].some(player => player.stretch) && <p className="flex items-center gap-2 text-sm text-ink-3">
+            <span aria-hidden="true" className="size-3 rounded-full border border-ink/60 bg-[rgb(var(--t-attention))]" />Yellow: stretch</p>}
         </section>
         {phone
           ? <BottomSheet className="arc" open={!!target} onOpenChange={open => { if (!open) setTarget(null) }} title={title} detents={[0.6, 0.92]}>{panel}</BottomSheet>

@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { publishEvent } from '@/lib/event-publish'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { rowToForm, startedLocked, type EventRow } from '@/lib/coach-events'
-import { STATE, fullTime, gameState, type GameTab } from '@/lib/games/loop'
+import { fullTime, gameStatus, type GameTab } from '@/lib/games/loop'
 import { formToPlan, planToForm, type PlanForm } from '@/lib/games/plan'
 import { evaluationToForm, type EvaluationForm } from '@/lib/games/evaluation'
 import type { Tables } from '@/integrations/supabase/types'
@@ -66,20 +66,21 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
   const [now, setNow] = useState(() => Date.now())
   const whistle = fullTime({ ...row, ends_at: row.ends_at ?? null })
   // TRAK-287, TRAK-288: the page reads the clock again at kick-off and at full time itself, so the plan locks and the
-  // evaluation opens with no reload, even when the header's countdown never ticked on screen. A wait past setTimeout's
-  // limit (24 days) just wakes early and waits again.
+  // evaluation opens with no reload, even when the header's countdown never ticked on screen. TRAK-290: and when a
+  // scheduled plan goes out. A wait past setTimeout's limit (24 days) just wakes early and waits again.
+  const sharesAt = sharedAt ? Date.parse(sharedAt) : NaN
   useEffect(() => {
-    const left = [Date.parse(row.starts_at), whistle].map(at => at - now).find(wait => wait > 0)
+    const left = [sharesAt, Date.parse(row.starts_at), whistle].map(at => at - now).filter(wait => wait > 0).sort((a, b) => a - b)[0]
     if (left === undefined) return
     const timer = setTimeout(() => setNow(Date.now()), Math.min(left + 50, 2 ** 31 - 1))
     return () => clearTimeout(timer)
-  }, [row.starts_at, whistle, now])
+  }, [sharesAt, row.starts_at, whistle, now])
   const cancelled = row.status === 'cancelled'
   // TRAK-286: who a share would change now. Only asked once the plan is shared; a failed read shows no changes.
   const changes = useGamePlanChanges([row.id], !!sharedAt && !cancelled).data?.get(row.id) ?? []
-  const state = STATE[gameState({ ...row, ends_at: row.ends_at ?? null }, now,
-    { drafted: !!plan.data, shared: !!sharedAt, changes: changes.length, evaluated: !!evaluation.data?.evaluation,
-      published: !!evaluation.data?.evaluation?.published_at })]
+  const state = gameStatus({ ...row, ends_at: row.ends_at ?? null }, now,
+    { drafted: !!plan.data, shared: !!sharedAt, sharedAt: sharedAt ?? undefined, changes: changes.length,
+      evaluated: !!evaluation.data?.evaluation, published: !!evaluation.data?.evaluation?.published_at })
   // The plan as typed, and its step, live here, above the tabs: Arc unmounts a panel that isn't shown. Until the coach
   // types, it is the saved plan, so a retried read still fills the form. Needs you's "Share the changes" opens Share.
   const [typed, setTyped] = useState<PlanForm | null>(null)
@@ -131,6 +132,7 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
                   plans={lockedPlan.players} planGoals={formToPlan(lockedPlan).goals.map((goal, i) => goal.title || goal.looks_like || `Goal ${i + 1}`)}
                   form={entered ?? evaluationToForm(evaluation.data ?? { evaluation: null, players: [], notes: [] })} onFormChange={setEntered}
                   step={evaluationStep} onStep={setEvaluationStep} savedAt={evaluation.data?.evaluation?.saved_at ?? null}
+                  remindAt={evaluation.data?.evaluation?.remind_at ?? null}
                   publishedAt={evaluation.data?.evaluation?.published_at ?? null} planCreatedAt={plan.data?.created_at ?? null} />}
           </TabsContent>
         </Tabs>

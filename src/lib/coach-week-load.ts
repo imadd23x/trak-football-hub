@@ -4,9 +4,10 @@ import type { EventRow } from '@/lib/coach-events'
 import type { WeekSession } from '@/lib/coach-week'
 
 /** Coach Home's week (TRAK-262) and Needs you (Imad, 24 Oct): the coach's events and logged sessions between two days.
- *  TRAK-288: where Games is on, also which of the matches have an evaluation draft (null where it's off). */
+ *  TRAK-288: where Games is on, also which of the matches have an evaluation draft (null where it's off); TRAK-290:
+ *  and when each draft's reminder falls. */
 export async function loadWeek(coachId: string, from: string, to: string, games = false): Promise<{
-  events: EventRow[]; sessions: WeekSession[]; evaluated: Set<string> | null; published: Set<string>
+  events: EventRow[]; sessions: WeekSession[]; evaluated: Set<string> | null; published: Set<string>; reminders: Map<string, string>
 }> {
   // Every squad's events: a draft's clash counts them all, as the database does (TRAK-218). A day either side, as a
   // late or early event can fall in this week on this phone's clock (Imad, 23 Oct); the week keeps only its own days.
@@ -27,7 +28,7 @@ export async function loadWeek(coachId: string, from: string, to: string, games 
   // The database returns only the coach's own evaluations.
   const matchIds = (events.data ?? []).filter(event => event.event_type === 'match').map(event => event.id)
   const evaluations = games && matchIds.length
-    ? await supabase.from('game_evaluations').select('event_id, published_at').in('event_id', matchIds) : null
+    ? await supabase.from('game_evaluations').select('event_id, published_at, remind_at').in('event_id', matchIds) : null
   if (evaluations?.error) throw evaluations.error
   const rows = evaluations?.data ?? []
   return {
@@ -35,5 +36,6 @@ export async function loadWeek(coachId: string, from: string, to: string, games 
     evaluated: games ? new Set(rows.filter(row => !row.published_at).map(row => row.event_id)) : null,
     // TRAK-289: published, the loop is closed.
     published: new Set(rows.filter(row => row.published_at).map(row => row.event_id)),
+    reminders: new Map(rows.flatMap(row => !row.published_at && row.remind_at ? [[row.event_id, row.remind_at] as const] : [])),
   }
 }

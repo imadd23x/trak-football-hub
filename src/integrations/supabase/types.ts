@@ -663,6 +663,7 @@ export type Database = {
           our_score: number | null
           plan_worked: (string | null)[]
           published_at: string | null
+          remind_at: string | null
           saved_at: string
           their_score: number | null
         }
@@ -673,6 +674,7 @@ export type Database = {
           our_score?: number | null
           plan_worked?: (string | null)[]
           published_at?: string | null
+          remind_at?: string | null
           saved_at?: string
           their_score?: number | null
         }
@@ -683,6 +685,7 @@ export type Database = {
           our_score?: number | null
           plan_worked?: (string | null)[]
           published_at?: string | null
+          remind_at?: string | null
           saved_at?: string
           their_score?: number | null
         }
@@ -1471,6 +1474,10 @@ export type Database = {
       }
       share_game_plan: {
         Args: { p_event_id: string; p_talked?: boolean }
+        Returns: number
+      }
+      schedule_game_plan: {
+        Args: { p_at?: string; p_event_id: string; p_talked?: boolean }
         Returns: number
       }
       publish_game_evaluation: {

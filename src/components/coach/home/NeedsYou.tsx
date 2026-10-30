@@ -5,8 +5,9 @@ import { ScrollArea } from '@/components/arc/scroll-area/scroll-area'
 import { LoadError } from '@/components/trak/LoadError'
 import type { NeedsYouItem } from '@/lib/coach-needs-you'
 
-/** An event still waiting for its register or match log (Imad, 24 Oct), with the week's own next step. */
-export type OwedEvent = { id: string; title: string; when: string; squad: string | null; reason: string; action: ReactNode }
+/** An event still waiting for its register or match log (Imad, 24 Oct), with the week's own next step. TRAK-290: an
+ *  evaluation draft past its 09:00 reminder is urgent. */
+export type OwedEvent = { id: string; title: string; when: string; squad: string | null; reason: string; action: ReactNode; urgent?: boolean }
 
 /** TRAK-262 (Imad, 22 Oct): Home's Needs you, one swipeable card per player (`needsYou()` says who). Imad, 24 Oct:
  *  events the week marks "Needs you" come first, with their Take register or Log it. */
@@ -38,8 +39,8 @@ export function NeedsYou({ items, events = [], failed, onRetry, onOpen }: {
                   <span className="truncate text-sm text-ink-3">{[event.squad, event.when].filter(Boolean).join(' · ')}</span>
                 </span>
                 <span className="flex items-start gap-2 text-sm text-ink-2">
-                  <span className="mt-1.5 size-2 flex-none rounded-full bg-warning" aria-hidden />
-                  <span>{event.reason}</span>
+                  <span className={`mt-1.5 size-2 flex-none rounded-full ${event.urgent ? 'bg-danger' : 'bg-warning'}`} aria-hidden />
+                  <span>{event.urgent && <span className="sr-only">Urgent: </span>}{event.reason}</span>
                 </span>
                 <span className="mt-auto">{event.action}</span>
               </div>

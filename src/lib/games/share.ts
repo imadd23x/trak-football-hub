@@ -1,4 +1,5 @@
 import type { Json } from '@/integrations/supabase/types'
+import { localParts } from '@/lib/event-time'
 import { formToPlan, type Goal, type PlanForm } from './plan'
 import { playerPlan, type Role } from './lineup'
 
@@ -44,4 +45,15 @@ export function sharedPlan(family: FamilyRow, player: PlayerRow | null): SharedP
     player: player && { goals: goals.map(goal => ({ title: goal.title, looksLike: goal.looks_like })), note: player.note },
     updated: family.changed_at != null || player?.changed_at != null,
   }
+}
+
+/** TRAK-290: a scheduled share's moment as the academy's day and time ("2026-10-29", "19:30"), for the Share at…
+ *  form, which is on the academy's clock as every form is. The academy's offset is read from the match's own wall
+ *  clock and instant, as academyClock does; a match with no time yet leaves the phone's clock. */
+export function shareWall(game: { event_date?: string | null; start_time?: string | null; starts_at: string }, at: string) {
+  const offset = game.event_date && game.start_time
+    ? Date.parse(`${game.event_date}T${game.start_time.slice(0, 5)}:00Z`) - Date.parse(game.starts_at) : null
+  if (offset === null) { const { date, time } = localParts(at); return { day: date, time } }
+  const wall = new Date(Date.parse(at) + offset).toISOString()
+  return { day: wall.slice(0, 10), time: wall.slice(11, 16) }
 }

@@ -50,10 +50,12 @@ label.taskCopy { cursor: pointer; }
 
 .message { overflow: hidden; }
 .error { padding: 0 20px 14px; font-size: var(--text-xs); color: var(--danger); }
+/* Trak (TRAK-290): what an alternative opens, under the footer. */
+.extra { padding: 4px 20px 16px; }
 
 @media (max-width: 420px) {
   .header, .progress, .task, .footer { padding-inline: 16px; }
-  .error { padding-inline: 16px; }
+  .error, .extra { padding-inline: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .fill, .task, .taskLabel { transition: none; }

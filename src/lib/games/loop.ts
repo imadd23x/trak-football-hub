@@ -1,13 +1,15 @@
 /* TRAK-283 (Games 1/8): where a match is in its loop (TRAK-282), from the event alone. The plan (TRAK-284 to 287)
    and the evaluation (TRAK-288, 289) add their own states. The clock is an instant (now, starts_at, ends_at), so
    the device's time zone never matters: the database sets both instants on the academy's clock (TRAK-175). */
+import { format } from 'date-fns'
 
 export type GameEvent = { id: string; published: boolean; starts_at: string; ends_at: string | null }
-export type GameState = 'logistics' | 'plan' | 'planDraft' | 'shared' | 'changes' | 'locked' | 'fullTime' | 'evaluationDraft' | 'published'
+export type GameState = 'logistics' | 'plan' | 'planDraft' | 'scheduled' | 'shared' | 'changes' | 'locked' | 'fullTime' | 'evaluationDraft' | 'published'
 export type GameTab = 'logistics' | 'plan' | 'evaluation'
 /** Where the plan is: saved as a draft (TRAK-284), shared, and how many players' copies an edit since would change
- *  (TRAK-286). And whether an evaluation draft is saved (TRAK-288). */
-export type PlanProgress = { drafted?: boolean; shared?: boolean; changes?: number; evaluated?: boolean; published?: boolean }
+ *  (TRAK-286); when it was shared, or goes out if that's still to come (TRAK-290). And whether an evaluation draft is
+ *  saved (TRAK-288). */
+export type PlanProgress = { drafted?: boolean; shared?: boolean; sharedAt?: string; changes?: number; evaluated?: boolean; published?: boolean }
 /** The next action opens a tab; `step: 'share'` opens the plan's Share step. */
 export type GameAction = { label: string; tab: GameTab; step?: 'share' }
 
@@ -23,6 +25,8 @@ export const STATE: Record<GameState, {
   plan: { label: 'Plan not written', tone: 'warning', step: 1, action: { label: 'Write the plan', tab: 'plan' } },
   // TRAK-284: a draft only the coach sees. Sharing it (TRAK-286) closes "Plan not shared".
   planDraft: { label: 'Plan not shared', tone: 'warning', step: 1, action: { label: 'Share the plan', tab: 'plan', step: 'share' } },
+  // TRAK-290: shared at a time still to come. Nothing to do: what's saved by then goes out.
+  scheduled: { label: 'Plan scheduled', tone: 'info', step: 2 },
   shared: { label: 'Plan shared', tone: 'success', step: 2 },
   // TRAK-286: edits after sharing wait until the coach shares them.
   changes: { label: 'Changes not shared', tone: 'warning', step: 2, action: { label: 'Share the changes', tab: 'plan', step: 'share' } },
@@ -43,9 +47,19 @@ export function fullTime(game: GameEvent): number {
 export function gameState(game: GameEvent, now: number, plan: PlanProgress = {}): GameState {
   if (!game.published) return 'logistics' // a draft can still be published after its time (TRAK-230)
   if (now < Date.parse(game.starts_at)) {
+    if (plan.shared && plan.sharedAt && now < Date.parse(plan.sharedAt)) return 'scheduled'
     return plan.shared ? (plan.changes ? 'changes' : 'shared') : plan.drafted ? 'planDraft' : 'plan'
   }
   return now < fullTime(game) ? 'locked' : plan.published ? 'published' : plan.evaluated ? 'evaluationDraft' : 'fullTime'
+}
+
+/** A game's state as its badge shows it. A scheduled plan says when it goes out, on this phone's clock, as every
+ *  screen time is (TRAK-290: "Shares Thu 19:30"). */
+export function gameStatus(game: GameEvent, now: number, plan: PlanProgress = {}) {
+  const state = gameState(game, now, plan)
+  return state === 'scheduled' && plan.sharedAt
+    ? { ...STATE.scheduled, label: `Shares ${format(new Date(plan.sharedAt), 'EEE HH:mm')}` }
+    : STATE[state]
 }
 
 /** The game page's address for a next action. */

@@ -153,6 +153,10 @@ describe('TRAK-288: the evaluation draft', { timeout: 30_000 }, () => {
   })
 
   it('saves every step in one draft that only the coach sees, and it reloads on every step', async () => {
+    // The evening the draft is saved (21:40 in Dubai), so the alert reads its time alone (TRAK-290: another day's adds
+    // the weekday).
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-28T18:00:00Z'))
     const user = userEvent.setup()
     backend(120 * MINUTE)
     renderApp('/coach/games/g1?tab=evaluation')

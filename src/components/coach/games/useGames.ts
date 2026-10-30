@@ -144,7 +144,7 @@ export function useGameEvaluation(eventId: string | undefined) {
     enabled: !!user && !!eventId,
     queryFn: async () => {
       const [evaluation, players, notes] = await Promise.all([
-        supabase.from('game_evaluations').select('our_score, their_score, goals, how_they_scored, plan_worked, saved_at, published_at')
+        supabase.from('game_evaluations').select('our_score, their_score, goals, how_they_scored, plan_worked, saved_at, published_at, remind_at')
           .eq('event_id', eventId!).maybeSingle(),
         supabase.from('game_evaluation_players').select('squad_player_id, played, did_job, against_expectation').eq('event_id', eventId!),
         supabase.from('game_evaluation_notes').select('squad_player_id, note').eq('event_id', eventId!),

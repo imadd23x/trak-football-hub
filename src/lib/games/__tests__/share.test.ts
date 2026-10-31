@@ -27,28 +27,29 @@ describe('readers (TRAK-286)', () => {
   })
 })
 
-describe('previewOf (TRAK-286)', () => {
-  it('a starter reads their job, trimmed, the goals with words and the note; their family, only that there is a note', () => {
+describe('previewOf (TRAK-286, TRAK-319)', () => {
+  it('a starter reads their job, trimmed, and the goals with words; a note to a selected player doesn\'t go out; their family reads only that they start', () => {
     expect(previewOf(form(), 'zagorakis', 'player')).toEqual({
-      role: 'starter', job: 'Stay tight to their winger.', hasNote: true, updated: false,
-      player: { goals: [{ title: 'Win the second ball', looksLike: 'First to every loose ball.' }], note: 'Proud of you.' },
+      role: 'starter', updated: false,
+      player: { goals: [{ title: 'Win the second ball', looksLike: 'First to every loose ball.' }], job: 'Stay tight to their winger.', note: '' },
     })
-    expect(previewOf(form(), 'zagorakis', 'parent')).toEqual({ role: 'starter', job: 'Stay tight to their winger.', hasNote: true, updated: false, player: null })
+    expect(previewOf(form(), 'zagorakis', 'parent')).toEqual({ role: 'starter', updated: false, player: null })
   })
 
   it('someone not placed is on the bench, with no job and no note', () => {
-    expect(previewOf(form(), 'fyssas', 'player')).toMatchObject({ role: 'bench', job: '', hasNote: false, player: { note: '' } })
+    expect(previewOf(form(), 'fyssas', 'player')).toMatchObject({ role: 'bench', player: { job: '', note: '' } })
   })
 
   it('someone left out reads only that, with the note and the goals', () => {
-    expect(previewOf(form(), 'charisteas', 'player')).toMatchObject({ role: 'not_selected', job: '', hasNote: true, player: { note: 'Not this week.' } })
+    expect(previewOf(form(), 'charisteas', 'player')).toMatchObject({ role: 'not_selected', player: { job: '', note: 'Not this week.' } })
     expect(previewOf(form(), 'charisteas', 'player').player!.goals).toHaveLength(1)
+    expect(previewOf(form(), 'charisteas', 'parent')).toEqual({ role: 'not_selected', updated: false, player: null })
   })
 
   it('never carries the expectation, the context, how strong they are or scouting', () => {
     const plan = previewOf(form(), 'zagorakis', 'player')
-    expect(Object.keys(plan).sort()).toEqual(['hasNote', 'job', 'player', 'role', 'updated'])
-    expect(Object.keys(plan.player!).sort()).toEqual(['goals', 'note'])
+    expect(Object.keys(plan).sort()).toEqual(['player', 'role', 'updated'])
+    expect(Object.keys(plan.player!).sort()).toEqual(['goals', 'job', 'note'])
   })
 })
 
@@ -62,14 +63,14 @@ describe('lineUpCounts (TRAK-286)', () => {
   })
 })
 
-describe('sharedPlan (TRAK-286)', () => {
-  const family = { role: 'starter', job: 'Stay tight.', has_note: true, changed_at: null }
-  const player = { goals: [{ title: 'Win the second ball', looks_like: '' }], note: 'Proud of you.', changed_at: null }
+describe('sharedPlan (TRAK-286, TRAK-319)', () => {
+  const family = { role: 'starter', changed_at: null }
+  const player = { goals: [{ title: 'Win the second ball', looks_like: '' }], job: 'Stay tight.', note: '', changed_at: null }
 
-  it('a player\'s plan holds the goals and the note; a guardian\'s holds neither', () => {
-    expect(sharedPlan(family, player)).toEqual({ role: 'starter', job: 'Stay tight.', hasNote: true, updated: false,
-      player: { goals: [{ title: 'Win the second ball', looksLike: '' }], note: 'Proud of you.' } })
-    expect(sharedPlan(family, null)).toMatchObject({ player: null, hasNote: true })
+  it('a player\'s plan holds the goals and their job; a guardian\'s holds only the role', () => {
+    expect(sharedPlan(family, player)).toEqual({ role: 'starter', updated: false,
+      player: { goals: [{ title: 'Win the second ball', looksLike: '' }], job: 'Stay tight.', note: '' } })
+    expect(sharedPlan(family, null)).toEqual({ role: 'starter', updated: false, player: null })
   })
 
   it('reads as updated when a later share changed either copy', () => {

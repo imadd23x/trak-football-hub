@@ -124,9 +124,9 @@ export function ShareStep({ game, form, who, sharedAt, changes, coachName, onSha
           <h2 id="plan-who" className="text-lg font-medium text-ink">Who sees what</h2>
           <ul className="divide-y divide-line">
             <li className="grid gap-0.5 py-3"><span className="text-sm font-medium text-ink">Each player</span>
-              <span className="text-sm text-ink-3">The goals, their job, and your note to them.</span></li>
+              <span className="text-sm text-ink-3">The goals and their job, or, if they’re left out, your note to them.</span></li>
             <li className="grid gap-0.5 py-3"><span className="text-sm font-medium text-ink">Families</span>
-              <span className="text-sm text-ink-3">The logistics and their player’s job, or “Not in the squad this week”. Never your note.</span></li>
+              <span className="text-sm text-ink-3">The logistics, and whether their player starts, is on the bench or is “Not in the squad this week”. Never the job or your note.</span></li>
             <li className="grid gap-0.5 py-3"><span className="flex items-center gap-1.5 text-sm font-medium text-ink">Only you<Lock size={14} aria-hidden="true" /></span>
               <span className="text-sm text-ink-3">Expectations and context, until you publish the evaluation. How strong they are and scouting, always.</span></li>
           </ul>

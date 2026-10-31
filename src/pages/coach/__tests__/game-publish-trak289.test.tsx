@@ -163,7 +163,7 @@ describe('TRAK-289: publishing the evaluation', { timeout: 30_000 }, () => {
     expect(await screen.findByText('Published to 2 players and their families. The loop is closed.')).toBeInTheDocument()
   })
 
-  it('the preview shows each player what they\'ll read, and their parent the same without the note', async () => {
+  it('the preview shows each player what they\'ll read, and their parent the score and how it went, never the job or the note (TRAK-319)', async () => {
     const user = userEvent.setup()
     backend({}, ['worked', 'partly'])
     renderApp('/coach/matches/g1?tab=evaluation')
@@ -186,8 +186,8 @@ describe('TRAK-289: publishing the evaluation', { timeout: 30_000 }, () => {
 
     await user.click(within(preview).getByRole('button', { name: 'As the parent' }))
     const parent = within(preview).getByRole('region', { name: 'After the match' })
-    expect(parent).toHaveTextContent('Theodoros’s job')
-    expect(parent).not.toHaveTextContent('Brave all game.')
-    expect(parent).toHaveTextContent('Coach Otto Rehhagel’s note is just for Theodoros.')
+    expect(parent).toHaveTextContent('Final score 2–1')
+    expect(parent).toHaveTextContent('Went beyond what we asked.')
+    expect(parent).not.toHaveTextContent(/’s job|Your job|You did|note is just for|Brave all game/)
   })
 })

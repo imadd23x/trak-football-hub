@@ -13,9 +13,9 @@ import { LockedValue } from './LockedValue'
 
 /* TRAK-285 (Games 3/8): what the line-up's sheet holds (a bottom sheet on a phone, a panel beside the pitch on a
    tablet or laptop). An empty slot: who plays there, Confirmed first, then Not confirmed, then "Can't make it",
-   which can't be picked. A player: their job (they and their family see it), a note only they see, context and the
-   expectation (only the coach, until the evaluation is published). Off the pitch, bench or not selected sits here
-   (Imad, 28 Oct); a player left out gets the note only. TRAK-287: locked at kick-off, the sheet only shows. */
+   which can't be picked. A player: one box only they see (TRAK-319, Imad 30 Oct), their job, or, left out, the coach's
+   note; then context and the expectation (only the coach, until the evaluation is published). Off the pitch, bench or
+   not selected sits here (Imad, 28 Oct). TRAK-287: locked at kick-off, the sheet only shows. */
 
 export type Target = { kind: 'slot'; slot: number } | { kind: 'player'; id: string }
 
@@ -52,8 +52,6 @@ export function PlayerPanel({ target, players, onPlayers, candidates, shape, onT
   const plan = playerPlan(players, player.id)
   const first = firstName(player.name)
   const set = (next: Partial<PlayerPlan>) => onPlayers({ ...players, [player.id]: { ...plan, ...next } })
-  const note = <Textarea label={`Note to ${first} · only ${first}, not the family`} rows={3} value={plan.note} maxLength={PLAYER_LIMITS.note} readOnly={locked}
-    onChange={event => set({ note: event.target.value })} />
 
   return <div className="grid gap-4">
     <p className="text-sm text-ink-2">{plan.role === 'starter' && plan.slot != null ? `${lineName(shape, plan.slot)}, slot ${plan.slot}` : plan.role === 'bench' ? 'Bench' : 'Not selected'}</p>
@@ -63,12 +61,12 @@ export function PlayerPanel({ target, players, onPlayers, candidates, shape, onT
       : <RadioGroup label="Bench or not selected" name={`role-${player.id}`} options={ROLES} value={plan.role}
           onValueChange={role => onPlayers(setRole(players, player.id, role as 'bench' | 'not_selected'))} />}
     {plan.role === 'not_selected' ? <>
-      {note}
+      <Textarea label={`Note to ${first} · only ${first} sees it`} rows={3} value={plan.note} maxLength={PLAYER_LIMITS.note} readOnly={locked}
+        onChange={event => set({ note: event.target.value })} />
       <p className="text-sm text-ink-3">{first}'s family sees “Not in the squad this week”.</p>
     </> : <>
-      <Textarea label={`Job · ${first} and family see it`} rows={3} value={plan.job} maxLength={PLAYER_LIMITS.job} readOnly={locked}
+      <Textarea label={`Job · only ${first} sees it`} rows={3} value={plan.job} maxLength={PLAYER_LIMITS.job} readOnly={locked}
         onChange={event => set({ job: event.target.value })} />
-      {note}
       {locked ? <>
         <LockedValue label="Context · only you" value={CONTEXT.filter(tag => plan.context.includes(tag.value)).map(tag => tag.label).join(', ') || 'None'} />
         <LockedValue label="Expectation · only you" value={EXPECTATIONS.find(level => level.value === plan.expectation)?.label ?? 'Usual'} />
@@ -80,7 +78,7 @@ export function PlayerPanel({ target, players, onPlayers, candidates, shape, onT
         <RadioGroup label="Expectation · only you" name={`expectation-${player.id}`} options={EXPECTATIONS} value={plan.expectation}
           onValueChange={value => set({ expectation: value as Expectation })} />
       </>}
-      <p className="text-sm text-ink-3">{first} and their family see the expectation only with the published evaluation.</p>
+      <p className="text-sm text-ink-3">{first}'s family sees whether {first} starts or is on the bench, never the job. The expectation shows only with the published evaluation.</p>
     </>}
   </div>
 }

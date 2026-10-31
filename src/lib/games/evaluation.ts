@@ -115,9 +115,11 @@ export function previewReview(form: EvaluationForm, id: string, plans: PlayerPla
   const plan = playerPlan(plans, id)
   const answer = answerOf(form, id)
   const note = answer.note.trim()
+  const player = as === 'player'
+  // TRAK-319: the job, "did the job" and the note are the player's alone.
   return {
-    eventId: '', sessionId: null, ourScore: form.ourScore, theirScore: form.theirScore, job: plan.job,
-    didJob: answer.didJob, expectation: plan.expectation, context: plan.context, against: answer.against,
-    hasNote: !!note, coachName, note: as === 'player' && note ? note : null,
+    eventId: '', sessionId: null, ourScore: form.ourScore, theirScore: form.theirScore, job: player ? plan.job : '',
+    didJob: player ? answer.didJob : null, expectation: plan.expectation, context: plan.context, against: answer.against,
+    coachName, note: player && note ? note : null,
   }
 }

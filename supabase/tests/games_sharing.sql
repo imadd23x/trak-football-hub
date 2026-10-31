@@ -1,7 +1,8 @@
 -- @trak-suite mode=--games-sharing in-all=true
 -- TRAK-286 (Games 4/8, spec TRAK-282): Share. Players and families read the plan from copies Share writes, never
--- the coach's working copy. A player reads the goals, their own job (or that they're not in the squad) and their own
--- note; a guardian reads their child's job and whether there's a note, never the note. Nobody reads expectation,
+-- the coach's working copy. A player reads the goals and their own job, or, left out, that and the coach's note to them
+-- (TRAK-319: a note to a selected player doesn't go out); a guardian reads only whether their child starts, is on the
+-- bench or isn't in the squad, never the job or the note (TRAK-319, Imad 30 Oct). Nobody reads expectation,
 -- context, strength or scouting. Consent and roster rules apply as for events; cancelling the match or switching
 -- Games off hides the plan. Edits after sharing stay unshared until the coach shares them, and only the children
 -- whose copy changes read "Updated". Test people are named after footballers. Synthetic fixtures; rolls back.
@@ -144,8 +145,9 @@ SELECT pg_temp.g286check((SELECT array_agg(right(squad_player_id::text,3)::integ
   AND (SELECT array_agg(right(squad_player_id::text,3)::integer ORDER BY squad_player_id) FROM public.game_for_player)=ARRAY[40,41,45,48],
   '2 copies for the consented squad who can come or are placed: none for consent pending, departed, U14 or can''t make it');
 SELECT pg_temp.g286check((SELECT role='bench' AND job='' AND NOT has_note FROM public.game_for_family WHERE squad_player_id=pg_temp.g286id(48))
-  AND (SELECT role='not_selected' AND job='' AND has_note FROM public.game_for_family WHERE squad_player_id=pg_temp.g286id(41)),
-  '2 not placed is bench; left out keeps only that there''s a note');
+  AND (SELECT role='not_selected' AND job='' AND NOT has_note FROM public.game_for_family WHERE squad_player_id=pg_temp.g286id(41))
+  AND (SELECT bool_and(job='' AND NOT has_note) FROM public.game_for_family),
+  '2 not placed is bench; a family copy holds the role only, never a job or that there''s a note (TRAK-319)');
 SELECT pg_temp.g286check((SELECT bool_and(changed_at IS NULL) FROM public.game_for_family) AND (SELECT bool_and(changed_at IS NULL) FROM public.game_for_player),
   '2 nothing reads as updated after the first share');
 SELECT pg_temp.g286check(NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
@@ -158,11 +160,11 @@ SELECT pg_temp.g286check((SELECT bool_and(coach_name='Otto Rehhagel') FROM publi
 -- ── 3. Who reads what ──────────────────────────────────────────────────────
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.g286actor(20);
-SELECT pg_temp.g286check(pg_temp.g286family()=ARRAY[40] AND (SELECT role='starter' AND job='Stay tight to their winger.' AND has_note FROM public.game_for_family),
-  '3 player A reads their own job, and nobody else''s');
-SELECT pg_temp.g286check(pg_temp.g286player()=ARRAY[40] AND (SELECT note='Second game at right-back. Proud of you.'
+SELECT pg_temp.g286check(pg_temp.g286family()=ARRAY[40] AND (SELECT role='starter' FROM public.game_for_family),
+  '3 player A reads that they start, and nobody else''s copy');
+SELECT pg_temp.g286check(pg_temp.g286player()=ARRAY[40] AND (SELECT job='Stay tight to their winger.' AND note=''
   AND goals='[{"title":"Win the second ball","looks_like":"First to every loose ball in midfield."}]'::jsonb FROM public.game_for_player),
-  '3 player A reads the goals and their own note, and nobody else''s');
+  '3 player A reads the goals and their own job in their own copy; a note to a selected player doesn''t go out (TRAK-319)');
 SELECT pg_temp.g286check((SELECT coach_name FROM public.game_for_family)='Otto Rehhagel'
   AND NOT EXISTS (SELECT 1 FROM public.profiles WHERE user_id=pg_temp.g286id(10)),
   '3 player A reads the coach''s name from the copy, though not the coach''s profile');
@@ -171,9 +173,9 @@ SELECT pg_temp.g286check(pg_temp.g286family()=ARRAY[41] AND (SELECT role='not_se
   AND pg_temp.g286player()=ARRAY[41] AND (SELECT note='Not this week. Your chance comes on Tuesday.' AND jsonb_array_length(goals)=1 FROM public.game_for_player),
   '3 player B, left out, reads that, the goals and their own note');
 SELECT pg_temp.g286actor(30);
-SELECT pg_temp.g286check(pg_temp.g286family()=ARRAY[40] AND (SELECT has_note FROM public.game_for_family),
-  '3 player A''s guardian reads their child''s job and that there''s a note');
-SELECT pg_temp.g286check(pg_temp.g286player()='{}','3 but never the note or the goals');
+SELECT pg_temp.g286check(pg_temp.g286family()=ARRAY[40] AND (SELECT role='starter' AND job='' AND NOT has_note FROM public.game_for_family),
+  '3 player A''s guardian reads only that their child starts: no job, and not that there''s a note (TRAK-319)');
+SELECT pg_temp.g286check(pg_temp.g286player()='{}','3 and never the job, the note or the goals');
 SELECT pg_temp.g286check((SELECT coach_name FROM public.game_for_family)='Otto Rehhagel','3 and the coach''s name');
 SELECT pg_temp.g286actor(31);
 SELECT pg_temp.g286check(pg_temp.g286family()=ARRAY[41] AND pg_temp.g286player()='{}','3 player B''s guardian reads only that B is left out');
@@ -216,17 +218,18 @@ UPDATE public.game_plan_players SET expectation='lead' WHERE event_id=pg_temp.g2
 UPDATE public.game_plans SET scouting='Their 9 is quick. Their 7 drifts inside.' WHERE event_id=pg_temp.g286id(500);
 SELECT pg_temp.g286check(pg_temp.g286changes(500)=ARRAY[40],'5 a new job is a change for that player; an expectation or scouting isn''t');
 SELECT pg_temp.g286actor(20);
-SELECT pg_temp.g286check((SELECT job FROM public.game_for_family)='Stay tight to their winger.','5 until it''s shared, player A reads the old job');
+SELECT pg_temp.g286check((SELECT job FROM public.game_for_player)='Stay tight to their winger.','5 until it''s shared, player A reads the old job');
 SELECT pg_temp.g286actor(10);
 SELECT pg_temp.g286check((SELECT public.share_game_plan(pg_temp.g286id(500),false))=1,
   '5 the coach shares the changes with 1, without ticking again');
 SELECT pg_temp.g286check(pg_temp.g286changes(500)='{}' AND (SELECT count(*)=2 AND min(changed)=1 FROM public.game_shares),
   '5 nothing is left to share, and the log has both shares');
 SELECT pg_temp.g286actor(20);
-SELECT pg_temp.g286check((SELECT job='Stay tight to their winger. Win your headers.' AND changed_at IS NOT NULL FROM public.game_for_family),
+SELECT pg_temp.g286check((SELECT job='Stay tight to their winger. Win your headers.' AND changed_at IS NOT NULL FROM public.game_for_player),
   '5 player A reads the new job, updated');
 SELECT pg_temp.g286actor(30);
-SELECT pg_temp.g286check((SELECT changed_at IS NOT NULL FROM public.game_for_family),'5 so does their guardian');
+SELECT pg_temp.g286check((SELECT changed_at IS NULL AND job='' FROM public.game_for_family),
+  '5 their guardian reads nothing new: the job isn''t theirs to read (TRAK-319)');
 SELECT pg_temp.g286actor(25);
 SELECT pg_temp.g286check((SELECT changed_at IS NULL FROM public.game_for_family) AND (SELECT changed_at IS NULL FROM public.game_for_player),
   '5 the keeper, whose plan didn''t change, sees nothing new');

@@ -1,7 +1,8 @@
 -- @trak-suite mode=--games-publish in-all=true
 -- TRAK-289 (Games 7/8, spec TRAK-282): publishing the evaluation. Before it, players and families read none of it.
 -- After it, a player reads their own review (job, did the job, what was asked, against expectation) and their note;
--- a guardian reads their child's review without the note's text; another coach, another child and a child whose
+-- a guardian reads the score and what was asked, never the job, "did the job" or a note line (TRAK-319); another
+-- coach, another child and a child whose
 -- consent is pending read nothing. Strength, scouting and how they scored are never copied. Publish refuses until every
 -- "Did the plan work?" answer is in and the match has a competition, writes the match log with no rating, and is final.
 -- Test people are named after footballers. Synthetic fixtures; rolls back.
@@ -174,24 +175,28 @@ SELECT pg_temp.g289check((SELECT count(*) FROM public.coach_sessions s WHERE s.e
 -- ── 5. After publishing: each reads exactly their own ─────────────────────
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.g289actor(20);
-SELECT pg_temp.g289check((SELECT our_score=2 AND their_score=1 AND job='Stay tight to their winger.' AND did_job='partly'
-    AND expectation='stretch' AND context='{out_of_position}' AND against_expectation='above' AND has_note AND coach_name='Otto Rehhagel'
+SELECT pg_temp.g289check((SELECT our_score=2 AND their_score=1 AND job='' AND did_job IS NULL
+    AND expectation='stretch' AND context='{out_of_position}' AND against_expectation='above' AND NOT has_note AND coach_name='Otto Rehhagel'
   FROM public.game_review_for_family WHERE event_id=pg_temp.g289id(500) AND squad_player_id=pg_temp.g289id(40))
-  AND (SELECT count(*) FROM public.game_review_for_family WHERE event_id=pg_temp.g289id(500))=1,
-  '5 player A reads their own review: job, did the job, what was asked, against expectation, and only theirs');
+  AND (SELECT count(*) FROM public.game_review_for_family WHERE event_id=pg_temp.g289id(500))=1
+  AND (SELECT job='Stay tight to their winger.' AND did_job='partly'
+  FROM public.game_review_for_player WHERE event_id=pg_temp.g289id(500) AND squad_player_id=pg_temp.g289id(40)),
+  '5 player A reads their own review: the score and what was asked, and in their own copy their job and did the job (TRAK-319)');
 SELECT pg_temp.g289check((SELECT note FROM public.game_review_for_player WHERE event_id=pg_temp.g289id(500))='Brave all game.',
   '5 player A reads their note');
 SELECT pg_temp.g289check(pg_temp.g289reads(500) = 'family 1 · notes 1 · evaluation 0 · plan players 0',
   '5 and still nothing of the coach''s working evaluation or plan');
 SELECT pg_temp.g289actor(21);
-SELECT pg_temp.g289check((SELECT did_job='yes' AND against_expectation='met' AND expectation='usual' AND NOT has_note
+SELECT pg_temp.g289check((SELECT did_job IS NULL AND against_expectation='met' AND expectation='usual' AND NOT has_note
   FROM public.game_review_for_family WHERE event_id=pg_temp.g289id(500))
-  AND pg_temp.g289reads(500) = 'family 1 · notes 0 · evaluation 0 · plan players 0',
+  AND (SELECT did_job='yes' AND note='' FROM public.game_review_for_player WHERE event_id=pg_temp.g289id(500))
+  AND pg_temp.g289reads(500) = 'family 1 · notes 1 · evaluation 0 · plan players 0',
   '5 player B reads their own (Yes · Met, no note), never player A''s');
 SELECT pg_temp.g289actor(30);
-SELECT pg_temp.g289check((SELECT has_note FROM public.game_review_for_family WHERE event_id=pg_temp.g289id(500)) IS TRUE
+SELECT pg_temp.g289check((SELECT job='' AND did_job IS NULL AND NOT has_note AND against_expectation='above'
+  FROM public.game_review_for_family WHERE event_id=pg_temp.g289id(500))
   AND pg_temp.g289reads(500) = 'family 1 · notes 0 · evaluation 0 · plan players 0',
-  '5 player A''s guardian reads the review, knows there''s a note, and never reads it');
+  '5 player A''s guardian reads the score and how it went: no job, no "did the job", no note line, never the child''s copy (TRAK-319)');
 SELECT pg_temp.g289actor(11);
 SELECT pg_temp.g289check(pg_temp.g289reads(500) = 'family 0 · notes 0 · evaluation 0 · plan players 0', '5 another coach reads none of it');
 SELECT pg_temp.g289actor(22);

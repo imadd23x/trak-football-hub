@@ -10,28 +10,31 @@ import { rosterRows } from './shared-plans'
 /* TRAK-289 (Games 7/8): a child's published reviews, read as the child or one of their guardians. The database opens
    only that child's copies (game_review_for_family), and the coach's note to the child alone (game_review_for_player).
    Read through the child's roster rows, as the shared plan is. TRAK-282's words are what they read; the coach sees the
-   plain labels. */
+   plain labels. TRAK-319 (Imad, 30 Oct): the job and "did the job" are the child's alone, in their own copy. */
 
 export type Review = {
   eventId: string
   /** The match session publish wrote: the child's match row for this game carries it. */
   sessionId: string | null
-  ourScore: number; theirScore: number; job: string
-  didJob: DidJob; expectation: Expectation; context: string[]; against: Against
-  hasNote: boolean
+  ourScore: number; theirScore: number
+  /** The child's alone: empty, and null, when read as a guardian. */
+  job: string; didJob: DidJob | null
+  expectation: Expectation; context: string[]; against: Against
   /** null when it isn't known: "your coach". */
   coachName: string | null
   /** The note's text: the child's alone, so null when read as a guardian. */
   note: string | null
 }
 
-type FamilyRow = Pick<Tables<'game_review_for_family'>, 'event_id' | 'session_id' | 'our_score' | 'their_score' | 'job' | 'did_job'
-  | 'expectation' | 'context' | 'against_expectation' | 'has_note' | 'coach_name'>
+type FamilyRow = Pick<Tables<'game_review_for_family'>, 'event_id' | 'session_id' | 'our_score' | 'their_score'
+  | 'expectation' | 'context' | 'against_expectation' | 'coach_name'>
+type PlayerRow = Pick<Tables<'game_review_for_player'>, 'note' | 'job' | 'did_job'>
 
-export const reviewOf = (row: FamilyRow, player: { note: string } | null): Review => ({
-  eventId: row.event_id, sessionId: row.session_id, ourScore: row.our_score, theirScore: row.their_score, job: row.job,
-  didJob: row.did_job as DidJob, expectation: row.expectation as Expectation, context: row.context, against: row.against_expectation as Against,
-  hasNote: row.has_note, coachName: row.coach_name.trim() || null, note: player?.note ?? null,
+export const reviewOf = (row: FamilyRow, player: PlayerRow | null): Review => ({
+  eventId: row.event_id, sessionId: row.session_id, ourScore: row.our_score, theirScore: row.their_score,
+  job: player?.job ?? '', didJob: (player?.did_job ?? null) as DidJob | null,
+  expectation: row.expectation as Expectation, context: row.context, against: row.against_expectation as Against,
+  coachName: row.coach_name.trim() || null, note: player?.note || null,
 })
 
 const DID_JOB_WORDS: Record<DidJob, string> = { yes: 'You did your job', partly: 'You did part of your job', not_yet: 'Not this time' }
@@ -45,9 +48,9 @@ export function whatWeAsked(expectation: Expectation, context: string[]) {
 }
 
 export const words = (review: Review) =>
-  ({ didJob: DID_JOB_WORDS[review.didJob], asked: whatWeAsked(review.expectation, review.context), against: AGAINST_WORDS[review.against] })
+  ({ didJob: review.didJob ? DID_JOB_WORDS[review.didJob] : null, asked: whatWeAsked(review.expectation, review.context), against: AGAINST_WORDS[review.against] })
 
-const FAMILY_COLUMNS = 'event_id, session_id, our_score, their_score, job, did_job, expectation, context, against_expectation, has_note, coach_name'
+const FAMILY_COLUMNS = 'event_id, session_id, our_score, their_score, expectation, context, against_expectation, coach_name'
 
 /** One match's review as this reader may read it, or null before it's published (or when the child didn't play). */
 export async function fetchReview(childId: string, eventId: string, asPlayer: boolean, signal: AbortSignal): Promise<Review | null> {
@@ -57,7 +60,7 @@ export async function fetchReview(childId: string, eventId: string, asPlayer: bo
     .eq('event_id', eventId).in('squad_player_id', rows.map(row => row.id)).abortSignal(signal).retry(false).maybeSingle()
   if (error) throw error
   if (!family) return null
-  const player = asPlayer && family.has_note ? await supabase.from('game_review_for_player').select('note').eq('event_id', eventId)
+  const player = asPlayer ? await supabase.from('game_review_for_player').select('note, job, did_job').eq('event_id', eventId)
     .eq('squad_player_id', family.squad_player_id).abortSignal(signal).retry(false).maybeSingle() : null
   if (player?.error) throw player.error
   return reviewOf(family, player?.data ?? null)

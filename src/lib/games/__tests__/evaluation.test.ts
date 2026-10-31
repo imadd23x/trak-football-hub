@@ -106,9 +106,10 @@ describe('publishing (TRAK-289)', () => {
   it('previews what a player and a parent will read, from the draft and the plan as it locked', () => {
     expect(previewReview({ ...form, theirScore: 1 }, 'zagorakis', plans, 'Otto Rehhagel', 'player')).toEqual({
       eventId: '', sessionId: null, ourScore: 2, theirScore: 1, job: 'Stay tight.', didJob: 'partly', expectation: 'stretch',
-      context: ['out_of_position'], against: 'above', hasNote: true, coachName: 'Otto Rehhagel', note: 'Brave all game.',
+      context: ['out_of_position'], against: 'above', coachName: 'Otto Rehhagel', note: 'Brave all game.',
     })
-    expect(previewReview(form, 'zagorakis', plans, null, 'parent')).toMatchObject({ hasNote: true, note: null, coachName: null })
-    expect(previewReview(form, 'charisteas', plans, null, 'player')).toMatchObject({ job: '', expectation: 'usual', context: [], didJob: 'yes', against: 'met', hasNote: false })
+    // TRAK-319: the parent reads no job, no "did the job" and no note.
+    expect(previewReview(form, 'zagorakis', plans, null, 'parent')).toMatchObject({ job: '', didJob: null, note: null, coachName: null, against: 'above' })
+    expect(previewReview(form, 'charisteas', plans, null, 'player')).toMatchObject({ job: '', expectation: 'usual', context: [], didJob: 'yes', against: 'met', note: null })
   })
 })

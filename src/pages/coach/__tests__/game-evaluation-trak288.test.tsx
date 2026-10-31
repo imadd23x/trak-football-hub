@@ -182,7 +182,7 @@ describe('TRAK-288: the evaluation draft', { timeout: 30_000 }, () => {
     const open = cardOf('Theodoros Zagorakis')
     await user.click(within(within(open).getByRole('group', { name: 'Did the job' })).getByRole('radio', { name: 'Partly' }))
     await user.click(within(within(open).getByRole('group', { name: 'Against expectation' })).getByRole('radio', { name: 'Above' }))
-    await user.type(within(open).getByRole('textbox', { name: 'Note to Theodoros · only Theodoros, not the family' }), 'Brave all game.')
+    await user.type(within(open).getByRole('textbox', { name: 'Note to Theodoros · only Theodoros sees it' }), 'Brave all game.')
     expect(screen.getByRole('button', { name: /^Theodoros Zagorakis/ })).toHaveTextContent('Did part of the job · Above')
 
     await user.click(screen.getByRole('button', { name: 'Save draft · sleep on it' }))
@@ -215,7 +215,7 @@ describe('TRAK-288: the evaluation draft', { timeout: 30_000 }, () => {
     expect(screen.getByRole('button', { name: /^Theodoros Zagorakis/ })).toHaveTextContent('Did part of the job · Above')
     expect(screen.getByRole('button', { name: /^Angelos Charisteas/ })).toHaveTextContent('Did the job · Met')
     await user.click(screen.getByRole('button', { name: /^Theodoros Zagorakis/ }))
-    expect(screen.getByRole('textbox', { name: 'Note to Theodoros · only Theodoros, not the family' })).toHaveValue('Brave all game.')
+    expect(screen.getByRole('textbox', { name: 'Note to Theodoros · only Theodoros sees it' })).toHaveValue('Brave all game.')
   })
 
   it('a refused save keeps everything entered and says why', async () => {

@@ -3,8 +3,9 @@ import { Badge } from '@/components/arc/badge/badge'
 import type { SharedPlan } from '@/lib/games/share'
 
 /* TRAK-286 (Games 4/8): the Game plan on the player's and the parent's event page, once the coach shares it
-   (TRAK-282). The player reads the goals, their job and the coach's note to them; the parent reads their child's job
-   and that there's a note, never the note. The coach's Share step previews with this same component. */
+   (TRAK-282). The player reads the goals and their job, or, left out, the coach's note to them. TRAK-319 (Imad, 30 Oct):
+   the parent reads only whether their child starts, is on the bench or isn't in the squad. The coach's Share step
+   previews with this same component. */
 
 const panel = 'rounded-[18px] border border-line bg-surface px-4 py-3'
 
@@ -21,7 +22,7 @@ export function GamePlanSection({ plan, as, coachName, childName, updated = fals
   const id = useId()
   const coach = coachName ? `Coach ${coachName}` : null
   const goals = plan.player?.goals ?? []
-  const who = as === 'player' ? 'Your' : `${childName}’s`
+  const job = plan.player?.job ?? ''
   return (
     <section aria-labelledby={id} className="arc grid gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -39,21 +40,18 @@ export function GamePlanSection({ plan, as, coachName, childName, updated = fals
       </div>}
       <div className={panel}>
         {plan.role === 'not_selected' ? <p className="text-[13px] font-medium text-ink">Not in the squad this week</p>
-          : plan.job ? <>
-              <h3 className="text-[13px] font-medium text-ink">{who} job{plan.role === 'bench' ? ' · bench' : ''}</h3>
-              <p className="mt-1 whitespace-pre-line text-[13px] text-ink-2">{plan.job}</p>
+          : job ? <>
+              <h3 className="text-[13px] font-medium text-ink">Your job{plan.role === 'bench' ? ' · bench' : ''}</h3>
+              <p className="mt-1 whitespace-pre-line text-[13px] text-ink-2">{job}</p>
             </>
           : <p className="text-[13px] font-medium text-ink">{as === 'player' ? '' : `${childName}: `}{plan.role === 'bench' ? 'On the bench' : 'Starting'}</p>}
       </div>
       {/* Imad, 28 Oct: a tinted panel like its neighbours, not Arc's card (a browsable item that lifts on hover), as
           the mockup's note. The parent's line has the mockup's dashed edge. */}
-      {plan.player?.note
-        ? <div className="rounded-[18px] px-4 py-3" style={{ background: 'rgb(var(--t-attention) / 0.15)' }}>
-            <h3 className="text-[13px] font-medium text-ink">From {coach ?? 'your coach'} · just for you</h3>
-            <p className="mt-1 whitespace-pre-line text-[13px] text-ink">{plan.player.note}</p>
-          </div>
-        : as === 'parent' && plan.hasNote
-          && <p className="rounded-[18px] border border-dashed border-line-strong px-4 py-3 text-[13px] text-ink-2">{coach ?? 'Your coach'}’s note is just for {childName}.</p>}
+      {plan.player?.note && <div className="rounded-[18px] px-4 py-3" style={{ background: 'rgb(var(--t-attention) / 0.15)' }}>
+        <h3 className="text-[13px] font-medium text-ink">From {coach ?? 'your coach'} · just for you</h3>
+        <p className="mt-1 whitespace-pre-line text-[13px] text-ink">{plan.player.note}</p>
+      </div>}
     </section>
   )
 }

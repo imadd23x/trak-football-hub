@@ -40,7 +40,7 @@ export function PlayersStep({ eventId, form, onFormChange, played, plans }: {
                 <RadioGroup label="Against expectation" name={`against-${eventId}-${player.id}`} options={AGAINST} value={answer.against}
                   onValueChange={value => set(player.id, { against: value as Against })} />
                 <div className="tablet:col-span-2">
-                  <Input label={`Note to ${name} · only ${name}, not the family`} placeholder="Optional. One sentence." value={answer.note}
+                  <Input label={`Note to ${name} · only ${name} sees it`} placeholder="Optional. One sentence." value={answer.note}
                     maxLength={EVALUATION_LIMITS.note} onChange={event => set(player.id, { note: event.target.value })} />
                 </div>
               </div>

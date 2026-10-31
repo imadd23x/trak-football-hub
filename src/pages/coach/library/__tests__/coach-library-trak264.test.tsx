@@ -149,7 +149,7 @@ describe('TRAK-264: the coach\'s Library', { timeout: 20_000 }, () => {
     expect(screen.queryByRole('heading', { name: 'Sessions' })).toBeNull()
     await userEvent.clear(box)
     await userEvent.type(box, 'zzzz')
-    expect(await screen.findByRole('status')).toHaveTextContent('No sessions match “zzzz”.')
+    expect(await screen.findByText('No sessions match “zzzz”.')).toHaveAttribute('role', 'status')
   })
 
   it('Play It Right opens inside the Library (TRAK-268), with a way back', async () => {

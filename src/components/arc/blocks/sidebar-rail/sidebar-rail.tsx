@@ -40,6 +40,8 @@ export interface SidebarRailProps {
   title: string;
   /** Right side of the top bar, such as the bell and Create. */
   actions?: ReactNode;
+  /** Trak (TRAK-324): under the brand in the open sidebar, such as the coach's squad switcher. Folded to a rail, it hides. */
+  afterBrand?: ReactNode;
   /** Phone and small tablet: no rail or top bar; the sidebar opens as a sheet. */
   narrow?: boolean;
   sheetOpen?: boolean;
@@ -146,7 +148,7 @@ function PanelGlyph({ collapsed, reduce }: { collapsed: boolean; reduce: boolean
   </svg>;
 }
 
-export function SidebarRail({ label, brand, items, footerItem, profile, active, onSelect, title, actions, narrow = false, sheetOpen = false, onSheetOpenChange, defaultOpen = {}, onWidthChange, children }: SidebarRailProps) {
+export function SidebarRail({ label, brand, items, footerItem, profile, active, onSelect, title, actions, afterBrand, narrow = false, sheetOpen = false, onSheetOpenChange, defaultOpen = {}, onWidthChange, children }: SidebarRailProps) {
   const baseId = useId();
   const prefersReduced = !!useReducedMotion();
   // The first measurement settles the layout before paint, so it never animates.
@@ -280,6 +282,7 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
         <motion.div className={styles.slot} initial={false} animate={{ width: slotWidth }} transition={reduce ? instant : motionTokens.spring.smooth}>
           <motion.div id={sidebarId} className={styles.sidebar} initial={false} animate={{ width: collapsed ? RAIL : FULL }} transition={reduce ? instant : motionTokens.spring.smooth} data-collapsed={collapsed || undefined} data-floating={overlaid || undefined}>
             <Identity className={styles.brand} mark={brand.logo} name={brand.name} detail={brand.detail} collapsed={collapsed} reduce={reduce} />
+            {afterBrand && !collapsed && <div className={styles.afterBrand}>{afterBrand}</div>}
             <Navigation variant="side" collapsed={collapsed} onSelect={id => select(id)} onGroup={id => toggleGroup(id)} {...navShared} />
             <Identity className={styles.profile} mark={profile.avatar} name={profile.name} detail={profile.detail} collapsed={collapsed} reduce={reduce} />
           </motion.div>

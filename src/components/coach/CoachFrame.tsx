@@ -13,7 +13,7 @@ import { CoachAlertsBell } from '@/components/coach/CoachAlertsBell'
 import { CoachCreate } from '@/components/coach/QuickAdd'
 import { CoachFrameContext, useCoachFrame, type CoachFrame as Frame } from '@/components/coach/coach-frame-context'
 import { useCoachSquad } from '@/lib/coach-squad'
-import { SquadPills } from '@/components/coach/home/SquadPills'
+import { SquadSwitcher } from '@/components/coach/SquadSwitcher'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { BARLESS, COACH_SCREEN_PATH, placeOf, type CoachScreen } from '@/lib/coach-places'
 
@@ -93,8 +93,8 @@ function Framed({ userId, name }: { userId: string; name: string }) {
   const select = (id: string) => { if (id in TO) navigate(TO[id as Screen]) }
   const club = identity?.club || 'Your academy'
   const barred = BARLESS.test(pathname)
-  const switcher = (compact: boolean) => coachSquad.view &&
-    <SquadPills squads={coachSquad.squads} value={coachSquad.view} onChange={coachSquad.pick} compact={compact} />
+  // TRAK-324: the squad switcher sits in the sidebar (a phone: at the top of the page), not in the top bar.
+  const switcher = <SquadSwitcher coachId={userId} />
 
   return <CoachFrameContext.Provider value={frame}>
     <SidebarRail label={club} title={title} narrow={!wide} sheetOpen={sheetOpen} onSheetOpenChange={setSheetOpen} onWidthChange={setRail}
@@ -102,9 +102,10 @@ function Framed({ userId, name }: { userId: string; name: string }) {
       items={items} footerItem={{ id: 'settings', label: 'Settings', icon: Settings }}
       profile={{ name, detail: identity?.role ?? undefined, avatar: <Avatar name={name} size="sm" /> }}
       active={screen ?? ''} onSelect={select}
-      actions={<>{!barred && switcher(true)}<CoachAlertsBell coachId={userId} /><CoachCreate placement="top" onSaved={saved} /></>}>
+      afterBrand={!barred && switcher}
+      actions={<><CoachAlertsBell coachId={userId} /><CoachCreate placement="top" onSaved={saved} /></>}>
       {/* TRAK-307: the menu pages' margins, so the pills end where the page does. */}
-      {!wide && !barred && coachSquad.view && <div className="flex justify-end bg-ground px-5 pt-3 tablet:px-8">{switcher(false)}</div>}
+      {!wide && !barred && coachSquad.view && <div className="flex justify-end bg-ground px-5 pt-3 tablet:px-8">{switcher}</div>}
       <Outlet />
     </SidebarRail>
     {!wide && !barred && <div className="arc fixed inset-x-0 z-50 px-3 pointer-events-none" style={{ bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>

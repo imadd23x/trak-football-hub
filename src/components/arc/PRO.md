@@ -12,5 +12,6 @@ Keep the notice line at the top of every file.
 - `glass-segmented/`
 - `glass-tabbar/`
 - `radar-chart/`
+- `team-switcher/` (TRAK-324: the coach's squad switcher; adapted: no Create or Join, no sample brands)
 - `blocks/` (adapted from Arc Pro blocks)
   - `blocks/release-readiness/` (TRAK-286: the Game plan's Share step)

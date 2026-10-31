@@ -168,21 +168,30 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(errors).toEqual([])
   })
 
-  // TRAK-305: one age-group switcher at the top (the top bar on a laptop, the page's top on a phone); the pick holds.
-  test(`Age groups at ${width} px: picked once at the top, kept after a reload`, async ({ page, context }, testInfo) => {
+  // TRAK-305, TRAK-324: one squad switcher (the sidebar on a laptop, the page's top on a phone); the pick holds.
+  test(`Age groups at ${width} px: picked once in the switcher, kept after a reload`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/training', width, height)
-    const ages = page.getByRole('group', { name: 'Age group' })
-    await expect(ages.getByRole('button')).toHaveText(['All', 'U14', 'U16'])
-    await expect(ages.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    const trigger = page.getByRole('button', { name: /^Squad: / })
+    await expect(trigger).toHaveAccessibleName(/^Squad: All squads\./)
     const coming = page.getByRole('region', { name: 'Coming up' })
     await expect(coming.getByRole('article')).toHaveCount(3)
-    await ages.getByRole('button', { name: 'U14' }).click()
+    await trigger.click()
+    const options = page.getByRole('listbox').getByRole('option')
+    await expect(options).toHaveCount(3)
+    // Squads have no role, so the tick is pinned to the last column; otherwise "All squads" was cut to "All squ…".
+    expect(await options.evaluateAll(rows => rows.filter(row => {
+      const name = row.querySelector<HTMLElement>('[class*="rowName"]')!
+      return name.scrollWidth > name.clientWidth
+    }).length)).toBe(0)
+    await expect(page.getByText('Create workspace')).toHaveCount(0)
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`squad-switcher-${width}.png`) })
+    await page.getByRole('option', { name: /^U14/ }).click()
+    await expect(trigger).toHaveAccessibleName(/^Squad: U14\./)
     await expect(coming.getByRole('article')).toHaveCount(1)
     await expect(coming.getByRole('article')).toContainText('U14 finishing')
-    await page.waitForTimeout(500)
-    await page.screenshot({ path: testInfo.outputPath(`age-groups-${width}.png`) })
     await page.reload()
-    await expect(page.getByRole('group', { name: 'Age group' }).getByRole('button', { name: 'U14' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: /^Squad: / })).toHaveAccessibleName(/^Squad: U14\./)
     await expect(page.getByRole('region', { name: 'Coming up' }).getByRole('article')).toHaveCount(1)
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])

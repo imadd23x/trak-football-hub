@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
+import { pickSquad } from '../../../../tests/support/squad-switcher'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
@@ -147,7 +148,7 @@ describe('TRAK-294: Training home', { timeout: 20_000 }, () => {
     expect(Date.parse(read.searchParams.get('starts_at')!.slice(4))).toBeLessThan(now - 7 * DAY)
 
     // U14: its own training and the whole roster's.
-    await user.click(within(screen.getByRole('group', { name: 'Age group' })).getByRole('button', { name: 'U14' }))
+    await pickSquad('U14')
     await waitFor(() => expect(comingUp()).toHaveLength(1))
     expect(comingUp()[0]).toMatch(/Training later$/)
     expect(lastWeek()).toHaveLength(1)

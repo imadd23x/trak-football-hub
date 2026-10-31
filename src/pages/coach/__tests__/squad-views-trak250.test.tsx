@@ -8,6 +8,7 @@ import { beforeAll, afterAll, it, expect, describe, beforeEach, afterEach, vi } 
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
+import { expectSquadPicked, pickSquad, squadsOffered } from '../../../../tests/support/squad-switcher'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
@@ -102,11 +103,11 @@ describe('TRAK-250: the Squad shell', { timeout: 20_000 }, () => {
     const first = await view('Players')
     await within(first).findByText('Nia Rehearsal')
     expect(within(first).getByText('Theo Rehearsal')).toBeInTheDocument()
-    expect(within(screen.getByRole('group', { name: 'Age group' })).getAllByRole('button').map(b => b.textContent)).toEqual(['All', 'U10', 'U12'])
-    await user.click(within(screen.getByRole('group', { name: 'Age group' })).getByRole('button', { name: 'U10' }))
+    expect(await squadsOffered()).toEqual(['All squads', 'U10', 'U12'])
+    await pickSquad('U10')
     await waitFor(() => expect(within(first).queryByText('Theo Rehearsal')).toBeNull())
 
-    await user.click(within(screen.getByRole('group', { name: 'Age group' })).getByRole('button', { name: 'U12' }))
+    await pickSquad('U12')
     const players = () => within(within(screen.getByRole('region', { name: 'Players' })).getByRole('list', { name: 'Players' }))
     await waitFor(() => expect(players().getAllByRole('listitem')).toHaveLength(2))
     expect(players().getByText('Ida Rehearsal')).toBeInTheDocument()
@@ -624,7 +625,7 @@ describe('TRAK-250: Availability tab', { timeout: 20_000 }, () => {
       { id: 'c9', coach_user_id: 'x', player_name: 'Omar T.', position: 'Defender', shirt_number: 5, age_group: 'U12' }]))
     renderApp('/coach/squad?tab=availability')
     // TRAK-266: Squad opens on All; picking U10 leaves the U12 event out.
-    await userEvent.click(within(await screen.findByRole('group', { name: 'Age group' })).getByRole('button', { name: 'U10' }))
+    await pickSquad('U10')
     const panel = await screen.findByRole('region', { name: 'Availability' })
     expect(await within(panel).findByText('No upcoming events')).toBeInTheDocument()
   })

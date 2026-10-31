@@ -101,16 +101,23 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     expect(screen.getByRole('button', { name: 'Create' })).toHaveAttribute('aria-haspopup', 'menu')
     expect(screen.queryByRole('tablist', { name: 'Coach' })).toBeNull()
 
-    // TRAK-305: the age groups sit in the top bar, not the sidebar; the pick holds from page to page.
-    expect(within(sidebar).queryByRole('button', { name: 'U16' })).toBeNull()
-    const ages = () => screen.getByRole('group', { name: 'Age group' })
-    await waitFor(() => expect(within(ages()).getAllByRole('button').map(b => b.textContent)).toEqual(['All', 'U14', 'U16']), { timeout: 5000 })
-    expect(within(ages()).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
-    await userEvent.click(within(ages()).getByRole('button', { name: 'U16' }))
+    // TRAK-324 (was TRAK-305's pills in the top bar): Arc's team switcher in the sidebar, each squad with its size; the
+    // pick holds from page to page.
+    expect(screen.queryByRole('group', { name: 'Age group' })).toBeNull()
+    const trigger = () => screen.getByRole('button', { name: /^Squad: / })
+    await waitFor(() => expect(trigger()).toHaveAccessibleName('Squad: All squads. 2 players'), { timeout: 5000 })
+    await userEvent.click(trigger())
+    const list = await screen.findByRole('listbox')
+    expect(within(list).getAllByRole('option').map(option => option.textContent)).toEqual([
+      expect.stringContaining('All squads2 players'), expect.stringContaining('U141 player'), expect.stringContaining('U161 player')])
+    expect(screen.queryByText('Create workspace')).toBeNull()
+    expect(screen.queryByText('Join with invite')).toBeNull()
+    await userEvent.click(within(list).getByRole('option', { name: /^U16/ }))
+    await waitFor(() => expect(trigger()).toHaveAccessibleName('Squad: U16. 1 player'), { timeout: 5000 })
     // The sidebar is looked up again: while a page's code loads, the frame can be rebuilt (CI, four times on #439).
     await userEvent.click(within(screen.getByRole('navigation', { name: 'Rehearsal FC' })).getByRole('button', { name: /^Squad/ }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/squad'))
-    await waitFor(() => expect(within(ages()).getByRole('button', { name: 'U16' })).toHaveAttribute('aria-pressed', 'true'), { timeout: 5000 })
+    await waitFor(() => expect(trigger()).toHaveAccessibleName('Squad: U16. 1 player'), { timeout: 5000 })
   })
 
   it("Imad, 24 Oct: the academy's logo in the sidebar; the coach stays initials (G7)", async () => {

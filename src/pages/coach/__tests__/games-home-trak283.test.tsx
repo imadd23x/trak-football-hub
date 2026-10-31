@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
+import { pickSquad } from '../../../../tests/support/squad-switcher'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
@@ -101,7 +102,7 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
     expect(read.searchParams.get('status')).toBe('neq.cancelled')
 
     // U14: its own match and the whole roster's; the next game follows.
-    await user.click(within(screen.getByRole('group', { name: 'Age group' })).getByRole('button', { name: 'U14' }))
+    await pickSquad('U14')
     await waitFor(() => expect(cards()).toEqual(['/coach/matches/later', '/coach/matches/past-new']))
     expect(within(screen.getByRole('region', { name: 'Next match' })).getByText('vs Opponent later')).toBeInTheDocument()
 

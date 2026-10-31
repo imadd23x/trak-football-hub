@@ -96,3 +96,6 @@
   .item, .icon, .iconButton, .sidebar { transition: none; }
   .tip, .tip[data-state="closed"] { transform: none; transition: opacity 90ms linear; }
 }
+
+/* Trak (TRAK-324): the squad switcher under the brand. */
+.afterBrand { padding: 0 12px 8px; }

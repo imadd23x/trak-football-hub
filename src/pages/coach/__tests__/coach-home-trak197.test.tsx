@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
+import { expectSquadPicked, pickSquad, squadsOffered } from '../../../../tests/support/squad-switcher'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
@@ -148,7 +149,7 @@ describe('TRAK-211: the Feedback and assessment tab', { timeout: 20_000 }, () =>
     let release!: () => void
     const held = new Promise<void>(resolve => { release = resolve })
     server.use(http.get(`${SUPABASE_URL}/rest/v1/coach_assessments`, async () => { await held; return HttpResponse.json([]) }))
-    await userEvent.click(within(screen.getByRole('group', { name: 'Age group' })).getByRole('button', { name: 'U14' }))
+    await pickSquad('U14')
     expect(within(overview()).queryByText('Bo Lind')).toBeNull()
     expect(within(overview()).getByRole('status')).toHaveTextContent('Loading your players…')
     release()
@@ -261,9 +262,9 @@ describe('TRAK-262: coach Home', () => {
     const needs = await screen.findByRole('region', { name: /Needs you/ }, { timeout: 5000 })
     expect(await within(needs).findByRole('button', { name: /Ade Okafor/ })).toBeInTheDocument()
     expect(within(needs).getByRole('button', { name: /Bo Lind/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    await expectSquadPicked('All')
     expect(within(screen.getByRole('region', { name: 'Squad shape' })).getByText('All squads')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'U16' }))
+    await pickSquad('U16')
     await waitFor(() => expect(within(needs).queryByRole('button', { name: /Ade Okafor/ })).toBeNull())
     expect(localStorage.getItem(`trak:coach-squad:${COACH.id}`)).toBe('U16')
     expect(localStorage.getItem(`trak:coach-squad-all:${COACH.id}`)).toBe('0')
@@ -275,7 +276,7 @@ describe('TRAK-262: coach Home', () => {
     renderApp('/coach/home')
     const shape = await screen.findByRole('region', { name: 'Squad shape' }, { timeout: 5000 })
     expect(await within(shape).findByText('All squads')).toBeInTheDocument()
-    await userEvent.click(await screen.findByRole('button', { name: 'U14' }))
+    await pickSquad('U14')
     expect(await within(shape).findByText('U14')).toBeInTheDocument()
   })
 })

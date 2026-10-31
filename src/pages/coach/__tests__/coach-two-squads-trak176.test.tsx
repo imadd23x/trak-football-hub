@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
+import { expectSquadPicked, pickSquad, squadsOffered } from '../../../../tests/support/squad-switcher'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
@@ -69,11 +70,10 @@ describe('TRAK-176: one coach, two squads', { timeout: 20_000 }, () => {
     coachReads(TWO)
     renderApp('/coach/home')
     // TRAK-266: pills, All first and picked; a squad tapped is remembered for what's made next.
-    // TRAK-305: one set at the top of the frame; the pick, All included, is what every page shows.
-    const pick = await screen.findByRole('group', { name: 'Age group' })
-    expect(within(pick).getAllByRole('button').map(b => b.textContent)).toEqual(['All', 'U14', 'U16'])
-    expect(within(pick).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
-    await userEvent.click(within(pick).getByRole('button', { name: 'U16' }))
+    // TRAK-305, TRAK-324: one switcher in the frame; the pick, All included, is what every page shows.
+    expect(await squadsOffered()).toEqual(['All squads', 'U14', 'U16'])
+    await expectSquadPicked('All')
+    await pickSquad('U16')
     // Remembered on this device, which is what the Squad page reads (TRAK-250 tests it there).
     await waitFor(() => expect(localStorage.getItem(`trak:coach-squad:${COACH.id}`)).toBe('U16'))
     expect(localStorage.getItem(`trak:coach-squad-all:${COACH.id}`)).toBe('0')
@@ -87,10 +87,10 @@ describe('TRAK-176: one coach, two squads', { timeout: 20_000 }, () => {
     // (TRAK-259: it left the nav, so it opens by its address).
     renderApp('/coach/feedback')
     expect(await screen.findByText('Ade Okafor', {}, { timeout: 5000 })).toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'Age group' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Squad: / })).toBeNull()
     await userEvent.click(screen.getByRole('tab', { name: 'Home' }))
     expect(await screen.findByRole('heading', { name: 'Angelos Basinas' })).toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'Age group' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Squad: / })).toBeNull()
   })
 
   it('a new event from quick add is saved for the squad picked', async () => {
@@ -195,10 +195,10 @@ describe('TRAK-176: one coach, two squads', { timeout: 20_000 }, () => {
     localStorage.setItem(`trak:coach-squad:${coach}`, 'U16')
     renderApp('/coach/schedule')
     expect(await screen.findByText('U14 training', { selector: 'p' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    await expectSquadPicked('All')
     expect(screen.getByText(/· U14/)).toBeInTheDocument()
     expect(screen.getByText(/· All squads/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'U16' }))
+    await pickSquad('U16')
     expect(await screen.findByText('U16 training', { selector: 'p' })).toBeInTheDocument()
     expect(screen.getByText('Whole roster training', { selector: 'p' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('U14 training', { selector: 'p' })).toBeNull())

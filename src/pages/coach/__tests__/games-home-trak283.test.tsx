@@ -155,4 +155,34 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
     renderApp('/coach/matches')
     expect(await screen.findByRole('note', { name: 'This screen is coming soon' })).toBeInTheDocument()
   })
+
+describe('TRAK-320: Previous matches', { timeout: 20_000 }, () => {
+  it('a published match leaves Your matches for Previous matches, newest first, with its result; it opens on its evaluation', async () => {
+    const user = userEvent.setup()
+    const now = Date.now()
+    eventsRead([
+      match('soon', 'U16', onTheMinute(now + 3 * DAY)),
+      match('won', 'U16', onTheMinute(now - 14 * DAY), { opponent: 'Mirdif Rangers', competition: 'league' }),
+      match('lost', 'U16', onTheMinute(now - 7 * DAY), { opponent: 'Dubai City FC', competition: 'tournament' }),
+      match('owed', 'U16', onTheMinute(now - 2 * DAY)),
+    ])
+    server.use(table('game_evaluations', [
+      { event_id: 'won', saved_at: '2026-10-01T18:00:00Z', published_at: '2026-10-01T19:00:00Z', our_score: 3, their_score: 1 },
+      { event_id: 'lost', saved_at: '2026-10-08T18:00:00Z', published_at: '2026-10-08T19:00:00Z', our_score: 0, their_score: 2 },
+      { event_id: 'owed', saved_at: '2026-10-28T18:00:00Z', published_at: null, our_score: 1, their_score: 1 },
+    ]))
+    renderApp('/coach/matches')
+    const previous = await screen.findByRole('region', { name: 'Previous matches' })
+    expect(cards()).toEqual(['/coach/matches/soon', '/coach/matches/owed'])
+    const links = within(previous).getAllByRole('link')
+    expect(links.map(link => link.getAttribute('href'))).toEqual(['/coach/matches/lost?tab=evaluation', '/coach/matches/won?tab=evaluation'])
+    expect(links[0]).toHaveTextContent('vs Dubai City FC')
+    expect(links[0]).toHaveTextContent('Tournament')
+    expect(links[0]).toHaveTextContent('Lost 0–2')
+    expect(links[1]).toHaveTextContent('League')
+    expect(links[1]).toHaveTextContent('Won 3–1')
+    await user.click(links[1])
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/matches/won?tab=evaluation'))
+  })
+})
 })

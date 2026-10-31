@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
+import { COMPETITIONS } from '@/lib/coach-events'
 import { actionLink, type GameAction, gameStatus, LOOP_STEPS, orderGames } from '@/lib/games/loop'
 import { gameTitle, gameWhen, useGameEvaluations, useGamePlanChanges, useGamePlans, useGameShares, useGames, type Game } from '@/components/coach/games/useGames'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
@@ -15,7 +16,8 @@ import { ScrollArea } from '@/components/arc/scroll-area/scroll-area'
 import { Stepper } from '@/components/arc/stepper/stepper'
 
 /* TRAK-283 (Games 1/8): Games home. The next game with where it is in its loop and its one next action, the open
-   drafts, and every match of the squad in view. Cards follow Home's Needs you pattern (Imad, 27 Oct). */
+   drafts, and every match of the squad in view. Cards follow Home's Needs you pattern (Imad, 27 Oct). TRAK-320 (Imad,
+   30 Oct): a published match moves to Previous matches, newest first, with its result, and opens on its evaluation. */
 
 const STEPS = LOOP_STEPS.map(label => ({ id: label, label }))
 /** Schedule's quick hand-over (TRAK-182 part 8): New event, on its first step, with Match picked. */
@@ -56,6 +58,9 @@ export default function CoachGames() {
       return evaluation && !evaluation.publishedAt ? [{ game, what: 'Evaluation', saved: evaluation.savedAt, tab: 'evaluation' as const }] : []
     }),
   ]
+
+  const published = (game: Game) => !!evaluations.data?.get(game.id)?.publishedAt
+  const previous = ordered.filter(published)
 
   return (
     <div className="min-h-screen bg-ground pb-24">
@@ -106,7 +111,7 @@ export default function CoachGames() {
               <div className="arc -mx-1">
                 <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="Your matches">
                   <ul className="flex gap-3 px-1 pb-1">
-                    {ordered.map(game => {
+                    {ordered.filter(game => !published(game)).map(game => {
                       const state = stateOf(game)
                       const { day, time } = gameWhen(game)
                       return <li key={game.id} className="w-[248px] flex-none" style={{ scrollSnapAlign: 'start' }}>
@@ -124,6 +129,7 @@ export default function CoachGames() {
                 </ScrollArea>
               </div>
             </div>
+            {previous.length > 0 && <PreviousMatches games={previous} results={evaluations.data!} squads={everySquad} />}
           </>}
       </div>
     </div>
@@ -155,5 +161,38 @@ function NextGame({ game, state, onOpen, onKickOff }: {
           label="Kick-off in" completeLabel="Locked" onComplete={onKickOff} className="ml-auto" />
       </div>
     </section>
+  )
+}
+
+/** TRAK-320: matches whose evaluation is published, newest first: the result at a glance, and the evaluation a tap away. */
+function PreviousMatches({ games, results, squads }: {
+  games: Game[]; results: Map<string, { ourScore: number | null; theirScore: number | null }>; squads: boolean
+}) {
+  return (
+    <div className="mt-8">
+      <h2 className="mb-2 text-lg font-medium text-ink">Previous matches</h2>
+      <div className="arc -mx-1">
+        <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="Previous matches">
+          <ul className="flex gap-3 px-1 pb-1">
+            {games.map(game => {
+              const { ourScore: our, theirScore: their } = results.get(game.id)!
+              const [said, tone] = our == null || their == null ? ['Published', 'neutral'] as const
+                : our > their ? ['Won', 'success'] as const : our === their ? ['Drew', 'neutral'] as const : ['Lost', 'danger'] as const
+              const competition = COMPETITIONS.find(c => c.value === game.competition)?.label
+              return <li key={game.id} className="w-[220px] flex-none" style={{ scrollSnapAlign: 'start' }}>
+                <Link to={`/coach/matches/${game.id}?tab=evaluation`}
+                  className="flex h-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <span className="grid min-w-0">
+                    <span className="truncate text-base font-medium text-ink">{gameTitle(game)}</span>
+                    <span className="truncate text-sm text-ink-3">{[gameWhen(game).day, competition, squads ? game.squad : null].filter(Boolean).join(' · ')}</span>
+                  </span>
+                  <span className="arc mt-auto"><Badge tone={tone} size="sm">{our == null || their == null ? said : `${said} ${our}–${their}`}</Badge></span>
+                </Link>
+              </li>
+            })}
+          </ul>
+        </ScrollArea>
+      </div>
+    </div>
   )
 }

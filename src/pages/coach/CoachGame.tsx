@@ -16,7 +16,7 @@ import { gameTitle, gameWhen, useGame, useGameEvaluation, useGamePlan, useGamePl
 import { GamePlan } from '@/components/coach/games/GamePlan'
 import { Evaluation } from '@/components/coach/games/Evaluation'
 import { EventSummary } from '@/components/coach/EventSummary'
-import { LoadError } from '@/components/trak'
+import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { Countdown } from '@/components/arc/countdown/countdown'
@@ -44,7 +44,8 @@ export default function CoachGame() {
   const evaluation = useGameEvaluation(eventId)
   return (
     <div className="min-h-screen bg-ground pb-24">
-      <div className="mx-auto w-full max-w-[960px] px-5 tablet:px-8">
+      {/* TRAK-323 (Imad, 30 Oct): the plan's steps use the screen: the coach's wide column (TRAK-307), not 960 px. */}
+      <div className={WIDE_COLUMN}>
         <Link to="/coach/matches" className={`mt-5 inline-flex items-center gap-1 ${linkClass}`}><ChevronLeft size={16} aria-hidden="true" />Matches</Link>
         {game.error || shares.error ? <div className="pt-6"><LoadError what="this match" onRetry={() => { void game.refetch(); void shares.refetch() }}
             retrying={game.isFetching || shares.isFetching} /></div>

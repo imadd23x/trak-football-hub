@@ -36,6 +36,7 @@ export function OpponentAndGoals({ eventId, opponent, form, onFormChange, tried,
   return (
     <div className="grid gap-4">
       <div className="grid gap-4 laptop:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] laptop:items-start">
+        <div className="grid min-w-0 gap-4">
         <section aria-labelledby="plan-goals" className={card}>
           <div>
             <h2 id="plan-goals" className="text-lg font-medium text-ink">Your goals</h2>
@@ -57,6 +58,16 @@ export function OpponentAndGoals({ eventId, opponent, form, onFormChange, tried,
           {form.goals.length < MAX_GOALS && !locked && <span><Button variant="ghost" size="sm" onClick={() => change({ goals: [...form.goals, emptyGoal()] })}>
             <Plus size={16} aria-hidden="true" />Add a goal</Button></span>}
         </section>
+
+        <section aria-labelledby="plan-scouting" className={card}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="plan-scouting" className="text-lg font-medium text-ink">Scouting</h2>
+            <Badge size="sm" icon={<Lock size={12} />}>Only you</Badge>
+          </div>
+          <Textarea label="What you know about them" rows={4} value={form.scouting} maxLength={LIMITS.scouting} readOnly={locked}
+            onChange={event => change({ scouting: event.target.value })} />
+        </section>
+        </div>
 
         <div className="grid min-w-0 gap-4">
           <section aria-labelledby="plan-strength" className={card}>
@@ -96,15 +107,6 @@ export function OpponentAndGoals({ eventId, opponent, form, onFormChange, tried,
             </ul>}
             {form.keyPlayers.length < MAX_KEY_PLAYERS && !locked && <span><Button variant="ghost" size="sm"
               onClick={() => change({ keyPlayers: [...form.keyPlayers, emptyKeyPlayer()] })}><Plus size={16} aria-hidden="true" />Add a key player</Button></span>}
-          </section>
-
-          <section aria-labelledby="plan-scouting" className={card}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 id="plan-scouting" className="text-lg font-medium text-ink">Scouting</h2>
-              <Badge size="sm" icon={<Lock size={12} />}>Only you</Badge>
-            </div>
-            <Textarea label="What you know about them" rows={4} value={form.scouting} maxLength={LIMITS.scouting} readOnly={locked}
-              onChange={event => change({ scouting: event.target.value })} />
           </section>
         </div>
       </div>

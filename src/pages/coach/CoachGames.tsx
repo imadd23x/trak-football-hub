@@ -21,7 +21,8 @@ import { Stepper } from '@/components/arc/stepper/stepper'
 /* TRAK-283 (Games 1/8): Games home. The next game with where it is in its loop and its one next action, the open
    drafts, and every match of the squad in view. Cards follow Home's Needs you pattern (Imad, 27 Oct). TRAK-320 (Imad,
    30 Oct): a published match moves to Previous matches, newest first, with its result, and opens on its evaluation.
-   TRAK-321: the season's top scorers and assists for the squad in view, from those evaluations. */
+   TRAK-321: the season's top scorers and assists for the squad in view, from those evaluations. TRAK-322 (Imad, 30 Oct):
+   compact, and the screen used: on a laptop the match rows and the scorers sit side by side in TRAK-307's one column. */
 
 const STEPS = LOOP_STEPS.map(label => ({ id: label, label }))
 /** Schedule's quick hand-over (TRAK-182 part 8): New event, on its first step, with Match picked. */
@@ -70,7 +71,7 @@ export default function CoachGames() {
   return (
     <div className="min-h-screen bg-ground pb-24">
       <div className={WIDE_COLUMN}>
-        <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 pb-4">
+        <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-5 pb-3">
           <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Matches</h1>
         </header>
 
@@ -111,7 +112,9 @@ export default function CoachGames() {
               </section>
             </div>
 
-            <div className="mt-8">
+            <div className={`mt-6 grid gap-6 ${previous.length ? 'laptop:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] laptop:items-start' : ''}`}>
+            <div className="grid min-w-0 gap-6">
+            <div className="min-w-0">
               <h2 className="mb-2 text-lg font-medium text-ink">Your matches</h2>
               <div className="arc -mx-1">
                 <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="Your matches">
@@ -119,9 +122,9 @@ export default function CoachGames() {
                     {ordered.filter(game => !published(game)).map(game => {
                       const state = stateOf(game)
                       const { day, time } = gameWhen(game)
-                      return <li key={game.id} className="w-[248px] flex-none" style={{ scrollSnapAlign: 'start' }}>
+                      return <li key={game.id} className="w-[220px] flex-none" style={{ scrollSnapAlign: 'start' }}>
                         <Link to={`/coach/matches/${game.id}`}
-                          className="flex h-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                          className="flex h-full flex-col gap-2.5 rounded-2xl border border-line bg-surface p-3.5 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                           <span className="grid min-w-0">
                             <span className="truncate text-base font-medium text-ink">{gameTitle(game)}</span>
                             <span className="truncate text-sm text-ink-3">{[day, time, everySquad ? game.squad : null].filter(Boolean).join(' · ')}</span>
@@ -135,7 +138,9 @@ export default function CoachGames() {
               </div>
             </div>
             {previous.length > 0 && <PreviousMatches games={previous} results={evaluations.data!} squads={everySquad} />}
+            </div>
             {previous.length > 0 && <TopScorers scorers={scorers} />}
+            </div>
           </>}
       </div>
     </div>
@@ -175,7 +180,7 @@ function PreviousMatches({ games, results, squads }: {
   games: Game[]; results: Map<string, { ourScore: number | null; theirScore: number | null }>; squads: boolean
 }) {
   return (
-    <div className="mt-8">
+    <div className="min-w-0">
       <h2 className="mb-2 text-lg font-medium text-ink">Previous matches</h2>
       <div className="arc -mx-1">
         <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="Previous matches">
@@ -185,9 +190,9 @@ function PreviousMatches({ games, results, squads }: {
               const [said, tone] = our == null || their == null ? ['Published', 'neutral'] as const
                 : our > their ? ['Won', 'success'] as const : our === their ? ['Drew', 'neutral'] as const : ['Lost', 'danger'] as const
               const competition = COMPETITIONS.find(c => c.value === game.competition)?.label
-              return <li key={game.id} className="w-[220px] flex-none" style={{ scrollSnapAlign: 'start' }}>
+              return <li key={game.id} className="w-[200px] flex-none" style={{ scrollSnapAlign: 'start' }}>
                 <Link to={`/coach/matches/${game.id}?tab=evaluation`}
-                  className="flex h-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  className="flex h-full flex-col gap-2.5 rounded-2xl border border-line bg-surface p-3.5 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                   <span className="grid min-w-0">
                     <span className="truncate text-base font-medium text-ink">{gameTitle(game)}</span>
                     <span className="truncate text-sm text-ink-3">{[gameWhen(game).day, competition, squads ? game.squad : null].filter(Boolean).join(' · ')}</span>
@@ -209,25 +214,25 @@ const SHOWN = 10
 function TopScorers({ scorers }: { scorers: UseQueryResult<Scorer[]> }) {
   const [all, setAll] = useState(false)
   const rows = scorers.data ?? []
-  const cell = 'py-2 text-right tabular-nums'
+  const cell = 'py-1.5 pl-2 text-right tabular-nums'
   return (
-    <section aria-labelledby="top-scorers" className="arc mt-8 rounded-2xl border border-line bg-surface p-5">
+    <section aria-labelledby="top-scorers" className="arc min-w-0 rounded-2xl border border-line bg-surface p-5">
       <h2 id="top-scorers" className="text-lg font-medium text-ink">Top scorers and assists</h2>
       <p className="mt-1 text-sm text-ink-3">This season, from your published evaluations.</p>
       {scorers.error ? <div className="mt-3"><LoadError what="the scorers" onRetry={() => void scorers.refetch()} retrying={scorers.isFetching} /></div>
         : scorers.isPending ? <p role="status" className="mt-3 text-sm text-ink-3">Loading the scorers…</p>
         : rows.length === 0 ? <p className="mt-3 text-sm text-ink-2">No goals or assists yet this season.</p>
         : <>
-            <table className="mt-3 w-full text-sm">
+            <table className="mt-3 w-full table-fixed text-sm">
               <thead><tr className="border-b border-line text-ink-3">
                 <th scope="col" className="py-2 text-left font-normal">Player</th>
-                <th scope="col" className="w-16 py-2 text-right font-normal">Goals</th>
-                <th scope="col" className="w-16 py-2 text-right font-normal">Assists</th>
-                <th scope="col" className="w-16 py-2 text-right font-normal">Played</th>
+                <th scope="col" className="w-14 py-2 pl-2 text-right font-normal">Goals</th>
+                <th scope="col" className="w-14 py-2 pl-2 text-right font-normal">Assists</th>
+                <th scope="col" className="w-14 py-2 pl-2 text-right font-normal">Played</th>
               </tr></thead>
               <tbody className="divide-y divide-line">
                 {(all ? rows : rows.slice(0, SHOWN)).map((row, i) => <tr key={row.id}>
-                  <th scope="row" className="py-2 text-left font-normal text-ink"><span className="mr-2 inline-block w-5 text-ink-3 tabular-nums">{i + 1}</span>{row.name}</th>
+                  <th scope="row" className="truncate py-1.5 text-left font-normal text-ink" title={row.name}><span className="mr-2 inline-block w-5 text-ink-3 tabular-nums">{i + 1}</span>{row.name}</th>
                   <td className={`${cell} font-medium text-ink`}>{row.goals}</td>
                   <td className={`${cell} text-ink-2`}>{row.assists}</td>
                   <td className={`${cell} text-ink-3`}>{row.played}</td>

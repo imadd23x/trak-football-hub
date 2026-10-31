@@ -15,7 +15,8 @@ import styles from "./share-readiness.module.css";
    rest worked out from the plan and shown as done or not. Only `required` checks hold the action back (Imad, 28 Oct);
    the bar turns green when every check is done. No owners and no notify switch: sharing is in the app only. TRAK-290:
    the action may offer alternatives behind a chevron (Arc's split-button: "Share now · Share at…"), and what an
-   alternative opens sits under the footer. */
+   alternative opens sits under the footer. TRAK-318: with no action, the card only lists the checks; the Game plan's
+   bottom bar then holds the action beside Save draft. */
 
 export interface ReadinessCheck {
   id: string;
@@ -32,8 +33,9 @@ export interface ShareReadinessProps {
   title: string;
   subtitle: string;
   checks: ReadinessCheck[];
-  actionLabel: string;
-  onAction: () => void;
+  /** Without one, there's no footer: the caller places the action. */
+  actionLabel?: string;
+  onAction?: () => void;
   busy?: boolean;
   /** Why the action failed; shown under the footer. */
   error?: string | null;
@@ -89,14 +91,14 @@ export function ShareReadiness({ title, subtitle, checks, actionLabel, onAction,
         ))}
       </ul>
 
-      <footer className={styles.footer}>
+      {onAction && actionLabel && <footer className={styles.footer}>
         <div className={styles.footerActions}>
           {alternatives?.length
             ? <SplitButton label={busy ? "Sharing…" : actionLabel} onClick={onAction} disabled={left > 0 || busy}
                 actions={alternatives.map(alternative => ({ ...alternative, disabled: alternative.disabled || left > 0 }))} />
             : <Button size="sm" disabled={left > 0} loading={busy} onClick={onAction}>{actionLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
         </div>
-      </footer>
+      </footer>}
       {children && <div className={styles.extra}>{children}</div>}
 
       {/* The message opens its own row: the card grows on a spring instead of snapping taller. */}

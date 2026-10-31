@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
+import { scorers, type ScoredMatch } from '@/lib/games/scorers'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Tables } from '@/integrations/supabase/types'
 import type { EventRow } from '@/lib/coach-events'
@@ -133,6 +134,31 @@ export function useGameEvaluations(enabled = true) {
       if (error) throw error
       return new Map((data ?? []).map(row => [row.event_id,
         { savedAt: row.saved_at, publishedAt: row.published_at, ourScore: row.our_score, theirScore: row.their_score }]))
+    },
+  })
+}
+
+/** TRAK-321: the scorers and assists of these published matches, from the coach's own evaluations (only they read them)
+ *  and who played; named from the coach's roster. */
+export function useScorers(eventIds: string[]) {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['coach', user?.id, 'scorers', eventIds],
+    enabled: !!user && eventIds.length > 0,
+    queryFn: async () => {
+      const [evaluations, played, roster] = await Promise.all([
+        supabase.from('game_evaluations').select('event_id, goals').in('event_id', eventIds),
+        supabase.from('game_evaluation_players').select('event_id, squad_player_id').in('event_id', eventIds).eq('played', true),
+        supabase.from('squad_players').select('id, player_name').eq('coach_user_id', user!.id),
+      ])
+      if (evaluations.error) throw evaluations.error
+      if (played.error) throw played.error
+      if (roster.error) throw roster.error
+      const names = new Map((roster.data ?? []).map(player => [player.id, player.player_name]))
+      return scorers((evaluations.data ?? []).filter(evaluation => eventIds.includes(evaluation.event_id)).map(evaluation => ({
+        goals: (Array.isArray(evaluation.goals) ? evaluation.goals : []) as ScoredMatch['goals'],
+        played: (played.data ?? []).filter(row => row.event_id === evaluation.event_id).map(row => row.squad_player_id),
+      })), names)
     },
   })
 }

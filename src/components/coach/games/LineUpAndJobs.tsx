@@ -1,29 +1,28 @@
 import { useState } from 'react'
-import { DEFAULT_FORMATION, FORMATIONS, FORMATS, lineName, type Format } from '@/lib/games/formations'
+import { DEFAULT_FORMATION, FORMATIONS, FORMATS, lineName } from '@/lib/games/formations'
 import { CONTEXT, EXPECTATIONS, fitFormat, playerPlan, type PlayerPlans } from '@/lib/games/lineup'
 import type { PlanForm } from '@/lib/games/plan'
 import { useIsMobile } from '@/hooks/use-mobile'
 import type { Candidate, useWhoCanCome } from './useGames'
-import { MiniPitch, Pitch, type PitchPlayer } from './Pitch'
+import { Pitch, type PitchPlayer } from './Pitch'
 import { PlayerPanel, type Target } from './PlayerPanel'
 import { LoadError } from '@/components/trak'
 import { Avatar } from '@/components/arc/avatar/avatar'
 import { Badge } from '@/components/arc/badge/badge'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { ExpandableText } from '@/components/arc/expandable-text/expandable-text'
+import { MorphSelect } from '@/components/arc/morph-select/morph-select'
 import { Progress } from '@/components/arc/progress/progress'
-import { RadioCards } from '@/components/arc/radio-cards/radio-cards'
-import { Select } from '@/components/arc/select/select'
-import { LockedValue } from './LockedValue'
 
 /* TRAK-285 (Games 3/8): plan step 2, line-up and jobs (TRAK-282; the mockup's Squad step merged in, Imad 27 Oct). The
    coach picks a format and a formation, places players who can come, and gives each a job and a note. Off the pitch,
    a player is on the bench unless the coach leaves them out in their sheet (Imad, 28 Oct). The sheet is a bottom sheet
    on a phone, and a panel beside the pitch on a tablet or laptop, where the pitch stays in view. TRAK-287: locked at
-   kick-off, the pitch and the sheet only show what was planned. */
+   kick-off, the pitch and the sheet only show what was planned. TRAK-329 (Imad, 2 Nov): format and formation are one
+   Arc morph select on the pitch's top left, a header per format, so a shape in another format switches the format. */
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
-const FORMAT_OPTIONS = FORMATS.map(format => ({ value: String(format), label: `${format} a side` }))
+const SHAPES = FORMATS.map(format => ({ label: `${format} a side`, options: FORMATIONS[format].map(shape => ({ value: shape, label: shape })) }))
 const contextLabel = new Map(CONTEXT.map(tag => [tag.value, tag.label]))
 const expectationLabel = new Map(EXPECTATIONS.map(level => [level.value, level.label]))
 
@@ -34,10 +33,10 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
   const [target, setTarget] = useState<Target | null>(null)
   const shape = form.formation ?? DEFAULT_FORMATION[form.format]
   const setPlayers = (players: PlayerPlans) => onFormChange({ ...form, players })
-  const setFormat = (value: string) => {
-    const format = Number(value) as Format
-    onFormChange({ ...form, format, players: fitFormat(form.players, format),
-      formation: form.formation && FORMATIONS[format].includes(form.formation) ? form.formation : null })
+  // A shape's lines add up to its format less the keeper, so each shape belongs to one format.
+  const setShape = (formation: string) => {
+    const format = FORMATS.find(size => FORMATIONS[size].includes(formation)) ?? form.format
+    onFormChange({ ...form, format, formation, players: fitFormat(form.players, format) })
   }
 
   if (who.error) return <LoadError what="who can come" onRetry={who.retry} />
@@ -84,27 +83,14 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
 
   return (
     <div className="grid gap-4">
-      <section aria-labelledby="plan-shape" className={card}>
-        <h2 id="plan-shape" className="text-lg font-medium text-ink">Format and formation</h2>
-        {/* TRAK-323: side by side on a laptop, so the pitch and the list start higher. */}
-        <div className="grid gap-4 laptop:grid-cols-[180px_minmax(0,1fr)] laptop:items-start">
-        <div className="max-w-[220px]">{locked ? <LockedValue label="Format" value={`${form.format} a side`} />
-          : <Select label="Format" options={FORMAT_OPTIONS} value={String(form.format)} onValueChange={setFormat} />}</div>
-        <div className="grid min-w-0 gap-2">
-          <p id="plan-formation" className="text-sm font-medium text-ink">Formation</p>
-          <RadioCards aria-labelledby="plan-formation" minColumnWidth={140} value={shape} disabled={locked}
-            options={FORMATIONS[form.format].map(option => ({ value: option, label: option, icon: <MiniPitch shape={option} /> }))}
-            onValueChange={formation => onFormChange({ ...form, formation })} />
-        </div>
-        </div>
-      </section>
-
       {/* TRAK-323 (Imad, 30 Oct): on a laptop the pitch, everyone's list and the selected player's sheet sit side by side,
           the pitch and the sheet staying in view while the list scrolls; on a tablet the list goes under them. */}
       <div className="grid gap-4 tablet:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] tablet:items-start laptop:grid-cols-[minmax(0,5fr)_minmax(0,4fr)_minmax(0,3fr)]">
         <section aria-labelledby="plan-pitch" className={`${card} tablet:sticky tablet:top-4`}>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="plan-pitch" className="text-lg font-medium text-ink">{shape}</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="plan-pitch" className={locked ? 'text-lg font-medium text-ink' : 'sr-only'}>{shape}</h2>
+            {!locked && <span className="arc"><MorphSelect label="Formation" hideLabel items={SHAPES} value={shape} onValueChange={setShape}
+              searchable={false} panelWidth={200} /></span>}
             <span className="text-sm text-ink-3">Attacking →</span>
           </div>
           <Pitch shape={shape} starters={onPitch} selected={target?.kind === 'slot' ? target.slot

@@ -52,12 +52,3 @@ export function Pitch({ shape, starters, selected, onSelect }: {
     </div>
   )
 }
-
-/** A formation card's picture: the shape's slots on a tiny pitch. */
-export function MiniPitch({ shape }: { shape: string }) {
-  return <svg viewBox="0 0 150 100" className="h-8 w-12 text-brand" aria-hidden="true">
-    <rect x="2" y="2" width="146" height="96" rx="8" fill="currentColor" fillOpacity={0.08} stroke="currentColor" strokeOpacity={0.3} strokeWidth={3} />
-    <line x1="75" y1="2" x2="75" y2="98" stroke="currentColor" strokeOpacity={0.3} strokeWidth={3} />
-    {slotsOf(shape).map(({ slot, x, y }) => <circle key={slot} cx={y * 1.5} cy={x} r={6} fill="currentColor" />)}
-  </svg>
-}

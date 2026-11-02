@@ -233,21 +233,26 @@ describe('TRAK-286: Needs you and Games home follow the share', { timeout: 30_00
   }
 
   it('Needs you: changes not shared for a shared plan with edits, nothing for one without, and the draft\'s next step', async () => {
+    const user = userEvent.setup()
     games({ g1: ['charisteas', 'basinas'] })
     renderApp('/coach/home')
     const needs = await screen.findByRole('region', { name: /Needs you/ }, { timeout: 5000 })
     const card = (title: string) => within(needs).getByText(title).closest('li')!
     await within(needs).findByText('vs Parkview Athletic')
     expect(within(card('vs Parkview Athletic')).getByText('Changes not shared · 2 players')).toBeInTheDocument()
-    expect(within(card('vs Parkview Athletic')).getByRole('link', { name: 'Share the changes' }))
-      .toHaveAttribute('href', '/coach/matches/g1?tab=plan&step=share')
     expect(within(needs).queryByText('vs Riverside Rovers')).toBeNull()
     expect(within(card('vs Harbour Town')).getByText('Plan not shared')).toBeInTheDocument()
-    expect(within(card('vs Harbour Town')).getByRole('link', { name: 'Share the plan' })).toHaveAttribute('href', '/coach/matches/g3?tab=plan&step=share')
-    expect(within(card('vs Northgate United')).getByRole('link', { name: 'Write the plan' })).toHaveAttribute('href', '/coach/matches/g4?tab=plan')
+    // TRAK-333 (Imad, 2 Nov): split buttons; the match's other pages sit behind the chevron.
+    expect(within(card('vs Harbour Town')).getByRole('button', { name: 'Share plan' })).toBeInTheDocument()
+    expect(within(card('vs Northgate United')).getByRole('button', { name: 'Write plan' })).toBeInTheDocument()
+    await user.click(within(card('vs Parkview Athletic')).getByRole('button', { name: 'Share changes more actions' }))
+    expect((await screen.findAllByRole('menuitem')).map(item => item.textContent)).toEqual(['View plan', 'Logistics'])
+    await user.keyboard('{Escape}')
+    await user.click(within(card('vs Parkview Athletic')).getByRole('button', { name: 'Share changes' }))
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/matches/g1?tab=plan&step=share'))
   })
 
-  it('Games home: a shared plan leaves Open drafts; the next game offers Share the changes', async () => {
+  it('Games home: a shared plan leaves Open drafts; the next game offers Share changes', async () => {
     const user = userEvent.setup()
     games({ g1: ['charisteas'] })
     renderApp('/coach/matches')
@@ -257,7 +262,7 @@ describe('TRAK-286: Needs you and Games home follow the share', { timeout: 30_00
     expect(await within(next).findByText('Changes not shared')).toBeInTheDocument()
     const strip = screen.getByRole('region', { name: 'Your matches' })
     expect(within(within(strip).getByRole('link', { name: /Riverside Rovers/ })).getByText('Plan shared')).toBeInTheDocument()
-    await user.click(within(next).getByRole('button', { name: 'Share the changes' }))
+    await user.click(within(next).getByRole('button', { name: 'Share changes' }))
     expect(window.location.pathname + window.location.search).toBe('/coach/matches/g1?tab=plan&step=share')
   })
 })

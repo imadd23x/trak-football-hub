@@ -87,7 +87,7 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
     { drafted: !!plan.data, shared: !!sharedAt, sharedAt: sharedAt ?? undefined, changes: changes.length,
       evaluated: !!evaluation.data?.evaluation, published: !!evaluation.data?.evaluation?.published_at })
   // The plan as typed, and its step, live here, above the tabs: Arc unmounts a panel that isn't shown. Until the coach
-  // types, it is the saved plan, so a retried read still fills the form. Needs you's "Share the changes" opens Share.
+  // types, it is the saved plan, so a retried read still fills the form. Needs you's "Share changes" opens Review & share.
   const [typed, setTyped] = useState<PlanForm | null>(null)
   // TRAK-332: a plan that is shared or scheduled opens on Review & share, not on its first step.
   const [planStep, setPlanStep] = useState(() => params.get('step') === 'share' || sharedAt != null ? 2 : 0)

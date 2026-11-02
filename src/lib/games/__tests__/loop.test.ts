@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { format } from 'date-fns'
-import { LOOP_STEPS, STATE, fullTime, gameState, gameStatus, needsAPlan, orderGames, type GameEvent } from '../loop'
+import { STATE, fullTime, gameState, gameStatus, matchActions, needsAPlan, orderGames, type GameEvent } from '../loop'
 
 // Kick-off Sat 31 Oct 2026, 11:00 in Athens (09:00Z); the clock is an instant, so the device's zone never matters.
 const KICK_OFF = Date.parse('2026-10-31T09:00:00Z')
@@ -33,17 +33,9 @@ describe('gameState (TRAK-283)', () => {
     expect(gameState(moved, KICK_OFF + 1000)).toBe('plan')
   })
 
-  it('names each state on the loop the stepper draws', () => {
-    expect(LOOP_STEPS).toEqual(['Logistics', 'Plan', 'Shared', 'Kick-off', 'Evaluation', 'Published'])
-    expect(LOOP_STEPS[STATE.logistics.step]).toBe('Logistics')
-    expect(LOOP_STEPS[STATE.plan.step]).toBe('Plan')
-    expect(LOOP_STEPS[STATE.locked.step]).toBe('Kick-off')
-    expect(LOOP_STEPS[STATE.fullTime.step]).toBe('Evaluation')
-  })
-
   it('offers one next action before kick-off, none while the match is on, and the evaluation from full time (TRAK-288)', () => {
-    expect(STATE.logistics.action).toEqual({ label: 'Share the logistics', tab: 'logistics' })
-    expect(STATE.plan.action).toEqual({ label: 'Write the plan', tab: 'plan' })
+    expect(STATE.logistics.action).toEqual({ label: 'Share logistics', tab: 'logistics' })
+    expect(STATE.plan.action).toEqual({ label: 'Write plan', tab: 'plan' })
     expect(STATE.locked.action).toBeUndefined()
     expect(STATE.fullTime.action).toEqual({ label: 'Evaluate', tab: 'evaluation' })
   })
@@ -53,7 +45,6 @@ describe('an evaluation draft (TRAK-288)', () => {
   it('after full time a saved evaluation is a draft only the coach sees, and publishing it is next', () => {
     expect(gameState(game(), Date.parse('2026-10-31T10:30:00Z'), { evaluated: true })).toBe('evaluationDraft')
     expect(STATE.evaluationDraft).toMatchObject({ label: 'Evaluation draft', tone: 'warning', action: { label: 'Publish', tab: 'evaluation' } })
-    expect(LOOP_STEPS[STATE.evaluationDraft.step]).toBe('Evaluation')
   })
 
   it('it can\'t be one before full time', () => {
@@ -65,7 +56,6 @@ describe('a published evaluation (TRAK-289)', () => {
   it('closes the loop: Published, with nothing left to do', () => {
     expect(gameState(game(), Date.parse('2026-10-31T12:00:00Z'), { evaluated: true, published: true })).toBe('published')
     expect(STATE.published).toMatchObject({ label: 'Published', tone: 'success' })
-    expect(LOOP_STEPS[STATE.published.step]).toBe('Published')
     expect(STATE.published.action).toBeUndefined()
   })
 })
@@ -73,7 +63,7 @@ describe('a published evaluation (TRAK-289)', () => {
 describe('a plan draft (TRAK-284)', () => {
   it('a published match with a plan draft before kick-off has a plan that is not shared; sharing it is next (TRAK-286)', () => {
     expect(gameState(game(), KICK_OFF - 1000, { drafted: true })).toBe('planDraft')
-    expect(STATE.planDraft).toMatchObject({ label: 'Plan not shared', step: 1, action: { label: 'Share the plan', tab: 'plan', step: 'share' } })
+    expect(STATE.planDraft).toMatchObject({ label: 'Plan not shared', action: { label: 'Share plan', tab: 'plan', step: 'share' } })
   })
 
   it('a draft changes nothing while the logistics wait, or after kick-off', () => {
@@ -86,14 +76,12 @@ describe('a shared plan (TRAK-286)', () => {
   it('a shared plan closes "Plan not shared"; there is nothing to do until kick-off', () => {
     expect(gameState(game(), KICK_OFF - 1000, { drafted: true, shared: true })).toBe('shared')
     expect(STATE.shared).toMatchObject({ label: 'Plan shared', tone: 'success' })
-    expect(LOOP_STEPS[STATE.shared.step]).toBe('Shared')
     expect(STATE.shared.action).toBeUndefined()
   })
 
-  it('edits after sharing wait for "Share the changes"', () => {
+  it('edits after sharing wait for "Share changes"', () => {
     expect(gameState(game(), KICK_OFF - 1000, { drafted: true, shared: true, changes: 2 })).toBe('changes')
-    expect(STATE.changes).toMatchObject({ label: 'Changes not shared', tone: 'warning', action: { label: 'Share the changes', tab: 'plan', step: 'share' } })
-    expect(LOOP_STEPS[STATE.changes.step]).toBe('Shared')
+    expect(STATE.changes).toMatchObject({ label: 'Changes not shared', tone: 'warning', action: { label: 'Share changes', tab: 'plan', step: 'share' } })
   })
 
   it('at kick-off a shared plan locks, changes or not', () => {
@@ -109,11 +97,10 @@ describe('a scheduled plan (TRAK-290)', () => {
   it('waits for its time with nothing to do; the badge says when it goes out, on this phone\'s clock', () => {
     expect(gameState(game(), Date.parse(at) - 1000, scheduled)).toBe('scheduled')
     expect(STATE.scheduled.action).toBeUndefined()
-    expect(LOOP_STEPS[STATE.scheduled.step]).toBe('Shared')
     expect(gameStatus(game(), Date.parse(at) - 1000, scheduled)).toMatchObject({ label: `Shares ${format(new Date(at), 'EEE HH:mm')}`, tone: 'info' })
   })
 
-  it('from its time it is a shared plan, and later edits wait for "Share the changes"', () => {
+  it('from its time it is a shared plan, and later edits wait for "Share changes"', () => {
     expect(gameState(game(), Date.parse(at), scheduled)).toBe('shared')
     expect(gameStatus(game(), Date.parse(at), scheduled).label).toBe('Plan shared')
     expect(gameState(game(), Date.parse(at) + 1000, { ...scheduled, changes: 1 })).toBe('changes')
@@ -162,5 +149,32 @@ describe('orderGames (TRAK-283)', () => {
 
   it('with only past matches there is no next game', () => {
     expect(orderGames([at('past', 3)], now).next).toBeNull()
+  })
+})
+
+describe('matchActions (TRAK-333)', () => {
+  const names = (state: Parameters<typeof matchActions>[0]) => {
+    const actions = matchActions(state)
+    return actions && [actions.main.label, ...actions.more.map(action => action.label)]
+  }
+
+  it('a split button: the next action first, then the match\'s other pages behind the chevron (Imad, 2 Nov)', () => {
+    expect(names('logistics')).toEqual(['Share logistics', 'View plan'])
+    expect(names('plan')).toEqual(['Write plan', 'Logistics'])
+    expect(names('planDraft')).toEqual(['Share plan', 'Logistics'])
+    expect(names('changes')).toEqual(['Share changes', 'View plan', 'Logistics'])
+    expect(names('fullTime')).toEqual(['Evaluate', 'View plan', 'Logistics'])
+    expect(names('evaluationDraft')).toEqual(['Publish', 'View plan', 'Logistics'])
+  })
+
+  it('a shared or scheduled plan, with nothing due, offers View plan', () => {
+    expect(names('shared')).toEqual(['View plan', 'Logistics'])
+    expect(names('scheduled')).toEqual(['View plan', 'Logistics'])
+    expect(matchActions('shared')!.main).toEqual({ label: 'View plan', tab: 'plan' })
+  })
+
+  it('nothing while the match is on, or once it is published', () => {
+    expect(matchActions('locked')).toBeNull()
+    expect(matchActions('published')).toBeNull()
   })
 })

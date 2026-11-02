@@ -95,7 +95,12 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
     const next = screen.getByRole('region', { name: 'Next match' })
     expect(within(next).getByText('vs Parkview Athletic')).toBeInTheDocument()
     expect(within(next).getByText('Plan not written')).toBeInTheDocument()
-    expect(within(next).getAllByRole('button').filter(button => button.textContent === 'Write the plan')).toHaveLength(1)
+    // TRAK-333 (Imad, 2 Nov): the action is a split button with the match's other pages behind it, and no loop stepper.
+    expect(within(next).getAllByRole('button', { name: 'Write plan' })).toHaveLength(1)
+    await user.click(within(next).getByRole('button', { name: 'Write plan more actions' }))
+    expect((await screen.findAllByRole('menuitem')).map(item => item.textContent)).toEqual(['Logistics'])
+    await user.keyboard('{Escape}')
+    expect(within(next).queryByLabelText('Where this match is')).toBeNull()
 
     // Only the coach's own matches, never a cancelled one, are asked for.
     const read = asked.find(url => url.searchParams.get('event_type') === 'eq.match')!
@@ -125,12 +130,12 @@ describe('TRAK-283: Games home', { timeout: 20_000 }, () => {
     renderApp('/coach/matches')
     const next = await screen.findByRole('region', { name: 'Next match' })
     expect(within(next).getByText('Logistics not shared')).toBeInTheDocument()
-    expect(within(next).getByRole('button', { name: 'Share the logistics' })).toBeInTheDocument()
+    expect(within(next).getByRole('button', { name: 'Share logistics' })).toBeInTheDocument()
     await waitFor(() => expect(within(next).getByRole('timer', { name: 'Kick-off in' })).toHaveTextContent(/3 days, 2 hours, [45] minutes/))
     const at = athens(kickOff)
     expect(within(next).getByText(new RegExp(`${at.hour}:${at.minute} Athens time$`))).toBeInTheDocument()
 
-    await userEvent.click(within(next).getByRole('button', { name: 'Share the logistics' }))
+    await userEvent.click(within(next).getByRole('button', { name: 'Share logistics' }))
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/matches/soon?tab=logistics'))
   })
 

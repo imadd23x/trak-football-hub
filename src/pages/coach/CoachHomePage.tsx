@@ -16,7 +16,8 @@ import { TodayPlan } from '@/components/coach/home/TodayPlan'
 import { NeedsYou, type OwedEvent } from '@/components/coach/home/NeedsYou'
 import { useOwedEvents } from '@/components/coach/home/useOwedEvents'
 import { gameTitle, gameWhen, useGamePlanChanges, useGamePlans, useGameShares, useGames } from '@/components/coach/games/useGames'
-import { STATE, actionLink, gameState, needsAPlan } from '@/lib/games/loop'
+import { STATE, gameState, needsAPlan } from '@/lib/games/loop'
+import { MatchAction } from '@/components/coach/games/MatchAction'
 import { useFeature } from '@/components/trak/parked'
 import { eventHeading, toPlayerEvent } from '@/lib/player-events'
 import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
@@ -66,7 +67,7 @@ export default function CoachHomePage() {
   const client = useQueryClient()
   const eventsOn = useFeature('events')
   // TRAK-284: a match a week out or less, its logistics shared, without a shared plan. TRAK-286: or with changes since
-  // it was shared that wait for "Share the changes". TRAK-288: a played match is evaluated, not logged.
+  // it was shared that wait for "Share changes". TRAK-288: a played match is evaluated, not logged.
   const gamesOn = useFeature('games')
   const owed = useOwedEvents(user?.id, everySquad ? () => true : coachSquad.eventInSquad, eventsOn, gamesOn)
   const trainingOn = useFeature('training')
@@ -109,7 +110,7 @@ export default function CoachHomePage() {
       urgent: remindAt !== undefined && Date.now() >= Date.parse(remindAt),
     }
   })
-  // The game's own next step (Write the plan, Share the plan, Share the changes); a shared plan with nothing new has none.
+  // The game's own next step (Write plan, Share plan, Share changes); a shared plan with nothing new has none.
   const planEvents: OwedEvent[] = soon.flatMap(game => {
     const changed = changes.data?.get(game.id)?.length ?? 0
     const state = gameState(game, Date.now(), { drafted: plans.data?.has(game.id), shared: shares.data?.has(game.id), sharedAt: shares.data?.get(game.id), changes: changed })
@@ -120,8 +121,8 @@ export default function CoachHomePage() {
       id: game.id, title: gameTitle(game), when: [day, time].filter(Boolean).join(' · '),
       squad: coachSquad.squads.length >= 2 ? squadName(game.squad) : null,
       reason: state === 'changes' ? `Changes not shared · ${changed} ${changed === 1 ? 'player' : 'players'}` : 'Plan not shared',
-      action: <Link to={actionLink(game.id, action)}
-        className="arc inline-flex h-9 min-w-[128px] items-center justify-center gap-2 rounded-full bg-brand px-4 text-[14px] font-medium text-on-brand focus-visible:ring-2 focus-visible:ring-primary">{action.label}</Link>,
+      // TRAK-333 (Imad, 2 Nov): every match action is a split button, with the match's other pages behind its chevron.
+      action: <MatchAction state={state} eventId={game.id} />,
     }]
   })
 

@@ -118,12 +118,12 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     expect(await screen.findByRole('heading', { name: '4-4-2' })).toBeInTheDocument()
   })
 
-  it('shared with changes still unshared, the alert counts who didn\'t get them; there is no Share the changes', async () => {
+  it('shared with changes still unshared, the alert counts who didn\'t get them; there is no Share changes', async () => {
     setup({ kickOffIn: -MINUTE, shared: true, changes: ['zagorakis', 'charisteas'] })
     renderApp('/coach/matches/g1?tab=plan&step=share')
     expect(await screen.findByText(/2 players didn’t get your last changes\./)).toBeInTheDocument()
     const shared = screen.getByRole('region', { name: 'Shared' })
-    expect(within(shared).queryByRole('button', { name: /Share the changes/ })).toBeNull()
+    expect(within(shared).queryByRole('button', { name: /Share changes/ })).toBeNull()
     expect(shared).not.toHaveTextContent('Edits stay with you')
   })
 

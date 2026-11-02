@@ -176,7 +176,7 @@ describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_00
     expect(card).not.toHaveTextContent('Only you see this')
     expect(within(card).queryByText('Strength')).toBeNull()
     expect(within(card).getByRole('group', { name: 'How strong are Parkview Athletic?' })).toBeInTheDocument()
-    const lock = within(card).getByRole('button', { name: 'Who sees this' })
+    const lock = within(card).getByRole('button', { name: 'Who sees how strong they are' })
     expect(screen.queryByRole('tooltip')).toBeNull()
 
     act(() => lock.focus())
@@ -191,5 +191,17 @@ describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_00
     expect(lock).toHaveAccessibleDescription('Only you can see this')
     await user.pointer({ keys: '[TouchA]', target: lock })
     await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull())
+  })
+
+  it('TRAK-337: Scouting has the same lock, in place of its "Only you" badge', async () => {
+    const user = userEvent.setup()
+    plans()
+    renderApp('/coach/matches/g1?tab=plan')
+    const card = await screen.findByRole('region', { name: 'Scouting' })
+    expect(within(card).queryByText('Only you')).toBeNull()
+    const lock = within(card).getByRole('button', { name: 'Who sees scouting' })
+    await user.pointer({ keys: '[TouchA]', target: lock })
+    await screen.findByRole('tooltip')
+    expect(lock).toHaveAccessibleDescription('Only you can see this')
   })
 })

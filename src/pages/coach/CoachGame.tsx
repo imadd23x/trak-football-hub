@@ -89,7 +89,8 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
   // The plan as typed, and its step, live here, above the tabs: Arc unmounts a panel that isn't shown. Until the coach
   // types, it is the saved plan, so a retried read still fills the form. Needs you's "Share the changes" opens Share.
   const [typed, setTyped] = useState<PlanForm | null>(null)
-  const [planStep, setPlanStep] = useState(() => params.get('step') === 'share' ? 2 : 0)
+  // TRAK-332: a plan that is shared or scheduled opens on Review & share, not on its first step.
+  const [planStep, setPlanStep] = useState(() => params.get('step') === 'share' || sharedAt != null ? 2 : 0)
   // TRAK-288: the evaluation as entered, and its step, kept here for the same reason; until the coach enters anything,
   // the saved draft.
   const [entered, setEntered] = useState<EvaluationForm | null>(null)
@@ -101,6 +102,7 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
   const locked = !cancelled && now >= Date.parse(row.starts_at)
   const squad = coachSquad.squads.length >= 2 && row.squad ? row.squad : undefined
   const where = [day, time ? `Kick-off ${time}` : '', row.home_away === 'home' ? 'Home' : row.home_away === 'away' ? 'Away' : '', row.venue ?? '', squad ?? '']
+  const logistics = useLogisticsEdit(row)
 
   return <>
     <header className="arc grid gap-2 pt-4 pb-2">
@@ -120,14 +122,15 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
           <TabsList aria-label="This match">
             {TABS.map(t => <TabsTrigger key={t.id} value={t.id}>{t.label}</TabsTrigger>)}
           </TabsList>
-          <TabsContent value="logistics"><Logistics row={row} squad={squad} /></TabsContent>
+          <TabsContent value="logistics"><Logistics row={row} squad={squad} onEdit={logistics.open} publish={logistics.publish} /></TabsContent>
           <TabsContent value="plan">
             {(plan.isError && plan.data === undefined) || (players.isError && players.data === undefined)
               ? <div className="pt-4"><LoadError what="the plan" onRetry={() => { void plan.refetch(); void players.refetch() }}
                   retrying={plan.isFetching || players.isFetching} /></div>
               // Locked, it shows the plan as saved at kick-off: what the evaluation reads against.
               : <GamePlan game={row} form={(locked ? null : typed) ?? planToForm(plan.data ?? null, players.data ?? [])} onFormChange={setTyped}
-                  step={planStep} onStep={setPlanStep} sharedAt={sharedAt} changes={changes} lockedAt={locked ? time : null} />}
+                  step={planStep} onStep={setPlanStep} sharedAt={sharedAt} changes={changes} lockedAt={locked ? time : null}
+                  onEditLogistics={() => logistics.open?.()} planStartedAt={plan.data?.created_at ?? null} />}
           </TabsContent>
           <TabsContent value="evaluation">
             {(evaluation.isError && evaluation.data === undefined) || (plan.isError && plan.data === undefined) || (players.isError && players.data === undefined)
@@ -143,13 +146,15 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
         </Tabs>
       </div>
     )}
+    {logistics.sheet}
   </>
 }
 
-/** Schedule's Review rows, read only. A draft publishes here, in place, as Home's event sheet publishes one (publishEvent:
- *  families are emailed the logistics, as today). TRAK-331 (Imad, 2 Nov): Edit pulls up Schedule's own edit sheet here, so
- *  the coach never leaves the match; it saves as Schedule saves an event that isn't part of a series. */
-function Logistics({ row, squad }: { row: EventRow; squad?: string }) {
+/** TRAK-331 (Imad, 2 Nov): Schedule's own edit sheet on the match page, so the coach never leaves the match; it saves as
+ *  Schedule saves an event that isn't part of a series. TRAK-332: the page holds it, so both the Logistics tab and
+ *  Review & share's Logistics part open it. A draft publishes in place, as Home's event sheet publishes one
+ *  (publishEvent: families are emailed the logistics, as today). */
+function useLogisticsEdit(row: EventRow) {
   const { user } = useAuth()
   const client = useQueryClient()
   const publish = useMutation({
@@ -187,19 +192,25 @@ function Logistics({ row, squad }: { row: EventRow; squad?: string }) {
     if (row.published) askToEmailFamilies() // TRAK-135: a published event's change goes to families, as from Schedule
     toast.success(row.published ? 'Saved. Families see the change.' : 'Draft saved')
   }
+  // TRAK-230: once it has started, what families were told is fixed, so there is nothing to open.
+  const open = startedLocked(row) ? null : () => setEdit({ row, form: rowToForm(row), repeat: blankRepeat(''), scope: 'one', step: 0, error: null })
+  const sheet = edit && <EventEditSheet key={row.id} sheet={edit} onChange={update => setEdit(current => current && update(current))} onClose={() => setEdit(null)}
+    onSave={publishNow => void save(publishNow)} saving={saving} venues={savedVenues(games.data ?? [])} childNames={children.data ?? null} />
+  return { open, sheet, publish }
+}
+
+/** Schedule's Review rows, read only, with Publish for a draft and Edit (useLogisticsEdit). */
+function Logistics({ row, squad, onEdit, publish }: {
+  row: EventRow; squad?: string; onEdit: (() => void) | null; publish: ReturnType<typeof useLogisticsEdit>['publish']
+}) {
   return (
     <div className="grid gap-4 pt-4">
       <div className="flex flex-wrap items-center gap-3">
         <Badge tone={row.published ? 'success' : 'neutral'}>{row.published ? 'Shared with families' : 'Draft'}</Badge>
         {!row.published && <Button loading={publish.isPending} onClick={() => publish.mutate()}>Publish</Button>}
-        {/* TRAK-230: once it has started, what families were told is fixed. */}
-        {!startedLocked(row) && <Button variant="secondary" size="sm"
-          onClick={() => setEdit({ row, form: rowToForm(row), repeat: blankRepeat(''), scope: 'one', step: 0, error: null })}>
-          <Pencil size={14} aria-hidden="true" />Edit</Button>}
+        {onEdit && <Button variant="secondary" size="sm" onClick={onEdit}><Pencil size={14} aria-hidden="true" />Edit</Button>}
       </div>
       <EventSummary form={rowToForm(row)} repeat={null} noteProblem={null} squad={squad} />
-      {edit && <EventEditSheet key={row.id} sheet={edit} onChange={update => setEdit(sheet => sheet && update(sheet))} onClose={() => setEdit(null)}
-        onSave={publishNow => void save(publishNow)} saving={saving} venues={savedVenues(games.data ?? [])} childNames={children.data ?? null} />}
     </div>
   )
 }

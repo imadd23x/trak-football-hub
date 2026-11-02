@@ -1,0 +1,76 @@
+/* Arc Pro (uiarc.dev): adapted from the Account health block; licensed source, not covered by this repository's licence. See src/components/arc/PRO.md. */
+/* One card. Spacing steps 4/8/12/16/24; three text sizes: meta, body and 28px figures. Body is Arc's --text-sm and meta
+   one pixel less, so on a coach's laptop both read 2px larger, as every coach screen does (TRAK-254). */
+.root {
+  --pr-pad: 24px;
+  --pr-track: color-mix(in oklab, var(--foreground) 9%, transparent);
+  --pr-meta: calc(var(--text-sm) - 1px);
+  container-type: inline-size;
+  position: relative; box-sizing: border-box; width: 100%; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--foreground);
+  font-family: var(--font-body); font-size: var(--text-sm); line-height: 1.43; letter-spacing: var(--tracking-body);
+}
+.root :where(p, h3, ul) { margin: 0; padding: 0; }
+.truncate { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Status colors: the icon carries the hue, the word stays readable. */
+.root [data-status="good"] { --pr-tone: var(--success); }
+.root [data-status="watch"] { --pr-tone: var(--warning); }
+.root [data-status="risk"] { --pr-tone: var(--danger); }
+.statusIcon { flex: none; color: var(--pr-tone); }
+
+/* Header and overview. */
+.top { display: flex; flex-direction: column; gap: 24px; padding: var(--pr-pad); }
+.identity { display: flex; flex-direction: column; min-width: 0; }
+.name { overflow: hidden; font-size: var(--text-base); font-weight: 500; line-height: 1.375; text-overflow: ellipsis; white-space: nowrap; }
+.meta { overflow: hidden; color: var(--text-muted); font-size: var(--pr-meta); line-height: 1.385; text-overflow: ellipsis; white-space: nowrap; }
+
+.overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.scoreCell { display: flex; align-items: stretch; gap: 16px; min-width: 0; padding-right: 24px; }
+.countdownCell { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; height: 60px; padding-left: 24px; border-left: 1px solid var(--border-subtle); }
+
+/* Gauge: the count sits on the arc's baseline, so it lines up with the days beside it. */
+.gauge { position: relative; flex: none; width: 112px; height: 60px; }
+.gauge > svg { display: block; overflow: visible; }
+.gaugeTrack, .gaugeValue { fill: none; stroke-width: 8; stroke-linecap: round; }
+.gaugeTrack { stroke: var(--pr-track); }
+.gaugeValue { stroke: var(--pr-tone); }
+.scoreNumber, .bigNumber { font-size: 28px; font-weight: 400; line-height: 28px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.scoreNumber { position: absolute; bottom: 0; left: 0; width: 100%; text-align: center; }
+.scoreText { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; padding-block: 2px 4px; }
+.band { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 20px; }
+.trend { color: var(--text-muted); font-size: var(--pr-meta); line-height: 1.385; }
+
+.countdownLabel { display: flex; min-width: 0; padding-top: 2px; color: var(--text-muted); font-size: var(--pr-meta); line-height: 1.385; }
+.term { position: relative; display: block; height: 4px; overflow: hidden; border-radius: 2px; background: var(--pr-track); }
+.termFill { position: absolute; inset: 0; border-radius: inherit; background: var(--text-secondary); transform-origin: left center; }
+.days { display: flex; align-items: baseline; gap: 6px; min-width: 0; height: 28px; white-space: nowrap; }
+.unit { color: var(--text-muted); font-size: var(--pr-meta); line-height: 1.385; }
+
+/* The plan's parts: one row each, hairlines between, never doubled. */
+.rows { list-style: none; padding: 0 var(--pr-pad); border-top: 1px solid var(--border-subtle); }
+.row { display: grid; grid-template-columns: 14px minmax(0, 1fr) 64px auto; column-gap: 12px; align-items: center; min-height: 56px; }
+.row[data-read-only] { grid-template-columns: 14px minmax(0, 1fr) 64px; }
+.row + .row { border-top: 1px solid var(--border-subtle); }
+.rowText { display: flex; flex-direction: column; min-width: 0; padding-block: 8px; }
+.rowLabel { font-weight: 500; }
+.rowDetail { color: var(--text-muted); font-size: var(--pr-meta); line-height: 1.385; }
+.status { color: var(--text-secondary); font-size: var(--pr-meta); line-height: 1.385; white-space: nowrap; }
+
+/* What shares it. */
+.footer { display: grid; gap: 12px; padding: var(--pr-pad); border-top: 1px solid var(--border-subtle); }
+
+/* Narrow cards: tighter padding; below 440px the gauge and the countdown stack. */
+@container (max-width: 520px) {
+  .top, .rows, .footer { --pr-pad: 16px; }
+}
+@container (max-width: 440px) {
+  .overview { grid-template-columns: minmax(0, 1fr); row-gap: 16px; }
+  .scoreCell { padding-right: 0; }
+  .countdownCell { padding: 16px 0 0; border-top: 1px solid var(--border-subtle); border-left: 0; height: auto; gap: 8px; }
+  .row { column-gap: 8px; grid-template-columns: 14px minmax(0, 1fr) 52px auto; }
+  .row[data-read-only] { grid-template-columns: 14px minmax(0, 1fr) 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .termFill { transition: none; }
+}

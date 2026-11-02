@@ -94,7 +94,7 @@ describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_00
     expect(await screen.findByRole('heading', { name: 'Instructions' })).toBeInTheDocument()
     expect(screen.getByText('Plan not written')).toBeInTheDocument()
     const steps = screen.getByRole('navigation', { name: 'Game plan' })
-    expect(steps).toHaveTextContent(/Tactics & analysis.*Line-up and jobs.*Share/)
+    expect(steps).toHaveTextContent(/Tactics & analysis.*Line-up and jobs.*Review & share/)
     expect(steps.querySelector('[aria-current="step"]')).toHaveTextContent('Tactics & analysis')
     // TRAK-328 (Imad, 2 Nov): no empty instruction until the coach adds one, and their line-up is gone.
     expect(screen.queryByRole('group', { name: /^Instruction \d$/ })).toBeNull()

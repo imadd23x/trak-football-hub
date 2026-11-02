@@ -114,15 +114,15 @@ afterEach(() => { vi.useRealTimers(); cleanup(); localStorage.clear() })
 const shareStep = () => renderApp('/coach/matches/g1?tab=plan&step=share')
 
 describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
-  it('sits behind Share now\'s chevron: it waits for the tick, saves what is typed, then schedules on the academy\'s clock', async () => {
+  it('sits behind Share plan\'s chevron: it waits for the tick, saves what is typed, then schedules on the academy\'s clock', async () => {
     const user = userEvent.setup()
     const calls = store()
     shareStep()
-    const block = await screen.findByRole('region', { name: 'Share the plan' })
-    expect(screen.getByRole('button', { name: 'Share now more actions' })).toBeDisabled()
+    await screen.findByRole('region', { name: 'Review & share' })
+    expect(screen.getByRole('button', { name: 'Share plan more actions' })).toBeDisabled()
 
     await user.click(screen.getByRole('checkbox', { name: /talked selection through/ }))
-    await user.click(screen.getByRole('button', { name: 'Share now more actions' }))
+    await user.click(screen.getByRole('button', { name: 'Share plan more actions' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Share at…' }))
     expect(screen.getByText('Any time before kick-off. Until then, only you see it.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Schedule' })).toBeDisabled()
@@ -136,7 +136,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     const scheduled = await screen.findByRole('region', { name: 'Scheduled' })
     expect(within(scheduled).getByText('Shares Thu 19:30')).toBeInTheDocument()
     expect(screen.getAllByText('Shares Thu 19:30')).toHaveLength(2) // the header's badge too
-    expect(screen.queryByRole('region', { name: 'Share the plan' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Share plan' })).toBeNull()
   })
 
   it('a scheduled plan waits: Save draft rewrites what waits, Change time moves it, and at its time it is shared, no reload', async () => {
@@ -187,9 +187,9 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     server.use(http.post(`${SUPABASE_URL}/rest/v1/rpc/schedule_game_plan`, () =>
       HttpResponse.json({ code: 'P0001', message: 'Pick a time before kick-off' }, { status: 400 })))
     shareStep()
-    const block = await screen.findByRole('region', { name: 'Share the plan' })
+    await screen.findByRole('region', { name: 'Review & share' })
     await user.click(screen.getByRole('checkbox', { name: /talked selection through/ }))
-    await user.click(screen.getByRole('button', { name: 'Share now more actions' }))
+    await user.click(screen.getByRole('button', { name: 'Share plan more actions' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Share at…' }))
     await pickDate(user, 'Day', '2026-11-07')
     await pickTime(user, 'Time', '11:00')

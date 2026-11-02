@@ -1,0 +1,63 @@
+import {
+  formProblem, pastDateProblem, repeatProblem, rowToForm, seriesDates, whatProblem,
+  type EventForm, type EventKind, type EventRow, type Repeat,
+} from '@/lib/coach-events'
+import { localTodayISO } from '@/lib/event-time'
+
+/* TRAK-331 (Imad, 2 Nov): what the event sheet (EventEditSheet) and the pages that save it share, moved out of
+   Schedule as it was. */
+
+/** A write that changed no row was refused (RLS filters, it doesn't error). */
+export function failed(error: unknown, data: unknown[] | null) {
+  return !!error || !data?.length
+}
+
+export const SAVE_FAILED = "Couldn't save the event. Check your connection and try again; your details are still here."
+
+export const inputClass = 'w-full bg-ground border border-line rounded-[12px] px-3 py-2.5 text-[14px] text-ink placeholder-ink-3 outline-none'
+export const font = { fontFamily: 'var(--t-font)' }
+export const mono = { fontFamily: 'var(--t-font-mono)' }
+
+export const KIND_LABEL: Record<EventKind, string> = { match: 'Match', training: 'Training', other: 'Other' }
+
+export type Scope = 'one' | 'following'
+/** The sheet while it's open: the event (null for a new one), what's typed, and the step. */
+export type EditSheet = { row: EventRow | null; form: EventForm; repeat: Repeat; scope: Scope; step: number; error: string | null }
+
+export const EVENT_STEPS = [
+  { id: 'what', label: 'What' },
+  { id: 'when', label: 'When' },
+  { id: 'families', label: 'For families' },
+  { id: 'review', label: 'Review' },
+]
+export const REVIEW = EVENT_STEPS.length - 1
+
+/** TRAK-127: a past date on New event, or moved to on an edit. TRAK-288: where Games is on, a new match that has
+ *  been played is saved to be evaluated instead (Imad, 28 Oct), so its date isn't a problem. */
+export function pastProblem(form: EventForm, editing: EventRow | null, games = false) {
+  if (playedMatch(form, editing, games)) return null
+  return pastDateProblem(form.date, localTodayISO(), editing ? rowToForm(editing).date : null)
+}
+export const playedMatch = (form: EventForm, editing: EventRow | null, games: boolean) =>
+  games && !editing && form.kind === 'match' && pastDateProblem(form.date, localTodayISO()) !== null
+
+/** TRAK-288: where Games is on, New event asks a match's competition, so publishing its evaluation can read it. */
+export const competitionProblem = (form: EventForm, editing: EventRow | null, games: boolean) =>
+  games && !editing && form.kind === 'match' && !form.competition ? 'Pick the competition' : null
+
+/** What stops Next on a step: only what that step can fix. */
+export function stepProblem(step: number, form: EventForm, repeat: Repeat, editing: EventRow | null, games: boolean) {
+  if (step === 0) return whatProblem(form) ?? competitionProblem(form, editing, games)
+  if (step === 1) return formProblem(form) ?? pastProblem(form, editing, games) ?? (editing ? null : repeatProblem(form, repeat))
+  return null
+}
+
+/** How many events Review's save makes: a new weekly series is several. */
+export function seriesCount(sheet: { row: EventRow | null; form: EventForm; repeat: Repeat }) {
+  const { row, form, repeat } = sheet
+  return !row && repeat.on && form.kind !== 'match' && !repeatProblem(form, repeat)
+    ? seriesDates(form.date, repeat.until, repeat.days).length : 1
+}
+
+export const inSeries = (row: EventRow | null): row is EventRow & { series_id: string; event_date: string } =>
+  !!row?.series_id && !!row.event_date

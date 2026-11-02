@@ -1,7 +1,7 @@
 /**
  * TRAK-283 (Games 1/8): a game's page. The header says where the game is in its loop. Logistics shows Schedule's
- * Review rows with Shared with families or Draft and Edit in Schedule; a draft publishes in place, as Home's event
- * sheet does. Game plan and Evaluation say what will happen there, and the panel lives in the URL. Only the
+ * Review rows with Shared with families or Draft; a draft publishes in place, as Home's event sheet does. TRAK-331
+ * (Imad, 2 Nov): Edit pulls up Schedule's edit sheet right here. Game plan and Evaluation say what will happen there, and the panel lives in the URL. Only the
  * coach's own match opens. Test people are named after footballers.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -89,7 +89,8 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     expect(row('Type')).toHaveTextContent('Match')
     expect(row('Opponent')).toHaveTextContent('Parkview Athletic (Home)')
     expect(row('Note for families')).toHaveTextContent('Bring water')
-    expect(screen.getByRole('link', { name: 'Edit in Schedule' })).toHaveAttribute('href', '/coach/schedule?edit=g1')
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit in Schedule' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Publish' })).toBeNull()
 
     const read = asked.find(url => url.searchParams.get('id') === 'eq.g1')!
@@ -152,7 +153,39 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     // jsdom never shows a past countdown's label (it can't tell the countdown is on screen); the TRAK-287 test sees it flip.
     expect(screen.getByRole('timer', { name: 'Kick-off in' })).toBeInTheDocument()
     expect(screen.getByText('Shared with families')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Edit in Schedule' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
+  })
+
+  it("TRAK-331: Edit pulls up the event's edit sheet on the match page; a saved change shows here, families are told as from Schedule, and the coach never leaves", async () => {
+    const user = userEvent.setup()
+    const rows = [game(soon())]
+    events(rows)
+    const patches: Record<string, unknown>[] = []
+    let emails = 0
+    server.use(
+      http.patch(`${SUPABASE_URL}/rest/v1/coach_calendar_events`, async ({ request }) => {
+        const body = await request.json() as Record<string, unknown>
+        patches.push(body)
+        rows[0] = { ...rows[0], ...body }
+        return HttpResponse.json([{ id: 'g1' }])
+      }),
+      http.post(`${SUPABASE_URL}/functions/v1/send-event-emails`, () => { emails += 1; return HttpResponse.json({}) }),
+    )
+    renderApp('/coach/matches/g1')
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Edit event' })
+    const venue = within(sheet).getByLabelText('Venue')
+    await user.clear(venue)
+    await user.type(venue, 'Al Barsha Pitch 2')
+    for (let step = 0; step < 3; step++) await user.click(within(sheet).getByRole('button', { name: 'Next' }))
+    await user.click(within(sheet).getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit event' })).toBeNull())
+    expect(patches).toHaveLength(1)
+    expect(patches[0]).toMatchObject({ venue: 'Al Barsha Pitch 2' })
+    await waitFor(() => expect(row('Venue')).toHaveTextContent('Al Barsha Pitch 2'))
+    await waitFor(() => expect(emails).toBe(1))
+    expect(window.location.pathname).toBe('/coach/matches/g1')
   })
 
   it('a cancelled match says so; a match that is not the coach\'s own does not open', async () => {

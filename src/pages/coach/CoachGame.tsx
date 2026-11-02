@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { ChevronLeft, Pencil } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/integrations/supabase/client'
@@ -20,6 +20,7 @@ import { GamePlan } from '@/components/coach/games/GamePlan'
 import { Evaluation } from '@/components/coach/games/Evaluation'
 import { EventSummary } from '@/components/coach/EventSummary'
 import { EventEditSheet } from '@/components/coach/EventEditSheet'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
@@ -36,7 +37,6 @@ const TABS: { id: GameTab; label: string }[] = [
 type Plan = UseQueryResult<Tables<'game_plans'> | null>
 type Players = UseQueryResult<Pick<Tables<'game_plan_players'>, 'squad_player_id' | 'role' | 'slot' | 'job' | 'note' | 'context' | 'expectation'>[]>
 type Evaluated = ReturnType<typeof useGameEvaluation>
-const linkClass = 'rounded text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
 export default function CoachGame() {
   const { eventId } = useParams()
@@ -50,7 +50,9 @@ export default function CoachGame() {
     <div className="min-h-screen bg-ground pb-24">
       {/* TRAK-323 (Imad, 30 Oct): the plan's steps use the screen: the coach's wide column (TRAK-307), not 960 px. */}
       <div className={WIDE_COLUMN}>
-        <Link to="/coach/matches" className={`mt-5 inline-flex items-center gap-1 ${linkClass}`}><ChevronLeft size={16} aria-hidden="true" />Matches</Link>
+        {/* TRAK-334: where the coach came from (Home, Matches, Schedule), in place of "‹ Matches". It waits for the
+            match's name, so the last crumb never swaps; a match that can't be read still offers the way back. */}
+        {!game.isPending && <CoachTrail className="mt-5" current={game.data ? gameTitle(game.data) : 'Match'} />}
         {game.error || shares.error ? <div className="pt-6"><LoadError what="this match" onRetry={() => { void game.refetch(); void shares.refetch() }}
             retrying={game.isFetching || shares.isFetching} /></div>
           : game.isPending || plan.isPending || players.isPending || shares.isPending || evaluation.isPending

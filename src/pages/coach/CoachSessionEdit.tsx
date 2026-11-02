@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -227,14 +227,9 @@ export default function CoachSessionEdit() {
 
   const header = (
     <div className="flex items-center justify-between pt-3 pb-2 border-b border-line">
-      <button onClick={goBack} aria-label="Back"
-        className="w-[34px] h-[34px] bg-raised border border-line rounded-[10px] flex items-center justify-center">
-        <ChevronLeft size={14} className="text-ink" />
-      </button>
-      <span className="text-[16px] font-medium text-ink" style={{ fontFamily: 'var(--t-font)' }}>
-        {isMatch ? 'Edit match' : 'Edit session'}
-      </span>
-      <div className="w-[34px]" />
+      {/* TRAK-334: the trail, in place of Back; its last crumb is the page's name. Opened from a link, it sits under
+          the sessions list, where Back went. */}
+      <CoachTrail current={isMatch ? 'Edit match' : 'Edit session'} parents={[{ label: 'Sessions', href: '/coach/sessions/list' }]} />
     </div>
   )
 

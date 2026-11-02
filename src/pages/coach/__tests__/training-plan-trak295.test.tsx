@@ -104,7 +104,8 @@ describe('TRAK-295: planning a training from Training home', { timeout: 20_000 }
     await user.click(within(card('Training later')).getByRole('button', { name: 'View plan' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/later/view'))
     expect(await screen.findByRole('list', { name: 'Practices to run' })).toHaveTextContent('Rondos 4v1')
-    await user.click(screen.getByRole('link', { name: 'Back to Training' }))
+    // TRAK-334: the trail's first crumb, in place of Back to Training.
+    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Training' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training'))
     await user.click(await within(await screen.findByRole('article', { name: /Training later$/ })).findByRole('button', { name: 'Edit plan' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/later/plan'))

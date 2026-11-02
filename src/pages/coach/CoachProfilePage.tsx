@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ChevronRight, Settings as SettingsIcon } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
@@ -60,7 +61,8 @@ export default function CoachProfilePage() {
   return (
     <MobileShell width="read">
       <div className="flex items-center justify-between pt-3 pb-2 border-b border-line">
-        <span className="text-[16px] font-medium text-ink" style={{ fontFamily: 'var(--t-font)' }}>Profile</span>
+        {/* TRAK-334: the trail (Settings › Profile); its last crumb is the page's name. */}
+        <CoachTrail current="Profile" />
       </div>
 
       <div className="pt-3.5 pb-4 space-y-2.5">

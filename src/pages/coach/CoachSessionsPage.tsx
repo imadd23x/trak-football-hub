@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -53,7 +54,9 @@ export default function CoachSessionsPage() {
     <MobileShell>
       {/* Topbar */}
       <div className="flex items-center justify-between px-5 py-[10px] border-b border-line shrink-0">
-        <h1 className="text-[15px] font-semibold text-ink">Sessions</h1>
+        {/* TRAK-334: the trail (Home › Log › Sessions); its last crumb is the page's name. */}
+        <CoachTrail current="Sessions" />
+        <h1 className="sr-only">Sessions</h1>
         <button
           onClick={() => navigate('/coach/sessions')}
           className="flex items-center justify-center w-8 h-8 rounded-[9px] bg-brand active:scale-95 transition-transform"

@@ -7,7 +7,7 @@ import { localTodayISO, phoneEventTime } from '@/lib/event-time'
 import { LIBRARIES, SESSIONS, libraryPath } from '@/lib/library/library'
 import { ON_LIBRARY } from '@/lib/fixed-colours'
 import { searchDrills, splitTrainings, trainingMinutes, type Drill } from '@/lib/training/sessions'
-import { planPath, viewPath, type PlannerState, type ViewState } from '@/lib/training/plans'
+import { planPath, viewPath, type PlannerState } from '@/lib/training/plans'
 import { gameWhen } from '@/components/coach/games/useGames'
 import { useDrills, usePlannedTrainings, useRegisters, useTrainings, type Training } from '@/components/coach/training/useTraining'
 import { DrillSheet } from '@/components/coach/training/DrillSheet'
@@ -180,7 +180,7 @@ function PlanButtons({ training, planned, onPlan, past = false }: { training: Tr
   return (
     <div className="flex flex-wrap gap-2">
       {planned ? <>
-        <Button size="sm" variant="secondary" onClick={() => navigate(viewPath(training.id), { state: { back: 'training' } satisfies ViewState })}>View plan</Button>
+        <Button size="sm" variant="secondary" onClick={() => navigate(viewPath(training.id))}>View plan</Button>
         <Button size="sm" variant="secondary" onClick={() => navigate(planPath(training.id))}>Edit plan</Button>
       </> : <Button size="sm" variant={past ? 'secondary' : 'primary'} onClick={onPlan}>Create plan</Button>}
     </div>

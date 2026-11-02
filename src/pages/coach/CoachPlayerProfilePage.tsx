@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Avatar } from '@/components/arc/avatar/avatar'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, MetadataLabel, CategoryBar, BandPill, LoadError, NavBar } from '@/components/trak'
@@ -8,7 +8,7 @@ import { QuickAdd } from '@/components/coach/QuickAdd'
 import { scoreToBand } from '@/lib/rating-engine'
 import { BANDS, appearanceLabel } from '@/lib/types'
 import { openable } from '@/lib/openable'
-import { ChevronLeft } from 'lucide-react'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { CoachAssessmentCard } from '@/components/coach/CoachAssessmentCard'
 import { loadPlayerAssessments } from '@/lib/coach-assessments'
 
@@ -22,7 +22,6 @@ function avgScore(a: any) {
 export function CoachPlayerOverview({ id, embedded = false }: { id: string | undefined; embedded?: boolean }) {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
   const [player, setPlayer] = useState<any>(null)
   const [assessments, setAssessments] = useState<any[]>([])
   const [notesById, setNotesById] = useState<Record<string, string>>({})
@@ -231,15 +230,10 @@ export function CoachPlayerOverview({ id, embedded = false }: { id: string | und
       {/* Header — always visible, never scrolls */}
       <div className="flex items-center gap-3 px-5 py-3 shrink-0"
         style={{ borderBottom: '1px solid rgb(var(--t-line))' }}>
-        {/* TRAK-200: Back returns where the coach came from (Home's Recent assessments, Squad);
-            opened with no history behind it, it goes to Squad (the TRAK-179 rule). */}
-        <button aria-label="Back" onClick={() => { if (location.key !== 'default') navigate(-1); else navigate('/coach/squad') }}
-          className="flex items-center justify-center w-[34px] h-[34px] rounded-[10px] bg-raised border border-line">
-          <ChevronLeft size={16} className="text-ink-2" />
-        </button>
-        <h1 className="flex-1 text-center text-[17px] font-semibold text-ink -ml-[34px] pointer-events-none">
-          {player.player_name.split(' ')[0]}
-        </h1>
+        {/* TRAK-334: the trail, in place of TRAK-200's Back: where the coach came from (Squad, Home, Assess);
+            opened with nothing behind it, Squad (the TRAK-179 rule). The name below is the page's visible title. */}
+        <CoachTrail current={player.player_name} />
+        <h1 className="sr-only">{player.player_name}</h1>
       </div>
 
       {/* Scrollable content */}

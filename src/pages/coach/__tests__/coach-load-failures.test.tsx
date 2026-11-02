@@ -208,7 +208,7 @@ describe('a failed coach load is not an empty squad', () => {
 
       await requestSettled('/squad_players', () => renderApp('/coach/player/sp-1'))
 
-      expect(await screen.findByText('Ade Okafor')).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { level: 1, name: 'Ade Okafor' })).toBeInTheDocument()
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
 
@@ -228,7 +228,7 @@ describe('a failed coach load is not an empty squad', () => {
          The first draft asserted the name first and passed against a page that
          subsequently threw the player away. */
       expect(await screen.findByRole('alert')).toBeInTheDocument()
-      expect(screen.getByText('Ade Okafor')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: 'Ade Okafor' })).toBeInTheDocument()
       // The banner must be the assessments one. A page-level failure banner
       // here would mean an assessments error was escalated to a page error.
       expect(screen.getByText(/this player's assessments/i)).toBeInTheDocument()

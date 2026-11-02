@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { Link } from 'react-router-dom'
 import { MomentArt } from '@/components/library/LibraryArt'
 import { ON_LIBRARY } from '@/lib/fixed-colours'
 import {
-  kindOf, momentPath, partById, partPath, shownOrder, speaker, type FollowUp, type Moment, type Panel, type Part, type SeniorPart, type Why,
+  PIR_PATH, kindOf, momentPath, partById, partPath, shownOrder, speaker, type FollowUp, type Moment, type Panel, type Part, type SeniorPart, type Why,
 } from '@/lib/library/play-it-right'
-import { BackButton, CloseButton } from '../parts'
+import { CloseButton } from '../parts'
 
 /* TRAK-268: Play It Right's pieces, in Trak's look. A coach can try a call before
    seeing the answers; nothing they tap is saved. */
@@ -170,7 +171,8 @@ export function MomentView({ moment, pane, onClose }: { moment: Moment; pane?: b
         </div>
       ) : (
         <header className="-mx-5 px-5 pt-3.5 pb-6 tablet:mx-0 tablet:mt-7 tablet:rounded-[12px] tablet:px-7 tablet:pt-6" style={{ background: part.tint }}>
-          <BackButton fallback={partPath(part)} label="Back" />
+          {/* TRAK-334: the trail, in place of Back; opened from a link, under its part. */}
+          <CoachTrail current={moment.title} parents={[{ label: 'Play It Right', href: PIR_PATH }, { label: part.name, href: partPath(part) }]} />
           <div className="mt-4 flex items-center gap-4 tablet:gap-6">
             <MomentArt colour={part.colour} size={84} rank={moment.type === 'rank'} />
             <div className="min-w-0 flex-1">

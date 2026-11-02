@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowDown, ArrowLeftRight, ArrowUp, BookOpen, ChevronLeft, ClipboardList, PenLine, Pencil, Trash2, UserRound } from 'lucide-react'
+import { ArrowDown, ArrowLeftRight, ArrowUp, BookOpen, ClipboardList, PenLine, Pencil, Trash2, UserRound } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
@@ -9,11 +9,12 @@ import { DRILL_DETAILS, DRILL_LIMITS, drillProblem, trainingEnd, trainingMinutes
 import { loopNote, loopState, practiceStarts } from '@/lib/training/loop'
 import {
   PLAN_MAX, blankPractice, fromDrill, fromSaved, minutesLine, move, overTime, planPath, plannedMinutes, roomFor, sourceLabel,
-  viewPath, type PlannerState, type Practice, type ViewState,
+  viewPath, type PlannerState, type Practice,
 } from '@/lib/training/plans'
 import { gameWhen } from '@/components/coach/games/useGames'
 import { usePlan, useRegisters, useSavePlan, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
 import { TakeRegister } from '@/components/coach/TakeRegister'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { SessionLog } from '@/components/coach/SessionLog'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { DetailFields, MinutesPicks, TellField } from '@/components/coach/training/fields'
@@ -71,9 +72,8 @@ function Header({ training, children }: { training: Training; children: ReactNod
   const minutes = trainingMinutes(training)
   return (
     <header className="arc grid gap-4 pt-5 pb-2">
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-ink-3">
-        <Link to={TRAINING_PATH} className={linkClass}>Training</Link><span aria-hidden="true">›</span><span className="text-ink">{day}</span>
-      </nav>
+      {/* TRAK-334: where the coach came from (Training, Home), as every coach page's trail. */}
+      <CoachTrail current={day} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="grid gap-1">
           <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">Training</p>
@@ -373,11 +373,10 @@ function PitchView({ training, plan }: { training: Training; plan: Plan | null }
   const practices = fromSaved(plan?.practices ?? [])
   const { day, time } = gameWhen(training)
   const starts = practiceStarts(time || null, practices)
-  // Opened from Training home's View plan, it goes back there; from the training's page, back to that.
-  const fromList = (useLocation().state as ViewState)?.back === 'training'
-  const back = fromList ? TRAINING_PATH : `${TRAINING_PATH}/${training.id}`
   return <div className="mx-auto grid max-w-[720px] gap-5 pt-5">
-    <Link to={back} className={`inline-flex min-h-11 items-center gap-1 justify-self-start ${linkClass}`}><ChevronLeft size={16} aria-hidden />{fromList ? 'Back to Training' : 'Back to the plan'}</Link>
+    {/* TRAK-334: opened from Training home's View plan, the trail goes back there; from the training's page, to that,
+        which is also where it sits when opened from a link. */}
+    <CoachTrail current="View" parents={[{ label: day, href: `${TRAINING_PATH}/${training.id}` }]} />
     <header className="grid gap-1">
       <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">View</p>
       <h1 className="text-[28px] font-medium leading-tight text-ink">{[day, time].filter(Boolean).join(' · ')}</h1>

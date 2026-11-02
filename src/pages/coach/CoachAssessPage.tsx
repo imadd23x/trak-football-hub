@@ -17,6 +17,7 @@ import { trackEvent, startTimer } from '@/lib/telemetry'
 import { ChevronLeft, ChevronDown } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { Stepper } from '@/components/arc/stepper/stepper'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { Button } from '@/components/arc/button/button'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { Select } from '@/components/arc/select/select'
@@ -565,23 +566,10 @@ function CoachAssessmentForm() {
       {/* ---- header: always visible, never scrolls ---- */}
       <div className="flex items-center gap-3 px-5 py-3 shrink-0"
         style={{ borderBottom: '1px solid rgb(var(--t-line))' }}>
-        <button
-          onClick={() => {
-            // TRAK-179: back to the screen the coach came from (Squad, the
-            // player, their history, Home). Opened directly, with nothing
-            // before it in Trak, fall back to the player or Home.
-            if (location.key !== 'default') { navigate(-1); return }
-            const fromPlayer = (location.state as any)?.preselectedPlayerId
-            navigate(fromPlayer ? `/coach/player/${fromPlayer}` : '/coach/home')
-          }}
-          aria-label="Back"
-          className="flex items-center justify-center w-[34px] h-[34px] rounded-[10px] bg-raised border border-line"
-        >
-          <ChevronLeft size={16} className="text-ink-2" />
-        </button>
-        <h1 className="flex-1 text-center text-[17px] font-semibold text-ink -ml-[34px] pointer-events-none">
-          Assessment
-        </h1>
+        {/* TRAK-334: the trail, in place of TRAK-179's Back: the screens the coach came through (Squad, the player,
+            Home); opened from a link, Home. */}
+        <CoachTrail current="Assessment" />
+        <h1 className="sr-only">Assessment</h1>
       </div>
 
       {/* ---- scrollable content ---- */}

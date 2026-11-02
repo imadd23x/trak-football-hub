@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
@@ -114,22 +114,23 @@ describe('TRAK-102: a coach opens and corrects a saved training session', () => 
   // Imad, 16 Oct: Back returns to where the coach came from (Home's week, via the
   // sheet's "Open session"), not always to the list. Going back leaves the
   // history as it was; the old Back pushed the list on top.
-  it('Back goes back to the screen it came from', async () => {
+  it('the trail goes back to the screen it came from (TRAK-334: in place of Back)', async () => {
     const user = userEvent.setup()
     renderApp('/coach/sessions/list')
     await user.click(await screen.findByRole('button', { name: /Finishing Training/ }, { timeout: 5000 }))
     expect(await screen.findByText('Edit session')).toBeInTheDocument()
     const depth = window.history.length
-    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Sessions' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/sessions/list'))
     expect(window.history.length).toBe(depth)
   })
 
-  it('opened directly, Back goes to the sessions list', async () => {
+  it('opened directly, its trail sits under the sessions list', async () => {
     const user = userEvent.setup()
     renderApp('/coach/sessions/session-1')
     expect(await screen.findByText('Edit session')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Home', 'Sessions', 'Edit session'])
+    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Sessions' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/sessions/list'))
   })
 

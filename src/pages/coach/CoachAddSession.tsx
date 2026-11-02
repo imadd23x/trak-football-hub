@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -680,15 +681,8 @@ export default function CoachAddSession() {
       {games && type === 'match' && <Navigate replace to={eventId ? `/coach/matches/${eventId}?tab=evaluation` : '/coach/matches'} />}
       {/* Topbar */}
       <div className="flex items-center justify-between pt-3 pb-2 border-b border-line">
-        <button onClick={() => navigate(-1)} aria-label="Back"
-          className="w-[34px] h-[34px] bg-raised border border-line rounded-[10px] flex items-center justify-center">
-          <ChevronLeft size={14} className="text-ink" />
-        </button>
-        <span className="text-[16px] font-medium text-ink"
-          style={{ fontFamily: 'var(--t-font)' }}>
-          Full Session
-        </span>
-        <div className="w-[34px]" />
+        {/* TRAK-334: the trail, in place of Back; its last crumb is the page's name. */}
+        <CoachTrail current="Full Session" />
       </div>
 
       <div className="pt-5 pb-32 space-y-5">

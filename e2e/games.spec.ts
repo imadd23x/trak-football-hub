@@ -242,6 +242,24 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(errors).toEqual([])
   })
 
+  // TRAK-331 (Imad, 2 Nov): Edit pulls up Schedule's own edit sheet on the match page; the coach never leaves the match.
+  test(`a game's logistics at ${width} px: Edit pulls up the event's sheet on the match page`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, '/coach/matches/m-next', width, height)
+    await expect(page.getByText('Shared with families')).toBeVisible()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    const sheet = page.getByRole('dialog', { name: 'Edit event' })
+    await expect(sheet).toBeVisible()
+    await expect(sheet.getByRole('navigation', { name: 'Event steps' })).toBeVisible()
+    await page.waitForTimeout(500)
+    await page.screenshot({ path: testInfo.outputPath(`logistics-edit-${width}.png`) })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    await sheet.getByRole('button', { name: 'Close' }).click()
+    await expect(sheet).toBeHidden()
+    expect(new URL(page.url()).pathname).toBe('/coach/matches/m-next')
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+
   test(`a game's plan at ${width} px: tactics and analysis, kept across tabs and saved as a draft`, async ({ page, context }, testInfo) => {
     const plans: Plans = new Map()
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', width, height, plans)

@@ -1,21 +1,25 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/integrations/supabase/client'
 import { publishEvent } from '@/lib/event-publish'
+import { askToEmailFamilies } from '@/lib/event-emails'
+import { SAVE_FAILED, failed, pastProblem, type EditSheet } from '@/lib/event-edit'
 import { useCoachSquad } from '@/lib/coach-squad'
-import { rowToForm, startedLocked, type EventRow } from '@/lib/coach-events'
+import { blankRepeat, clashMessage, formProblem, formToRow, lockedMessage, rowToForm, savedVenues, startedLocked, type EventRow } from '@/lib/coach-events'
 import { fullTime, gameStatus, type GameTab } from '@/lib/games/loop'
 import { formToPlan, planToForm, type PlanForm } from '@/lib/games/plan'
 import { evaluationToForm, type EvaluationForm } from '@/lib/games/evaluation'
 import type { Tables } from '@/integrations/supabase/types'
-import { gameTitle, gameWhen, useGame, useGameEvaluation, useGamePlan, useGamePlanChanges, useGamePlayers, useGameShares } from '@/components/coach/games/useGames'
+import { gameTitle, gameWhen, useGame, useGameEvaluation, useGamePlan, useGamePlanChanges, useGamePlayers, useGameShares, useGames } from '@/components/coach/games/useGames'
 import { GamePlan } from '@/components/coach/games/GamePlan'
 import { Evaluation } from '@/components/coach/games/Evaluation'
 import { EventSummary } from '@/components/coach/EventSummary'
+import { EventEditSheet } from '@/components/coach/EventEditSheet'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
@@ -142,9 +146,11 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
   </>
 }
 
-/** Schedule's Review rows, read only; Schedule stays where the event is edited (?edit=). A draft publishes here, in
- *  place, as Home's event sheet publishes one (publishEvent: families are emailed the logistics, as today). */
+/** Schedule's Review rows, read only. A draft publishes here, in place, as Home's event sheet publishes one (publishEvent:
+ *  families are emailed the logistics, as today). TRAK-331 (Imad, 2 Nov): Edit pulls up Schedule's own edit sheet here, so
+ *  the coach never leaves the match; it saves as Schedule saves an event that isn't part of a series. */
 function Logistics({ row, squad }: { row: EventRow; squad?: string }) {
+  const { user } = useAuth()
   const client = useQueryClient()
   const publish = useMutation({
     mutationFn: () => publishEvent(row.id),
@@ -154,15 +160,46 @@ function Logistics({ row, squad }: { row: EventRow; squad?: string }) {
     },
     onError: error => toast.error(error.message),
   })
+  const [edit, setEdit] = useState<EditSheet | null>(null)
+  const [saving, setSaving] = useState(false)
+  // What the sheet offers as the coach types: venues the coach's matches used, and the names a family note mustn't hold.
+  const games = useGames(!!edit)
+  const children = useQuery({
+    queryKey: ['coach', user?.id, 'child-names'], enabled: !!user && !!edit,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('squad_players').select('player_name').eq('coach_user_id', user!.id)
+      if (error) throw error
+      return (data ?? []).map(child => child.player_name ?? '').filter(Boolean)
+    },
+  })
+  const save = async (publishNow = false) => {
+    if (!edit) return
+    const problem = formProblem(edit.form) ?? pastProblem(edit.form, row)
+    if (problem) { setEdit({ ...edit, error: problem }); return }
+    setSaving(true)
+    const { data, error } = await supabase.from('coach_calendar_events').update(formToRow(edit.form)).eq('id', row.id).select('id')
+    setSaving(false)
+    // Errors keep what was typed and say what failed, as Schedule's do.
+    if (failed(error, data)) { setEdit({ ...edit, error: clashMessage(error) ?? lockedMessage(error) ?? SAVE_FAILED }); return }
+    setEdit(null)
+    void client.invalidateQueries({ queryKey: ['coach'] })
+    if (publishNow && !row.published) return publish.mutate()
+    if (row.published) askToEmailFamilies() // TRAK-135: a published event's change goes to families, as from Schedule
+    toast.success(row.published ? 'Saved. Families see the change.' : 'Draft saved')
+  }
   return (
     <div className="grid gap-4 pt-4">
       <div className="flex flex-wrap items-center gap-3">
         <Badge tone={row.published ? 'success' : 'neutral'}>{row.published ? 'Shared with families' : 'Draft'}</Badge>
         {!row.published && <Button loading={publish.isPending} onClick={() => publish.mutate()}>Publish</Button>}
         {/* TRAK-230: once it has started, what families were told is fixed. */}
-        {!startedLocked(row) && <Link to={`/coach/schedule?edit=${row.id}`} className={linkClass}>Edit in Schedule</Link>}
+        {!startedLocked(row) && <Button variant="secondary" size="sm"
+          onClick={() => setEdit({ row, form: rowToForm(row), repeat: blankRepeat(''), scope: 'one', step: 0, error: null })}>
+          <Pencil size={14} aria-hidden="true" />Edit</Button>}
       </div>
       <EventSummary form={rowToForm(row)} repeat={null} noteProblem={null} squad={squad} />
+      {edit && <EventEditSheet key={row.id} sheet={edit} onChange={update => setEdit(sheet => sheet && update(sheet))} onClose={() => setEdit(null)}
+        onSave={publishNow => void save(publishNow)} saving={saving} venues={savedVenues(games.data ?? [])} childNames={children.data ?? null} />}
     </div>
   )
 }

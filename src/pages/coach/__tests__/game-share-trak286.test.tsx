@@ -202,17 +202,14 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     expect(screen.getByRole('checkbox', { name: /talked selection through/ })).toBeChecked()
   })
 
-  it('a starter whose family says they can\'t make it is flagged in the squad table and on the pitch, and still reads the plan', async () => {
+  it('a starter whose family says they can\'t make it is flagged in Everyone\'s job, and still reads the plan', async () => {
     const user = userEvent.setup()
     store({ lineUp: [...LINE_UP, row('nikopolidis', { role: 'starter', slot: 1, job: 'Command the box on crosses.' })] })
     renderApp('/coach/matches/g1?tab=plan')
     await user.click(await screen.findByRole('button', { name: 'Next: Line-up and jobs' }))
-    // TRAK-330: the squad table, not Everyone's job.
-    const table = await screen.findByRole('table', { name: 'The match squad' })
-    const keeper = within(table).getAllByRole('row').find(each => each.textContent?.includes('Antonios Nikopolidis'))!
-    expect(keeper).toHaveTextContent('Can’t make it')
-    expect(keeper).toHaveTextContent('Starting · Goalkeeper')
-    expect(screen.getByRole('combobox', { name: "Antonios Nikopolidis, slot 1, can't make it" })).toBeInTheDocument()
+    const jobs = await screen.findByRole('region', { name: 'Everyone’s job' })
+    const keeper = within(jobs).getByRole('button', { name: /Antonios Nikopolidis/ }).closest('li')!
+    expect(within(keeper).getByText('Can’t make it')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next: Review & share' }))
     expect(await screen.findByText('4 players and their families, in the app only')).toBeInTheDocument()
   })

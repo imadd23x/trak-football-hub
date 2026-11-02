@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
@@ -39,22 +39,29 @@ describe('TRAK-179: a player in the overview opens the player (TRAK-211: on Feed
     await waitFor(() => expect(window.location.pathname).toBe('/coach/player/sp-1'))
   }, 20_000)
 
-  // TRAK-200 (Imad, 18 Oct): Back on that profile returns where it was opened, not Squad.
-  it('Back on the profile returns to Feedback and assessment', async () => {
+  // TRAK-200 (Imad, 18 Oct): the way back from that profile is where it was opened, not Squad. TRAK-334: it's the
+  // trail's first crumb, in place of Back.
+  it("the profile's trail ends at Feedback, where it was opened, and goes back there", async () => {
     signInAs(COACH)
     serve()
     renderApp('/coach/feedback')
     await userEvent.click(await screen.findByRole('button', { name: /^Open Ade Okafor's profile/ }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/player/sp-1'))
-    await userEvent.click(await screen.findByRole('button', { name: 'Back' }))
+    const trail = await screen.findByRole('navigation', { name: 'Breadcrumb trail' })
+    // Feedback, opened from a link and outside the nav, sits under Home.
+    expect(within(trail).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Home', 'Feedback', 'Ade Okafor'])
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+    await userEvent.click(within(trail).getByRole('link', { name: 'Feedback' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/feedback'))
   }, 20_000)
 
-  it('a profile opened with no history behind it goes Back to Squad', async () => {
+  it('a profile opened with nothing behind it starts its trail at Squad', async () => {
     signInAs(COACH)
     serve()
     renderApp('/coach/player/sp-1')
-    await userEvent.click(await screen.findByRole('button', { name: 'Back' }))
+    const trail = await screen.findByRole('navigation', { name: 'Breadcrumb trail' })
+    expect(within(trail).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Squad', 'Ade Okafor'])
+    await userEvent.click(within(trail).getByRole('link', { name: 'Squad' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/squad'))
   }, 20_000)
 })

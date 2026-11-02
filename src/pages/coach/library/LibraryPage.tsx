@@ -1,15 +1,16 @@
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell } from '@/components/trak'
 import { PitchArt } from '@/components/library/LibraryArt'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
-import { ON_LIBRARY, ON_LIBRARY_RING } from '@/lib/fixed-colours'
+import { ON_COLOUR_TRAIL, ON_LIBRARY, ON_LIBRARY_RING } from '@/lib/fixed-colours'
 import {
   AGE_BANDS, LIBRARY_PATH, SESSIONS, TOPICS, ageLabel, forAge, formatLabel, libraryByKey, libraryOf, libraryOrder, sessionById,
   squadsAgeBand, titleParts, type Library, type LibrarySession,
 } from '@/lib/library/library'
-import { BackButton, BesideList, Chip, CloseButton, ProgrammeRow, SessionDetail, SessionHeading, SessionRow } from './parts'
+import { BesideList, Chip, CloseButton, ProgrammeRow, SessionDetail, SessionHeading, SessionRow } from './parts'
 
 /* TRAK-264: one library (Defending, Technical…). Its coloured header, the
    squad's age group as a filter the coach can clear, its topics as tabs, its
@@ -122,7 +123,8 @@ function Header({ library, sessions, topics }: { library: Library; sessions: num
     <header className="relative -mx-5 overflow-hidden px-5 pt-3.5 pb-6 tablet:mx-0 tablet:mt-7 tablet:rounded-[12px] tablet:px-7 tablet:pt-6"
       style={{ background: library.colour, color: ON_LIBRARY }}>
       <span aria-hidden className="absolute -right-10 -bottom-16 h-52 w-52 rounded-full border-2 tablet:-right-16 tablet:-bottom-24 tablet:h-[300px] tablet:w-[300px]" style={{ borderColor: ON_LIBRARY_RING }} />
-      <BackButton fallback={LIBRARY_PATH} label="Back" onColour />
+      {/* TRAK-334: the trail, in place of Back, white on the library's colour. */}
+      <CoachTrail current={library.label} style={ON_COLOUR_TRAIL} />
       <p className="mt-14 text-[12px] font-semibold tracking-[0.1em] tablet:mt-16">LIBRARY</p>
       <h1 className="mt-0.5 text-[40px] font-bold leading-[1.05] tracking-[-0.01em] tablet:text-[54px]">{library.label}</h1>
       <p className="mt-2 text-[14px] font-medium tablet:text-[16px]">{plural(sessions, 'session')} · {plural(topics, 'topic')}</p>

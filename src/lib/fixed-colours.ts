@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 /**
  * TRAK-189: the few colours that don't follow Trak's theme, in one place.
  * Everything else uses the role tokens (--t-* in src/index.css).
@@ -14,3 +16,5 @@ export const ON_LIBRARY_RING = 'rgb(255 255 255 / 0.3)'
 /** A round button on a library's colour, and on its pale tint. */
 export const ON_LIBRARY_BUTTON = 'rgb(0 0 0 / 0.22)'
 export const ON_TINT_BUTTON = 'rgb(255 255 255 / 0.7)'
+/** TRAK-334: a page's trail (CoachTrail) on a library's colour: white, as the header's own text, with ring-white chevrons. */
+export const ON_COLOUR_TRAIL = { '--text-secondary': ON_LIBRARY, '--text-muted': ON_LIBRARY, '--accent-strong': ON_LIBRARY, '--border-strong': ON_LIBRARY_RING } as CSSProperties

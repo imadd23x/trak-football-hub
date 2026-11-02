@@ -1,8 +1,9 @@
 import { Navigate, useParams } from 'react-router-dom'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { MobileShell } from '@/components/trak'
 import { PitchArt, ProgrammeArt } from '@/components/library/LibraryArt'
 import { LIBRARY_PATH, agesLabel, libraryOf, libraryPath, sessionById, sessionPath, titleParts } from '@/lib/library/library'
-import { BackButton, SessionDetail, SessionHeading, WeekList } from './parts'
+import { SessionDetail, SessionHeading, WeekList } from './parts'
 
 /* TRAK-264: a session's own page, and a six-week programme's. The picture sits
    on a pale wash of the library's colour; on a tablet or laptop it moves to the
@@ -21,7 +22,8 @@ export default function SessionPage() {
     <MobileShell width="wide">
       <div className="pb-36">
         <header className={header} style={{ background: library.tint }}>
-          <BackButton fallback={libraryPath(library.key)} label="Back" />
+          {/* TRAK-334: the trail, in place of Back; opened from a link, it sits under its library. */}
+          <CoachTrail current={titleParts(session).title} parents={[{ label: library.label, href: libraryPath(library.key) }]} />
           <div className={picture}>
             <PitchArt seed={session.id} colour={library.colour} className="w-[232px] flex-none shadow-[0_16px_32px_-14px_rgb(26_36_33/0.55)] tablet:w-[260px]" />
             <SessionHeading session={session} />
@@ -43,7 +45,8 @@ export function ProgrammePage() {
     <MobileShell width="wide">
       <div className="pb-36">
         <header className={header} style={{ background: library.tint }}>
-          <BackButton fallback={`${LIBRARY_PATH}/programmes`} label="Back" />
+          {/* TRAK-334: the trail, in place of Back; opened from a link, it sits under Programmes. */}
+          <CoachTrail current={titleParts(programme).title} parents={[{ label: 'Programmes', href: `${LIBRARY_PATH}/programmes` }]} />
           <div className={picture}>
             <ProgrammeArt colour={library.colour} size={210} label={library.label} />
             <div className="w-full min-w-0 flex-1">

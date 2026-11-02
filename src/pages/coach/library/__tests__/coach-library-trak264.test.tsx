@@ -100,7 +100,7 @@ describe('TRAK-264: the coach\'s Library', { timeout: 20_000 }, () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Read and react' })).toBeInTheDocument()
     expect(screen.getByText('Pressing and covering session')).toBeInTheDocument()
     expect(screen.getByText('Ages 12–16 · 14 players · 44×30-yard pitch')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getAllByRole('listitem').at(-1)).toHaveTextContent('Read and react')
     expect(screen.getByRole('heading', { name: 'About this session' }).nextElementSibling).toHaveTextContent(/press and cover effectively to win the ball back/)
 
     const learn = screen.getByRole('heading', { name: 'Players will learn to' }).nextElementSibling as HTMLElement
@@ -126,6 +126,12 @@ describe('TRAK-264: the coach\'s Library', { timeout: 20_000 }, () => {
     expect(within(weeks).getAllByRole('link').map(a => a.textContent)).toEqual([
       '1Read and react', '2Pressing for glory', '3Cover and recover', '4Pressing duels', '5Defending in small numbers', '6Games week',
     ])
+    // TRAK-334: opened from a link, it sits under Programmes, and a week's session keeps that trail.
+    const trail = () => within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getAllByRole('listitem').map(item => item.textContent)
+    expect(trail()).toEqual(['Library', 'Programmes', 'Press and cover to defend'])
+    await userEvent.click(within(weeks).getByRole('link', { name: /Read and react/ }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Read and react' })).toBeInTheDocument()
+    expect(trail()).toEqual(['Library', 'Programmes', 'Press and cover to defend', 'Read and react'])
   })
 
   it('the Programmes chip lists the squad\'s age group first, then every age, the rest on request', async () => {
@@ -156,7 +162,7 @@ describe('TRAK-264: the coach\'s Library', { timeout: 20_000 }, () => {
     renderApp('/coach/trainings/play-it-right')
     expect(await screen.findByRole('heading', { level: 1, name: 'Play It Right' })).toBeInTheDocument()
     expect(document.querySelector('iframe')).toBeNull()
-    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Library' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Library' })).toBeInTheDocument()
   })
 
@@ -197,7 +203,7 @@ describe('TRAK-264: the coach\'s Library', { timeout: 20_000 }, () => {
     expect(within(skills).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Moving with the ball'])
   })
 
-  it('a new page opens at its top, and Back returns to the same library, topic and place', async () => {
+  it('a new page opens at its top, and its trail goes back to the same library, topic and place', async () => {
     const scrolls = vi.spyOn(Element.prototype, 'scrollTo')
     renderApp('/coach/trainings')
     await userEvent.click(await screen.findByRole('link', { name: /^Defending/ }))
@@ -211,10 +217,11 @@ describe('TRAK-264: the coach\'s Library', { timeout: 20_000 }, () => {
     expect(scrolls).toHaveBeenCalledWith(0, 0)
 
     scrolls.mockClear()
-    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    // TRAK-334: the library's crumb, in place of Back, goes back the way Back did.
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Defending' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Defending' })).toBeInTheDocument()
     expect(within(screen.getByRole('tablist', { name: 'Topics' })).getByRole('tab', { selected: true })).toHaveTextContent(/^Marking and intercepting/)
-    // Back leaves the place in the list to the browser: no jump to the top.
+    // Going back leaves the place in the list to the browser: no jump to the top.
     expect(scrolls).not.toHaveBeenCalled()
     scrolls.mockRestore()
   })

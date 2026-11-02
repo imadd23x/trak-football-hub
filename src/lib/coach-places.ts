@@ -29,6 +29,13 @@ export function placeOf(path: string): { screen: CoachScreen | null; title: stri
   return hit ? { screen: hit[1], title: hit[2] } : { screen: null, title: 'Trak' }
 }
 
+/** TRAK-334: the nav row a page sits under, as the first crumb of its trail when nothing came before it (a link from
+ *  outside, a refresh). Assess and Feedback sit under none, so they go Home. */
+export function tabOf(path: string): { label: string; href: string } {
+  const href = COACH_SCREEN_PATH[placeOf(path).screen ?? 'home']
+  return { label: placeOf(href).title, href }
+}
+
 /** Pages with no bottom bar on a phone before (TRAK-254's `sideMenuOnly`) keep none: their own actions sit at the bottom,
  *  and Back leaves them. Settings, the manual, a player's page, and adding or editing a session (not History). */
 export const BARLESS = /^\/(settings|coach\/(manual|player\/.+|sessions\/(?!list$)[^/]+))$/

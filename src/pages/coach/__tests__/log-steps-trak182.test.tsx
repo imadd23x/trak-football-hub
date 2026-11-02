@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderApp } from '../../../../tests/support/render-app'
 import { logStep, matchAt, saveLog } from '../../../../tests/support/log-steps'
@@ -80,10 +80,11 @@ describe('TRAK-182: the session log in steps', { timeout: 20_000 }, () => {
     expect(screen.getByRole('button', { name: 'Save match' })).toBeEnabled()
   })
 
-  it("names the step buttons apart from the header's Back, which leaves the screen", async () => {
+  it("names the step buttons apart from the trail, which leaves the screen (TRAK-334: in place of the header's Back)", async () => {
     renderApp('/coach/sessions/quick')
     await matchAt('Squad')
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Back to Match' })).toBeInTheDocument()
   })
 })

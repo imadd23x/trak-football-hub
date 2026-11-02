@@ -186,32 +186,33 @@ describe('TRAK-69: a coach opens a saved assessment and edits that row', { timeo
     expect(await screen.findByText(/Editing your assessment for vs Olympiacos Youth/)).toBeInTheDocument()
   })
 
-  // TRAK-179 (Kostas, 15 Oct): Back returns to the screen the coach came from.
-  it("Back from an assessment opened in the player's history returns to that player", async () => {
+  // TRAK-179 (Kostas, 15 Oct): the way back is the screen the coach came from. TRAK-334: the trail, in place of Back.
+  it("the trail from an assessment opened in the player's history goes back to that player", async () => {
     const user = userEvent.setup()
     renderApp('/coach/player/player-a')
     await user.click(await screen.findByRole('button', { name: /Open assessment .*vs Olympiacos Academy/ }))
     expect(await screen.findByText(/Editing your assessment for vs Olympiacos Academy/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Squad', 'Manos Synthetic', 'Assessment'])
+    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Manos Synthetic' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/player/player-a'))
     expect(await screen.findByRole('article', { name: /assessment, / })).toBeInTheDocument()
   })
 
-  it('Back from an assessment reached from the overview returns to that player', async () => {
+  it('the trail from an assessment reached from the overview goes back to that player', async () => {
     const user = userEvent.setup()
     renderApp('/coach/feedback')
     await user.click(await screen.findByRole('button', { name: /^Open Manos Synthetic's profile/ }))
     await openLatest(user)
     expect(await screen.findByText(/Editing your assessment for vs Olympiacos Youth/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Manos Synthetic' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/player/player-a'))
   })
 
-  it('Back from an assessment opened directly, with nothing before it in Trak, goes home', async () => {
+  it('the trail from an assessment opened directly, with nothing before it in Trak, starts at Home', async () => {
     const user = userEvent.setup()
     renderApp('/coach/assess?assessment=assess-new')
     expect(await screen.findByText(/Editing your assessment for vs Olympiacos Youth/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Home' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/home'))
   })
 

@@ -79,8 +79,8 @@ describe('TRAK-268: the coach\'s Play It Right', { timeout: 20_000 }, () => {
     expect(link(/^Double-session Thursday\s*Make the call · Week 1/)).toHaveAttribute('href', '/coach/trainings/play-it-right/moment/c1')
     expect(link(/^The rest day\s*Rank three/)).toHaveAttribute('href', '/coach/trainings/play-it-right/moment/c2')
 
-    // Back returns to the six parts.
-    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    // The trail goes back to the six parts (TRAK-334: in place of Back).
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Play It Right' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Play It Right' })).toBeInTheDocument()
   })
 
@@ -112,8 +112,9 @@ describe('TRAK-268: the coach\'s Play It Right', { timeout: 20_000 }, () => {
     expect(screen.queryByText('Your call')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'What the coach saw' })).toBeNull()
 
-    // Back goes to its part when the coach came straight here.
-    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+    // Come straight here, the trail still has its part (TRAK-334: in place of Back).
+    expect(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Library', 'Play It Right', 'Commitment', expect.any(String)])
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Commitment' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Commitment' })).toBeInTheDocument()
   })
 

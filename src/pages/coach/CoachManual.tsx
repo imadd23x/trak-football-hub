@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { MobileShell, NavBar } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
 import { useFeature } from '@/components/trak/parked'
@@ -313,15 +314,9 @@ export default function CoachManual() {
     <MobileShell width="read">
       {/* Topbar */}
       <div className="flex items-center gap-3 pt-3 pb-3 border-b border-line shrink-0">
-        <button
-          onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
-          className="w-[34px] h-[34px] bg-raised border border-line rounded-[10px] flex items-center justify-center flex-shrink-0"
-          aria-label="Back"
-        >
-          <ChevronLeft size={14} className="text-ink" />
-        </button>
-        <div>
-          <p className="text-[16px] font-medium text-ink leading-tight" style={{ fontFamily: 'var(--t-font)' }}>How Trak works</p>
+        {/* TRAK-334: the trail (Settings › How Trak works), in place of Back and the title. */}
+        <div className="grid gap-0.5">
+          <CoachTrail current="How Trak works" />
           <p className="text-[10px] text-ink-3" style={{ fontFamily: 'var(--t-font-mono)' }}>{SECTIONS.length} SECTIONS</p>
         </div>
       </div>

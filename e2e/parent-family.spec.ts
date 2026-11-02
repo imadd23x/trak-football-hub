@@ -240,7 +240,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
       } else {
         // TRAK-182 (Imad, 16 Oct): a logged session opens its sheet too. Open
         // session goes to its record, and Back comes back to Home, not to the
-        // sessions history.
+        // sessions history. TRAK-334: the trail's Home, in place of Back.
         // TRAK-262: the coach's week picks an event on a tap; Details opens its sheet.
         await week.getByRole('button', { name: /Logged set pieces/ }).click()
         await week.getByRole('button', { name: 'Details' }).click()
@@ -249,7 +249,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         // Imad, 23 Oct (TRAK-278): the sheet shows the log, read only; Edit log opens the saved record.
         await logged.getByRole('link', { name: 'Edit log' }).click()
         await expect(page).toHaveURL(/\/coach\/sessions\/saved-session$/)
-        await page.getByRole('button', { name: 'Back' }).click()
+        await page.getByRole('navigation', { name: 'Breadcrumb trail' }).getByRole('link', { name: 'Home' }).click()
         await expect(page).toHaveURL(/\/coach\/home$/)
         await week.getByRole('button', { name: /Technical training/ }).click()
         await week.getByRole('button', { name: 'Details' }).click()

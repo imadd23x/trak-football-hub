@@ -2,7 +2,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { MobileShell, NavBar } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
 import { useFeature } from '@/components/trak/parked'
-import { ChevronLeft, History } from 'lucide-react'
+import { History } from 'lucide-react'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { IconMatch, IconSessions } from '@/components/icons/TrakIcons'
 
 export default function CoachSessionsChooser() {
@@ -15,13 +16,8 @@ export default function CoachSessionsChooser() {
     <MobileShell>
       {/* Topbar — mirrors PlayerLogChoose */}
       <div className="flex items-center justify-between pt-3 pb-2 border-b border-line">
-        <button
-          onClick={() => navigate('/coach/home')}
-          className="w-[34px] h-[34px] bg-raised border border-line rounded-[10px] flex items-center justify-center"
-          aria-label="Back"
-        >
-          <ChevronLeft size={14} className="text-ink" />
-        </button>
+        {/* TRAK-334: the trail, in place of Back. */}
+        <CoachTrail current="Log" />
         <span
           className="text-[16px] font-medium text-ink tracking-tight"
           style={{ fontFamily: 'var(--t-font)' }}

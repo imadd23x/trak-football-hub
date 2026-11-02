@@ -160,7 +160,7 @@ describe('TRAK-298: View', { timeout: 30_000 }, () => {
     renderApp('/coach/training/soon')
     await user.click(await screen.findByRole('button', { name: 'View' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/soon/view'))
-    expect(screen.getByText('View')).toBeInTheDocument()
+    expect(screen.getByText('View', { selector: 'p' })).toBeInTheDocument()
     const list = await screen.findByRole('list', { name: 'Practices to run' })
     const rows = within(list).getAllByRole('listitem')
     expect(rows).toHaveLength(2)
@@ -169,7 +169,8 @@ describe('TRAK-298: View', { timeout: 30_000 }, () => {
     expect(rows[0]).toHaveTextContent('10 × 10 m')
     expect(rows[1]).toHaveTextContent('25min')
     expect(within(rows[1]).getByText('“Press when their 6 turns.”')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Back to the plan' })).toHaveAttribute('href', '/coach/training/soon')
+    // TRAK-334: the trail, in place of Back to the plan: Training, then the training's page.
+    expect(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getAllByRole('link').map(link => link.getAttribute('href'))).toEqual(['/coach/training', '/coach/training/soon'])
   })
 
   it('the old Run it address opens View', async () => {
@@ -203,7 +204,7 @@ describe('TRAK-298: Last week', { timeout: 30_000 }, () => {
     await user.click(within(tue).getByRole('button', { name: 'View plan' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/tue/view'))
     expect(await screen.findByRole('list', { name: 'Practices to run' })).toHaveTextContent('Pressing 3v2')
-    await user.click(screen.getByRole('link', { name: 'Back to Training' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Training' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training'))
     await user.click(await within(await screen.findByRole('article', { name: /Pressing zones$/ })).findByRole('button', { name: 'Edit plan' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/tue/plan'))

@@ -1,11 +1,12 @@
 /**
- * TRAK-284 (Games 2/8): plan step 1, opponent and goals, saved as a draft only the coach sees. The draft saves and
- * reloads; a fourth goal can't be added; a failed save keeps the form. Switching tabs keeps what was typed:
- * e2e/games.spec.ts checks that in a browser, where the panel's exit animation runs. Test people are named after
- * footballers.
+ * TRAK-284 (Games 2/8): plan step 1, saved as a draft only the coach sees. The draft saves and reloads; a fourth
+ * instruction can't be added; a failed save keeps the form. TRAK-328 (Imad, 2 Nov): the step is Tactics & analysis, the
+ * goals are Instructions, their line-up is gone, and a lock says who sees how strong they are. Switching tabs keeps
+ * what was typed: e2e/games.spec.ts checks that in a browser, where the panel's exit animation runs. Test people are
+ * named after footballers.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
@@ -83,37 +84,34 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); localStorage.clear() })
 
-const goal = (number: number) => screen.getByRole('group', { name: `Goal ${number}` })
-const keyPlayer = (number: number) => screen.getByRole('group', { name: `Key player ${number}` })
+const instruction = (number: number) => screen.getByRole('group', { name: `Instruction ${number}` })
 
-describe('TRAK-284: plan step 1, opponent and goals', { timeout: 30_000 }, () => {
+describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_000 }, () => {
   it('saves a draft only the coach sees, and it comes back when the page opens again', async () => {
     const user = userEvent.setup()
     const { saves } = plans()
     renderApp('/coach/matches/g1?tab=plan')
-    expect(await screen.findByRole('heading', { name: 'Your goals' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Instructions' })).toBeInTheDocument()
     expect(screen.getByText('Plan not written')).toBeInTheDocument()
     const steps = screen.getByRole('navigation', { name: 'Game plan' })
-    expect(steps).toHaveTextContent(/Opponent and goals.*Line-up and jobs.*Share/)
-    expect(steps.querySelector('[aria-current="step"]')).toHaveTextContent('Opponent and goals')
+    expect(steps).toHaveTextContent(/Tactics & analysis.*Line-up and jobs.*Share/)
+    expect(steps.querySelector('[aria-current="step"]')).toHaveTextContent('Tactics & analysis')
+    // TRAK-328 (Imad, 2 Nov): no empty instruction until the coach adds one, and their line-up is gone.
+    expect(screen.queryByRole('group', { name: /^Instruction \d$/ })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Their likely line-up' })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Their formation' })).toBeNull()
 
-    await user.type(within(goal(1)).getByLabelText('Goal'), 'Win it back in their half')
-    await user.type(within(goal(1)).getByLabelText('What it looks like'), 'Press when their keeper plays short.')
+    await user.click(screen.getByRole('button', { name: 'Add instruction' }))
+    await user.type(within(instruction(1)).getByLabelText('Instruction'), 'Win it back in their half')
+    await user.type(within(instruction(1)).getByLabelText('What it looks like'), 'Press when their keeper plays short.')
     await user.click(screen.getByRole('radio', { name: /Stronger/ }))
-    screen.getByRole('combobox', { name: 'Their formation' }).focus()
-    await user.keyboard('{Enter}')
-    await user.click(await screen.findByRole('option', { name: '4-3-3' }))
-    await user.click(screen.getByRole('button', { name: 'Add a key player' }))
-    await user.type(within(keyPlayer(1)).getByLabelText('Number'), 'a9')
-    await user.type(within(keyPlayer(1)).getByLabelText('Position'), 'Striker')
-    await user.type(within(keyPlayer(1)).getByLabelText('Note'), 'Quick. Runs in behind.')
     await user.type(screen.getByLabelText('What you know about them'), 'Their keeper plays short.')
     await user.click(screen.getByRole('button', { name: 'Save draft' }))
 
     expect(await screen.findByRole('button', { name: 'Saved' })).toBeInTheDocument()
+    // Their line-up is never written, so what an earlier plan saved there stays as it was.
     expect(saves).toEqual([{
-      event_id: 'g1', strength: 'stronger', their_formation: '4-3-3', scouting: 'Their keeper plays short.',
-      key_players: [{ number: 9, position: 'Striker', note: 'Quick. Runs in behind.' }],
+      event_id: 'g1', strength: 'stronger', scouting: 'Their keeper plays short.',
       goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }],
       format: 11, formation: null,
     }])
@@ -126,37 +124,41 @@ describe('TRAK-284: plan step 1, opponent and goals', { timeout: 30_000 }, () =>
     renderApp('/coach/matches/g1?tab=plan')
     expect(await screen.findByDisplayValue('Win it back in their half')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /Stronger/ })).toBeChecked()
-    expect(screen.getByRole('combobox', { name: 'Their formation' })).toHaveTextContent('4-3-3')
-    expect(within(keyPlayer(1)).getByLabelText('Number')).toHaveValue('9')
     expect(screen.getByLabelText('What you know about them')).toHaveValue('Their keeper plays short.')
     expect(screen.getByText('Plan not shared')).toBeInTheDocument()
   })
 
-  it('takes up to three goals: a fourth can\'t be added, and one can be removed', async () => {
+  it('takes up to three instructions: a fourth can\'t be added, and any can be removed, the last one too', async () => {
     const user = userEvent.setup()
     plans()
     renderApp('/coach/matches/g1?tab=plan')
-    await user.click(await screen.findByRole('button', { name: 'Add a goal' }))
-    await user.click(screen.getByRole('button', { name: 'Add a goal' }))
-    expect(screen.getAllByRole('group', { name: /^Goal \d$/ })).toHaveLength(3)
-    expect(screen.queryByRole('button', { name: 'Add a goal' })).toBeNull()
+    await user.click(await screen.findByRole('button', { name: 'Add instruction' }))
+    await user.click(screen.getByRole('button', { name: 'Add instruction' }))
+    await user.click(screen.getByRole('button', { name: 'Add instruction' }))
+    expect(screen.getAllByRole('group', { name: /^Instruction \d$/ })).toHaveLength(3)
+    expect(screen.queryByRole('button', { name: 'Add instruction' })).toBeNull()
 
-    await user.type(within(goal(3)).getByLabelText('Goal'), 'Keeper owns the box')
-    await user.click(screen.getByRole('button', { name: 'Remove goal 2' }))
-    expect(screen.getAllByRole('group', { name: /^Goal \d$/ })).toHaveLength(2)
-    expect(within(goal(2)).getByLabelText('Goal')).toHaveValue('Keeper owns the box')
-    expect(screen.getByRole('button', { name: 'Add a goal' })).toBeInTheDocument()
+    await user.type(within(instruction(3)).getByLabelText('Instruction'), 'Keeper owns the box')
+    await user.click(screen.getByRole('button', { name: 'Remove instruction 2' }))
+    expect(screen.getAllByRole('group', { name: /^Instruction \d$/ })).toHaveLength(2)
+    expect(within(instruction(2)).getByLabelText('Instruction')).toHaveValue('Keeper owns the box')
+    expect(screen.getByRole('button', { name: 'Add instruction' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove instruction 2' }))
+    await user.click(screen.getByRole('button', { name: 'Remove instruction 1' }))
+    expect(screen.queryByRole('group', { name: /^Instruction \d$/ })).toBeNull()
   })
 
   it('a failed save keeps everything typed and says so; saving again works', async () => {
     const user = userEvent.setup()
     const { saves, state } = plans({ failSaves: true })
     renderApp('/coach/matches/g1?tab=plan')
-    await user.type(within(await screen.findByRole('group', { name: 'Goal 1' })).getByLabelText('Goal'), 'Switch play to the free side')
+    await user.click(await screen.findByRole('button', { name: 'Add instruction' }))
+    await user.type(within(instruction(1)).getByLabelText('Instruction'), 'Switch play to the free side')
     await user.click(screen.getByRole('button', { name: 'Save draft' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save the plan. Check your connection and try again; everything you typed is still here.")
-    expect(within(goal(1)).getByLabelText('Goal')).toHaveValue('Switch play to the free side')
+    expect(within(instruction(1)).getByLabelText('Instruction')).toHaveValue('Switch play to the free side')
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeInTheDocument()
     expect(screen.getByText('Plan not written')).toBeInTheDocument()
 
@@ -166,19 +168,28 @@ describe('TRAK-284: plan step 1, opponent and goals', { timeout: 30_000 }, () =>
     expect(saves).toHaveLength(1)
   })
 
-  it('a shirt number is 1 to 99 or blank; a 0 stops the save and says where', async () => {
+  it('how strong they are has no extra words; a lock says only the coach sees it, on focus and on a tap (TRAK-328)', async () => {
     const user = userEvent.setup()
-    const { saves } = plans()
+    plans()
     renderApp('/coach/matches/g1?tab=plan')
-    await user.click(await screen.findByRole('button', { name: 'Add a key player' }))
-    await user.type(within(keyPlayer(1)).getByLabelText('Number'), '0')
-    await user.click(screen.getByRole('button', { name: 'Save draft' }))
-    expect(await screen.findByText('A shirt number goes from 1 to 99. Fix the one marked above, then save.')).toBeInTheDocument()
-    expect(within(keyPlayer(1)).getByLabelText('Number')).toHaveAccessibleDescription('From 1 to 99')
-    expect(saves).toHaveLength(0)
+    const card = await screen.findByRole('region', { name: 'How strong are Parkview Athletic?' })
+    expect(card).not.toHaveTextContent('Only you see this')
+    expect(within(card).queryByText('Strength')).toBeNull()
+    expect(within(card).getByRole('group', { name: 'How strong are Parkview Athletic?' })).toBeInTheDocument()
+    const lock = within(card).getByRole('button', { name: 'Who sees this' })
+    expect(screen.queryByRole('tooltip')).toBeNull()
 
-    await user.type(within(keyPlayer(1)).getByLabelText('Number'), '7')
-    await user.click(within(keyPlayer(1)).getByRole('button', { name: 'Remove key player 1' }))
-    expect(screen.getByText('No key players yet.')).toBeInTheDocument()
+    act(() => lock.focus())
+    await screen.findByRole('tooltip')
+    expect(lock).toHaveAccessibleDescription('Only you can see this')
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull())
+
+    // A phone has no hover: a tap opens it, and another tap closes it.
+    await user.pointer({ keys: '[TouchA]', target: lock })
+    await screen.findByRole('tooltip')
+    expect(lock).toHaveAccessibleDescription('Only you can see this')
+    await user.pointer({ keys: '[TouchA]', target: lock })
+    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull())
   })
 })

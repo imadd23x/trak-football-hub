@@ -3,10 +3,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import type { EventRow } from '@/lib/coach-events'
-import { formToPlan, numberProblem, type PlanForm } from '@/lib/games/plan'
+import { formToPlan, type PlanForm } from '@/lib/games/plan'
 import { rowsToSave } from '@/lib/games/lineup'
 import { useWhoCanCome } from './useGames'
-import { OpponentAndGoals } from './OpponentAndGoals'
+import { TacticsAndAnalysis } from './TacticsAndAnalysis'
 import { LineUpAndJobs } from './LineUpAndJobs'
 import { ShareAt, ShareStep } from './ShareStep'
 import { Lock } from 'lucide-react'
@@ -17,16 +17,16 @@ import { SplitButton } from '@/components/arc/split-button/split-button'
 import { localTodayISO } from '@/lib/event-time'
 import { Stepper } from '@/components/arc/stepper/stepper'
 
-/* TRAK-284, TRAK-285, TRAK-286 (Games 2 to 4/8): the Game plan tab. Opponent and goals, Line-up and jobs, then Share.
-   One draft, only the coach sees it: Save draft keeps both steps, and a failed save keeps everything typed and says so,
-   as Schedule's does. Sharing saves what's typed first, so what goes out is what's on screen. The game page holds what's
+/* TRAK-284, TRAK-285, TRAK-286 (Games 2 to 4/8): the Game plan tab. Tactics & analysis (TRAK-328), Line-up and jobs,
+   then Share. One draft, only the coach sees it: Save draft keeps both steps, and a failed save keeps everything typed
+   and says so, as Schedule's does. Sharing saves what's typed first, so what goes out is what's on screen. The game page holds what's
    typed and the step, above its tabs, so a look at Logistics never loses them. TRAK-287: at kick-off the plan locks; the
    saved plan shows read only, Save and Share go, and the alert says what wasn't shared. TRAK-290: Share at… schedules
    it; until then Save draft also rewrites what's waiting, so it goes out as saved (Imad, 29 Oct). TRAK-318 (Imad, 30 Oct):
    before the first share, the bottom bar offers both choices, Save draft and Share now (Share at… on its chevron), with
    the face-to-face tick just above, and says what holds Share now back. */
 
-const STEPS = [{ id: 'opponent', label: 'Opponent and goals' }, { id: 'line-up', label: 'Line-up and jobs' }, { id: 'share', label: 'Share' }]
+const STEPS = [{ id: 'opponent', label: 'Tactics & analysis' }, { id: 'line-up', label: 'Line-up and jobs' }, { id: 'share', label: 'Share' }]
 const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again; everything you typed is still here."
 const SHARE_FAILED = "Couldn't share the plan. Check your connection and try again; everything you typed is still here."
 const SCHEDULE_FAILED = "Couldn't schedule the plan. Check your connection and try again; everything you typed is still here."
@@ -42,7 +42,6 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
   const { user, profile } = useAuth()
   const client = useQueryClient()
   const who = useWhoCanCome(game)
-  const [tried, setTried] = useState(false)
   const [savedNow, setSavedNow] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const [shareProblem, setShareProblem] = useState<string | null>(null)
@@ -60,18 +59,13 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
     setShareProblem(null)
   }
 
-  /** What Save draft and Share write, or why it can't be saved yet. */
+  /** What Save draft and Share write. */
   const draft = () => {
-    setTried(true)
-    if (form.keyPlayers.some(player => numberProblem(player.number))) {
-      return step === 0 ? 'A shirt number goes from 1 to 99. Fix the one marked above, then save.'
-        : 'A key player’s shirt number in Opponent and goals goes from 1 to 99. Fix it there, then save.'
-    }
     // Only children who can still be recorded. Until that's known, every row goes and the database checks each one.
     const eligible = who.isPending || who.error ? null : new Set(who.players.map(player => player.id))
     return { plan: formToPlan(form), players: rowsToSave(game.id, form.players, eligible), version: version.current }
   }
-  const write = async ({ plan, players }: Exclude<ReturnType<typeof draft>, string>) => {
+  const write = async ({ plan, players }: ReturnType<typeof draft>) => {
     const { error } = await supabase.from('game_plans').upsert({ event_id: game.id, ...plan })
     if (error) throw error
     if (players.length === 0) return
@@ -87,7 +81,7 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
   ])
 
   const save = useMutation({
-    mutationFn: async (sent: Exclude<ReturnType<typeof draft>, string>) => {
+    mutationFn: async (sent: ReturnType<typeof draft>) => {
       await write(sent)
       // TRAK-290: a plan that waits for its time goes out as saved, so saving rewrites what's waiting; the time stays.
       if (sharedAt == null || Date.now() >= Date.parse(sharedAt)) return
@@ -101,15 +95,11 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
     },
     onError: () => setProblem(SAVE_FAILED),
   })
-  const submit = () => {
-    const next = draft()
-    if (typeof next === 'string') return setProblem(next)
-    save.mutate(next)
-  }
+  const submit = () => save.mutate(draft())
 
   // TRAK-286: Share now and Share the changes. The database checks the logistics, the tick and kick-off, and says why.
   const share = useMutation({
-    mutationFn: async ({ sent, talked }: { sent: Exclude<ReturnType<typeof draft>, string>; talked: boolean }) => {
+    mutationFn: async ({ sent, talked }: { sent: ReturnType<typeof draft>; talked: boolean }) => {
       await write(sent)
       const { error } = await supabase.rpc('share_game_plan', { p_event_id: game.id, p_talked: talked })
       if (error) throw error
@@ -122,15 +112,13 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
     onError: (error: { code?: string; message?: string }) => setShareProblem(error.code === 'P0001' && error.message ? error.message : SHARE_FAILED),
   })
   const shareNow = (talked: boolean) => {
-    const next = draft()
-    if (typeof next === 'string') return setShareProblem(next)
     setShareProblem(null)
-    share.mutate({ sent: next, talked })
+    share.mutate({ sent: draft(), talked })
   }
 
   // TRAK-290: Share at… and Change time. What's typed is saved first, as for Share now; the database checks the time.
   const schedule = useMutation({
-    mutationFn: async ({ sent, talked, at }: { sent: Exclude<ReturnType<typeof draft>, string>; talked: boolean; at: string }) => {
+    mutationFn: async ({ sent, talked, at }: { sent: ReturnType<typeof draft>; talked: boolean; at: string }) => {
       await write(sent)
       const { error } = await supabase.rpc('schedule_game_plan', { p_event_id: game.id, p_talked: talked, p_at: at })
       if (error) throw error
@@ -142,10 +130,8 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
     onError: (error: { code?: string; message?: string }) => setShareProblem(error.code === 'P0001' && error.message ? error.message : SCHEDULE_FAILED),
   })
   const scheduleAt = (at: string, talked: boolean) => {
-    const next = draft()
-    if (typeof next === 'string') return setShareProblem(next)
     setShareProblem(null)
-    schedule.mutate({ sent: next, talked, at })
+    schedule.mutate({ sent: draft(), talked, at })
   }
 
   const firstShare = step === 2 && !locked && sharedAt == null
@@ -160,7 +146,7 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
           : changes.length ? ` ${changes.length} ${changes.length === 1 ? 'player' : 'players'} didn’t get your last changes.` : ''}`}
       </Alert></div>}
       <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Game plan" />
-      {step === 0 ? <OpponentAndGoals eventId={game.id} opponent={game.opponent ?? null} form={form} onFormChange={change} tried={tried} locked={locked} />
+      {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} form={form} onFormChange={change} locked={locked} />
         : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} />
         : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} coachName={profile?.full_name?.trim() || null}
             onShare={shareNow} onSchedule={scheduleAt} sharing={sharing} problem={shareProblem} talked={talked} locked={locked} />}

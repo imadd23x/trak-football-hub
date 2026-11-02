@@ -102,7 +102,7 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     events([game(soon())])
     renderApp('/coach/matches/g1')
     await user.click(await screen.findByRole('tab', { name: 'Game plan' }))
-    expect(await screen.findByRole('heading', { name: 'Your goals' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Instructions' })).toBeInTheDocument()
     expect(window.location.search).toBe('?tab=plan')
 
     await user.keyboard('{ArrowRight}')

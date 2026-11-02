@@ -64,6 +64,8 @@ describe('TRAK-286: the shared game plan on the player\'s event page', { timeout
     setup()
     renderApp('/player/event/g1')
     const section = await screen.findByRole('region', { name: 'Game plan' })
+    // TRAK-328 (Imad, 2 Nov): the plan's goals are instructions for the player too.
+    expect(within(section).getByRole('heading', { name: 'Instructions' })).toBeInTheDocument()
     expect(within(section).getByText('1 · Win the second ball')).toBeInTheDocument()
     expect(within(section).getByText('Your job')).toBeInTheDocument()
     expect(within(section).getByText('Stay tight to their winger.')).toBeInTheDocument()
@@ -72,7 +74,7 @@ describe('TRAK-286: the shared game plan on the player\'s event page', { timeout
     cleanup()
 
     // The coach's preview of the same plan, from what they typed (ShareStep draws previewOf with this section).
-    const form = planToForm({ strength: 'stronger', their_formation: null, key_players: [], scouting: 'Their 9 is quick.', format: 11,
+    const form = planToForm({ strength: 'stronger', scouting: 'Their 9 is quick.', format: 11,
       formation: '4-4-2', goals: GOALS }, [{ squad_player_id: 'zagorakis', role: 'starter', slot: 4, job: 'Stay tight to their winger.',
       note: 'Second game at right-back. Proud of you.', context: ['out_of_position'], expectation: 'stretch' }])
     render(<GamePlanSection as="player" coachName="Otto Rehhagel" childName="Theodoros" plan={previewOf(form, 'zagorakis', 'player')} />)

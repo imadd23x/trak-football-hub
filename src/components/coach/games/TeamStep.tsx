@@ -2,7 +2,8 @@ import { PLAN_WORKED, type EvaluationForm, type PlanWorked } from '@/lib/games/e
 import { RadioGroup } from '@/components/arc/radio-group/radio-group'
 
 /* TRAK-288 (Games 6/8): the evaluation's Team step (TRAK-282). "Did the plan work?" for each of the plan's goals, as
-   they locked at kick-off. A plan with no goals says so, and the coach moves on. */
+   they locked at kick-off. A plan with no goals says so, and the coach moves on. TRAK-328: the coach reads them as
+   instructions. */
 
 export function TeamStep({ eventId, form, onFormChange, goals }: {
   eventId: string; form: EvaluationForm; onFormChange: (form: EvaluationForm) => void
@@ -15,7 +16,7 @@ export function TeamStep({ eventId, form, onFormChange, goals }: {
     <section aria-labelledby="evaluation-team" className="grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5 tablet:max-w-[640px]">
       <div>
         <h2 id="evaluation-team" className="text-lg font-medium text-ink">Did the plan work?</h2>
-        <p className="mt-1 text-sm text-ink-3">{goals.length ? 'One answer for each of your goals.' : 'Your plan had no goals, so there’s nothing to check here.'}</p>
+        <p className="mt-1 text-sm text-ink-3">{goals.length ? 'One answer for each instruction.' : 'Your plan had no instructions, so there’s nothing to check here.'}</p>
       </div>
       {goals.map((goal, index) => <RadioGroup key={index} label={goal} name={`plan-worked-${eventId}-${index}`} options={PLAN_WORKED}
         value={form.planWorked[index] ?? ''} onValueChange={value => answer(index, value as PlanWorked)} />)}

@@ -130,7 +130,7 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
               ? <div className="pt-4"><LoadError what="the evaluation" onRetry={() => { void evaluation.refetch(); void plan.refetch(); void players.refetch() }}
                   retrying={evaluation.isFetching || plan.isFetching || players.isFetching} /></div>
               : <Evaluation game={row} opensAt={now < whistle ? format(new Date(whistle), 'HH:mm') : null}
-                  plans={lockedPlan.players} planGoals={formToPlan(lockedPlan).goals.map((goal, i) => goal.title || goal.looks_like || `Goal ${i + 1}`)}
+                  plans={lockedPlan.players} planGoals={formToPlan(lockedPlan).goals.map((goal, i) => goal.title || goal.looks_like || `Instruction ${i + 1}`)}
                   form={entered ?? evaluationToForm(evaluation.data ?? { evaluation: null, players: [], notes: [] })} onFormChange={setEntered}
                   step={evaluationStep} onStep={setEvaluationStep} savedAt={evaluation.data?.evaluation?.saved_at ?? null}
                   remindAt={evaluation.data?.evaluation?.remind_at ?? null}

@@ -6,7 +6,7 @@ import { lineUpCounts, previewOf, readers, sharedPlan } from '../share'
    the preview, the same way the database writes the copies (trak_private.game_copies). */
 
 const form = (over: Partial<PlanForm> = {}): PlanForm => ({
-  ...planToForm({ strength: 'stronger', their_formation: null, key_players: [], scouting: 'Their 9 is quick.', format: 11, formation: '4-4-2',
+  ...planToForm({ strength: 'stronger', scouting: 'Their 9 is quick.', format: 11, formation: '4-4-2',
     goals: [{ title: 'Win the second ball', looks_like: 'First to every loose ball.' }, { title: '', looks_like: '' }] }),
   players: {
     zagorakis: { role: 'starter', slot: 4, job: '  Stay tight to their winger. ', note: ' Proud of you. ', context: ['out_of_position'], expectation: 'stretch' },

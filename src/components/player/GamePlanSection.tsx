@@ -5,7 +5,7 @@ import type { SharedPlan } from '@/lib/games/share'
 /* TRAK-286 (Games 4/8): the Game plan on the player's and the parent's event page, once the coach shares it
    (TRAK-282). The player reads the goals and their job, or, left out, the coach's note to them. TRAK-319 (Imad, 30 Oct):
    the parent reads only whether their child starts, is on the bench or isn't in the squad. The coach's Share step
-   previews with this same component. */
+   previews with this same component. TRAK-328 (Imad, 2 Nov): the goals read "Instructions", as on the coach's plan. */
 
 const panel = 'rounded-[18px] border border-line bg-surface px-4 py-3'
 
@@ -30,7 +30,7 @@ export function GamePlanSection({ plan, as, coachName, childName, updated = fals
         {updated && <Badge size="sm" tone="info">Updated</Badge>}
       </div>
       {goals.length > 0 && <div className={panel}>
-        <h3 className="text-[13px] font-medium text-ink">{goals.length === 1 ? 'Our goal' : 'Our goals'}</h3>
+        <h3 className="text-[13px] font-medium text-ink">Instructions</h3>
         <ol className="mt-2 grid gap-2">
           {goals.map((goal, i) => <li key={i} className="grid gap-0.5 text-[13px]">
             <span className="text-ink">{i + 1} · {goal.title || goal.looksLike}</span>

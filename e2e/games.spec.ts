@@ -232,7 +232,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     // The keyboard moves between the panels (Arc tabs).
     await page.getByRole('tab', { name: 'Logistics' }).focus()
     await page.keyboard.press('ArrowRight')
-    await expect(page.getByRole('heading', { name: 'Your goals' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Instructions' })).toBeVisible()
     await page.keyboard.press('ArrowRight')
     // TRAK-288: until full time it says when it opens.
     await expect(page.getByRole('heading', { name: /^Opens at full time, \d\d:\d\d$/ })).toBeVisible()
@@ -242,40 +242,46 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(errors).toEqual([])
   })
 
-  test(`a game's plan at ${width} px: opponent and goals, kept across tabs and saved as a draft`, async ({ page, context }, testInfo) => {
+  test(`a game's plan at ${width} px: tactics and analysis, kept across tabs and saved as a draft`, async ({ page, context }, testInfo) => {
     const plans: Plans = new Map()
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', width, height, plans)
-    await expect(page.getByRole('heading', { name: 'Your goals' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Instructions' })).toBeVisible()
     await expect(page.getByText('Plan not written')).toBeVisible()
-    const goal = page.getByRole('group', { name: 'Goal 1' })
-    await goal.getByLabel('Goal').fill('Win it back in their half')
+    // TRAK-328: no empty instruction until one is added.
+    await expect(page.getByRole('group', { name: /^Instruction \d$/ })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Add instruction' }).click()
+    const goal = page.getByRole('group', { name: 'Instruction 1' })
+    await goal.getByLabel('Instruction', { exact: true }).fill('Win it back in their half')
     await goal.getByLabel('What it looks like').fill('Press when their keeper plays short.')
     await page.getByText('Stronger', { exact: true }).click()
-    await page.getByRole('button', { name: 'Add a key player' }).click()
-    const player = page.getByRole('group', { name: 'Key player 1' })
-    await player.getByLabel('Number').fill('9')
-    await player.getByLabel('Position').fill('Striker')
-    await player.getByLabel('Note').fill('Quick. Runs in behind.')
     await page.getByLabel('What you know about them').fill('Their keeper plays short to the left centre-back.')
+    // TRAK-328: the lock says who sees how strong they are. Arc's tooltip also holds a hidden copy it measures, so the
+    // check is what a screen reader hears: the lock's description.
+    const lock = page.getByRole('button', { name: 'Who sees this' })
+    await lock.click()
+    await expect(page.getByRole('tooltip')).toBeAttached()
+    await expect(lock).toHaveAccessibleDescription('Only you can see this')
+    await lock.click()
+    await expect(page.getByRole('tooltip')).toHaveCount(0)
 
     // A look at Logistics, with the panel's exit animation, keeps every field.
     await page.getByRole('tab', { name: 'Logistics' }).click()
     await expect(page.getByText('Shared with families')).toBeVisible()
     await page.waitForTimeout(600)
     await page.getByRole('tab', { name: 'Game plan' }).click()
-    await expect(goal.getByLabel('Goal')).toHaveValue('Win it back in their half')
-    await expect(player.getByLabel('Number')).toHaveValue('9')
+    await expect(goal.getByLabel('Instruction', { exact: true })).toHaveValue('Win it back in their half')
 
     await page.getByRole('button', { name: 'Save draft' }).click()
     await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
     await expect(page.getByText('Plan not shared')).toBeVisible()
-    expect(plans.get('m-next')).toMatchObject({ strength: 'stronger', key_players: [{ number: 9, position: 'Striker', note: 'Quick. Runs in behind.' }],
+    expect(plans.get('m-next')).toMatchObject({ strength: 'stronger',
       goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }] })
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`game-plan-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     const keyboard = await everyControlByKeyboard(page, '[role="tabpanel"]:not([hidden])', true)
-    expect(keyboard.count).toBeGreaterThan(10)
+    // TRAK-328: their line-up's formation select and Add a key player went with the card.
+    expect(keyboard.count).toBeGreaterThanOrEqual(8)
     expect(keyboard.missed).toEqual([])
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
@@ -504,8 +510,8 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByText(/^Locked at kick-off, \d\d:\d\d$/)).toBeVisible()
     await expect(page.getByText(/It wasn’t shared, so only you saw it\./)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Save draft' })).toHaveCount(0)
-    await expect(page.getByRole('textbox', { name: 'Goal' })).toHaveAttribute('readonly', '')
-    await expect(page.getByRole('button', { name: /Add a goal/ })).toHaveCount(0)
+    await expect(page.getByRole('textbox', { name: 'Instruction' })).toHaveAttribute('readonly', '')
+    await expect(page.getByRole('button', { name: /Add instruction/ })).toHaveCount(0)
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`locked-plan-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)

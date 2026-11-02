@@ -42,8 +42,7 @@ describe('TRAK-220: every Arc panel opened into <body> carries the arc class', (
     // TRAK-263: the coach's player profile editor (foot, nationality, traits). Imad, 23 Oct: Home's Take register and View log.
     // TRAK-294: New drill. TRAK-285: a player's line-up sheet on a phone. TRAK-295: How do you want to plan it?
     // TRAK-296: add or swap a practice. TRAK-298: a training's Who's here and log.
-    // TRAK-330: the line-up's player sheet went; its squad table edits in place.
-    expect(files.sort()).toEqual(['src/components/coach/CoachWeekStrip.tsx',
+    expect(files.sort()).toEqual(['src/components/coach/CoachWeekStrip.tsx', 'src/components/coach/games/LineUpAndJobs.tsx',
       'src/components/coach/squad/PlayerFactsEditor.tsx', 'src/components/coach/training/AddSheet.tsx', 'src/components/coach/training/DrillSheet.tsx',
       'src/components/coach/training/PlanWaySheet.tsx', 'src/components/trak/EventSheet.tsx', 'src/pages/coach/training/CoachTrainingPlan.tsx'])
     for (const file of files) {

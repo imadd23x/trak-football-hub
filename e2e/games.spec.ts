@@ -307,54 +307,82 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   })
 }
 
-// TRAK-330 (Imad, 2 Nov): the pitch fills the column, each slot is an Arc morph select, and the squad table under the
-// pitch takes the job in place (Arc's inline edit). On a phone the table's rows fold into two lines (Arc).
-for (const [width, height] of [[390, 844], [1440, 900]] as const) {
-  test(`a game's line-up at ${width} px: a full-width pitch, a slot's own picker, and the job typed in the squad table`, async ({ page, context }, testInfo) => {
-    const plans: Plans = new Map()
-    const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', width, height, plans)
-    await page.getByRole('button', { name: 'Next: Line-up and jobs' }).click()
-    const card = page.getByRole('region', { name: '4-4-2' })
-    await expect(card).toBeVisible()
-    // The pitch fills its card, and the card the column: only the card's padding is left.
-    const column = (await page.locator('[role="tabpanel"]:not([hidden])').boundingBox())!
-    const pitch = (await card.locator('.aspect-\\[3\\/2\\]').boundingBox())!
-    expect(pitch.width).toBeGreaterThan(column.width - 60)
-    await page.waitForTimeout(400)
-    if (width === 1440) {
-      // TRAK-329: the formations are one dropdown on the pitch, a header per format.
-      await page.getByRole('combobox', { name: 'Formation' }).click()
-      await expect(page.getByRole('group', { name: '9 a side' })).toBeVisible()
-      await page.waitForTimeout(400)
-      await page.screenshot({ path: testInfo.outputPath('formations-1440.png') })
-      await page.keyboard.press('Escape')
-      await expect(page.getByRole('listbox', { name: 'Formation' })).toBeHidden()
-    }
-    // Exact: each slot's picker also holds its search field, "Search slot 2, empty".
-    await page.getByRole('combobox', { name: 'Slot 2, empty', exact: true }).click()
-    await expect(page.getByRole('option', { name: /^Traianos Dellas/ })).toBeVisible()
-    await page.waitForTimeout(400)
-    await page.screenshot({ path: testInfo.outputPath(`slot-picker-${width}.png`) })
-    await page.getByRole('option', { name: /^Traianos Dellas/ }).click()
-    await expect(page.getByRole('combobox', { name: 'Traianos Dellas, slot 2', exact: true })).toBeVisible()
-    const dellas = page.getByRole('table', { name: 'The match squad' }).getByRole('row').filter({ hasText: 'Traianos Dellas' })
-    await expect(dellas).toContainText('Starting · Defender')
-    await dellas.getByRole('button', { name: /^Job · only Traianos sees it/ }).click()
-    await page.getByRole('textbox', { name: 'Job · only Traianos sees it' }).fill('Stay tight to their number 9. Win the first header.')
-    await page.keyboard.press('Enter')
-    await expect(dellas).toContainText('Stay tight to their number 9. Win the first header.')
-    await page.getByRole('button', { name: 'Save draft' }).click()
-    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
-    expect(plans.get('line-up:m-next:sq-4')).toMatchObject({ role: 'starter', slot: 2, job: 'Stay tight to their number 9. Win the first header.' })
-    await page.waitForTimeout(500)
-    await page.screenshot({ path: testInfo.outputPath(`line-up-${width}.png`), fullPage: true })
-    expect(await sideways(page)).toBeLessThanOrEqual(0)
-    const keyboard = await everyControlByKeyboard(page, '[role="tabpanel"]:not([hidden])', true)
-    expect(keyboard.missed).toEqual([])
-    expect(unexpected).toEqual([])
-    expect(errors).toEqual([])
-  })
-}
+// TRAK-285: on a phone the player's sheet is a bottom sheet: it opens, scrolls, and closes with Esc and with a swipe.
+test("a game's line-up at 390 px: the player's sheet opens, scrolls and closes with Esc and with a swipe", async ({ page, context }, testInfo) => {
+  const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', 390, 844)
+  await page.getByRole('button', { name: 'Next: Line-up and jobs' }).click()
+  await expect(page.getByRole('heading', { name: '4-4-2' })).toBeVisible()
+  await page.getByRole('button', { name: 'Slot 1, empty' }).click()
+  const sheet = page.getByRole('dialog')
+  await expect(sheet).toBeVisible()
+  await sheet.getByRole('combobox', { name: 'Who plays here?' }).click()
+  await page.getByRole('option', { name: /^Theodoros Zagorakis/ }).click()
+  await expect(sheet.getByLabel('Job · only Theodoros sees it')).toBeVisible()
+  await sheet.getByLabel('Job · only Theodoros sees it').fill('Command the box on crosses.')
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: testInfo.outputPath('line-up-sheet-390.png') })
+
+  // Expanded with its grabber, it scrolls to the last field.
+  await sheet.getByRole('button', { name: 'Expand sheet' }).click()
+  await page.waitForTimeout(500)
+  const box = (await sheet.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.75)
+  await page.mouse.wheel(0, 1200)
+  await expect(sheet.getByRole('group', { name: 'Expectation · only you' })).toBeInViewport()
+
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Theodoros Zagorakis, slot 1' })).toBeVisible()
+
+  // A swipe down on the sheet's header closes it too.
+  await page.getByRole('button', { name: 'Theodoros Zagorakis, slot 1' }).click()
+  await expect(sheet).toBeVisible()
+  await page.waitForTimeout(500)
+  const title = (await sheet.getByRole('heading', { name: 'Theodoros Zagorakis' }).boundingBox())!
+  await page.mouse.move(title.x + title.width / 2, title.y + title.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(title.x + title.width / 2, title.y + 520, { steps: 12 })
+  await page.mouse.up()
+  await expect(sheet).toBeHidden()
+  expect(await sideways(page)).toBeLessThanOrEqual(0)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
+})
+
+// TRAK-285: on a laptop the sheet is a panel beside the pitch, so the pitch stays in view while the coach edits.
+test("a game's line-up at 1440 px: the pitch stays in view while the panel beside it is edited", async ({ page, context }, testInfo) => {
+  const plans: Plans = new Map()
+  const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', 1440, 900, plans)
+  await page.getByRole('button', { name: 'Next: Line-up and jobs' }).click()
+  const pitch = page.getByRole('region', { name: '4-4-2' })
+  await expect(pitch).toBeVisible()
+  await page.waitForTimeout(400)
+  // TRAK-329: the formations are one dropdown on the pitch, a header per format.
+  await page.getByRole('combobox', { name: 'Formation' }).click()
+  await expect(page.getByRole('group', { name: '9 a side' })).toBeVisible()
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: testInfo.outputPath('formations-1440.png') })
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('listbox', { name: 'Formation' })).toBeHidden()
+  await page.getByRole('button', { name: 'Slot 2, empty' }).click()
+  await page.getByRole('combobox', { name: 'Who plays here?' }).click()
+  await page.getByRole('option', { name: /^Traianos Dellas/ }).click()
+  const job = page.getByLabel('Job · only Traianos sees it')
+  await job.fill('Stay tight to their number 9. Win the first header.')
+  await expect(pitch).toBeInViewport()
+  await expect(job).toBeInViewport()
+  await expect(page.getByRole('progressbar', { name: '1 of 11 starters have a job' })).toBeVisible()
+  await page.getByRole('button', { name: 'Save draft' }).click()
+  await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
+  expect(plans.get('line-up:m-next:sq-4')).toMatchObject({ role: 'starter', slot: 2, job: 'Stay tight to their number 9. Win the first header.' })
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: testInfo.outputPath('line-up-1440.png'), fullPage: true })
+  expect(await sideways(page)).toBeLessThanOrEqual(0)
+  const keyboard = await everyControlByKeyboard(page, '[role="tabpanel"]:not([hidden])', true)
+  expect(keyboard.missed).toEqual([])
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
+})
 
 // TRAK-286, TRAK-332: Review & share. One card reads every part of the plan; its Share plan waits for the face-to-face
 // tick, which the keyboard ticks before it shares.
@@ -370,10 +398,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   test(`a stretch starter at ${width} px: a yellow circle on the pitch, and the key`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', width, height, DRAFT())
     await page.getByRole('button', { name: 'Next: Line-up and jobs' }).click()
-    // TRAK-330: the slot is its picker (a combobox); its circle carries the yellow.
-    const stretch = page.getByRole('combobox', { name: /^(?!Search ).*, slot 4, stretch$/ })
+    const stretch = page.getByRole('button', { name: /, slot 4, stretch$/ })
     await expect(stretch).toBeVisible()
-    expect(await stretch.evaluate(el => getComputedStyle(el.querySelector('[data-stretch]')!).backgroundColor)).toBe('rgb(234, 179, 8)')
+    expect(await stretch.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(234, 179, 8)')
     await expect(page.getByText('Yellow: stretch')).toBeVisible()
     await page.waitForTimeout(400)
     await page.getByRole('region', { name: '4-4-2' }).screenshot({ path: testInfo.outputPath(`stretch-pitch-${width}.png`) })
@@ -505,10 +532,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(keyboard.count).toBeGreaterThan(3)
     expect(keyboard.missed).toEqual([])
     await page.getByRole('button', { name: 'Next: Line-up and jobs' }).click()
-    // TRAK-330: the squad table reads the job, and the slots are pictures, not pickers.
-    const table = page.getByRole('table', { name: 'The match squad' })
-    await expect(table.getByRole('row').filter({ hasText: 'Stay tight to their winger.' })).toBeVisible()
-    await expect(page.getByRole('combobox', { name: /slot \d/i })).toHaveCount(0)
+    await expect(page.getByText('Tap a player to see their job.')).toBeVisible()
     await page.waitForTimeout(400)
     await page.screenshot({ path: testInfo.outputPath(`locked-line-up-${width}.png`) })
     expect(await sideways(page)).toBeLessThanOrEqual(0)

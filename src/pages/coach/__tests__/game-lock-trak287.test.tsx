@@ -109,9 +109,11 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     renderApp('/coach/matches/g1?tab=plan&step=share')
     expect(await screen.findByText(/It wasn’t shared, so only you saw it\./)).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Not shared' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Share now' })).toBeNull()
-    // The preview still shows what it would have said.
-    expect(within(screen.getByRole('region', { name: 'Preview' })).getByText('Stay tight to their winger.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Share plan' })).toBeNull()
+    // TRAK-332: the review still reads every part, with nothing to edit.
+    const review = screen.getByRole('region', { name: 'Review & share' })
+    expect(within(review).getByText('1 of 1 starters have one')).toBeInTheDocument()
+    expect(within(review).queryByRole('button', { name: /^Edit/ })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(await screen.findByRole('heading', { name: '4-4-2' })).toBeInTheDocument()
   })

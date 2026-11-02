@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -8,13 +8,10 @@ import { rowsToSave } from '@/lib/games/lineup'
 import { useWhoCanCome } from './useGames'
 import { TacticsAndAnalysis } from './TacticsAndAnalysis'
 import { LineUpAndJobs } from './LineUpAndJobs'
-import { ShareAt, ShareStep } from './ShareStep'
+import { ShareStep } from './ShareStep'
 import { Lock } from 'lucide-react'
 import { Alert } from '@/components/arc/alert/alert'
 import { Button } from '@/components/arc/button/button'
-import { Checkbox } from '@/components/arc/checkbox/checkbox'
-import { SplitButton } from '@/components/arc/split-button/split-button'
-import { localTodayISO } from '@/lib/event-time'
 import { Stepper } from '@/components/arc/stepper/stepper'
 
 /* TRAK-284, TRAK-285, TRAK-286 (Games 2 to 4/8): the Game plan tab. Tactics & analysis (TRAK-328), Line-up and jobs,
@@ -22,33 +19,33 @@ import { Stepper } from '@/components/arc/stepper/stepper'
    and says so, as Schedule's does. Sharing saves what's typed first, so what goes out is what's on screen. The game page holds what's
    typed and the step, above its tabs, so a look at Logistics never loses them. TRAK-287: at kick-off the plan locks; the
    saved plan shows read only, Save and Share go, and the alert says what wasn't shared. TRAK-290: Share at… schedules
-   it; until then Save draft also rewrites what's waiting, so it goes out as saved (Imad, 29 Oct). TRAK-318 (Imad, 30 Oct):
-   before the first share, the bottom bar offers both choices, Save draft and Share now (Share at… on its chevron), with
-   the face-to-face tick just above, and says what holds Share now back. */
+   it; until then Save draft also rewrites what's waiting, so it goes out as saved (Imad, 29 Oct). TRAK-332 (Imad, 2 Nov):
+   the last step is Review & share, and the face-to-face tick and Share plan (Share at… on its chevron) sit in its card;
+   the bottom bar keeps Back and Save draft (it was TRAK-318's place for Share). */
 
-const STEPS = [{ id: 'opponent', label: 'Tactics & analysis' }, { id: 'line-up', label: 'Line-up and jobs' }, { id: 'share', label: 'Share' }]
+const STEPS = [{ id: 'opponent', label: 'Tactics & analysis' }, { id: 'line-up', label: 'Line-up and jobs' }, { id: 'share', label: 'Review & share' }]
 const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again; everything you typed is still here."
 const SHARE_FAILED = "Couldn't share the plan. Check your connection and try again; everything you typed is still here."
 const SCHEDULE_FAILED = "Couldn't schedule the plan. Check your connection and try again; everything you typed is still here."
 
-export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, changes, lockedAt = null }: {
+export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, changes, lockedAt = null, onEditLogistics, planStartedAt = null }: {
   game: EventRow; form: PlanForm; onFormChange: (form: PlanForm) => void; step: number; onStep: (step: number) => void
   /** TRAK-286: when the plan was first shared, or null; and whose copies a share would change now. */
   sharedAt: string | null; changes: string[]
   /** TRAK-287: kick-off as the header shows it ("11:00") once it has passed; null before. */
   lockedAt?: string | null
+  /** TRAK-332: Review & share's Logistics part pulls up the event's edit sheet (TRAK-331). */
+  onEditLogistics: () => void
+  /** When the plan was first saved, for Review & share's countdown. */
+  planStartedAt?: string | null
 }) {
   const locked = lockedAt !== null
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const client = useQueryClient()
   const who = useWhoCanCome(game)
   const [savedNow, setSavedNow] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const [shareProblem, setShareProblem] = useState<string | null>(null)
-  // TRAK-318: the first share's tick and Share at…, beside Save draft. A new share time closes the picker.
-  const [talked, setTalked] = useState(false)
-  const [picking, setPicking] = useState(false)
-  useEffect(() => setPicking(false), [sharedAt])
   // Every change counts, so a save that lands after more typing doesn't say "Saved" for what it never sent.
   const version = useRef(0)
   const change = (next: PlanForm) => {
@@ -134,8 +131,6 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
     schedule.mutate({ sent: draft(), talked, at })
   }
 
-  const firstShare = step === 2 && !locked && sharedAt == null
-  const holdsBack = !game.published ? 'Publish the match in Logistics first' : !talked ? 'Tick “I’ve talked selection through” to share' : null
   const sharing = share.isPending || schedule.isPending
 
   return (
@@ -148,26 +143,17 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
       <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Game plan" />
       {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} form={form} onFormChange={change} locked={locked} />
         : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} />
-        : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} coachName={profile?.full_name?.trim() || null}
-            onShare={shareNow} onSchedule={scheduleAt} sharing={sharing} problem={shareProblem} talked={talked} locked={locked} />}
-      {firstShare && <div className="arc grid gap-3 rounded-2xl border border-line bg-surface p-4">
-        <Checkbox label="I’ve talked selection through with the players, face to face" checked={talked}
-          description="Before this goes out. Players should hear it from you first." onCheckedChange={value => setTalked(value === true)} />
-        {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta={when => when ? `Schedule for ${when}` : 'Schedule'}
-          busy={sharing} ready={!holdsBack} onSchedule={at => scheduleAt(at, talked)} onCancel={() => setPicking(false)} />}
-      </div>}
+        : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} onShare={shareNow} onSchedule={scheduleAt}
+            sharing={sharing} problem={shareProblem} locked={locked} onStep={onStep} onEditLogistics={onEditLogistics} planStartedAt={planStartedAt} />}
       <div className="flex flex-wrap items-center gap-3">
         {step > 0 && <Button variant="ghost" onClick={() => onStep(step - 1)}>Back</Button>}
         {!locked && <>
-          <span className="ml-auto text-sm text-ink-3">{firstShare && holdsBack ? holdsBack : 'Draft · only you see it'}</span>
+          <span className="ml-auto text-sm text-ink-3">Draft · only you see it</span>
           <Button variant="secondary" loading={save.isPending} onClick={submit}>{savedNow ? 'Saved' : 'Save draft'}</Button>
         </>}
-        {firstShare && <span className="arc"><SplitButton label={share.isPending ? 'Sharing…' : 'Share now'} onClick={() => shareNow(talked)}
-          disabled={!!holdsBack || sharing} actions={[{ label: 'Share at…', onSelect: () => setPicking(true), disabled: !!holdsBack }]} /></span>}
-        {step < 2 && <Button className={locked ? 'ml-auto' : undefined} onClick={() => onStep(step + 1)}>{step === 0 ? 'Next: Line-up and jobs' : 'Next: Share'}</Button>}
+        {step < 2 && <Button className={locked ? 'ml-auto' : undefined} onClick={() => onStep(step + 1)}>{step === 0 ? 'Next: Line-up and jobs' : 'Next: Review & share'}</Button>}
       </div>
       {problem && <p role="alert" className="text-right text-[15px] text-danger">{problem}</p>}
-      {firstShare && shareProblem && <p role="alert" className="text-right text-[15px] text-danger">{shareProblem}</p>}
     </div>
   )
 }

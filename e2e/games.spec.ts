@@ -355,8 +355,8 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   })
 }
 
-// TRAK-286: the Share step. Share now waits for the face-to-face tick; the keyboard ticks it and shares. The preview
-// switches between the player and the parent with the arrow keys, and the parent never reads the note.
+// TRAK-286, TRAK-332: Review & share. One card reads every part of the plan; its Share plan waits for the face-to-face
+// tick, which the keyboard ticks before it shares.
 const DRAFT = (): Plans => new Map([
   ['m-next', { event_id: 'm-next', strength: 'stronger', their_formation: null, key_players: [], scouting: 'Their 9 is quick.', format: 11,
     formation: '4-4-2', goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }],
@@ -383,43 +383,30 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
 }
 
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
-  test(`a game's Share step at ${width} px: the preview by keyboard, then tick and share`, async ({ page, context }, testInfo) => {
+  test(`a game's Review & share at ${width} px: every part at a glance, then tick and share by keyboard`, async ({ page, context }, testInfo) => {
     const plans = DRAFT()
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan&step=share', width, height, plans)
-    const block = page.getByRole('region', { name: 'Share the plan' })
-    await expect(block).toBeVisible()
-    const shareNow = page.getByRole('button', { name: 'Share now', exact: true })
-    await expect(shareNow).toBeDisabled()
-    // TRAK-318: at the bottom of the step, Save draft and Share now sit together, and the bar says what holds Share back.
-    await shareNow.scrollIntoViewIfNeeded()
-    await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toBeInViewport()
-    await expect(shareNow).toBeInViewport()
-    await expect(page.getByText('Tick “I’ve talked selection through” to share')).toBeInViewport()
-    await page.waitForTimeout(400)
-    await page.screenshot({ path: testInfo.outputPath(`share-bar-${width}.png`) })
-    const preview = page.getByRole('region', { name: 'Preview' })
-    // TRAK-319: a starter reads their job; a note to a selected player doesn't go out.
-    await expect(preview.getByText('Stay tight to their winger.')).toBeVisible()
-    await page.waitForTimeout(500)
-    await page.screenshot({ path: testInfo.outputPath(`share-step-${width}.png`), fullPage: true })
+    const card = page.getByRole('region', { name: 'Review & share' })
+    await expect(card).toBeVisible()
+    await expect(card.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(5)
+    const share = card.getByRole('button', { name: 'Share plan', exact: true })
+    await expect(share).toBeDisabled()
+    await expect(card.getByText('Tick “I’ve talked selection through” to share')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Preview' })).toHaveCount(0)
+    await page.waitForTimeout(600)
+    await page.screenshot({ path: testInfo.outputPath(`review-share-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
 
-    await preview.getByRole('button', { name: 'As the player' }).focus()
-    await page.keyboard.press('ArrowRight')
-    await expect(preview.getByText('Theodoros: Starting')).toBeVisible()
-    await expect(preview.getByText('Stay tight to their winger.')).toHaveCount(0)
-    await expect(preview.getByText('Second game at right-back. Proud of you.')).toHaveCount(0)
-
-    const tick = page.getByRole('checkbox', { name: /talked selection through/ })
+    const tick = card.getByRole('checkbox', { name: /talked selection through/ })
     await tick.focus()
     await page.keyboard.press('Space')
     await expect(tick).toBeChecked()
-    await expect(shareNow).toBeEnabled()
-    // Every control, Share now included once it's enabled, takes focus from the keyboard.
+    await expect(share).toBeEnabled()
+    // Every control, Share plan included once it's enabled, takes focus from the keyboard.
     const keyboard = await everyControlByKeyboard(page, '[role="tabpanel"]:not([hidden])', true)
     expect(keyboard.count).toBeGreaterThan(5)
     expect(keyboard.missed).toEqual([])
-    await shareNow.focus()
+    await share.focus()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('region', { name: 'Shared' })).toBeVisible()
     expect(plans.get('share:m-next')).toMatchObject({ talked: true })
@@ -433,18 +420,18 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   })
 }
 
-// TRAK-290: Share at… sits behind Share now's chevron and opens by keyboard; its day and time pickers fit the step. A
+// TRAK-290: Share at… sits behind Share plan's chevron and opens by keyboard; its day and time pickers fit the step. A
 // scheduled plan waits with "Shares …", Change time opens the pickers on the time it has, and every control takes focus
 // from the keyboard. What's sent is the unit tests' (game-share-at-trak290).
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   test(`Share at… at ${width} px: the chevron by keyboard, then a scheduled plan waits`, async ({ page, context }, testInfo) => {
     const plans = DRAFT()
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan&step=share', width, height, plans)
-    const block = page.getByRole('region', { name: 'Share the plan' })
-    await expect(page.getByRole('button', { name: 'Share now more actions' })).toBeDisabled()
+    await expect(page.getByRole('region', { name: 'Review & share' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Share plan more actions' })).toBeDisabled()
     await page.getByRole('checkbox', { name: /talked selection through/ }).focus()
     await page.keyboard.press('Space')
-    await page.getByRole('button', { name: 'Share now more actions' }).focus()
+    await page.getByRole('button', { name: 'Share plan more actions' }).focus()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('menuitem', { name: 'Share at…' })).toBeFocused()
     await page.keyboard.press('Enter')

@@ -1,7 +1,6 @@
-import { Lock, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { LIMITS, MAX_GOALS, STRENGTHS, emptyGoal, type Goal, type PlanForm, type Strength } from '@/lib/games/plan'
 import { LockIcon } from '@/components/icons/LockIcon'
-import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { Input } from '@/components/arc/input/input'
 import { RadioGroup } from '@/components/arc/radio-group/radio-group'
@@ -11,9 +10,20 @@ import { Tooltip } from '@/components/arc/tooltip/tooltip'
 /* TRAK-284 (Games 2/8): plan step 1 (TRAK-282). TRAK-287: locked at kick-off, the fields read only, the picker becomes
    words, and nothing can be added or removed. TRAK-328 (Imad, 2 Nov): the step is Tactics & analysis; the goals are
    Instructions, none shown until the coach adds one; their likely line-up is gone; how strong they are asks only its
-   question, with his lock saying who sees it (Arc tooltip, which a tap opens too). */
+   question, with his lock saying who sees it (Arc tooltip, which a tap opens too). TRAK-337 (Imad, 2 Nov): Scouting has
+   the same lock. */
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
+
+/** Imad's lock at a card's top right: "Only you can see this" on hover, focus or a tap. `what` names it for screen readers. */
+function OnlyYou({ what }: { what: string }) {
+  return <Tooltip content="Only you can see this" openOnTap>
+    <button type="button" aria-label={`Who sees ${what}`}
+      className="-m-1.5 grid size-9 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      <LockIcon size={20} />
+    </button>
+  </Tooltip>
+}
 
 export function TacticsAndAnalysis({ eventId, opponent, form, onFormChange, locked = false }: {
   eventId: string; opponent: string | null; form: PlanForm; onFormChange: (form: PlanForm) => void; locked?: boolean
@@ -50,9 +60,9 @@ export function TacticsAndAnalysis({ eventId, opponent, form, onFormChange, lock
         </section>
 
         <section aria-labelledby="plan-scouting" className={card}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-start justify-between gap-3">
             <h2 id="plan-scouting" className="text-lg font-medium text-ink">Scouting</h2>
-            <Badge size="sm" icon={<Lock size={12} />}>Only you</Badge>
+            <OnlyYou what="scouting" />
           </div>
           <Textarea label="What you know about them" rows={4} value={form.scouting} maxLength={LIMITS.scouting} readOnly={locked}
             onChange={event => change({ scouting: event.target.value })} />
@@ -62,12 +72,7 @@ export function TacticsAndAnalysis({ eventId, opponent, form, onFormChange, lock
         <section aria-labelledby="plan-strength" className={card}>
           <div className="flex items-start justify-between gap-3">
             <h2 id="plan-strength" className="text-lg font-medium text-ink">{strong}</h2>
-            <Tooltip content="Only you can see this" openOnTap>
-              <button type="button" aria-label="Who sees this"
-                className="-m-1.5 grid size-9 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                <LockIcon size={20} />
-              </button>
-            </Tooltip>
+            <OnlyYou what="how strong they are" />
           </div>
           {locked ? <p className="text-sm text-ink">{STRENGTHS.find(option => option.value === form.strength)?.label ?? 'Not set'}</p>
             : <RadioGroup label={strong} hideLabel name={`strength-${eventId}`} options={STRENGTHS} value={form.strength ?? ''}

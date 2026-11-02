@@ -275,7 +275,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.getByLabel('What you know about them').fill('Their keeper plays short to the left centre-back.')
     // TRAK-328: the lock says who sees how strong they are. Arc's tooltip also holds a hidden copy it measures, so the
     // check is what a screen reader hears: the lock's description.
-    const lock = page.getByRole('button', { name: 'Who sees this' })
+    const lock = page.getByRole('button', { name: 'Who sees how strong they are' })
     await lock.click()
     await expect(page.getByRole('tooltip')).toBeAttached()
     await expect(lock).toHaveAccessibleDescription('Only you can see this')

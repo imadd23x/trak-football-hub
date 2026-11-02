@@ -125,21 +125,22 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     expect(shared).not.toHaveTextContent('Edits stay with you')
   })
 
-  it('the player\'s sheet only shows: the job reads only, context and expectation are words, nothing moves', async () => {
+  it('the squad table only shows (TRAK-330): the job, context and expectation are words, the slots are pictures, nothing moves', async () => {
     const user = userEvent.setup()
     setup({ kickOffIn: -MINUTE })
     renderApp('/coach/matches/g1?tab=plan')
     await user.click(await screen.findByRole('button', { name: 'Next: Line-up and jobs' }))
-    await user.click(await screen.findByRole('button', { name: /^Theodoros Zagorakis, slot 4/ }))
-    const sheet = await screen.findByRole('complementary', { name: 'Theodoros Zagorakis' })
-    expect(within(sheet).getByRole('textbox', { name: /^Job · / })).toHaveAttribute('readonly')
-    expect(within(sheet).getByText('Out of position')).toBeInTheDocument()
-    expect(within(sheet).getByText('Stretch')).toBeInTheDocument()
-    expect(within(sheet).queryByRole('button', { name: 'Take off the pitch' })).toBeNull()
-    expect(within(sheet).queryByRole('group', { name: /Expectation/ })).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Slot 1, empty' }))
-    expect(await screen.findByText('Nobody was placed here before kick-off.')).toBeInTheDocument()
-    expect(screen.queryByRole('combobox', { name: 'Who plays here?' })).toBeNull()
+    const table = await screen.findByRole('table', { name: 'The match squad' })
+    const row = within(table).getAllByRole('row').find(each => each.textContent?.includes('Theodoros Zagorakis'))!
+    expect(row).toHaveTextContent('Starting · Defender')
+    expect(row).toHaveTextContent('Stay tight to their winger.')
+    expect(row).toHaveTextContent('Out of position')
+    expect(row).toHaveTextContent('Stretch')
+    expect(within(row).queryByRole('button')).toBeNull()
+    expect(within(row).queryByRole('textbox')).toBeNull()
+    expect(screen.getByRole('img', { name: 'Theodoros Zagorakis, slot 4, stretch' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Slot 1, empty' })).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /slot \d/i })).toBeNull()
   })
 
   it('Home\'s plan card closes at kick-off, with Home open', async () => {

@@ -60,6 +60,12 @@ export interface MorphSelectProps {
   name?: string;
   disabled?: boolean;
   className?: string;
+  /** Trak (TRAK-330): what the closed trigger shows in place of the chosen label, such as a pitch slot's shirt number.
+   *  The list still ticks the chosen option, and the label doesn't fly into the trigger. */
+  trigger?: ReactNode;
+  /** Trak (TRAK-330): a round trigger as tall as the control, with no chevron and no surface of its own until it opens:
+   *  the trigger content draws itself, as a pitch slot does. */
+  compact?: boolean;
 }
 
 type Section = { key: string; label?: string; options: MorphSelectOption[] };
@@ -122,7 +128,7 @@ const triggerWidth = (node: HTMLElement) => {
 };
 
 export function MorphSelect({ label, hideLabel = false, items, value, defaultValue = null, onValueChange, placeholder = "Select", searchable = "auto", searchPlaceholder,
-  panelWidth = 272, maxListHeight = 296, align = "start", name, disabled = false, className }: MorphSelectProps) {
+  panelWidth = 272, maxListHeight = 296, align = "start", name, disabled = false, className, trigger, compact = false }: MorphSelectProps) {
   const reduced = useReducedFlag();
   const uid = useId();
   const labelId = `${uid}-label`, listId = `${uid}-list`, optionId = (index: number) => `${uid}-option-${index}`;
@@ -273,7 +279,7 @@ export function MorphSelect({ label, hideLabel = false, items, value, defaultVal
       let fly: Change["fly"] = null;
       const slot = slotRef.current;
       const part = source?.querySelector<HTMLElement>("[data-part='value']");
-      if (!reduced && part && slot) {
+      if (!reduced && part && slot && trigger === undefined) {
         const from = part.getBoundingClientRect(), to = slot.getBoundingClientRect();
         fly = { x: from.left - to.left, y: from.top + from.height / 2 - (to.top + to.height / 2) };
       }
@@ -366,7 +372,7 @@ export function MorphSelect({ label, hideLabel = false, items, value, defaultVal
     setAnnouncement(text ? count ? `${count} ${count === 1 ? "option" : "options"}` : "No matches" : "");
   };
 
-  const renderValue = (option: MorphSelectOption | undefined) => option
+  const renderValue = (option: MorphSelectOption | undefined) => trigger !== undefined ? trigger : option
     ? <>{option.icon && <span className={styles.icon} aria-hidden="true">{option.icon}</span>}<span className={styles.valueText}>{option.label}</span></>
     : <span className={styles.placeholder}>{placeholder}</span>;
 
@@ -375,7 +381,7 @@ export function MorphSelect({ label, hideLabel = false, items, value, defaultVal
   const changeForLayer: Change = change.value === selected ? change : { ...change, fly: null };
   const rootStyle = { "--ms-panel-w": `${panelWidth}px`, "--ms-list-max": `${maxListHeight}px` } as CSSProperties;
 
-  return <div ref={rootRef} className={[styles.root, className].filter(Boolean).join(" ")} style={rootStyle} data-open={open || undefined} data-align={align} data-disabled={disabled || undefined} onBlur={onBlur}>
+  return <div ref={rootRef} className={[styles.root, className].filter(Boolean).join(" ")} style={rootStyle} data-open={open || undefined} data-align={align} data-disabled={disabled || undefined} data-compact={compact || undefined} onBlur={onBlur}>
     <span id={labelId} className={hideLabel ? styles.srOnly : styles.label}>{label}</span>
 
     <motion.div className={styles.anchor} style={{ width: anchorW }}>

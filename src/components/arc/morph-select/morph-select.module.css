@@ -84,3 +84,11 @@
 @media (prefers-contrast: more) {
   .shape::after { border-color: var(--border-strong); }
 }
+/* Trak (TRAK-330): compact, a round trigger for a pitch slot. Closed, the surface is clear and the trigger content draws the
+   slot; open, it is the raised list as usual. */
+.root[data-compact] { --ms-h: 36px; }
+.root[data-compact] .trigger { padding: 0; justify-content: center; }
+.root[data-compact] .layer { justify-content: center; }
+.root[data-compact] .chevron { display: none; }
+.root[data-compact]:not([data-open]) .shape { background: transparent; box-shadow: none; }
+.root[data-compact]:not([data-open]) .shape::after { border-color: transparent; }

@@ -16,7 +16,7 @@ import { ShareEventButton, ShareIcon } from '@/components/coach/ShareEventButton
 import { Button } from '@/components/arc/button/button'
 import { WeekPicker, type WeekDay } from '@/components/arc/blocks/availability-picker/week-picker'
 import { useCoachSquad } from '@/lib/coach-squad'
-import { STATE, actionLink } from '@/lib/games/loop'
+import { MatchAction } from '@/components/coach/games/MatchAction'
 import { coachWeek, squadName, type WeekItem, type WeekSession } from '@/lib/coach-week'
 import { loadWeek } from '@/lib/coach-week-load'
 import { publishEvent } from '@/lib/event-publish'
@@ -172,9 +172,9 @@ export function NextStep({ item, coachId, roster, onChanged }: {
     {close => <TakeRegister eventId={row.id} coachId={coachId} sessionId={null} squad={row.squad ?? null} onSaved={() => { close(); onChanged() }} />}
   </StepSheet>
   // TRAK-288: where Games is on, the match's evaluation on its game page: Evaluate, then Publish once a draft is saved.
+  // TRAK-333: a split button, as every match action, with View plan and Logistics behind its chevron.
   if ((item.step === 'evaluate' || item.step === 'publish-evaluation') && row) {
-    const action = STATE[item.step === 'evaluate' ? 'fullTime' : 'evaluationDraft'].action!
-    return go(action.label, () => navigate(actionLink(row.id, action)))
+    return <MatchAction state={item.step === 'evaluate' ? 'fullTime' : 'evaluationDraft'} eventId={row.id} />
   }
   // TRAK-289: a published evaluation is final; it's read on the game page, never in the old log's editor.
   if (item.step === 'review' && row) return go('View review', () => navigate(`/coach/matches/${row.id}?tab=evaluation`))

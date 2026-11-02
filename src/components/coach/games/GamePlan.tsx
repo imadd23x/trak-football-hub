@@ -83,7 +83,7 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
       // TRAK-290: a plan that waits for its time goes out as saved, so saving rewrites what's waiting; the time stays.
       if (sharedAt == null || Date.now() >= Date.parse(sharedAt)) return
       const { error } = await supabase.rpc('schedule_game_plan', { p_event_id: game.id })
-      // It went out while this saved: the edits then wait for Share the changes, as on any shared plan.
+      // It went out while this saved: the edits then wait for Share changes, as on any shared plan.
       if (error && error.code !== 'P0001') throw error
     },
     onSuccess: (_, sent) => {
@@ -94,7 +94,7 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
   })
   const submit = () => save.mutate(draft())
 
-  // TRAK-286: Share now and Share the changes. The database checks the logistics, the tick and kick-off, and says why.
+  // TRAK-286: Share plan, Share now and Share changes. The database checks the logistics, the tick and kick-off, and says why.
   const share = useMutation({
     mutationFn: async ({ sent, talked }: { sent: ReturnType<typeof draft>; talked: boolean }) => {
       await write(sent)

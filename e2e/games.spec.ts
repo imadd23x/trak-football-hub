@@ -204,8 +204,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const next = page.getByRole('region', { name: 'Next match' })
     await expect(next.getByText('vs Parkview Athletic U16')).toBeVisible()
     await expect(next.getByText('Plan not shared')).toBeVisible()
-    // TRAK-286: with a draft, sharing it is next.
-    await expect(next.getByRole('button', { name: 'Share the plan' })).toBeVisible()
+    // TRAK-286: with a draft, sharing it is next. TRAK-333: on a split button, with the match's other pages behind it.
+    await expect(next.getByRole('button', { name: 'Share plan', exact: true })).toBeVisible()
+    await expect(next.getByRole('button', { name: 'Share plan more actions' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Open drafts' }).getByRole('button', { name: 'Open the plan, vs Parkview Athletic U16' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Your matches' }).getByRole('link')).toHaveCount(4)
     await page.waitForTimeout(500)

@@ -6,7 +6,7 @@ import { format } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { COMPETITIONS } from '@/lib/coach-events'
-import { actionLink, type GameAction, gameStatus, LOOP_STEPS, orderGames } from '@/lib/games/loop'
+import { actionLink, type GameAction, type GameState, type PlanProgress, gameState, gameStatus, orderGames } from '@/lib/games/loop'
 import { gameTitle, gameWhen, useGameEvaluations, useGamePlanChanges, useGamePlans, useGameShares, useGames, useScorers, type Game } from '@/components/coach/games/useGames'
 import { seasonStart } from '@/lib/games/scorers'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
@@ -16,7 +16,7 @@ import { Button } from '@/components/arc/button/button'
 import { Countdown } from '@/components/arc/countdown/countdown'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { ScrollArea } from '@/components/arc/scroll-area/scroll-area'
-import { Stepper } from '@/components/arc/stepper/stepper'
+import { MatchAction } from '@/components/coach/games/MatchAction'
 
 /* TRAK-283 (Games 1/8): Games home. The next game with where it is in its loop and its one next action, the open
    drafts, and every match of the squad in view. Cards follow Home's Needs you pattern (Imad, 27 Oct). TRAK-320 (Imad,
@@ -24,7 +24,6 @@ import { Stepper } from '@/components/arc/stepper/stepper'
    TRAK-321: the season's top scorers and assists for the squad in view, from those evaluations. TRAK-322 (Imad, 30 Oct):
    compact, and the screen used: on a laptop the match rows and the scorers sit side by side in TRAK-307's one column. */
 
-const STEPS = LOOP_STEPS.map(label => ({ id: label, label }))
 /** Schedule's quick hand-over (TRAK-182 part 8): New event, on its first step, with Match picked. */
 const ADD_MATCH = { quickEvent: { kind: 'match' } }
 const details = (game: Game, time: string | null) => [
@@ -50,9 +49,9 @@ export default function CoachGames() {
   // TRAK-286: edits since sharing, for shared matches still to kick off. A failed read shows them as shared.
   const changes = useGamePlanChanges(ordered.filter(game => shares.data?.has(game.id) && now < Date.parse(game.starts_at)).map(game => game.id))
   const open = (game: Game, action: Omit<GameAction, 'label'>) => navigate(actionLink(game.id, action))
-  const stateOf = (game: Game) => gameStatus(game, now,
-    { drafted: plans.data?.has(game.id), shared: shares.data?.has(game.id), sharedAt: shares.data?.get(game.id), changes: changes.data?.get(game.id)?.length,
-      evaluated: evaluations.data?.has(game.id), published: !!evaluations.data?.get(game.id)?.publishedAt })
+  const progress = (game: Game): PlanProgress => ({ drafted: plans.data?.has(game.id), shared: shares.data?.has(game.id), sharedAt: shares.data?.get(game.id),
+    changes: changes.data?.get(game.id)?.length, evaluated: evaluations.data?.has(game.id), published: !!evaluations.data?.get(game.id)?.publishedAt })
+  const stateOf = (game: Game) => gameStatus(game, now, progress(game))
   // TRAK-284: a plan draft stays open until it's shared (TRAK-286) or its match kicks off and locks it (TRAK-287).
   // TRAK-288: an evaluation draft stays open until it's published (TRAK-289).
   const drafts = [
@@ -87,7 +86,7 @@ export default function CoachGames() {
             </div>
           ) : <>
             <div className="grid gap-4 laptop:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-              {next ? <NextGame game={next} state={stateOf(next)} onOpen={open} onKickOff={() => setNow(Date.now())} /> : (
+              {next ? <NextGame game={next} state={stateOf(next)} step={gameState(next, now, progress(next))} onKickOff={() => setNow(Date.now())} /> : (
                 <section aria-labelledby="next-game" className="rounded-2xl border border-line bg-surface p-5">
                   <h2 id="next-game" className="text-lg font-medium text-ink">Next match</h2>
                   <p className="mt-2 text-sm text-ink-2">No match coming up.</p>
@@ -147,9 +146,10 @@ export default function CoachGames() {
   )
 }
 
-/** The next match: its loop, the one next action and the countdown to kick-off. A static panel, not a link. */
-function NextGame({ game, state, onOpen, onKickOff }: {
-  game: Game; state: ReturnType<typeof gameStatus>; onOpen: (game: Game, action: Omit<GameAction, 'label'>) => void; onKickOff: () => void
+/** The next match: its next action as a split button (TRAK-333) and the countdown to kick-off. A static panel, not a
+ *  link. TRAK-333 (Imad, 2 Nov): no loop stepper; it served no purpose here. */
+function NextGame({ game, state, step, onKickOff }: {
+  game: Game; state: ReturnType<typeof gameStatus>; step: GameState; onKickOff: () => void
 }) {
   const { day, time, academy } = gameWhen(game)
   return (
@@ -163,11 +163,8 @@ function NextGame({ game, state, onOpen, onKickOff }: {
         <p className="text-sm text-ink-2">{[day, details(game, time)].filter(Boolean).join(' · ')}</p>
         {academy && <p className="text-sm text-ink-3">{academy}</p>}
       </div>
-      <Stepper steps={STEPS} current={state.step} label="Where this match is" />
       <div className="flex flex-wrap items-center gap-3">
-        {state.action && <Button size="lg" onClick={() => onOpen(game, state.action!)}>{state.action.label}</Button>}
-        {state.step > 0 && <Link to={`/coach/matches/${game.id}?tab=logistics`}
-          className="text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">Logistics</Link>}
+        <MatchAction state={step} eventId={game.id} />
         <Countdown variant="compact" units={['days', 'hours', 'minutes']} target={game.starts_at}
           label="Kick-off in" completeLabel="Locked" onComplete={onKickOff} className="ml-auto" />
       </div>

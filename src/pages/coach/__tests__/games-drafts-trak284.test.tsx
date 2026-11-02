@@ -4,7 +4,7 @@
  * the plan". Neither shows with the games switch off. Test people are named after footballers.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
@@ -85,7 +85,7 @@ describe('TRAK-284: plan drafts on Games home and in Needs you', { timeout: 30_0
     expect(window.location.pathname + window.location.search).toBe('/coach/matches/g1?tab=plan')
   })
 
-  it('Needs you lists a shared match kicking off within 7 days: "Plan not shared · Write the plan"', async () => {
+  it('Needs you lists a shared match kicking off within 7 days: "Plan not shared · Write plan"', async () => {
     server.use(table('coach_calendar_events', [
       game('g1', 'Parkview Athletic', 3), game('g2', 'Riverside Rovers', 8), game('g3', 'Harbour Town', 2, { published: false }),
     ]))
@@ -93,7 +93,9 @@ describe('TRAK-284: plan drafts on Games home and in Needs you', { timeout: 30_0
     const needs = await screen.findByRole('region', { name: /Needs you/ }, { timeout: 5000 })
     const card = (await within(needs).findByText('vs Parkview Athletic')).closest('li')!
     expect(within(card).getByText('Plan not shared')).toBeInTheDocument()
-    expect(within(card).getByRole('link', { name: 'Write the plan' })).toHaveAttribute('href', '/coach/matches/g1?tab=plan')
+    // TRAK-333: a split button, as every match action.
+    await userEvent.click(within(card).getByRole('button', { name: 'Write plan' }))
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/matches/g1?tab=plan'))
     expect(within(needs).queryByText('vs Riverside Rovers')).toBeNull()
     expect(within(needs).queryByText('vs Harbour Town')).toBeNull()
   })

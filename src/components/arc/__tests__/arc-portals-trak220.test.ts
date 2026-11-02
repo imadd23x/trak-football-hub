@@ -19,6 +19,8 @@ describe('TRAK-220: every Arc panel opened into <body> carries the arc class', (
     ['card/card.tsx', /className=\{\["arc", className, styles\.panel\]/],
     // TRAK-272: Arc's Button group's More menu.
     ['button-group/button-group.tsx', /<DropdownPrimitive\.Content className=\{`arc \$\{styles\.menu\}`\}/],
+    // TRAK-328: Arc's tooltip (the lock on "How strong are they?").
+    ['tooltip/tooltip.tsx', /<TooltipPrimitive\.Content className=\{`arc \$\{styles\.tooltip\}`\}/],
   ])('%s', (file, pattern) => {
     expect(source(file)).toMatch(pattern)
   })
@@ -29,7 +31,7 @@ describe('TRAK-220: every Arc panel opened into <body> carries the arc class', (
       .filter(file => /\.Portal\b/.test(source(file)))
     // The bottom sheet takes its class from callers; they pass "arc" (EventSheet).
     expect(portalling.sort()).toEqual(['bottom-sheet/bottom-sheet.tsx', 'button-group/button-group.tsx', 'card/card.tsx', 'dropdown-menu/dropdown-menu.tsx',
-      'notification-center/notification-center.tsx', 'select/select.tsx', 'split-button/split-button.tsx'])
+      'notification-center/notification-center.tsx', 'select/select.tsx', 'split-button/split-button.tsx', 'tooltip/tooltip.tsx'])
   })
 
   it('every bottom sheet in the app passes className="arc"', () => {

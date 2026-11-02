@@ -33,7 +33,7 @@ export function PublishStep({ eventId, form, listed, plans, goals, coachName, as
 }) {
   const [choices, setChoices] = useState<PublishChoices>({ competition: '', homeAway: '' })
   const summary = publishSummary(form, listed)
-  const blocked = !planAnswered(form, goals) ? 'Answer “Did the plan work?” for every goal first.'
+  const blocked = !planAnswered(form, goals) ? 'Answer “Did the plan work?” for every instruction first.'
     : askCompetition && !choices.competition ? 'Pick the competition first.'
     : askHomeAway && !choices.homeAway ? 'Say whether it was home or away first.'
     : summary.players === 0 ? 'Tick who played in Result first.' : null

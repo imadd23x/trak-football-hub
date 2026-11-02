@@ -104,11 +104,13 @@ describe('TRAK-289: publishing the evaluation', { timeout: 30_000 }, () => {
     backend()
     renderApp('/coach/matches/g1?tab=evaluation')
     await user.click(await screen.findByRole('button', { name: 'Next: Team' }))
+    // TRAK-328 (Imad, 2 Nov): the plan's goals are instructions, here too.
+    expect(screen.getByText('One answer for each instruction.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next: Players' }))
     await user.click(screen.getByRole('button', { name: 'Next: Publish' }))
     expect(screen.getByText('2 players · 1 changed from “Met” · 1 note')).toBeInTheDocument()
     expect(publishButton()).toBeDisabled()
-    expect(screen.getByText('Answer “Did the plan work?” for every goal first.')).toBeInTheDocument()
+    expect(screen.getByText('Answer “Did the plan work?” for every instruction first.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Back' }))
     await user.click(screen.getByRole('button', { name: 'Back' }))

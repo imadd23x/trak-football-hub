@@ -81,7 +81,7 @@ describe('TRAK-286: the shared game plan on a guardian\'s event page', () => {
     const page = section.textContent
     cleanup()
 
-    const form = planToForm({ strength: 'stronger', their_formation: null, key_players: [], scouting: '', format: 11, formation: '4-4-2',
+    const form = planToForm({ strength: 'stronger', scouting: '', format: 11, formation: '4-4-2',
       goals: [{ title: 'Win the second ball', looks_like: '' }] }, [{ squad_player_id: 'zagorakis', role: 'starter', slot: 4,
       job: 'Stay tight to their winger.', note: 'Second game at right-back. Proud of you.', context: [], expectation: 'usual' }])
     render(<GamePlanSection as="parent" coachName="Otto Rehhagel" childName="Theodoros" plan={previewOf(form, 'zagorakis', 'parent')} />)

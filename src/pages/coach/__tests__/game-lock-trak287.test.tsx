@@ -85,10 +85,10 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     setup({ kickOffIn: 30_000 })
     renderApp('/coach/matches/g1?tab=plan')
-    const goal = await screen.findByRole('textbox', { name: 'Goal' })
+    const goal = await screen.findByRole('textbox', { name: 'Instruction' })
     expect(goal).not.toHaveAttribute('readonly')
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Strength' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /^How strong are/ })).toBeInTheDocument()
 
     await act(async () => { await vi.advanceTimersByTimeAsync(31_000) })
 
@@ -96,12 +96,11 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     expect(screen.getByRole('timer', { name: 'Kick-off in' })).toHaveTextContent('Locked')
     expect(screen.getByText(/Jobs and expectations are fixed, so the evaluation reads against what you expected before the game\./)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull()
-    expect(screen.getByRole('textbox', { name: 'Goal' })).toHaveAttribute('readonly')
-    expect(screen.queryByRole('button', { name: /Add a goal|Add a key player/ })).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Instruction' })).toHaveAttribute('readonly')
+    expect(screen.queryByRole('button', { name: /Add instruction|Remove instruction/ })).toBeNull()
     // The pickers show their choice in words.
-    expect(screen.queryByRole('group', { name: 'Strength' })).toBeNull()
+    expect(screen.queryByRole('group', { name: /^How strong are/ })).toBeNull()
     expect(screen.getByText('Similar')).toBeInTheDocument()
-    expect(screen.getByText('4-3-3')).toBeInTheDocument()
   })
 
   it('locked as a draft, the alert says only the coach saw it, and Share is gone', async () => {

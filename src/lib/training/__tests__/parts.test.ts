@@ -56,6 +56,13 @@ describe('your usual and the three drills a part shows', () => {
     expect(usualFor('own', candidates('own', []), usage)).toBeNull()
   })
 
+  it('a drill written in a plan matches the same-named one in My drills, so it never shows twice', () => {
+    const list = candidates('own', [mine('d-1', 'Pressing on the trigger', null)])
+    const written = { ...list[0], source: 'own' as const, drill_id: null }
+    const shown = shownFor('own', written, list, usageOf([]))
+    expect(shown.filter(d => d.name === 'Pressing on the trigger')).toHaveLength(1)
+  })
+
   it('the coach’s own drills sit on their part’s shelf, first', () => {
     const list = candidates('rondo', [mine('d-1', 'Our rondo', 'rondo'), mine('d-2', 'Our game', 'game')])
     expect(list[0]).toMatchObject({ source: 'drill', drill_id: 'd-1', name: 'Our rondo' })

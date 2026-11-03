@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import { Reorder, useDragControls } from 'motion/react'
-import { Check, GripVertical, Plus, Search, Users, X } from 'lucide-react'
-import { fitLine, partColour, playersLine, totalMinutes, type Part, type PlanDrill } from '@/lib/training/parts'
+import { Check, GripVertical, Pencil, Plus, Search, Users, X } from 'lucide-react'
+import { fitLine, partColour, partLine, playersLine, totalMinutes, type Part, type PlanDrill } from '@/lib/training/parts'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 
@@ -102,7 +102,7 @@ function SessionRow({ part, index, count, state, onOpen, onMove, onRemove }: {
         <span className="flex items-center gap-1.5 truncate text-sm font-medium text-ink">
           <span aria-hidden="true" className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: partColour(index, count) }} />
           <span className="truncate">{part.name}</span></span>
-        <span className="truncate text-[13px] text-ink-3">{part.drill?.name ?? 'No drill yet'}</span>
+        {part.drill?.name !== part.name && <span className="truncate text-[13px] text-ink-3">{part.drill?.name ?? 'No drill yet'}</span>}
       </span>
       <span className="flex-none text-[13px] text-ink-2">{part.minutes} min</span>
     </button>
@@ -110,4 +110,32 @@ function SessionRow({ part, index, count, state, onOpen, onMove, onRemove }: {
       className="inline-flex h-11 w-9 flex-none items-center justify-center rounded-lg text-ink-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
       <X aria-hidden size={16} /></button>
   </Reorder.Item>
+}
+
+
+/** The plan as a list: each part's minutes, name, drill and players, with Edit (or Pick a drill) and ×. TRAK-341: the
+ *  planner's Review step and a saved plan's Review page show the same list. */
+export function PlanRows({ parts, onEdit, onRemove, busy = false }: {
+  parts: Part[]; onEdit: (index: number) => void; onRemove: (index: number) => void; busy?: boolean
+}) {
+  if (!parts.length) return <p className="py-3 text-[15px] text-ink-2">No parts in this plan yet. Add one below.</p>
+  return <ol aria-label="The plan" className="grid divide-y divide-line">
+    {parts.map((part, i) => {
+      const players = part.drill ? playersLine(part.drill) : null
+      return <li key={part.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
+        <span className="w-10 flex-none text-center text-base font-medium text-ink">{part.minutes}<span className="block text-[11px] font-normal text-ink-3">min</span></span>
+        <span className="grid min-w-0 flex-[1_1_14rem] gap-0.5">
+          <span className="flex items-center gap-1.5 text-[13px] text-ink-3">
+            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: partColour(i, parts.length) }} />{partLine(part, i)}</span>
+          <span className={`text-[15px] font-medium break-words ${part.drill ? 'text-ink' : 'text-ink-3'}`}>{part.drill?.name ?? 'No drill yet'}</span>
+          {players && <span className="text-[13px] text-ink-3">{players}</span>}
+        </span>
+        <span className="flex flex-none gap-1">
+          <Button size="sm" variant="ghost" disabled={busy} aria-label={`${part.drill ? 'Edit' : 'Pick a drill for'} ${part.name}`} onClick={() => onEdit(i)}>
+            <Pencil aria-hidden size={14} />{part.drill ? 'Edit' : 'Pick a drill'}</Button>
+          <Button size="sm" variant="ghost" disabled={busy} aria-label={`Remove ${part.name}`} onClick={() => onRemove(i)}><X aria-hidden size={16} /></Button>
+        </span>
+      </li>
+    })}
+  </ol>
 }

@@ -303,7 +303,8 @@ test("a laptop's breadcrumb names the page, one title after several moves", asyn
     await side.getByRole('button', { name, exact: true }).click()
     await page.waitForTimeout(300)
   }
-  await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveText(/^Your academy\s*\/?\s*Home$/)
+  // TRAK-347 (Imad, 3 Nov): the club is in the sidebar, not in the top bar's trail.
+  await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveText(/^Home$/)
   expect(errors).toEqual([])
 })
 

@@ -10,10 +10,13 @@ import { placeOf, tabOf } from '@/lib/coach-places'
    from Needs you, "Matches › vs Mirdif Rangers" from Matches. Opened from a link or after a refresh, it starts at the
    page's own nav row. The frame remembers each history entry's trail, and each page's name, for as long as the visit
    lasts; a page's own tabs and steps (?tab=, ?step=) are the same page. A crumb for a page this visit came through goes
-   back to it, as Back did, so it opens as the coach left it (its filters, where they were on it). */
+   back to it, as Back did, so it opens as the coach left it (its filters, where they were on it). TRAK-347 (Imad, 3 Nov):
+   on a laptop the frame's top bar is the trail ("Matches / vs Mirdif Rangers"), so the page shows none of its own. */
 
 /** `at`: the crumb's place in the browser's history, when this visit came through it. */
 export type Crumb = { label: string; href: string; at?: number }
+/** A page's trail for the laptop's top bar: the crumbs before it, then its own name. */
+export type Trail = { crumbs: Crumb[]; current: string }
 
 /** Where the current entry sits in the browser's history (React Router keeps it there). */
 const historyIndex = () => (window.history.state as { idx?: number } | null)?.idx
@@ -23,12 +26,15 @@ interface Trails {
   behind: (key: string) => Crumb[] | undefined
   /** A page's own name, and the trail it showed, for the trails of the pages it opens. */
   name: (key: string, label: string, shown: Crumb[]) => void
+  /** On a laptop, hands a page's trail to the frame's top bar (null when it leaves); null on a phone, where the page
+   *  shows its trail itself. */
+  topBar: ((trail: Trail | null) => void) | null
 }
 const TrailContext = createContext<Trails | null>(null)
 
 /** In the coach's frame: follows every move between pages, so each page knows the way it came. `tabs` are the nav
  *  rows' paths; a nav row starts a fresh trail. */
-export function CoachTrailProvider({ tabs, children }: { tabs: string[]; children: ReactNode }) {
+export function CoachTrailProvider({ tabs, topBar = null, children }: { tabs: string[]; topBar?: Trails['topBar']; children: ReactNode }) {
   const location = useLocation()
   const type = useNavigationType()
   const memory = useRef({ trails: new Map<string, Crumb[] | undefined>(), names: new Map<string, string>(), at: new Map<string, number | undefined>(), last: null as Location | null })
@@ -61,7 +67,8 @@ export function CoachTrailProvider({ tabs, children }: { tabs: string[]; childre
       // A page that started its own trail (a link, a refresh) passes on the one it showed, its parents with it.
       if (memory.current.trails.get(key) === undefined) memory.current.trails.set(key, shown)
     },
-  }), [])
+    topBar,
+  }), [topBar])
   return <TrailContext.Provider value={value}>{children}</TrailContext.Provider>
 }
 
@@ -70,26 +77,43 @@ function RouterLink({ href, ...props }: ArcLinkProps) {
   return <Link to={href} {...props} />
 }
 
-/** The trail at the top of a page: where the coach came from, then `current`, this page's name. `parents` are the pages
- *  it sits under, after its nav row, for when nothing came before it (a link, a refresh). `style` can set Arc's text
- *  tokens, for a trail on a coloured header. */
-export function CoachTrail({ current, parents = [], className, style }: { current: string; parents?: Crumb[]; className?: string; style?: CSSProperties }) {
-  const location = useLocation()
+/** A crumb's click: back through the history to a page this visit came through. A crumb it didn't come through (a nav
+ *  row, a page it sits under), or a click that opens a new tab, follows the link. */
+function useTrailBack() {
   const navigate = useNavigate()
-  const trails = useContext(TrailContext)
-  const behind = trails?.behind(location.key) ?? [tabOf(location.pathname), ...parents]
-  // By what it says, not by the array: `parents` is written in place, so it is new on every render.
-  const shown = JSON.stringify(behind)
-  useEffect(() => { trails?.name(location.key, current, JSON.parse(shown) as Crumb[]) }, [trails, location.key, current, shown])
-  // Back through the history to a page this visit came through; a crumb it didn't (a nav row, a page it sits under), or
-  // a click that opens a new tab, follows the link.
-  const back = (crumb: Crumb) => (event: MouseEvent<HTMLElement>) => {
+  return (crumb: Crumb) => (event: MouseEvent<HTMLElement>) => {
     const here = historyIndex()
     const steps = crumb.at === undefined || here === undefined ? 0 : here - crumb.at
     if (steps <= 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
     navigate(-steps)
   }
+}
+
+/** A crumb as a link, for a laptop's top bar (TRAK-347): it goes back the way the page's own trail does. */
+export function TrailLink({ crumb }: { crumb: Crumb }) {
+  const back = useTrailBack()
+  return <Link to={crumb.href} onClick={back(crumb)}>{crumb.label}</Link>
+}
+
+/** The trail at the top of a page: where the coach came from, then `current`, this page's name. `parents` are the pages
+ *  it sits under, after its nav row, for when nothing came before it (a link, a refresh). `style` can set Arc's text
+ *  tokens, for a trail on a coloured header. On a laptop it shows in the frame's top bar instead (TRAK-347). */
+export function CoachTrail({ current, parents = [], className, style }: { current: string; parents?: Crumb[]; className?: string; style?: CSSProperties }) {
+  const location = useLocation()
+  const trails = useContext(TrailContext)
+  const back = useTrailBack()
+  const behind = trails?.behind(location.key) ?? [tabOf(location.pathname), ...parents]
+  // By what it says, not by the array: `parents` is written in place, so it is new on every render.
+  const shown = JSON.stringify(behind)
+  useEffect(() => { trails?.name(location.key, current, JSON.parse(shown) as Crumb[]) }, [trails, location.key, current, shown])
+  const topBar = trails?.topBar ?? null
+  useEffect(() => {
+    if (!topBar) return
+    topBar({ crumbs: JSON.parse(shown) as Crumb[], current })
+    return () => topBar(null)
+  }, [topBar, shown, current])
+  if (topBar) return null
   return (
     <div className={['arc', className].filter(Boolean).join(' ')} style={style}>
       <ArcProvider link={RouterLink}>

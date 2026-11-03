@@ -417,6 +417,15 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const card = page.getByRole('region', { name: 'Game plan review' })
     await expect(card).toBeVisible()
     await expect(card.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(5)
+    // TRAK-347 (Imad, 3 Nov): a laptop's top bar is the trail, with no trail on the page; a phone keeps the page's own.
+    if (width >= 1024) {
+      await expect(page.getByRole('navigation', { name: 'Breadcrumb', exact: true })).toHaveText(/^Matches\s*\/?\s*vs Parkview Athletic U16$/)
+      await expect(page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('link', { name: 'Matches' })).toHaveAttribute('href', '/coach/matches')
+      await expect(page.getByRole('navigation', { name: 'Breadcrumb trail' })).toHaveCount(0)
+    } else {
+      await expect(page.getByRole('navigation', { name: 'Breadcrumb trail' })).toBeVisible()
+      await expect(page.getByRole('navigation', { name: 'Breadcrumb', exact: true })).toHaveCount(0)
+    }
     // TRAK-344 (Imad, 3 Nov): the gauge, what's left and the countdown sit in three equal columns on one line; on a
     // phone the countdown goes under the other two.
     const box = async (locator: ReturnType<typeof page.getByRole>) => (await locator.boundingBox())!

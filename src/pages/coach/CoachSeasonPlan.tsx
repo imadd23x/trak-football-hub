@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2 } from 'lucide-react'
@@ -38,6 +38,9 @@ const toForm = (plan: SeasonPlan | null, saved: SeasonObjective[]): Form => ({
   endsOn: plan?.ends_on ?? '',
   objectives: saved.map(o => ({ key: o.id, id: o.id, title: o.title, looksLike: o.looks_like })),
 })
+/** What a form built from the saved plan shows, to tell when the saved plan has moved on. */
+const savedKey = (plan: SeasonPlan | null, saved: SeasonObjective[]) =>
+  JSON.stringify([plan?.id, plan?.starts_on, plan?.ends_on, saved.map(o => [o.id, o.title, o.looks_like])])
 const isoToDate = (iso: string) => (iso ? new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) : undefined)
 const dateToIso = (date: Date | undefined) => (date
   ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')
@@ -61,7 +64,7 @@ export default function CoachSeasonPlan() {
         <CoachTrail className="mt-5" current="Season plan" />
         <header className="pt-4 pb-4">
           <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Season plan</h1>
-          {squad && <p className="mt-1 text-sm text-ink-3">{squad} · {season.plan ? 'Draft, only you see it' : 'Not started'}</p>}
+          {squad && !season.isPending && <p className="mt-1 text-sm text-ink-3">{squad} · {season.plan ? 'Draft, only you see it' : 'Not started'}</p>}
         </header>
         {!squad ? <p className="text-sm text-ink-2">Pick one squad at the top of the page to plan its season.</p>
           : season.error || objectives.error ? (
@@ -88,6 +91,15 @@ function SetUp({ squad, plan, saved }: { squad: string; plan: SeasonPlan | null;
   // Every change counts, so a save that lands after more typing doesn't say "Saved" for what it never sent.
   const version = useRef(0)
   const nextKey = useRef(0)
+  // Until the coach types, the form follows what's saved: a plan whose objectives arrive late never shows as empty
+  // (CI, 3 Nov). Once the coach has typed, only a save replaces the form.
+  const shownFrom = useRef(savedKey(plan, saved))
+  useEffect(() => {
+    const next = savedKey(plan, saved)
+    if (version.current !== 0 || next === shownFrom.current) return
+    shownFrom.current = next
+    setForm(toForm(plan, saved))
+  }, [plan, saved])
   const change = (next: Form) => {
     version.current += 1
     setForm(next)

@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
@@ -201,6 +201,30 @@ describe('TRAK-350 the season plan, step 1', () => {
     expect(await screen.findByText(/Couldn't save the plan/)).toBeInTheDocument()
     expect(screen.getByDisplayValue('Win the second ball')).toBeInTheDocument()
     expect(saveDraft()).toHaveTextContent('Save draft')
+  })
+
+  it('waits for the switch before saying anything: never "Not started" or an empty form for a saved plan (CI, 3 Nov)', async () => {
+    plans = [{ id: 'plan-1', squad: 'U16', starts_on: null, ends_on: null, shared_at: null }]
+    objectives = [{ id: 'o1', plan_id: 'plan-1', place: 1, title: 'Stay compact', looks_like: '' }]
+    seasonTables()
+    // Only the season plan's switch is slow: the frame's own switches answer at once, so the page shows before it knows
+    // whether the plan is on. Held until released, so the test doesn't race a timer.
+    let release = () => {}
+    const answered = new Promise<void>(resolve => { release = resolve })
+    server.use(http.post(`${SUPABASE_URL}/rest/v1/rpc/feature_on`, async ({ request }) => {
+      const { p_feature: feature } = await request.json() as { p_feature: string }
+      asked.push(feature)
+      if (feature === 'season_plan') await answered
+      return HttpResponse.json(true)
+    }))
+    renderApp('/coach/season-plan')
+    expect(await screen.findByRole('heading', { name: 'Season plan', level: 1 })).toBeInTheDocument()
+    await waitFor(() => expect(asked).toContain('season_plan'))
+    expect(screen.queryByText('U16 · Not started')).toBeNull()
+    expect(screen.queryByText(/None yet/)).toBeNull()
+    release()
+    expect(await screen.findByDisplayValue('Stay compact')).toBeInTheDocument()
+    expect(screen.getByText('U16 · Draft, only you see it')).toBeInTheDocument()
   })
 
   it('shows nothing on Home with the switch off', async () => {

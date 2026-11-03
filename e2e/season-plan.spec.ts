@@ -32,7 +32,12 @@ async function backend(context: BrowserContext, unexpected: string[]) {
     if (path === '/rest/v1/coach_details') return json([{ user_id: coachId, organization_id: 'org-350', coach_role: 'Head Coach', team: 'U16' }])
     if (path === '/rest/v1/squad_players') return json(players)
     if (path === '/rest/v1/rpc/my_session_is_live') return json(true)
-    if (path === '/rest/v1/rpc/feature_on') return json(['events', 'season_plan'].includes(req.postDataJSON()?.p_feature))
+    // The season plan's switch answers last, as it did on CI on 3 Nov: the page must wait for it, not show "Not started".
+    if (path === '/rest/v1/rpc/feature_on') {
+      const feature = req.postDataJSON()?.p_feature
+      if (feature === 'season_plan') await new Promise(resolve => setTimeout(resolve, 800))
+      return json(['events', 'season_plan'].includes(feature))
+    }
     if (path === '/rest/v1/season_plans') {
       if (req.method() === 'GET') return json(plans.filter(p => p.squad === eq('squad')))
       if (req.method() === 'POST') {

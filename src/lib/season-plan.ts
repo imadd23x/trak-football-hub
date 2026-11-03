@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
-import { useFeature } from '@/components/trak/parked'
+import { useFeatureState } from '@/components/trak/parked'
 import type { Tables } from '@/integrations/supabase/types'
 
 /* TRAK-350 (Season plan 2/18, spec TRAK-348): a squad's season plan, set up once. This slice holds the season's dates
@@ -47,15 +47,16 @@ export function planSquad({ squads, squad, everySquad }: { squads: string[]; squ
   return everySquad ? null : squad
 }
 
-/** The squad's plan, read only where the switch is on. `on` is false while the switch is unknown or off. */
+/** The squad's plan, read only where the switch is on. `on` is false while the switch is unknown or off; `isPending`
+ *  stays true until the switch has answered, so a screen never shows "Not started" for a plan it hasn't asked for. */
 export function useSeasonPlan(coachId: string | undefined, squad: string | null) {
-  const on = useFeature('season_plan')
+  const { on, known } = useFeatureState('season_plan')
   const query = useQuery({
     queryKey: seasonPlanKey(coachId, squad),
     queryFn: () => loadSeasonPlan(coachId!, squad!),
     enabled: on && !!coachId && !!squad,
   })
-  return { on, plan: query.data ?? null, isPending: on && !!squad && query.isPending, error: query.error, retry: () => void query.refetch() }
+  return { on, plan: query.data ?? null, isPending: !known || (on && !!squad && query.isPending), error: query.error, retry: () => void query.refetch() }
 }
 
 /** "1 September", for "since …" lines. */

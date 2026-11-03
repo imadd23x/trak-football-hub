@@ -337,3 +337,18 @@ export function usePastTrainings() {
     },
   })
 }
+
+/** TRAK-342: how many players a training's squad has (its whole roster when it has none), the number a plan is made
+ *  for. Players whose coach left don't count. */
+export function useSquadSize(squad: string | null) {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['coach', user?.id, 'squad-size', squad],
+    enabled: !!user,
+    queryFn: async (): Promise<number> => {
+      const { data, error } = await supabase.from('squad_players').select('id, age_group, status').eq('coach_user_id', user!.id)
+      if (error) throw error
+      return (data ?? []).filter(p => p.status !== 'coach_departed' && (squad == null || p.age_group?.trim() === squad)).length
+    },
+  })
+}

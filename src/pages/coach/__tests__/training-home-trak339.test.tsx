@@ -137,9 +137,10 @@ describe('TRAK-339: the Next training card', { timeout: 30_000 }, () => {
     const card = await nextCard('Training today')
     expect(within(card).getByText('Today', { selector: 'span' })).toBeInTheDocument()
     expect(within(card).getByRole('button', { name: 'Review plan' })).toBeInTheDocument()
+    // TRAK-342: Who's here is its own page.
     await user.click(within(card).getByRole('button', { name: 'Who’s here' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Who’s here' })
-    expect(await within(sheet).findByRole('button', { name: 'Mohamed Salah: present' })).toBeInTheDocument()
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/today/here'))
+    expect(await screen.findByRole('button', { name: 'Mohamed Salah: present' })).toBeInTheDocument()
   })
 
   it('after the training: Notes on the card; Save and close keeps the answer and moves the card on', async () => {

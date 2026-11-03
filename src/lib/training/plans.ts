@@ -9,6 +9,8 @@ import type { PartType } from './shelf'
 
 /** Plan session, for one training (TRAK-340; was Write my own). */
 export const planPath = (eventId: string) => `/coach/training/${eventId}/plan`
+/** Who's here: the register, then Trak's suggestions for the plan (TRAK-342). */
+export const herePath = (eventId: string) => `/coach/training/${eventId}/here`
 /** View: the plan read at the pitch side (TRAK-309). */
 export const viewPath = (eventId: string) => `/coach/training/${eventId}/view`
 /** What the planner can open with: a drill sent from Training › Drills (TRAK-296), or a past session's practices to

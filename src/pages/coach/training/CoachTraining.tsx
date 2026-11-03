@@ -7,7 +7,7 @@ import { localTodayISO, phoneEventTime } from '@/lib/event-time'
 import { LIBRARIES, SESSIONS, libraryPath } from '@/lib/library/library'
 import { ON_LIBRARY } from '@/lib/fixed-colours'
 import { searchDrills, splitTrainings, trainingMinutes, type Drill } from '@/lib/training/sessions'
-import { planPath, sessionSummary, type PlannerState } from '@/lib/training/plans'
+import { herePath, planPath, sessionSummary, type PlannerState } from '@/lib/training/plans'
 import { registerProblem } from '@/lib/event-register'
 import { AGAIN, NOTE_MAX, againLabel, loopSteps, nextTraining, searchPast, trainingBadge, type Again, type Phase } from '@/lib/training/next'
 import { gameWhen } from '@/components/coach/games/useGames'
@@ -16,9 +16,8 @@ import {
 } from '@/components/coach/training/useTraining'
 import { DrillSheet } from '@/components/coach/training/DrillSheet'
 import { CopyTargetSheet, PastPlanSheet, type PlanToCopy } from '@/components/coach/training/PastPlanSheet'
-import { RegisterSheet } from '@/components/coach/training/RegisterSheet'
 import { CoachTrail } from '@/components/coach/CoachTrail'
-import { PitchViewRoute, PlanEditorRoute, PlanRoute } from './CoachTrainingPlan'
+import { PitchViewRoute, PlanEditorRoute, PlanRoute, WhosHereRoute } from './CoachTrainingPlan'
 import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
@@ -64,6 +63,7 @@ export default function CoachTraining() {
       <Route path=":eventId" element={<PlanRoute />} />
       <Route path=":eventId/plan" element={<PlanEditorRoute />} />
       <Route path=":eventId/view" element={<PitchViewRoute />} />
+      <Route path=":eventId/here" element={<WhosHereRoute />} />
       {/* TRAK-309: View was Run it, at /run. An open tab or an older link (Home's Today card) still lands on it. */}
       <Route path=":eventId/run" element={<Navigate to="../view" relative="path" replace />} />
       <Route path="*" element={<Navigate to={TRAINING_PATH} replace />} />
@@ -203,7 +203,6 @@ function NextTraining({ training, phase, planned, draft, sessionId, onStart, onC
 }) {
   const navigate = useNavigate()
   const here = useHere(sessionId ? [sessionId] : [])
-  const [sheet, setSheet] = useState<'register' | null>(null)
   const [copying, setCopying] = useState(false)
   const { day, time, academy } = gameWhen(training)
   const minutes = trainingMinutes(training)
@@ -244,7 +243,7 @@ function NextTraining({ training, phase, planned, draft, sessionId, onStart, onC
           </p>}
           <div className="flex flex-wrap items-center gap-3">
             {phase === 'day' ? <>
-              <Button size="lg" disabled={!!registerWhy && !sessionId} onClick={() => setSheet('register')}>Who’s here</Button>
+              <Button size="lg" disabled={!!registerWhy && !sessionId} onClick={() => navigate(herePath(training.id))}>Who’s here</Button>
               {planned ? <Button size="lg" variant="secondary" onClick={review}>Review plan</Button>
                 : <Button size="lg" variant="secondary" onClick={plan}>Plan session</Button>}
             </> : planned ? <>
@@ -261,12 +260,11 @@ function NextTraining({ training, phase, planned, draft, sessionId, onStart, onC
           </div>
           <p className="text-sm text-ink-3">{phase === 'day'
             ? registerWhy && !sessionId ? 'Who’s here opens when the training starts.'
-              : planned ? 'Tick who came and save the register.' : 'No plan yet. You can still take the register.'
+              : planned ? 'Tick who came. Then Trak checks each part of your plan against the numbers.' : 'No plan yet. You can still take the register.'
             : planned ? 'Planned for the whole squad. Who’s here opens on the day.'
               : stoppedAt ? `You stopped at ${stoppedAt}. Only you see a draft.` : 'Plan it, or start from a plan you’ve used before.'}</p>
         </>}
 
-      <RegisterSheet training={training} sheet={sheet} sessionId={sessionId} onClose={() => setSheet(null)} />
       <PastPlanSheet open={copying} onOpenChange={setCopying} training={training} />
     </section>
   )

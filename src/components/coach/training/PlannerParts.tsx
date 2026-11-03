@@ -121,7 +121,8 @@ export function PlanRows({ parts, onEdit, onRemove, busy = false }: {
   if (!parts.length) return <p className="py-3 text-[15px] text-ink-2">No parts in this plan yet. Add one below.</p>
   return <ol aria-label="The plan" className="grid divide-y divide-line">
     {parts.map((part, i) => {
-      const players = part.drill ? playersLine(part.drill) : null
+      // TRAK-342: once Who's here set it up for the players who came, that set-up shows instead.
+      const players = part.drill?.numbers.trim() ? `Today: ${part.drill.numbers.trim()}` : part.drill ? playersLine(part.drill) : null
       return <li key={part.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
         <span className="w-10 flex-none text-center text-base font-medium text-ink">{part.minutes}<span className="block text-[11px] font-normal text-ink-3">min</span></span>
         <span className="grid min-w-0 flex-[1_1_14rem] gap-0.5">

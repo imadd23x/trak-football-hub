@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { registerProblem } from '@/lib/event-register'
 import { DRILL_DETAILS, trainingEnd, trainingMinutes } from '@/lib/training/sessions'
 import { loopNote, loopState, practiceStarts } from '@/lib/training/loop'
-import { fromSaved, overTime, planPath, viewPath, type PlannerState, type Practice } from '@/lib/training/plans'
+import { fromSaved, herePath, overTime, planPath, viewPath, type PlannerState, type Practice } from '@/lib/training/plans'
 import { partsFromSaved, totalMinutes } from '@/lib/training/parts'
 import { gameWhen } from '@/components/coach/games/useGames'
 import { useNotes, usePlan, useRegisters, useSavePlan, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
@@ -16,6 +16,7 @@ import { LoopStrip } from '@/components/coach/training/LoopStrip'
 import { RegisterSheet } from '@/components/coach/training/RegisterSheet'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Planner } from './Planner'
+import { WhosHere } from './WhosHere'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
@@ -128,9 +129,10 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
         </> : <>
           <Badge tone={plan ? 'success' : 'warning'}>{plan ? 'Ready' : 'Not planned'}</Badge>
           {/* On the day, the main action is Who's here; otherwise View, the plan at the pitch side. */}
-          {canRegister && <Button onClick={() => setSheet('register')}>Who’s here</Button>}
+          {/* TRAK-342: Who's here is a page of its own: the register, then Trak's suggestions for the plan. */}
+          {canRegister && <Button onClick={() => navigate(herePath(training.id))}>Who’s here</Button>}
           {plan && <Button variant={canRegister ? 'secondary' : 'primary'} onClick={view}>View</Button>}
-          {sessionId && <Button variant="ghost" onClick={() => setSheet('register')}>Edit register</Button>}
+          {sessionId && <Button variant="ghost" onClick={() => navigate(herePath(training.id))}>Who’s here</Button>}
           {/* TRAK-341: a saved plan is changed part by part below (Kostas, 30 Oct), so no Change the plan up here. */}
           {!plan && <Button variant={canRegister ? 'secondary' : 'primary'} onClick={planIt}>Plan session</Button>}
         </>}
@@ -156,6 +158,12 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
 
     <RegisterSheet training={training} sheet={sheet} sessionId={sessionId} onClose={() => setSheet(null)} />
   </>
+}
+
+/* ── Who's here (TRAK-342) ─────────────────────────────────────────────────── */
+
+export function WhosHereRoute() {
+  return <WithTraining wide>{(training, plan) => <WhosHere training={training} plan={plan} />}</WithTraining>
 }
 
 /* ── Review (TRAK-341) ──────────────────────────────────────────────────────── */

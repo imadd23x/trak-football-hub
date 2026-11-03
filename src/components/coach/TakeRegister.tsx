@@ -23,6 +23,9 @@ interface TakeRegisterProps {
   /** TRAK-176: the event's squad; null is the whole roster. */
   squad?: string | null
   onSaved: () => void
+  /** TRAK-342: Training's Who's here page. Several names to a row, so the whole squad fits a laptop screen, and the
+   *  button says how many are here ("Done: 15 here"). Everywhere else keeps the one-column list. */
+  wide?: boolean
 }
 
 type Loaded = {
@@ -34,7 +37,7 @@ type Loaded = {
 const font = { fontFamily: 'var(--t-font)' }
 const SAVE_FAILED = "Couldn't save the register. Check your connection and save again; your ticks are still here."
 
-export function TakeRegister({ eventId, coachId, sessionId, squad: eventSquad = null, onSaved }: TakeRegisterProps) {
+export function TakeRegister({ eventId, coachId, sessionId, squad: eventSquad = null, onSaved, wide = false }: TakeRegisterProps) {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -125,7 +128,7 @@ export function TakeRegister({ eventId, coachId, sessionId, squad: eventSquad = 
       ) : (
         <>
           <p className="text-[12px] text-ink-2" style={font}>{present.size} present, {absent} absent</p>
-          <ul className="space-y-1.5">
+          <ul className={wide ? 'grid gap-1.5 tablet:grid-cols-3 laptop:grid-cols-5' : 'space-y-1.5'}>
             {loaded.players.map(p => {
               const on = present.has(p.id)
               const family = loaded.familyReason.has(p.id)
@@ -166,9 +169,9 @@ export function TakeRegister({ eventId, coachId, sessionId, squad: eventSquad = 
       {error && <p role="alert" className="text-[12px] text-danger" style={font}>{error}</p>}
       {loaded.players.length > 0 && (
         <button type="button" onClick={save} disabled={saving}
-          className="w-full py-3 rounded-[12px] text-[14px] font-medium disabled:opacity-50"
+          className={`${wide ? 'w-full tablet:w-auto tablet:px-8' : 'w-full'} py-3 rounded-[12px] text-[14px] font-medium disabled:opacity-50`}
           style={{ background: 'rgb(var(--t-brand))', color: 'rgb(var(--t-on-brand))' }}>
-          {saving ? 'Saving…' : 'Save register'}
+          {saving ? 'Saving…' : wide ? `Done: ${present.size} here` : 'Save register'}
         </button>
       )}
     </div>

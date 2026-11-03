@@ -58,8 +58,9 @@ const players = [['Thierry Henry', 'U16'], ['Patrick Vieira', 'U16'], ['Robert P
   status: 'active', linked_player_id: null, created_at: '2026-10-01T08:00:00Z',
 }))
 
-async function backend(context: BrowserContext, unexpected: string[], trainings = TRAININGS) {
-  const plans = new Map(PLANNED)
+async function backend(context: BrowserContext, unexpected: string[], trainings = TRAININGS, extra: typeof PLANNED = [], sessions = SESSIONS,
+  attendance: { session_id: string; squad_player_id: string; status: string }[] = []) {
+  const plans = new Map([...PLANNED, ...extra])
   const user = { id: COACH, email: 'coach@training294.test', email_confirmed_at: '2026-10-01T00:00:00Z', created_at: '2026-10-01T00:00:00Z',
     aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {} }
   const exp = Math.floor(Date.now() / 1000) + 3600
@@ -97,8 +98,10 @@ async function backend(context: BrowserContext, unexpected: string[], trainings 
     }
     if (path === '/rest/v1/coach_sessions') {
       const id = url.searchParams.get('id')?.slice(3)
-      return json(id ? SESSIONS.filter(session => session.id === id) : SESSIONS.map(({ id: sid, event_id }) => ({ id: sid, event_id })))
+      return json(id ? sessions.filter(session => session.id === id) : sessions.map(({ id: sid, event_id }) => ({ id: sid, event_id })))
     }
+    if (path === '/rest/v1/session_attendance') return json(attendance)
+    if (path === '/rest/v1/rpc/coach_squad_player_consent_required') return json(false)
     if (path === '/rest/v1/rpc/save_training_plan') {
       const { p_event_id, p_practices } = req.postDataJSON() as { p_event_id: string; p_practices: Record<string, unknown>[] }
       // As the database does: a practice ticked "Save to My drills" becomes the coach's drill.
@@ -114,11 +117,12 @@ async function backend(context: BrowserContext, unexpected: string[], trainings 
   })
 }
 
-async function open(page: Page, context: BrowserContext, path: string, width: number, height: number, trainings = TRAININGS) {
+async function open(page: Page, context: BrowserContext, path: string, width: number, height: number, trainings = TRAININGS,
+  ...more: Parameters<typeof backend> extends [unknown, unknown, unknown, ...infer R] ? R : never) {
   const unexpected: string[] = [], errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.setViewportSize({ width, height })
-  await backend(context, unexpected, trainings)
+  await backend(context, unexpected, trainings, ...more)
   await page.goto(path)
   return { unexpected, errors }
 }
@@ -346,6 +350,36 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     await page.getByRole('button', { name: 'Cancel' }).click()
     await expect(page).toHaveURL(/\/coach\/training\/t-tue$/)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+
+  // TRAK-342: Who's here, with the register saved: one of the two U16 players came; Trak checks each part.
+  test(`Who's here at ${width} px: the register, then Trak's suggestions`, async ({ page, context }, testInfo) => {
+    const started = Date.now() - 10 * MINUTE
+    const here = { ...training('t-here', 'U16', 0, '18:00', 'Pressing triggers'), starts_at: new Date(started).toISOString(),
+      ends_at: new Date(started + 90 * MINUTE).toISOString() }
+    const part = (position: number, trak_drill: string, name: string, part: string, part_type: string, minutes: number) => ({
+      position, name, minutes, how: '', tell: '', area: '', numbers: '', direction: '', targets: '', conditions: '', source: 'trak',
+      drill_id: null, library_session: null, trak_drill, part, part_type, players_kind: null, group_size: null })
+    const { unexpected, errors } = await open(page, context, '/coach/training/t-here/here', width, height, [here, ...TRAININGS],
+      [['t-here', [part(1, 'w1', 'Dynamic warm-up', 'Dry warm-up', 'warmup', 10), part(2, 'p4', 'Passing in pairs on the move', 'Passing & movement', 'passing', 15),
+        part(3, 'g1', 'Free play', 'Game', 'game', 25)]]],
+      [...SESSIONS, { id: 's-here', event_id: 't-here', session_type: 'training', title: 'Pressing triggers', session_date: null, training_type: null, notes: null }],
+      [{ session_id: 's-here', squad_player_id: 'sq-1', status: 'present' }])
+    await expect(page.getByRole('heading', { name: 'Today’s plan for 1 player' })).toBeVisible()
+    await expect(page.getByText('2 parts don’t work with 1 player. Change them yourself.')).toBeVisible()
+    await expect(page.getByRole('list', { name: 'Today’s plan' }).getByRole('article')).toHaveCount(3)
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-here-plan-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    const keyboard = await everyControlByKeyboard(page, '.trak-wide')
+    expect(keyboard.missed).toEqual([])
+    await page.getByRole('button', { name: 'Change', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Done: 1 here' })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-here-register-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
   })

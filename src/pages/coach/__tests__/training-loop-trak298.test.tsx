@@ -104,24 +104,24 @@ describe('TRAK-298: the loop on a training’s page', { timeout: 30_000 }, () =>
       .toEqual(['1 · Logistics(done)', '→2 · Plan(done)', '→3 · Who’s here(next)', '→4 · Notes'])
   })
 
-  it('on the day: Who’s here opens the existing register; once taken, Notes are next, optional', async () => {
+  it('on the day: Who’s here opens its page with the existing register; once taken, Notes are next, optional', async () => {
     const user = userEvent.setup()
     // Started 20 minutes ago, 90 minutes long.
     const taken = database([training('today', onTheMinute(Date.now() - 20 * MINUTE))], { today: [practice(1, 'Rondos 4v1')] })
     renderApp('/coach/training/today')
+    // TRAK-342: Who's here is its own page: the register, then Trak's suggestions.
     await user.click(await screen.findByRole('button', { name: 'Who’s here' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Who’s here' })
-    expect(await within(sheet).findByRole('button', { name: 'Mohamed Salah: present' })).toBeInTheDocument()
-    await user.click(within(sheet).getByRole('button', { name: 'Virgil van Dijk: present' }))
-    await user.click(within(sheet).getByRole('button', { name: 'Save register' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/today/here'))
+    expect(await screen.findByRole('button', { name: 'Mohamed Salah: present' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Virgil van Dijk: present' }))
+    await user.click(screen.getByRole('button', { name: 'Done: 1 here' }))
     await waitFor(() => expect(taken).toEqual([{ p_event_id: 'today', p_present: ['sp-1'] }]))
+    expect(await screen.findByRole('button', { name: 'Change' })).toBeInTheDocument()
 
-    // The sheet closes on save; the page shows again once it has.
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Who’s here' })).toBeNull())
-    expect(loop()).toHaveTextContent(/3 · Who’s here\s*\(done\)/)
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/today'))
+    await waitFor(() => expect(loop()).toHaveTextContent(/3 · Who’s here\s*\(done\)/))
     expect(loop()).toHaveTextContent(/4 · Notes\s*\(optional\)/)
-    expect(screen.getByRole('button', { name: 'Edit register' })).toBeInTheDocument()
     expect(screen.queryByText('Closed')).toBeNull()
   })
 

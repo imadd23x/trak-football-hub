@@ -24,8 +24,8 @@ export function useParked() {
    deploy (public.academy_features). The database enforces it; this only
    decides whether the screen shows the pill. Loading, a failed read or no
    feature all count as off. TRAK-283: Games is switched on the same way, and
-   TRAK-294 Training. */
-export type Feature = 'events' | 'games' | 'training'
+   TRAK-294 Training, and TRAK-350 the season plan. */
+export type Feature = 'events' | 'games' | 'training' | 'season_plan'
 
 export function useFeature(feature?: Feature): boolean {
   const { user } = useAuth()

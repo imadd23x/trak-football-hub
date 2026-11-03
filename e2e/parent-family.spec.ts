@@ -178,6 +178,8 @@ test.describe('TRAK-171 Home follow-ups', () => {
         // TRAK-261: the coach's notification switches (the bell's "Can't make it"); no row means on.
         if (url.pathname === '/rest/v1/notification_settings') return json([])
         if (url.pathname === '/rest/v1/rpc/my_session_is_live' || url.pathname === '/rest/v1/rpc/feature_on') return json(true)
+        // TRAK-350: the season plan's switch is on here, so Home asks for the squad's plan; there is none.
+        if (url.pathname === '/rest/v1/season_plans') return json([])
         if (['get_children_awaiting_consent', 'get_roster_children_awaiting_consent', 'get_my_child_logins', 'get_my_approved_children_awaiting_signup', 'get_player_invites_for_current_user', 'family_training_history', 'my_calendar_link'].some(name => url.pathname === `/rest/v1/rpc/${name}`)) return json([])
         if (url.pathname === '/rest/v1/telemetry_events') return route.fulfill({ status: 201, body: '' })
         // TRAK-262: notification_settings is coach Home's Needs you switch (no row: on).

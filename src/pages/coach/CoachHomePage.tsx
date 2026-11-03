@@ -14,6 +14,8 @@ import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { SquadShape } from '@/components/coach/home/SquadShape'
 import { TodayPlan } from '@/components/coach/home/TodayPlan'
 import { NeedsYou, type OwedEvent } from '@/components/coach/home/NeedsYou'
+import { SeasonPlanRow } from '@/components/coach/home/SeasonPlanRow'
+import { planSquad } from '@/lib/season-plan'
 import { useOwedEvents } from '@/components/coach/home/useOwedEvents'
 import { gameTitle, gameWhen, useGamePlanChanges, useGamePlans, useGameShares, useGames } from '@/components/coach/games/useGames'
 import { STATE, gameState, needsAPlan } from '@/lib/games/loop'
@@ -151,6 +153,8 @@ export default function CoachHomePage() {
               ? navigate(`/coach/player/${item.playerId}`)
               : navigate('/coach/assess', { state: { preselectedPlayerId: item.playerId } })} />
         </div>}
+        {/* TRAK-350: the season plan, where the academy's switch is on (TRAK-361 makes it the card that folds). */}
+        {user && <SeasonPlanRow coachId={user.id} squad={planSquad(coachSquad)} className={wide ? 'mt-6' : 'mt-5'} />}
       </div>
       <QuickAdd onSaved={() => setWeekVersion(v => v + 1)} />
     </MobileShell>

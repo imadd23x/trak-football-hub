@@ -47,6 +47,8 @@ test('coach saves squad kits, publishes a kit event and reopens its announcement
       return json(event ? [event] : [])
     }
     if (path === '/rest/v1/rpc/my_session_is_live' || path === '/rest/v1/rpc/feature_on') return json(true)
+    // TRAK-350: the season plan's switch is on here, so Home asks for the squad's plan; there is none.
+    if (path === '/rest/v1/season_plans') return json([])
     if (path === '/rest/v1/rpc/coach_squad_player_consent_required') return json(false)
     // TRAK-262: notification_settings is coach Home's Needs you switch (no row: on).
     if (['coach_sessions', 'coach_assessments', 'event_absences', 'session_attendance', 'coach_shared_feedback', 'matches', 'recognition_awards', 'notification_settings',

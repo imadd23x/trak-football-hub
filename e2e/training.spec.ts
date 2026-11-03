@@ -83,6 +83,8 @@ async function backend(context: BrowserContext, unexpected: string[], trainings 
     if (path === '/rest/v1/squad_players') return json(players)
     if (path === '/rest/v1/rpc/my_consent_status') return json({ required: false, granted: true, invited_parent: null })
     if (path === '/rest/v1/rpc/my_session_is_live' || path === '/rest/v1/rpc/feature_on') return json(true)
+    // TRAK-350: the season plan's switch is on here, so Home asks for the squad's plan; there is none.
+    if (path === '/rest/v1/season_plans') return json([])
     // An `eq.` or `in.(…)` filter, as PostgREST reads it; no filter matches everything.
     const matches = (key: string) => {
       const value = url.searchParams.get(key)

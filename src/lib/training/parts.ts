@@ -137,7 +137,13 @@ export function usualFor(type: PartType, all: PlanDrill[], usage: Usage): PlanDr
   return best ?? all.find(d => d.source === 'trak') ?? all[0] ?? null
 }
 
-const same = (a: PlanDrill | null, b: PlanDrill | null) => !!a && !!b && (drillKey(a) ? drillKey(a) === drillKey(b) : a.name === b.name)
+/** The same drill: by its key when both have one; otherwise by name, so a drill written in a plan before it was saved
+ *  to My drills (or a plan from before parts) doesn't show twice. */
+const same = (a: PlanDrill | null, b: PlanDrill | null) => {
+  if (!a || !b) return false
+  const ka = drillKey(a), kb = drillKey(b)
+  return ka && kb ? ka === kb : a.name.trim().toLocaleLowerCase() === b.name.trim().toLocaleLowerCase()
+}
 
 /** The three drills a part shows: its usual, then those used lately, then the rest; the picked one is always there. */
 export function shownFor(type: PartType, picked: PlanDrill | null, all: PlanDrill[], usage: Usage): PlanDrill[] {
@@ -223,3 +229,6 @@ export function partColour(index: number, count: number): string {
   return `rgb(var(--t-brand) / ${alpha.toFixed(2)})`
 }
 
+
+/** "1 · Rondo" over the drill's name; a plan from before parts names its part after its drill, so just "1" then. */
+export const partLine = (part: Part, index: number) => part.drill && part.name === part.drill.name ? `${index + 1}` : `${index + 1} · ${part.name}`

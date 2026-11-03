@@ -327,6 +327,29 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(errors).toEqual([])
   })
 
+  // TRAK-341: a saved plan's page is Review: Edit opens only that part, × removes one, Add a part.
+  test(`Review a saved plan at ${width} px`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, '/coach/training/t-tue', width, height)
+    await expect(page.getByRole('heading', { name: 'Review' })).toBeVisible()
+    await expect(page.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(2)
+    await expect(page.getByRole('button', { name: 'Change the plan' })).toHaveCount(0)
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-review-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    const keyboard = await everyControlByKeyboard(page, '.max-w-\\[1040px\\]')
+    expect(keyboard.missed).toEqual([])
+    await page.getByRole('button', { name: 'Edit Pressing on the trigger' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Edit: Pressing on the trigger' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save and go back to Review' })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-review-edit-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page).toHaveURL(/\/coach\/training\/t-tue$/)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+
   test(`View and a closed training at ${width} px`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/training/t-tue', width, height)
     await expect(page.getByRole('list', { name: 'Training loop' }).getByRole('listitem')).toHaveCount(4)

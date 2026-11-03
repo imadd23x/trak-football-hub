@@ -1,12 +1,16 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ClipboardList } from 'lucide-react'
+import { ClipboardList, Plus } from 'lucide-react'
+import { toast } from 'sonner'
 import { registerProblem } from '@/lib/event-register'
 import { DRILL_DETAILS, trainingEnd, trainingMinutes } from '@/lib/training/sessions'
 import { loopNote, loopState, practiceStarts } from '@/lib/training/loop'
-import { fromSaved, overTime, planPath, plannedMinutes, sourceLabel, viewPath, type Practice } from '@/lib/training/plans'
+import { fromSaved, overTime, planPath, viewPath, type PlannerState, type Practice } from '@/lib/training/plans'
+import { partsFromSaved, totalMinutes } from '@/lib/training/parts'
 import { gameWhen } from '@/components/coach/games/useGames'
-import { useNotes, usePlan, useRegisters, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
+import { useNotes, usePlan, useRegisters, useSavePlan, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
+import { PlanRows, TimeBar, TotalLine } from '@/components/coach/training/PlannerParts'
+import { AddPartSheet } from '@/components/coach/training/PlannerSheets'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { LoopStrip } from '@/components/coach/training/LoopStrip'
 import { RegisterSheet } from '@/components/coach/training/RegisterSheet'
@@ -81,25 +85,6 @@ function OverTime({ text }: { text: string }) {
 /** The details a practice has, in the mockup's order: "20 × 30 m · 4v4 + 2". */
 const detailsLine = (practice: Practice) => DRILL_DETAILS.map(d => practice[d.key].trim()).filter(Boolean).join(' · ')
 
-function PracticeRow({ practice, actions }: { practice: Practice; actions?: ReactNode }) {
-  const details = detailsLine(practice)
-  const tag = sourceLabel(practice)
-  return (
-    <div className="arc flex flex-wrap items-start gap-x-3.5 gap-y-1 rounded-2xl border border-line bg-surface px-4 py-3.5 tablet:flex-nowrap tablet:px-5">
-      <span className="w-11 flex-none pt-px text-center text-base font-medium text-ink">{practice.minutes}<span className="block text-[11px] font-normal text-ink-3">min</span></span>
-      <div className="grid min-w-0 flex-1 gap-1">
-        {/* TRAK-340: the part it fills, when it's a different name. */}
-        {practice.part && practice.part !== practice.name && <p className="text-[13px] text-ink-3 break-words">{practice.part}</p>}
-        <p className="text-[15px] font-medium text-ink break-words">{practice.name}</p>
-        {practice.tell.trim() && <p className="text-sm text-ink-2 break-words">“{practice.tell.trim()}”</p>}
-        {details && <p className="text-sm text-ink-3 break-words">{details}</p>}
-        <span><Badge size="sm" tone={tag === 'Your drill' ? 'success' : tag.startsWith('Library') ? 'info' : 'neutral'}>{tag}</Badge></span>
-      </div>
-      {/* On a phone the buttons sit under the practice, so its name keeps the width. */}
-      {actions && <div className="flex w-full justify-end tablet:w-auto">{actions}</div>}
-    </div>
-  )
-}
 
 /* ── Plan session (TRAK-340) ──────────────────────────────────────────────── */
 
@@ -123,9 +108,6 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
   const [sheet, setSheet] = useState<'register' | 'log' | null>(null)
   const [now] = useState(() => Date.now())
   const cancelled = training.status === 'cancelled'
-  const practices = fromSaved(plan?.practices ?? [])
-  const total = plannedMinutes(practices)
-
   const sessionId = registers.data?.get(training.id) ?? null
   const started = Date.parse(training.starts_at) <= now
   const over = trainingEnd(training) <= now
@@ -149,8 +131,8 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
           {canRegister && <Button onClick={() => setSheet('register')}>Who’s here</Button>}
           {plan && <Button variant={canRegister ? 'secondary' : 'primary'} onClick={view}>View</Button>}
           {sessionId && <Button variant="ghost" onClick={() => setSheet('register')}>Edit register</Button>}
-          {plan ? <Button variant="secondary" onClick={() => navigate(planPath(training.id))}>Change the plan</Button>
-            : <Button variant={canRegister ? 'secondary' : 'primary'} onClick={planIt}>Plan session</Button>}
+          {/* TRAK-341: a saved plan is changed part by part below (Kostas, 30 Oct), so no Change the plan up here. */}
+          {!plan && <Button variant={canRegister ? 'secondary' : 'primary'} onClick={planIt}>Plan session</Button>}
         </>}
     </Header>
     {!cancelled && <div className="grid gap-2 pt-2">
@@ -161,27 +143,67 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
           ? 'Who’s here opens when the training starts.' : `Who’s here: ${registerWhy.toLowerCase()}.`}</p>}
     </div>}
 
-    <section aria-labelledby="practices" className="mt-6 grid max-w-[720px] gap-2.5">
-      {plan ? <>
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 id="practices" className="text-lg font-medium text-ink">Practices</h2>
-          <span className="text-[13px] text-ink-3">{practices.length} {practices.length === 1 ? 'practice' : 'practices'} · {total} min</span>
-        </div>
-        {!cancelled && overTime(total, trainingMinutes(training)) && <OverTime text={overTime(total, trainingMinutes(training))!} />}
-        <ol className="grid gap-2.5">{practices.map((practice, i) => <li key={i}><PracticeRow practice={practice} /></li>)}</ol>
-      </> : <>
+    {plan && plan.practices.length ? <SavedReview training={training} plan={plan} cancelled={cancelled} />
+      : <section aria-labelledby="practices" className="mt-6 grid max-w-[720px] gap-2.5">
         <h2 id="practices" className="sr-only">Practices</h2>
         <div className="arc">
           <EmptyState icon={<ClipboardList size={24} strokeWidth={1.5} />} title={cancelled ? 'This training was cancelled' : 'Not planned yet'}
             description={cancelled ? 'It had no plan.' : 'Plan it your way. Only you see the plan.'}
             action={cancelled ? undefined : <Button onClick={planIt}>Plan session</Button>} />
         </div>
-      </>}
-      <Link to={`/coach/schedule?event=${training.id}`} className={`mt-2 justify-self-start ${linkClass}`}>Open in Schedule</Link>
-    </section>
+      </section>}
+    <Link to={`/coach/schedule?event=${training.id}`} className={`mt-4 inline-block ${linkClass}`}>Open in Schedule</Link>
 
     <RegisterSheet training={training} sheet={sheet} sessionId={sessionId} onClose={() => setSheet(null)} />
   </>
+}
+
+/* ── Review (TRAK-341) ──────────────────────────────────────────────────────── */
+
+/** A saved plan, to review and change part by part (Kostas, 30 Oct): Edit opens only that part in the planner, ×
+ *  removes one at once (with Undo), Add a part adds one. Each change saves the plan whole. */
+function SavedReview({ training, plan, cancelled }: { training: Training; plan: Plan; cancelled: boolean }) {
+  const navigate = useNavigate()
+  const save = useSavePlan(training.id)
+  const [adding, setAdding] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+  // Read once per saved plan, so each part keeps its key between renders.
+  const parts = useMemo(() => partsFromSaved(plan.practices), [plan.practices])
+  const length = trainingMinutes(training)
+  const over = overTime(totalMinutes(parts), length)
+  const edit = (index: number) => navigate(planPath(training.id), { state: { editPart: index } satisfies PlannerState })
+  const remove = (index: number) => {
+    if (parts.length === 1) return setProblem('A plan needs at least one part. Edit this one instead, or add another first.')
+    setProblem(null)
+    const gone = parts[index]
+    save.mutate({ parts: parts.filter((_, i) => i !== index), note: plan.note }, {
+      onSuccess: () => toast(`${gone.name} removed.`, { action: { label: 'Undo', onClick: () => save.mutate({ parts, note: plan.note }) } }),
+      onError: () => setProblem('Couldn’t remove it. Check your connection and try again.'),
+    })
+  }
+  return <div className="mt-6 grid gap-5 laptop:grid-cols-[minmax(0,1fr)_320px] laptop:items-start">
+    <section aria-labelledby="review" className="arc grid min-w-0 gap-4 rounded-2xl border border-line bg-surface p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 id="review" className="text-[22px] font-medium text-ink">Review</h2>
+        <TotalLine parts={parts} length={length} />
+      </div>
+      <TimeBar parts={parts} length={length} />
+      {over && !cancelled && <OverTime text={over} />}
+      {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
+      {cancelled
+        ? <ol aria-label="The plan" className="grid divide-y divide-line">{parts.map((part, i) => <li key={part.key} className="py-3 text-[15px] text-ink">
+            {part.minutes} min · {part.drill?.name}</li>)}</ol>
+        : <PlanRows parts={parts} onEdit={edit} onRemove={remove} busy={save.isPending} />}
+      {!cancelled && <div><Button size="sm" variant="secondary" onClick={() => setAdding(true)}><Plus aria-hidden size={16} />Add a part</Button></div>}
+      {plan.note && <div className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2"><span className="font-medium text-ink">Your note:</span> {plan.note}</div>}
+    </section>
+    <aside aria-labelledby="players" className="arc grid content-start gap-3 rounded-2xl border border-line bg-surface p-5">
+      <h2 id="players" className="text-lg font-medium text-ink">Players</h2>
+      <p className="text-sm text-ink-2">Planned for your whole squad. On the day, take the register with Who’s here at the top.</p>
+    </aside>
+    <AddPartSheet open={adding} onClose={() => setAdding(false)}
+      onAdd={(type, name) => { setAdding(false); navigate(planPath(training.id), { state: { addPart: { type, name } } satisfies PlannerState }) }} />
+  </div>
 }
 
 /* ── View ─────────────────────────────────────────────────────────────────── */
@@ -215,6 +237,8 @@ function PitchView({ training, plan }: { training: Training; plan: Plan | null }
               <p className="text-[13px] text-ink-3">min</p>
             </div>
             <div className="grid min-w-0 flex-1 content-start gap-1.5">
+              {/* TRAK-341: the part it fills, when it isn't named after the drill. */}
+              {practice.part && practice.part !== practice.name && <p className="text-[15px] font-medium text-brand break-words">{practice.part}</p>}
               <p className="text-[22px] font-medium leading-snug text-ink break-words">{practice.name}</p>
               {practice.tell.trim() && <p className="text-[19px] leading-snug text-ink break-words">“{practice.tell.trim()}”</p>}
               {details && <p className="text-[17px] text-ink-2 break-words">{details}</p>}

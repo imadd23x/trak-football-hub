@@ -1,6 +1,7 @@
 import type { Tables } from '@/integrations/supabase/types'
 import { libraryOf, sessionById } from '@/lib/library/library'
 import type { Drill, DrillDraft } from './sessions'
+import type { PartType } from './shelf'
 
 /* TRAK-295 (Training 2/5, spec TRAK-293): a training's plan, kept apart from the screens. A practice carries what a
    drill does, plus where it came from. The plan is saved whole by save_training_plan(); its limits are the
@@ -15,6 +16,9 @@ export const viewPath = (eventId: string) => `/coach/training/${eventId}/view`
 export type PlannerState = {
   addDrill?: Drill & { part_type?: string | null; players_kind?: string | null; group_size?: number | null }
   copy?: SavedPractice[]; copiedFrom?: string
+  /** TRAK-341: from a saved plan's Review page, change one part (by its place) or add one. */
+  editPart?: number
+  addPart?: { type: PartType; name: string }
 } | null
 
 export type PracticeSource = 'own' | 'drill' | 'library' | 'trak'

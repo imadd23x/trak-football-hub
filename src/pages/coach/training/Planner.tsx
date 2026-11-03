@@ -14,7 +14,7 @@ import { gameWhen } from '@/components/coach/games/useGames'
 import {
   useDrafts, useDrills, usePastSessions, useSaveDraft, useSavePlan, type Draft, type Plan, type Training,
 } from '@/components/coach/training/useTraining'
-import { ActionTile, DrillTile, SessionCard, TimeBar, TotalLine } from '@/components/coach/training/PlannerParts'
+import { ActionTile, DrillTile, PlanRows, SessionCard, TimeBar, TotalLine } from '@/components/coach/training/PlannerParts'
 import { AddPartSheet, LeaveSheet, MoreDrillsSheet, OwnDrillSheet } from '@/components/coach/training/PlannerSheets'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { useParked } from '@/components/trak/parked'
@@ -35,7 +35,9 @@ const TRAINING_PATH = '/coach/training'
 const SAVE_FAILED = 'Couldn’t save. Check your connection and try again. Nothing you changed is lost.'
 const REVIEW = 'review'
 
-type Start = { parts: Part[]; note: string; at: string; fromShape: boolean; copiedFrom: string | null; dirty: boolean }
+type Start = { parts: Part[]; note: string; at: string; fromShape: boolean; copiedFrom: string | null; dirty: boolean
+  /** TRAK-341: opened from a saved plan's Review page to change or add one part, then save and go back. */
+  only?: 'edit' | 'add' }
 
 /** Where the planner starts: a copied plan; a drill sent from My drills; the draft; the saved plan (at Review); else
  *  the coach's last shape or Trak's five. */
@@ -45,6 +47,17 @@ function startFrom({ state, saved, draft, past, drills, usage }: {
   const fresh = () => {
     const shape = lastShape(past)
     return { parts: partsFromShape(shape ?? standardShape(), drills, usage), fromShape: !!shape }
+  }
+  if (saved?.practices.length && state?.editPart != null) {
+    const parts = partsFromSaved(saved.practices)
+    const part = parts[Math.min(Math.max(0, state.editPart), parts.length - 1)]
+    return { parts, note: saved.note, at: part.key, fromShape: false, copiedFrom: null, dirty: false, only: 'edit' }
+  }
+  if (saved?.practices.length && state?.addPart) {
+    const { type, name } = state.addPart
+    const part: Part = { key: newKey(), type, name, minutes: partInfo(type).mins, drill: usualFor(type, candidates(type, drills), usage) }
+    return { parts: [...partsFromSaved(saved.practices), part].slice(0, PARTS_MAX), note: saved.note, at: part.key, fromShape: false,
+      copiedFrom: null, dirty: true, only: 'add' }
   }
   if (state?.copy?.length) {
     const parts = partsFromSaved(state.copy).slice(0, PARTS_MAX)
@@ -145,23 +158,32 @@ function PlannerBody({ training, saved, draft, past, drills }: {
     const why = planProblem(parts)
     if (why) return setProblem(why)
     savePlan.mutate({ parts, note }, {
-      onSuccess: () => { toast.success('Plan saved'); navigate(TRAINING_PATH, { replace: true, state: { savedPlan: training.id } }) },
+      onSuccess: () => {
+        toast.success('Plan saved')
+        // From a saved plan's Review page, back to it; otherwise Training, which offers the next one to plan.
+        if (start.only) navigate(reviewPage, { replace: true })
+        else navigate(TRAINING_PATH, { replace: true, state: { savedPlan: training.id } })
+      },
       onError: error => setProblem('code' in error && error.code === 'P0001' ? `${error.message}.` : SAVE_FAILED),
     })
   }
-  const leave = () => dirty ? setSheet('leave') : navigate(-1)
+  const leave = () => dirty ? setSheet('leave') : navigate(TRAINING_PATH)
+  const reviewPage = `${TRAINING_PATH}/${training.id}`
 
   const steps = [...parts.map(p => ({ id: p.key, label: p.name })), { id: REVIEW, label: 'Review' }]
 
   return <div className="grid gap-5 pt-5">
     <header className="arc grid gap-2">
       <CoachTrail current="Plan session" />
-      <h1 className="text-[24px] font-medium tracking-[-0.01em] text-ink break-words">Plan session: {training.title}</h1>
-      <p className="text-sm text-ink-2">{[day, time, training.venue, length ? `${length} min` : null].filter(Boolean).join(' · ')}</p>
+      <h1 className="text-[24px] font-medium tracking-[-0.01em] text-ink break-words">{start.only && part
+        ? `${start.only === 'add' ? 'Add' : 'Edit'}: ${part.name}` : `Plan session: ${training.title}`}</h1>
+      <p className="text-sm text-ink-2">{[start.only ? training.title : null, day, time, training.venue, length ? `${length} min` : null].filter(Boolean).join(' · ')}</p>
+      {start.only && <p className="text-sm text-ink-3">{start.only === 'add' ? 'Pick a drill, then add it to the plan.'
+        : 'Only this part changes. The rest of the plan stays as it is.'}</p>}
     </header>
     {start.copiedFrom && <p role="status" className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
       Copied from {start.copiedFrom}. Check it, change any part, then save. Nothing is saved until you do.</p>}
-    <div className="arc"><Stepper label="Planning steps" steps={steps} current={step} onStepSelect={go} /></div>
+    {!start.only && <div className="arc"><Stepper label="Planning steps" steps={steps} current={step} onStepSelect={go} /></div>}
     {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
 
     <div className="grid gap-5 laptop:grid-cols-[minmax(0,1fr)_360px] laptop:items-start">
@@ -194,8 +216,9 @@ function PlannerBody({ training, saved, draft, past, drills }: {
         </div>
         <p className="max-w-[640px] text-[15px] text-ink-2">{partInfo(part.type).guide}</p>
         <div className="grid gap-3">
-          <p className="text-sm font-medium text-ink">Pick a drill <span className="font-normal text-ink-3">{part.type === 'own'
-            ? 'Pick any drill, or write your own.' : part.drill ? 'We picked your usual. Change it if you like.' : 'Pick one for this part.'}</span></p>
+          {/* A part of the coach's own already says "Pick any drill, or write your own." in its guide line. */}
+          <p className="text-sm font-medium text-ink">Pick a drill {part.type !== 'own' && <span className="font-normal text-ink-3">{part.drill
+            ? 'We picked your usual. Change it if you like.' : 'Pick one for this part.'}</span>}</p>
           <ul aria-label={`Drills for ${part.name}`} className="grid gap-3 tablet:grid-cols-2 laptop:grid-cols-4">
             {shownFor(part.type, part.drill, all, usage).map(d => <li key={`${d.source}:${d.trak_drill ?? d.drill_id ?? d.name}`}>
               <DrillTile drill={d} picked={isSameDrill(d, part.drill)} tag={tagFor(d, part.type, all, usage)} onPick={() => pick(d)} /></li>)}
@@ -206,7 +229,11 @@ function PlannerBody({ training, saved, draft, past, drills }: {
             See more drills ({all.length - 3})</Button></div>}
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
-          {fromReview ? <>
+          {start.only ? <>
+            <Button variant="secondary" onClick={() => navigate(reviewPage)}>Cancel</Button>
+            <span className="flex-1" />
+            <Button loading={savePlan.isPending} onClick={save}>{start.only === 'add' ? 'Add to the plan' : 'Save and go back to Review'}</Button>
+          </> : fromReview ? <>
             <Button variant="ghost" loading={saveDraft.isPending} onClick={keepDraft}>Save as draft</Button>
             <span className="flex-1" />
             <Button variant="ghost" onClick={() => remove(step)}><X aria-hidden size={16} />Remove this part</Button>
@@ -224,7 +251,8 @@ function PlannerBody({ training, saved, draft, past, drills }: {
         onBack={() => parts.length ? go(parts.length - 1) : leave()} onDraft={keepDraft} onSave={save}
         saving={savePlan.isPending} drafting={saveDraft.isPending} />}
 
-      {part ? <SessionCard parts={parts} length={length} current={part.key} onOpen={key => setAt(key)} onReorder={setParts}
+      {part && start.only ? <OnTheDay parts={parts} title="Your session" />
+        : part ? <SessionCard parts={parts} length={length} current={part.key} onOpen={key => setAt(key)} onReorder={setParts}
         onMove={(i, by) => setParts(moveTo(parts, i, i + by))} onRemove={remove} onAdd={() => setSheet('add')} onStandard={toStandard}
         fromShape={start.fromShape && !dirty} standard={isStandard(parts)} />
         : <OnTheDay parts={parts} />}
@@ -254,26 +282,7 @@ function Review({ parts, length, note, onNote, onEdit, onRemove, onAdd, onBack, 
       <TotalLine parts={parts} length={length} />
     </div>
     <TimeBar parts={parts} length={length} />
-    {parts.length === 0 ? <p className="py-3 text-[15px] text-ink-2">No parts in this plan yet. Add one below.</p>
-      : <ol aria-label="The plan" className="grid divide-y divide-line">
-        {parts.map((part, i) => {
-          const players = part.drill ? playersLine(part.drill) : null
-          return <li key={part.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-            <span className="w-10 flex-none text-center text-base font-medium text-ink">{part.minutes}<span className="block text-[11px] font-normal text-ink-3">min</span></span>
-            <span className="grid min-w-0 flex-[1_1_14rem] gap-0.5">
-              <span className="flex items-center gap-1.5 text-[13px] text-ink-3">
-                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: partColour(i, parts.length) }} />{i + 1} · {part.name}</span>
-              <span className={`text-[15px] font-medium break-words ${part.drill ? 'text-ink' : 'text-ink-3'}`}>{part.drill?.name ?? 'No drill yet'}</span>
-              {players && <span className="text-[13px] text-ink-3">{players}</span>}
-            </span>
-            <span className="flex flex-none gap-1">
-              <Button size="sm" variant="ghost" aria-label={`${part.drill ? 'Edit' : 'Pick a drill for'} ${part.name}`} onClick={() => onEdit(i)}>
-                <Pencil aria-hidden size={14} />{part.drill ? 'Edit' : 'Pick a drill'}</Button>
-              <Button size="sm" variant="ghost" aria-label={`Remove ${part.name}`} onClick={() => onRemove(i)}><X aria-hidden size={16} /></Button>
-            </span>
-          </li>
-        })}
-      </ol>}
+    <PlanRows parts={parts} onEdit={onEdit} onRemove={onRemove} />
     <div><Button size="sm" variant="secondary" onClick={onAdd}><Plus aria-hidden size={16} />Add a part</Button></div>
     {/* Kostas, 30 Oct: one optional note at the end, not one per drill. */}
     <Textarea label="A note for you (optional)" description="Anything to remember on the day. Only you see it." rows={2} maxLength={NOTE_MAX}
@@ -288,10 +297,11 @@ function Review({ parts, length, note, onNote, onEdit, onRemove, onAdd, onBack, 
 }
 
 /** How Home's Today card will show the plan (TRAK-304): every drill and its minutes. */
-function OnTheDay({ parts }: { parts: Part[] }) {
+function OnTheDay({ parts, title = 'On the day' }: { parts: Part[]; title?: string }) {
   return <aside aria-labelledby="on-the-day" className="arc grid content-start gap-3 rounded-2xl border border-line bg-surface p-5">
-    <h2 id="on-the-day" className="text-lg font-medium text-ink">On the day</h2>
-    <p className="text-sm text-ink-3">Your Today card on Home shows the plan like this. Only you see it.</p>
+    <h2 id="on-the-day" className="text-lg font-medium text-ink">{title}</h2>
+    <p className="text-sm text-ink-3">{title === 'On the day' ? 'Your Today card on Home shows the plan like this. Only you see it.'
+      : 'The rest of the plan, as it is.'}</p>
     <div className="grid gap-1.5 rounded-xl bg-raised p-4">
       <p className="flex justify-between text-sm"><span className="font-medium text-ink">Training plan</span><span className="text-ink-3">{totalMinutes(parts)} min</span></p>
       {parts.filter(p => p.drill).map(p => <p key={p.key} className="flex justify-between gap-3 text-sm text-ink-2">

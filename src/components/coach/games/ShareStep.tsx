@@ -47,7 +47,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
   /** Pulls up the event's edit sheet (TRAK-331), for the Logistics part. */
   onEditLogistics: () => void
 }) {
-  // The face-to-face tick, and Share at…'s pickers. A new share time (scheduled, moved or gone out now) closes them.
+  // The face-to-face tick, and Schedule's pickers. A new share time (scheduled, moved or gone out now) closes them.
   const [talked, setTalked] = useState(false)
   const [picking, setPicking] = useState(false)
   useEffect(() => setPicking(false), [sharedAt])
@@ -90,16 +90,16 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
             <p className="text-sm text-ink-2">It wasn’t shared before kick-off, so only you saw it.</p>
           </section>
         ) : sharedAt == null ? <>
-          <Checkbox label="I’ve talked selection through with the players, face to face" checked={talked}
-            description="Before this goes out. Players should hear it from you first." onCheckedChange={value => setTalked(value === true)} />
+          {/* TRAK-345 (Imad, 3 Nov): the tick says this and nothing else; Schedule (it was "Share at…") opens under the button. */}
+          <Checkbox label="I’ve talked selection through with the players" checked={talked} onCheckedChange={value => setTalked(value === true)} />
           <p className="text-sm text-ink-3">{players(reading.length)} and their families, in the app only</p>
-          {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta={when => when ? `Schedule for ${when}` : 'Schedule'}
-            busy={sharing} ready={!holdsBack} onSchedule={at => onSchedule(at, talked)} onCancel={() => setPicking(false)} />}
           <div className="flex flex-wrap items-center gap-3">
             {holdsBack && <span className="text-sm text-ink-3">{holdsBack}</span>}
             <span className="ml-auto"><SplitButton label={sharing ? 'Sharing…' : 'Share plan'} onClick={() => onShare(talked)}
-              disabled={!!holdsBack || sharing} actions={[{ label: 'Share at…', onSelect: () => setPicking(true), disabled: !!holdsBack }]} /></span>
+              disabled={!!holdsBack || sharing} actions={[{ label: 'Schedule', onSelect: () => setPicking(true), disabled: !!holdsBack }]} /></span>
           </div>
+          {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta={when => when ? `Schedule for ${when}` : 'Schedule'}
+            busy={sharing} ready={!holdsBack} onSchedule={at => onSchedule(at, talked)} onCancel={() => setPicking(false)} />}
           {problem && <p role="alert" className="text-sm text-danger">{problem}</p>}
         </> : waiting ? (
           <section aria-labelledby="plan-scheduled" className="grid gap-3">
@@ -136,7 +136,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
   )
 }
 
-/** TRAK-290: Share at… The day and time are the academy's clock, as every form's are; the database turns them into
+/** TRAK-290: Schedule ("Share at…" until TRAK-345). The day and time are the academy's clock, as every form's are; the database turns them into
  *  the moment it goes out, and refuses one that has passed or isn't before kick-off. */
 export function ShareAt({ game, initial, cta, busy, ready, onSchedule, onCancel }: {
   game: EventRow; initial: { day: string; time: string }; busy: boolean
@@ -151,11 +151,14 @@ export function ShareAt({ game, initial, cta, busy, ready, onSchedule, onCancel 
   const when = day && time ? `${format(dayAsDate(day)!, 'EEE')} ${time}` : null
   return (
     <div className="grid gap-3">
-      <DatePicker label="Day" className="arc-trak-field" value={dayAsDate(day)} clearable={false} placeholder="Pick a day"
-        onChange={date => { if (date) setDay(dateAsDay(date)) }} minDate={dayAsDate(localTodayISO())}
-        maxDate={dayAsDate(displayEventTime(game).date)} format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale="en-GB" />
-      <TimePicker label="Time" className="arc-trak-field" value={time} onChange={setTime} minuteStep={5} format="12h"
-        placeholder="Pick a time" emptyAt="19:00" />
+      {/* TRAK-345: the day and the time side by side, on a phone too. */}
+      <div className="grid grid-cols-2 gap-3">
+        <DatePicker label="Day" className="arc-trak-field min-w-0" value={dayAsDate(day)} clearable={false} placeholder="Pick a day"
+          onChange={date => { if (date) setDay(dateAsDay(date)) }} minDate={dayAsDate(localTodayISO())}
+          maxDate={dayAsDate(displayEventTime(game).date)} format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale="en-GB" />
+        <TimePicker label="Time" className="arc-trak-field min-w-0" value={time} onChange={setTime} minuteStep={5} format="12h"
+          placeholder="Pick a time" emptyAt="19:00" />
+      </div>
       <p className="text-sm text-ink-3">Any time before kick-off. Until then, only you see it.</p>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" disabled={!ready || !day || !time} loading={busy} onClick={() => onSchedule(`${day}T${time}`)}>{cta(when)}</Button>

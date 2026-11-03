@@ -203,7 +203,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByRole('heading', { level: 1, name: 'Matches' })).toBeVisible()
     const next = page.getByRole('region', { name: 'Next match' })
     await expect(next.getByText('vs Parkview Athletic U16')).toBeVisible()
-    await expect(next.getByText('Plan not shared')).toBeVisible()
+    await expect(next.getByText('Draft', { exact: true })).toBeVisible()
     // TRAK-286: with a draft, sharing it is next. TRAK-333: on a split button, with the match's other pages behind it.
     await expect(next.getByRole('button', { name: 'Share plan', exact: true })).toBeVisible()
     await expect(next.getByRole('button', { name: 'Share plan more actions' })).toBeVisible()
@@ -246,7 +246,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   // TRAK-331 (Imad, 2 Nov): Edit pulls up Schedule's own edit sheet on the match page; the coach never leaves the match.
   test(`a game's logistics at ${width} px: Edit pulls up the event's sheet on the match page`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next', width, height)
-    await expect(page.getByText('Shared with families')).toBeVisible()
+    await expect(page.getByText('Shared', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Edit', exact: true }).click()
     const sheet = page.getByRole('dialog', { name: 'Edit event' })
     await expect(sheet).toBeVisible()
@@ -285,14 +285,14 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
 
     // A look at Logistics, with the panel's exit animation, keeps every field.
     await page.getByRole('tab', { name: 'Logistics' }).click()
-    await expect(page.getByText('Shared with families')).toBeVisible()
+    await expect(page.getByText('Shared', { exact: true })).toBeVisible()
     await page.waitForTimeout(600)
     await page.getByRole('tab', { name: 'Game plan' }).click()
     await expect(goal.getByLabel('Instruction', { exact: true })).toHaveValue('Win it back in their half')
 
     await page.getByRole('button', { name: 'Save draft' }).click()
     await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
-    await expect(page.getByText('Plan not shared')).toBeVisible()
+    await expect(page.getByText('Draft', { exact: true })).toBeVisible()
     expect(plans.get('m-next')).toMatchObject({ strength: 'stronger',
       goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }] })
     await page.waitForTimeout(500)
@@ -414,9 +414,28 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   test(`a game's Review & share at ${width} px: every part at a glance, then tick and share by keyboard`, async ({ page, context }, testInfo) => {
     const plans = DRAFT()
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan&step=share', width, height, plans)
-    const card = page.getByRole('region', { name: 'Review & share' })
+    const card = page.getByRole('region', { name: 'Game plan review' })
     await expect(card).toBeVisible()
     await expect(card.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(5)
+    // TRAK-344 (Imad, 3 Nov): the gauge, what's left and the countdown sit in three equal columns on one line; on a
+    // phone the countdown goes under the other two.
+    const box = async (locator: ReturnType<typeof page.getByRole>) => (await locator.boundingBox())!
+    const [whole, gauge, left, label, clock] = await Promise.all([box(card), box(card.getByRole('img', { name: /parts ready/ })),
+      // What's left is its icon and its words, centred together.
+      box(card.getByText('1 incomplete', { exact: true }).locator('..')), box(card.getByText('Kick-off in', { exact: true })),
+      box(card.getByRole('timer', { name: 'Kick-off in' }))])
+    const middleY = (top: number, bottom: number) => (top + bottom) / 2
+    const centreX = (b: { x: number; width: number }) => b.x + b.width / 2
+    expect(Math.abs(middleY(gauge.y, gauge.y + gauge.height) - middleY(left.y, left.y + left.height))).toBeLessThanOrEqual(2)
+    if (width >= 1024) {
+      expect(Math.abs(middleY(gauge.y, gauge.y + gauge.height) - middleY(label.y, clock.y + clock.height))).toBeLessThanOrEqual(2)
+      expect(Math.abs(centreX(left) - centreX(whole))).toBeLessThanOrEqual(2)
+      expect(Math.abs((centreX(gauge) + centreX(clock)) / 2 - centreX(whole))).toBeLessThanOrEqual(2)
+      // Arc's countdown digits are the gauge count's size.
+      expect(await card.getByRole('timer').evaluate(el => getComputedStyle(el.querySelector('[class*="units"]')!).fontSize)).toBe('28px')
+    } else {
+      expect(label.y).toBeGreaterThan(gauge.y + gauge.height)
+    }
     const share = card.getByRole('button', { name: 'Share plan', exact: true })
     await expect(share).toBeDisabled()
     await expect(card.getByText('Tick “I’ve talked selection through” to share')).toBeVisible()
@@ -455,7 +474,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   test(`Share at… at ${width} px: the chevron by keyboard, then a scheduled plan waits`, async ({ page, context }, testInfo) => {
     const plans = DRAFT()
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan&step=share', width, height, plans)
-    await expect(page.getByRole('region', { name: 'Review & share' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Game plan review' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Share plan more actions' })).toBeDisabled()
     await page.getByRole('checkbox', { name: /talked selection through/ }).focus()
     await page.keyboard.press('Space')

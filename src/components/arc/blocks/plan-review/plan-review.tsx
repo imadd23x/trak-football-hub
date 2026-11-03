@@ -1,18 +1,20 @@
 // Arc Pro (uiarc.dev): adapted from the Account health block; licensed source, not covered by this repository's licence. See src/components/arc/PRO.md.
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import { CircleAlert, CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "../../button/button";
+import { Countdown } from "../../countdown/countdown";
 import { motionTokens } from "../../lib/motion-tokens";
 import styles from "./plan-review.module.css";
 
 /* Trak (TRAK-332, Imad 2 Nov): Review & share. Account health's card (a gauge, a countdown, signal rows, one next step)
    reads a game plan instead of a customer: the gauge counts the parts that are ready, the countdown runs to kick-off,
    each row is a part of the plan with its own Edit, and the footer holds what shares it. No time ranges, no sparklines
-   and no AI summary: Trak has no history to draw and no AI writing it. */
+   and no AI summary: Trak has no history to draw and no AI writing it. TRAK-344 (Imad, 3 Nov): one row of three equal
+   columns (the gauge, what's left, Arc's countdown), and each part's status is its icon, a word only for screen readers. */
 
 export type ReviewStatus = "good" | "watch" | "risk";
 export type ReviewRow = {
@@ -25,38 +27,37 @@ export type ReviewRow = {
   onEdit?: () => void;
 };
 export interface PlanReviewProps {
-  /** The match: "vs Mirdif Rangers". */
+  /** The card's name: "Game plan review". */
   title: string;
-  /** When and where: "Sat 7 Nov · Kick-off 12:00 · Away". */
-  meta?: string;
   rows: ReviewRow[];
-  /** The gauge's word: "Ready to share", "2 to check", "Logistics first". */
+  /** The gauge's word: "Ready to share", "3 incomplete". */
   band: { status: ReviewStatus; label: string };
-  /** The countdown: its label ("Kick-off Sat 7 Nov"), when the plan began and kick-off. */
-  countdown: { label: string; start: Date | string; end: Date | string };
+  /** The countdown: its label ("Kick-off in"), kick-off, and what it says once kick-off has passed. */
+  countdown: { label: string; end: Date | string; completeLabel: string };
   /** Read only: the rows have no Edit. */
   readOnly?: boolean;
   /** What shares the plan, under the rows. */
   children?: ReactNode;
 }
 
-const HOUR = 3_600_000, DAY = 24 * HOUR;
 const ease = [...motionTokens.ease.enter] as [number, number, number, number];
 const STATUS: Record<ReviewStatus, { label: string; Icon: typeof CircleCheck }> = {
   good: { label: "Ready", Icon: CircleCheck },
-  watch: { label: "Check", Icon: CircleAlert },
+  watch: { label: "Incomplete", Icon: CircleAlert },
   risk: { label: "Needed", Icon: TriangleAlert },
 };
-const toDate = (value: Date | string) => value instanceof Date ? value : new Date(value);
 
-function StatusIcon({ status }: { status: ReviewStatus }) {
-  const { Icon } = STATUS[status];
-  return <Icon className={styles.statusIcon} data-status={status} size={14} strokeWidth={2} aria-hidden="true" />;
+/** A status as its icon. `spoken`: screen readers hear the status's word, as a row shows none. */
+function StatusIcon({ status, spoken = false }: { status: ReviewStatus; spoken?: boolean }) {
+  const { Icon, label } = STATUS[status];
+  return <Icon className={styles.statusIcon} data-status={status} size={14} strokeWidth={2}
+    {...(spoken ? { role: "img", "aria-label": label } : { "aria-hidden": true })} />;
 }
 
-export function PlanReview({ title, meta, rows, band, countdown, readOnly = false, children }: PlanReviewProps) {
+export function PlanReview({ title, rows, band, countdown, readOnly = false, children }: PlanReviewProps) {
   const reduced = useReducedMotion() ?? false;
   const rootRef = useRef<HTMLElement>(null);
+  const titleId = useId();
   const ready = rows.filter(row => row.status === "good").length;
 
   // The entrance starts when the card first scrolls into view, so a capture always opens on it.
@@ -84,21 +85,12 @@ export function PlanReview({ title, meta, rows, band, countdown, readOnly = fals
     return () => controls.stop();
   }, [started, target, reduced, score]);
 
-  // Trak: whole days and hours to go, as the match page's own countdown counts them (04d 19h), not calendar days.
-  const end = toDate(countdown.end), start = toDate(countdown.start);
-  const left = end.getTime() - Date.now();
-  const daysLeft = Math.floor(left / DAY), hoursLeft = Math.floor(left / HOUR);
-  const termDone = Math.min(1, Math.max(0, (Date.now() - start.getTime()) / Math.max(1, end.getTime() - start.getTime())));
-
   return (
-    <section ref={rootRef} className={styles.root} aria-label="Review & share">
+    <section ref={rootRef} className={styles.root} aria-labelledby={titleId}>
       <div className={styles.top}>
-        <header className={styles.identity}>
-          <h3 className={styles.name}>{title}</h3>
-          {meta ? <p className={styles.meta}>{meta}</p> : null}
-        </header>
+        <h3 id={titleId} className={styles.name}>{title}</h3>
         <div className={styles.overview}>
-          <div className={styles.scoreCell}>
+          <div className={styles.cell}>
             <div className={styles.gauge} role="img" aria-label={`${ready} of ${rows.length} parts ready, ${band.label.toLowerCase()}`}>
               <svg viewBox="0 0 112 60" width="112" height="60" aria-hidden="true">
                 <path className={styles.gaugeTrack} d="M8 56a48 48 0 0 1 96 0" />
@@ -106,37 +98,29 @@ export function PlanReview({ title, meta, rows, band, countdown, readOnly = fals
               </svg>
               <span className={styles.scoreNumber} aria-hidden="true">{ready}/{rows.length}</span>
             </div>
-            <div className={styles.scoreText}>
-              <span className={styles.band} data-status={band.status}>
-                <StatusIcon status={band.status} />
-                <span className={styles.truncate}>{band.label}</span>
-              </span>
-              <span className={styles.trend}>{ready} of {rows.length} ready</span>
-            </div>
           </div>
-          <div className={styles.countdownCell}>
-            <p className={styles.countdownLabel}><span className={styles.truncate}>{countdown.label}</span></p>
-            <span className={styles.term} aria-hidden="true">
-              <motion.span className={styles.termFill} initial={{ scaleX: 0 }} animate={{ scaleX: started ? termDone : 0 }}
-                transition={reduced ? { duration: 0 } : { duration: .56, ease }} />
+          <div className={styles.cell}>
+            <span className={styles.band} data-status={band.status}>
+              <StatusIcon status={band.status} />
+              <span>{band.label}</span>
             </span>
-            <p className={styles.days}>
-              {daysLeft > 0 ? <><span className={styles.bigNumber}>{daysLeft}</span><span className={styles.unit}>{daysLeft === 1 ? "day left" : "days left"}</span></>
-                : hoursLeft > 0 ? <><span className={styles.bigNumber}>{hoursLeft}</span><span className={styles.unit}>{hoursLeft === 1 ? "hour left" : "hours left"}</span></>
-                : <span className={styles.unit}>{left > 0 ? "Kick-off within the hour" : "Kicked off"}</span>}
-            </p>
+          </div>
+          <div className={`${styles.cell} ${styles.countdownCell}`}>
+            {/* The timer is named by the same words, so they're said once. */}
+            <p className={styles.countdownLabel} aria-hidden="true">{countdown.label}</p>
+            <Countdown className={styles.countdown} target={countdown.end} units={["days", "hours", "minutes"]}
+              label={countdown.label} completeLabel={countdown.completeLabel} />
           </div>
         </div>
       </div>
 
       <ul className={styles.rows} aria-label="The plan">
         {rows.map(row => <li key={row.id} className={styles.row} data-read-only={readOnly || undefined}>
-          <StatusIcon status={row.status} />
+          <StatusIcon status={row.status} spoken />
           <span className={styles.rowText}>
             <span className={styles.rowLabel}>{row.label}</span>
             {row.detail ? <span className={styles.rowDetail}>{row.detail}</span> : null}
           </span>
-          <span className={styles.status} data-status={row.status}>{STATUS[row.status].label}</span>
           {!readOnly && row.onEdit ? <Button variant="ghost" size="sm" aria-label={`Edit ${row.label.toLowerCase()}`} onClick={row.onEdit}>Edit</Button> : null}
         </li>)}
       </ul>

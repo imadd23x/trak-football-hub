@@ -5,7 +5,7 @@ import { displayEventTime, localTodayISO } from '@/lib/event-time'
 import { STRENGTHS, type PlanForm } from '@/lib/games/plan'
 import { playerPlan } from '@/lib/games/lineup'
 import { lineUpCounts, readers, shareWall } from '@/lib/games/share'
-import { gameWhen, type useWhoCanCome } from './useGames'
+import type { useWhoCanCome } from './useGames'
 import { LoadError } from '@/components/trak'
 import { Alert } from '@/components/arc/alert/alert'
 import { Badge } from '@/components/arc/badge/badge'
@@ -22,13 +22,15 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    a scheduled plan waits with "Shares Thu 19:30", and what's saved by then goes out (Imad, 29 Oct). TRAK-332 (Imad,
    2 Nov): Review & share, one card (Arc Pro Account health, adapted): the plan at a glance, each part with its own Edit,
    and in the card itself the face-to-face tick and Share plan. Share waits only for the logistics and the tick (Imad,
-   28 Oct); the other parts say Check and never block. Who sees what and the preview are gone. */
+   28 Oct); the other parts never block. Who sees what and the preview are gone. TRAK-344 (Imad, 3 Nov):
+   Game plan review says each thing once: no match or time (the header has them), "N incomplete", one countdown, and
+   no detail for Logistics or Tactics & analysis. */
 
 const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
 const list = (names: string[]) => names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 const sub = 'text-sm font-medium text-ink'
 
-export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSchedule, sharing, problem, locked = false, onStep, onEditLogistics, planStartedAt }: {
+export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSchedule, sharing, problem, locked = false, onStep, onEditLogistics }: {
   game: EventRow; form: PlanForm; who: ReturnType<typeof useWhoCanCome>; locked?: boolean
   /** When the plan was first shared, or goes out if that's still to come (TRAK-290); null while it's a draft. */
   sharedAt: string | null
@@ -44,8 +46,6 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
   onStep: (step: number) => void
   /** Pulls up the event's edit sheet (TRAK-331), for the Logistics part. */
   onEditLogistics: () => void
-  /** When the plan was first saved: where the countdown's bar starts. */
-  planStartedAt: string | null
 }) {
   // The face-to-face tick, and Share at…'s pickers. A new share time (scheduled, moved or gone out now) closes them.
   const [talked, setTalked] = useState(false)
@@ -66,10 +66,8 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
   const waiting = sharedAt != null && !locked && Date.now() < Date.parse(sharedAt)
 
   const rows: ReviewRow[] = [
-    { id: 'logistics', label: 'Logistics', status: game.published ? 'good' : 'risk', onEdit: onEditLogistics,
-      detail: game.published ? 'Shared with families' : 'A draft: publish it before you share' },
-    { id: 'tactics', label: 'Tactics & analysis', status: strength ? 'good' : 'watch', onEdit: () => onStep(0),
-      detail: `${strength ?? 'How strong they are isn’t set'} · ${form.scouting.trim() ? 'scouting written' : 'no scouting'}` },
+    { id: 'logistics', label: 'Logistics', status: game.published ? 'good' : 'risk', onEdit: onEditLogistics },
+    { id: 'tactics', label: 'Tactics & analysis', status: strength ? 'good' : 'watch', onEdit: () => onStep(0) },
     { id: 'instructions', label: 'Instructions', status: instructions ? 'good' : 'watch', onEdit: () => onStep(0),
       detail: instructions ? `${instructions} ${instructions === 1 ? 'instruction' : 'instructions'}` : 'None yet' },
     { id: 'line-up', label: 'Line-up', status: placed === form.format ? 'good' : 'watch', onEdit: () => onStep(1),
@@ -77,17 +75,15 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
     { id: 'jobs', label: 'Jobs', status: placed > 0 && withJob === placed ? 'good' : 'watch', onEdit: () => onStep(1),
       detail: placed === 0 ? 'Nobody is on the pitch yet' : `${withJob} of ${placed} starters have one` },
   ]
-  const toCheck = rows.filter(row => row.status !== 'good').length
-  const band = !game.published ? { status: 'risk' as const, label: 'Logistics first' }
-    : toCheck === 0 ? { status: 'good' as const, label: 'Ready to share' } : { status: 'watch' as const, label: `${toCheck} to check` }
-  const { day, time } = gameWhen(game)
-  const meta = [day, time ? `Kick-off ${time}` : '', game.home_away === 'home' ? 'Home' : game.home_away === 'away' ? 'Away' : ''].filter(Boolean).join(' · ')
+  const incomplete = rows.filter(row => row.status !== 'good').length
+  const band = incomplete === 0 ? { status: 'good' as const, label: 'Ready to share' }
+    : { status: game.published ? 'watch' as const : 'risk' as const, label: `${incomplete} incomplete` }
   const holdsBack = !game.published ? 'Publish the match in Logistics first' : !talked ? 'Tick “I’ve talked selection through” to share' : null
 
   return (
     <div className="arc">
-      <PlanReview title={game.opponent ? `vs ${game.opponent}` : game.title} meta={meta} rows={rows} band={band} readOnly={locked}
-        countdown={{ label: `Kick-off ${format(new Date(game.starts_at), 'EEE d MMM')}`, start: planStartedAt ?? new Date().toISOString(), end: game.starts_at }}>
+      <PlanReview title="Game plan review" rows={rows} band={band} readOnly={locked}
+        countdown={{ label: locked ? 'Kick-off' : 'Kick-off in', end: game.starts_at, completeLabel: 'Locked' }}>
         {sharedAt == null && locked ? (
           <section aria-labelledby="plan-not-shared" className="grid gap-1">
             <h4 id="plan-not-shared" className={sub}>Not shared</h4>

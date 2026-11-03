@@ -116,15 +116,13 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     const user = userEvent.setup()
     const calls = store()
     shareStep()
-    const card = await screen.findByRole('region', { name: 'Review & share' })
+    const card = await screen.findByRole('region', { name: 'Game plan review' })
     // Who can come or is placed reads it; who can't make it and isn't placed doesn't, nor a child waiting for consent.
     expect(within(card).getByText('3 players and their families, in the app only')).toBeInTheDocument()
-    expect(within(card).getByRole('img', { name: '4 of 5 parts ready, 1 to check' })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: '4 of 5 parts ready, 1 incomplete' })).toBeInTheDocument()
     const parts = within(card).getByRole('list', { name: 'The plan' })
     expect(within(parts).getAllByRole('listitem').map(item => item.querySelector('[class*="rowLabel"]')?.textContent))
       .toEqual(['Logistics', 'Tactics & analysis', 'Instructions', 'Line-up', 'Jobs'])
-    expect(within(parts).getByText('Shared with families')).toBeInTheDocument()
-    expect(within(parts).getByText('Stronger · scouting written')).toBeInTheDocument()
     expect(within(parts).getByText('1 instruction')).toBeInTheDocument()
     expect(within(parts).getByText('1 of 11 placed · 1 on the bench')).toBeInTheDocument()
     expect(within(parts).getByText('1 of 1 starters have one')).toBeInTheDocument()
@@ -148,7 +146,7 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     const user = userEvent.setup()
     const calls = store()
     shareStep()
-    const card = await screen.findByRole('region', { name: 'Review & share' })
+    const card = await screen.findByRole('region', { name: 'Game plan review' })
     expect(screen.queryByRole('region', { name: 'Who sees what' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Preview' })).toBeNull()
     // Share sits in the card, not in the bar.
@@ -162,7 +160,7 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     expect(await screen.findByRole('heading', { name: 'Instructions' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next: Line-up and jobs' }))
     await user.click(screen.getByRole('button', { name: 'Next: Review & share' }))
-    await user.click(within(await screen.findByRole('region', { name: 'Review & share' })).getByRole('button', { name: 'Edit line-up' }))
+    await user.click(within(await screen.findByRole('region', { name: 'Game plan review' })).getByRole('button', { name: 'Edit line-up' }))
     expect(await screen.findByRole('heading', { name: '4-4-2' })).toBeInTheDocument()
   })
 
@@ -185,7 +183,7 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
   it('a shared plan opens on Review & share, not on its first step', async () => {
     store({ shared: true })
     renderApp('/coach/matches/g1?tab=plan')
-    expect(await screen.findByRole('region', { name: 'Review & share' })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Game plan review' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Game plan' }).querySelector('[aria-current="step"]')).toHaveTextContent('Review & share')
   })
 
@@ -195,7 +193,7 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     server.use(http.post(`${SUPABASE_URL}/rest/v1/rpc/share_game_plan`, () =>
       HttpResponse.json({ code: 'P0001', message: 'This match has kicked off, so its plan can\'t be shared' }, { status: 400 })))
     shareStep()
-    const card = await screen.findByRole('region', { name: 'Review & share' })
+    const card = await screen.findByRole('region', { name: 'Game plan review' })
     await user.click(within(card).getByRole('checkbox', { name: /talked selection through/ }))
     await user.click(within(card).getByRole('button', { name: 'Share plan' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('This match has kicked off, so its plan can\'t be shared')

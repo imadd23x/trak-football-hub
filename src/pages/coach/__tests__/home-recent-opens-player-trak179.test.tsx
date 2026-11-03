@@ -36,7 +36,7 @@ describe('TRAK-179: a player in the overview opens the player (TRAK-211: on Feed
     serve()
     renderApp('/coach/feedback')
     await userEvent.click(await screen.findByRole('button', { name: /^Open Ade Okafor's profile/ }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/player/sp-1'))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/squad/player/sp-1'))
   }, 20_000)
 
   // TRAK-200 (Imad, 18 Oct): the way back from that profile is where it was opened, not Squad. TRAK-334: it's the
@@ -46,11 +46,12 @@ describe('TRAK-179: a player in the overview opens the player (TRAK-211: on Feed
     serve()
     renderApp('/coach/feedback')
     await userEvent.click(await screen.findByRole('button', { name: /^Open Ade Okafor's profile/ }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/player/sp-1'))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/squad/player/sp-1'))
     const trail = await screen.findByRole('navigation', { name: 'Breadcrumb trail' })
     // Feedback, opened from a link and outside the nav, sits under Home.
     expect(within(trail).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Home', 'Feedback', 'Ade Okafor'])
-    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+    // TRAK-351 (Tarek, 3 Nov): the player's own page also has a Back button, beside the trail TRAK-334 gave it.
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
     await userEvent.click(within(trail).getByRole('link', { name: 'Feedback' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/feedback'))
   }, 20_000)

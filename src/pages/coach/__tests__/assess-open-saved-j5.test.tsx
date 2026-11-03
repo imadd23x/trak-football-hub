@@ -135,7 +135,8 @@ const assessmentWrites = () => writes.filter(w => w.table === 'coach_assessments
 // TRAK-182: walking the steps adds real interaction; CI under load needs more than 5 s.
 // TRAK-200: the latest assessment is Arc's card; Edit sits behind its split button's chevron.
 async function openLatest(user: ReturnType<typeof userEvent.setup>) {
-  const card = await screen.findByRole('article', { name: /assessment, / })
+  // The latest card comes first: on the player's own page (TRAK-351) every assessment is a card, newest first.
+  const [card] = await screen.findAllByRole('article', { name: /assessment, / })
   await user.click(within(card).getByRole('button', { name: /more actions$/ }))
   await user.click(await screen.findByRole('menuitem', { name: 'Edit' }))
 }
@@ -181,7 +182,7 @@ describe('TRAK-69: a coach opens a saved assessment and edits that row', { timeo
     const user = userEvent.setup()
     renderApp('/coach/feedback')
     await user.click(await screen.findByRole('button', { name: /^Open Manos Synthetic's profile/ }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/player/player-a'))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/squad/player/player-a'))
     await openLatest(user)
     expect(await screen.findByText(/Editing your assessment for vs Olympiacos Youth/)).toBeInTheDocument()
   })
@@ -205,7 +206,7 @@ describe('TRAK-69: a coach opens a saved assessment and edits that row', { timeo
     await openLatest(user)
     expect(await screen.findByText(/Editing your assessment for vs Olympiacos Youth/)).toBeInTheDocument()
     await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Manos Synthetic' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/player/player-a'))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/squad/player/player-a'))
   })
 
   it('the trail from an assessment opened directly, with nothing before it in Trak, starts at Home', async () => {

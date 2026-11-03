@@ -148,7 +148,7 @@ export default function CoachHomePage() {
             onRetry={() => { roster.retry(); owed.retry(); if (gamesOn) { void games.refetch(); void plans.refetch(); void shares.refetch() } }}
             onOpen={item => item.kind === 'draft'
               // TRAK-200: the profile's assessment card says Draft and has Publish.
-              ? navigate(`/coach/player/${item.playerId}`)
+              ? navigate(`/coach/squad/player/${item.playerId}`)
               : navigate('/coach/assess', { state: { preselectedPlayerId: item.playerId } })} />
         </div>}
       </div>

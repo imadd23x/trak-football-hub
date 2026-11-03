@@ -160,7 +160,8 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/how-it-works" element={<HowTrakWorks />} />
             <Route path="/coach/home" element={<RouteGuard allowedRole="coach"><CoachHomePage /></RouteGuard>} />
-            <Route path="/coach/squad" element={<RouteGuard allowedRole="coach"><CoachSquadPage /></RouteGuard>} />
+            {/* TRAK-351: /coach/squad/player/:id is a player's own page, inside Squad so the list keeps its place. */}
+            <Route path="/coach/squad/*" element={<RouteGuard allowedRole="coach"><CoachSquadPage /></RouteGuard>} />
             <Route path="/coach/squad/add" element={<RouteGuard allowedRole="coach"><Navigate to="/coach/squad" replace /></RouteGuard>} />
             <Route path="/coach/assess" element={<RouteGuard allowedRole="coach"><CoachAssessPage /></RouteGuard>} />
             <Route path="/coach/feedback" element={<RouteGuard allowedRole="coach"><CoachFeedbackPage /></RouteGuard>} />

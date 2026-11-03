@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import type { Tables } from '@/integrations/supabase/types'
+import type { Json, Tables } from '@/integrations/supabase/types'
 import { WEEK, cleanDrill, trainingEnd, type Drill, type DrillDraft } from '@/lib/training/sessions'
-import { toSave, type Practice, type SavedPractice } from '@/lib/training/plans'
+import type { SavedPractice } from '@/lib/training/plans'
+import { toSave, type MyDrill, type Part } from '@/lib/training/parts'
 import type { Again } from '@/lib/training/next'
 
 /* TRAK-294 (Training 1/5): the coach's own trainings for Training home, not cancelled (a published event is cancelled,
@@ -52,8 +53,8 @@ export function useTraining(eventId: string | undefined) {
   })
 }
 
-const PRACTICE_COLUMNS = 'position, name, minutes, how, tell, area, numbers, direction, targets, conditions, source, drill_id, library_session'
-export type Plan = { updatedAt: string; practices: SavedPractice[] }
+const PRACTICE_COLUMNS = 'position, name, minutes, how, tell, area, numbers, direction, targets, conditions, source, drill_id, library_session, part, part_type, trak_drill, players_kind, group_size'
+export type Plan = { updatedAt: string; note: string; practices: SavedPractice[] }
 
 /** A training's plan, or null before its first save. Only its coach reads it (the database's rule). */
 export function usePlan(eventId: string | undefined) {
@@ -62,13 +63,13 @@ export function usePlan(eventId: string | undefined) {
     queryKey: ['coach', user?.id, 'training-plan', eventId],
     enabled: !!user && !!eventId,
     queryFn: async (): Promise<Plan | null> => {
-      const plan = await supabase.from('training_plans').select('updated_at').eq('event_id', eventId!).maybeSingle()
+      const plan = await supabase.from('training_plans').select('updated_at, note').eq('event_id', eventId!).maybeSingle()
       if (plan.error) throw plan.error
       if (!plan.data) return null
       const practices = await supabase.from('training_plan_practices').select(PRACTICE_COLUMNS)
         .eq('event_id', eventId!).order('position')
       if (practices.error) throw practices.error
-      return { updatedAt: plan.data.updated_at, practices: practices.data ?? [] }
+      return { updatedAt: plan.data.updated_at, note: plan.data.note, practices: practices.data ?? [] }
     },
   })
 }
@@ -130,34 +131,67 @@ export function usePastSessions(enabled = true) {
   })
 }
 
-/** Saves the whole plan in one go (save_training_plan: every practice or none). A practice ticked "Save to My drills"
- *  joins My drills in the same save. */
+/** Saves the whole plan in one go (save_training_plan: every part or none), with the coach's note. The training's
+ *  draft goes with it (TRAK-340). */
 export function useSavePlan(eventId: string) {
   const { user } = useAuth()
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async (practices: Practice[]) => {
-      const { error } = await supabase.rpc('save_training_plan', { p_event_id: eventId, p_practices: toSave(practices) })
+    mutationFn: async ({ parts, note }: { parts: Part[]; note: string }) => {
+      const { error } = await supabase.rpc('save_training_plan', { p_event_id: eventId, p_practices: toSave(parts), p_note: note.trim() })
       if (error) throw error
     },
-    onSuccess: () => Promise.all([
-      client.invalidateQueries({ queryKey: ['coach', user?.id, 'training-plan', eventId] }),
-      client.invalidateQueries({ queryKey: ['coach', user?.id, 'training-plans'] }),
-      client.invalidateQueries({ queryKey: ['coach', user?.id, 'past-sessions'] }),
-      client.invalidateQueries({ queryKey: ['coach', user?.id, 'past-trainings'] }),
-      client.invalidateQueries({ queryKey: ['coach', user?.id, 'drills'] }),
-    ]),
+    onSuccess: () => Promise.all(['training-plan', 'training-plans', 'past-sessions', 'past-trainings', 'drills', 'training-drafts']
+      .map(key => client.invalidateQueries({ queryKey: key === 'training-plan' ? ['coach', user?.id, key, eventId] : ['coach', user?.id, key] }))),
   })
 }
 
-const DRILL_COLUMNS = 'id, name, minutes, how, tell, area, numbers, direction, targets, conditions, updated_at'
+/* ── TRAK-340: drafts ─────────────────────────────────────────────────── */
+
+export type Draft = { step: number; parts: Part[]; note: string; updatedAt: string }
+
+const asDraft = (row: { step: number; body: Json; updated_at: string }): Draft | null => {
+  const body = row.body as { parts?: Part[]; note?: string } | null
+  return Array.isArray(body?.parts) ? { step: row.step, parts: body!.parts!, note: body!.note ?? '', updatedAt: row.updated_at } : null
+}
+
+/** The trainings the coach has a draft for, with where they stopped. Only their own. */
+export function useDrafts() {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['coach', user?.id, 'training-drafts'],
+    enabled: !!user,
+    queryFn: async (): Promise<Map<string, Draft>> => {
+      const { data, error } = await supabase.from('training_plan_drafts').select('event_id, step, body, updated_at')
+      if (error) throw error
+      return new Map((data ?? []).flatMap(row => { const draft = asDraft(row); return draft ? [[row.event_id, draft] as const] : [] }))
+    },
+  })
+}
+
+/** Keeps the planner as it is, to carry on later. Only the coach sees it; it never counts as planned. */
+export function useSaveDraft(eventId: string) {
+  const { user } = useAuth()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ step, parts, note }: { step: number; parts: Part[]; note: string }) => {
+      const { error } = await supabase.from('training_plan_drafts')
+        .upsert({ event_id: eventId, step: Math.min(step, 12), body: { parts, note } as unknown as Json }, { onConflict: 'event_id' })
+        .select('event_id').single()
+      if (error) throw error
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['coach', user?.id, 'training-drafts'] }),
+  })
+}
+
+const DRILL_COLUMNS = 'id, name, minutes, how, tell, area, numbers, direction, targets, conditions, updated_at, part_type, players_kind, group_size'
 
 export function useDrills() {
   const { user } = useAuth()
   return useQuery({
     queryKey: ['coach', user?.id, 'drills'],
     enabled: !!user,
-    queryFn: async (): Promise<Drill[]> => {
+    queryFn: async (): Promise<(Drill & MyDrill)[]> => {
       const { data, error } = await supabase.from('coach_drills').select(DRILL_COLUMNS)
         .eq('coach_user_id', user!.id).order('updated_at', { ascending: false })
       if (error) throw error
@@ -177,6 +211,21 @@ export function useSaveDrill() {
         ? await supabase.from('coach_drills').update(drill).eq('id', id).eq('coach_user_id', user!.id).select('id').single()
         : await supabase.from('coach_drills').insert(drill).select('id').single()
       if (error) throw error
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['coach', user?.id, 'drills'] }),
+  })
+}
+
+/** TRAK-340: Write your own, saved to My drills under its part, and the drill as saved. */
+export function useAddDrill() {
+  const { user } = useAuth()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (drill: DrillDraft & Pick<MyDrill, 'part_type' | 'players_kind' | 'group_size'>): Promise<MyDrill> => {
+      const { data, error } = await supabase.from('coach_drills').insert({ ...cleanDrill(drill), part_type: drill.part_type,
+        players_kind: drill.players_kind, group_size: drill.group_size }).select(DRILL_COLUMNS).single()
+      if (error) throw error
+      return data
     },
     onSuccess: () => client.invalidateQueries({ queryKey: ['coach', user?.id, 'drills'] }),
   })

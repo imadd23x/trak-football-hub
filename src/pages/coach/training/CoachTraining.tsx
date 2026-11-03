@@ -12,7 +12,7 @@ import { registerProblem } from '@/lib/event-register'
 import { AGAIN, NOTE_MAX, againLabel, loopSteps, nextTraining, searchPast, trainingBadge, type Again, type Phase } from '@/lib/training/next'
 import { gameWhen } from '@/components/coach/games/useGames'
 import {
-  useDrills, useHere, useNotes, usePastTrainings, usePlannedTrainings, useRegisters, useSaveNotes, useTrainings, type Notes, type Training,
+  useDrafts, useDrills, useHere, useNotes, usePastTrainings, usePlannedTrainings, useRegisters, useSaveNotes, useTrainings, type Draft, type Notes, type Training,
 } from '@/components/coach/training/useTraining'
 import { DrillSheet } from '@/components/coach/training/DrillSheet'
 import { CopyTargetSheet, PastPlanSheet, type PlanToCopy } from '@/components/coach/training/PastPlanSheet'
@@ -109,7 +109,11 @@ function SessionsView() {
   const planned = usePlannedTrainings()
   const registers = useRegisters()
   const notes = useNotes()
+  const drafts = useDrafts()
   const past = usePastTrainings()
+  const location = useLocation()
+  // TRAK-340: back from saving a plan, say so and offer the next one not planned yet.
+  const [savedPlan, setSavedPlan] = useState<string | null>(() => (location.state as { savedPlan?: string } | null)?.savedPlan ?? null)
   // The countdown's end moves the card on, so the clock is read again then.
   const [now, setNow] = useState(() => Date.now())
   const [closed, setClosed] = useState<string | null>(null)
@@ -120,7 +124,9 @@ function SessionsView() {
   const next = nextTraining(inView, now, id => !!notes.data?.has(id), isToday)
   const upcoming = splitTrainings(inView, now).comingUp
   const pastInView = (past.data ?? []).filter(t => everySquad || coachSquad.eventInSquad(t.squad))
-  const reads = [trainings, planned, registers, notes]
+  const reads = [trainings, planned, registers, notes, drafts]
+  const justSaved = savedPlan ? inView.find(t => t.id === savedPlan) : undefined
+  const nextToPlan = justSaved ? upcoming.find(t => t.id !== justSaved.id && !planned.data?.has(t.id)) : undefined
 
   return (
     <Page view="sessions">
@@ -136,7 +142,17 @@ function SessionsView() {
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X aria-hidden size={16} /></button>
           </div>}
 
-          {next ? <NextTraining key={next.training.id} training={next.training} phase={next.phase} planned={!!planned.data?.has(next.training.id)}
+          {justSaved && <div role="status" className="arc flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-5 py-3.5">
+            <Check aria-hidden size={18} className="text-brand" />
+            <p className="min-w-0 flex-1 text-[15px] text-ink"><span className="font-medium">Plan saved for {justSaved.title}, {gameWhen(justSaved).day}.</span>
+              {nextToPlan && <span className="text-ink-2"> Next to plan: {nextToPlan.title}, {gameWhen(nextToPlan).day}.</span>}</p>
+            {nextToPlan && <Button size="sm" onClick={() => navigate(planPath(nextToPlan.id))}>
+              {drafts.data?.has(nextToPlan.id) ? 'Continue' : 'Plan'} {nextToPlan.title}</Button>}
+            <button type="button" aria-label="Close message" onClick={() => setSavedPlan(null)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X aria-hidden size={16} /></button>
+          </div>}
+
+          {next ? <NextTraining key={next.training.id} draft={drafts.data?.get(next.training.id)} training={next.training} phase={next.phase} planned={!!planned.data?.has(next.training.id)}
             sessionId={registers.data?.get(next.training.id) ?? null} onStart={() => setNow(Date.now())}
             onClosed={() => setClosed(next.training.title)} />
             : <div className="arc">
@@ -152,7 +168,8 @@ function SessionsView() {
                 <ul className="flex gap-3 px-1 pb-1">
                   {upcoming.map(training => {
                     const { day, time } = gameWhen(training)
-                    const badge = trainingBadge({ phase: isToday(training) ? 'day' : 'before', planned: !!planned.data?.has(training.id) })
+                    const badge = trainingBadge({ phase: isToday(training) ? 'day' : 'before', planned: !!planned.data?.has(training.id),
+                      draft: drafts.data?.has(training.id) })
                     return <li key={training.id} className="w-[220px] flex-none" style={{ scrollSnapAlign: 'start' }}>
                       <Link to={`${TRAINING_PATH}/${training.id}`}
                         className="flex h-full flex-col gap-2.5 rounded-2xl border border-line bg-surface p-3.5 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -181,8 +198,8 @@ function SessionsView() {
 
 /** The training the card shows: its name and badge, when and where, the loop, the message to families, and the one next
  *  action. After the training, its Notes. */
-function NextTraining({ training, phase, planned, sessionId, onStart, onClosed }: {
-  training: Training; phase: Phase; planned: boolean; sessionId: string | null; onStart: () => void; onClosed: () => void
+function NextTraining({ training, phase, planned, draft, sessionId, onStart, onClosed }: {
+  training: Training; phase: Phase; planned: boolean; draft: Draft | undefined; sessionId: string | null; onStart: () => void; onClosed: () => void
 }) {
   const navigate = useNavigate()
   const here = useHere(sessionId ? [sessionId] : [])
@@ -191,7 +208,8 @@ function NextTraining({ training, phase, planned, sessionId, onStart, onClosed }
   const { day, time, academy } = gameWhen(training)
   const minutes = trainingMinutes(training)
   const count = sessionId ? here.data?.get(sessionId) ?? null : null
-  const badge = trainingBadge({ phase, planned, here: count })
+  const badge = trainingBadge({ phase, planned, here: count, draft: !!draft })
+  const stoppedAt = draft ? draft.parts[draft.step]?.name ?? 'Review' : null
   const current = phase === 'after' ? 3 : planned || phase === 'day' ? 2 : 1
   // A step the card has moved past is ticked only if it really happened; otherwise it says what's missing (live check,
   // 3 Nov: a training ended with no register showed Who's here ticked).
@@ -232,6 +250,8 @@ function NextTraining({ training, phase, planned, sessionId, onStart, onClosed }
             </> : planned ? <>
               <Button size="lg" onClick={review}>Review plan</Button>
               <Button variant="ghost" onClick={plan}>Edit plan</Button>
+            </> : draft ? <>
+              <Button size="lg" onClick={plan}>Continue plan</Button>
             </> : <>
               <Button size="lg" onClick={plan}>Plan session</Button>
               <Button size="lg" variant="secondary" onClick={() => setCopying(true)}><Copy aria-hidden size={16} />Use a past plan</Button>
@@ -242,7 +262,8 @@ function NextTraining({ training, phase, planned, sessionId, onStart, onClosed }
           <p className="text-sm text-ink-3">{phase === 'day'
             ? registerWhy && !sessionId ? 'Who’s here opens when the training starts.'
               : planned ? 'Tick who came and save the register.' : 'No plan yet. You can still take the register.'
-            : planned ? 'Planned for the whole squad. Who’s here opens on the day.' : 'Plan it, or start from a plan you’ve used before.'}</p>
+            : planned ? 'Planned for the whole squad. Who’s here opens on the day.'
+              : stoppedAt ? `You stopped at ${stoppedAt}. Only you see a draft.` : 'Plan it, or start from a plan you’ve used before.'}</p>
         </>}
 
       <RegisterSheet training={training} sheet={sheet} sessionId={sessionId} onClose={() => setSheet(null)} />

@@ -47,10 +47,11 @@ export function loopSteps({ current, planned, registered }: { current: number; p
 export type Tone = 'success' | 'warning' | 'neutral'
 
 /** The badge a training carries, on the card and in Upcoming trainings. */
-export function trainingBadge({ phase, planned, here }: { phase: Phase; planned: boolean; here?: number | null }): { label: string; tone: Tone } {
+export function trainingBadge({ phase, planned, here, draft = false }: { phase: Phase; planned: boolean; here?: number | null; draft?: boolean }): { label: string; tone: Tone } {
   if (phase === 'after') return here != null ? { label: `${here} here`, tone: 'success' } : { label: 'Finished', tone: 'neutral' }
   if (phase === 'day') return { label: 'Today', tone: 'success' }
-  return planned ? { label: 'Plan ready', tone: 'success' } : { label: 'Plan not written', tone: 'warning' }
+  // TRAK-340: a plan started and kept as a draft.
+  return planned ? { label: 'Plan ready', tone: 'success' } : draft ? { label: 'Draft', tone: 'neutral' } : { label: 'Plan not written', tone: 'warning' }
 }
 
 /* Notes: "Would you run this session again?" (Kostas, 2 Nov). */

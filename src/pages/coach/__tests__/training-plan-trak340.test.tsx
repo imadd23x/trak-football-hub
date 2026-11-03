@@ -280,7 +280,9 @@ describe('TRAK-340: drafts and a saved plan', { timeout: 30_000 }, () => {
     renderApp('/coach/training')
     const card = await screen.findByRole('region', { name: 'Pressing triggers' }, { timeout: 5000 })
     expect(within(card).getByText('Draft')).toBeInTheDocument()
-    expect(within(card).getByText('You stopped at Rondo. Only you see a draft.')).toBeInTheDocument()
+    expect(within(card).getByText('You stopped at Rondo.')).toBeInTheDocument()
+    // Kostas, 3 Nov: Open drafts sits beside the card, as the mockup.
+    expect(within(screen.getByRole('region', { name: 'Open drafts' })).getByText(/stopped at Rondo/)).toBeInTheDocument()
     await user.click(within(card).getByRole('button', { name: 'Continue plan' }))
     expect(await part('Rondo')).toBeInTheDocument()
   })

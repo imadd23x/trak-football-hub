@@ -42,6 +42,8 @@ import SegmentedControl from '@/components/arc/segmented-control/segmented-contr
 
 export const TRAINING_PATH = '/coach/training'
 const PAST_PATH = `${TRAINING_PATH}/past`
+/** Kostas, 3 Nov: the mockup's row of four; the rest one tap away. */
+const UPCOMING_SHOWN = 4
 /** Schedule's quick hand-over (TRAK-182 part 8): New event, on its first step, with Training picked. */
 const ADD_TRAINING = { quickEvent: { kind: 'training' } }
 const linkClass = 'rounded text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
@@ -117,6 +119,7 @@ function SessionsView() {
   // The countdown's end moves the card on, so the clock is read again then.
   const [now, setNow] = useState(() => Date.now())
   const [closed, setClosed] = useState<string | null>(null)
+  const [allUpcoming, setAllUpcoming] = useState(false)
   // TRAK-305: All or one squad, as picked at the top of the frame.
   const { everySquad } = coachSquad
   const inView = (trainings.data ?? []).filter(t => everySquad || coachSquad.eventInSquad(t.squad))
@@ -152,6 +155,8 @@ function SessionsView() {
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X aria-hidden size={16} /></button>
           </div>}
 
+          {/* Kostas, 3 Nov: as the mockup, the Next training card and Open drafts side by side on a laptop. */}
+          <div className="grid gap-4 laptop:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] laptop:items-start">
           {next ? <NextTraining key={next.training.id} draft={drafts.data?.get(next.training.id)} training={next.training} phase={next.phase} planned={!!planned.data?.has(next.training.id)}
             sessionId={registers.data?.get(next.training.id) ?? null} onStart={() => setNow(Date.now())}
             onClosed={() => setClosed(next.training.title)} />
@@ -160,30 +165,30 @@ function SessionsView() {
                 description="Add a training in Schedule. You’ll plan it here."
                 action={<Button onClick={() => navigate('/coach/schedule', { state: ADD_TRAINING })}>Add a training</Button>} />
             </div>}
+          <OpenDrafts drafts={upcoming.filter(t => drafts.data?.has(t.id) && !planned.data?.has(t.id)).map(t => ({ training: t, draft: drafts.data!.get(t.id)! }))} />
+          </div>
 
           {upcoming.length > 0 && <section aria-labelledby="upcoming" className="min-w-0">
             <h2 id="upcoming" className="mb-2 text-lg font-medium text-ink">Upcoming trainings</h2>
-            <div className="arc -mx-1">
-              <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="Upcoming trainings">
-                <ul className="flex gap-3 px-1 pb-1">
-                  {upcoming.map(training => {
-                    const { day, time } = gameWhen(training)
-                    const badge = trainingBadge({ phase: isToday(training) ? 'day' : 'before', planned: !!planned.data?.has(training.id),
-                      draft: drafts.data?.has(training.id) })
-                    return <li key={training.id} className="w-[220px] flex-none" style={{ scrollSnapAlign: 'start' }}>
-                      <Link to={`${TRAINING_PATH}/${training.id}`}
-                        className="flex h-full flex-col gap-2.5 rounded-2xl border border-line bg-surface p-3.5 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                        <span className="grid min-w-0">
-                          <span className="truncate text-base font-medium text-ink">{training.title}</span>
-                          <span className="truncate text-sm text-ink-3">{[isToday(training) ? 'Today' : day, time, everySquad ? training.squad : null].filter(Boolean).join(' · ')}</span>
-                        </span>
-                        <span className="mt-auto"><Badge tone={badge.tone} size="sm">{badge.label}</Badge></span>
-                      </Link>
-                    </li>
-                  })}
-                </ul>
-              </ScrollArea>
-            </div>
+            <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]">
+              {(allUpcoming ? upcoming : upcoming.slice(0, UPCOMING_SHOWN)).map(training => {
+                const { day, time } = gameWhen(training)
+                const badge = trainingBadge({ phase: isToday(training) ? 'day' : 'before', planned: !!planned.data?.has(training.id),
+                  draft: drafts.data?.has(training.id) })
+                return <li key={training.id}>
+                  <Link to={`${TRAINING_PATH}/${training.id}`}
+                    className="flex h-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                    <span className="grid min-w-0">
+                      <span className="truncate text-base font-medium text-ink">{training.title}</span>
+                      <span className="truncate text-sm text-ink-3">{[isToday(training) ? 'Today' : day, time, everySquad ? training.squad : null].filter(Boolean).join(' · ')}</span>
+                    </span>
+                    <span className="mt-auto"><Badge tone={badge.tone} size="sm">{badge.label}</Badge></span>
+                  </Link>
+                </li>
+              })}
+            </ul>
+            {upcoming.length > UPCOMING_SHOWN && <div className="arc mt-2"><Button variant="ghost" size="sm" onClick={() => setAllUpcoming(!allUpcoming)}>
+              {allUpcoming ? 'Show fewer' : `Show all ${upcoming.length}`}</Button></div>}
           </section>}
 
           <div className="arc flex flex-wrap items-center gap-3 border-t border-line pt-5">
@@ -258,16 +263,34 @@ function NextTraining({ training, phase, planned, draft, sessionId, onStart, onC
             <Countdown variant="compact" units={['days', 'hours', 'minutes']} target={training.starts_at}
               label="Starts in" completeLabel="Started" onComplete={onStart} className="ml-auto" />
           </div>
-          <p className="text-sm text-ink-3">{phase === 'day'
-            ? registerWhy && !sessionId ? 'Who’s here opens when the training starts.'
-              : planned ? 'Tick who came. Then Trak checks each part of your plan against the numbers.' : 'No plan yet. You can still take the register.'
-            : planned ? 'Planned for the whole squad. Who’s here opens on the day.'
-              : stoppedAt ? `You stopped at ${stoppedAt}. Only you see a draft.` : 'Plan it, or start from a plan you’ve used before.'}</p>
+          {/* Kostas, 3 Nov: the mockup is clean; a line only when a button is waiting for the training to start. */}
+          {phase === 'day' && registerWhy && !sessionId && <p className="text-sm text-ink-3">Who’s here opens when the training starts.</p>}
+          {stoppedAt && phase === 'before' && !planned && <p className="text-sm text-ink-3">You stopped at {stoppedAt}.</p>}
         </>}
 
       <PastPlanSheet open={copying} onOpenChange={setCopying} training={training} />
     </section>
   )
+}
+
+/** Open drafts (the mockup's card beside the Next training): plans the coach kept for later, with where they stopped.
+ *  Only the coach sees a draft. */
+function OpenDrafts({ drafts }: { drafts: { training: Training; draft: Draft }[] }) {
+  const navigate = useNavigate()
+  return <section aria-labelledby="open-drafts" className="arc grid gap-2 rounded-2xl border border-line bg-surface p-5">
+    <h2 id="open-drafts" className="text-lg font-medium text-ink">Open drafts</h2>
+    <p className="text-sm text-ink-3">Only you see a draft.</p>
+    {drafts.length === 0 ? <p className="pt-1 text-sm text-ink-2">No drafts. Stop a plan half-way with Save as draft and it waits here.</p>
+      : <ul className="mt-1 divide-y divide-line border-t border-line">
+        {drafts.map(({ training, draft }) => <li key={training.id} className="flex items-center justify-between gap-3 py-3">
+          <span className="grid min-w-0">
+            <span className="truncate text-[15px] font-medium text-ink">{training.title}</span>
+            <span className="truncate text-sm text-ink-3">{gameWhen(training).day} · stopped at {draft.parts[draft.step]?.name ?? 'Review'}</span>
+          </span>
+          <Button size="sm" variant="secondary" aria-label={`Continue ${training.title}`} onClick={() => navigate(planPath(training.id))}>Continue</Button>
+        </li>)}
+      </ul>}
+  </section>
 }
 
 /** Notes, after the training (Kostas, 2 Nov): one question for the whole session and a note for next time. Optional:
@@ -285,6 +308,8 @@ function NotesForm({ training, planned, onReview, onClosed }: { training: Traini
     })
   }
   return <div className="grid gap-4">
+    {/* As the mockup: the question and the note in one soft panel. */}
+    <div className="grid gap-3 rounded-2xl bg-ground p-4">
     <div className="grid justify-items-start gap-2">
       {/* The loop above already says Notes are optional. */}
       <p aria-hidden="true" className="text-[15px] font-medium text-ink">Would you run this session again?</p>
@@ -293,13 +318,13 @@ function NotesForm({ training, planned, onReview, onClosed }: { training: Traini
     </div>
     <Textarea label="A note for next time" rows={2} maxLength={NOTE_MAX} value={note} onChange={e => setNote(e.target.value)}
       placeholder="For example: the rondo grids were too small for this group" />
+    </div>
     {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
     <div className="flex flex-wrap items-center gap-3">
       <Button size="lg" loading={save.isPending} onClick={() => close({ again, note })}>Save and close</Button>
       {planned && <Button size="lg" variant="secondary" onClick={onReview}>Review today’s plan</Button>}
       <Button variant="ghost" disabled={save.isPending} onClick={() => close({ again: null, note: '' })}>Skip and close</Button>
     </div>
-    <p className="text-sm text-ink-3">Notes are optional. Skip them and the training still closes.</p>
   </div>
 }
 

@@ -128,7 +128,7 @@ export function TakeRegister({ eventId, coachId, sessionId, squad: eventSquad = 
       ) : (
         <>
           <p className="text-[12px] text-ink-2" style={font}>{present.size} present, {absent} absent</p>
-          <ul className={wide ? 'grid gap-1.5 tablet:grid-cols-3 laptop:grid-cols-5' : 'space-y-1.5'}>
+          <ul className={wide ? 'grid gap-1.5 tablet:grid-cols-3 laptop:grid-cols-6' : 'space-y-1.5'}>
             {loaded.players.map(p => {
               const on = present.has(p.id)
               const family = loaded.familyReason.has(p.id)
@@ -137,7 +137,7 @@ export function TakeRegister({ eventId, coachId, sessionId, squad: eventSquad = 
                 <li key={p.id}>
                   <button type="button" onClick={() => toggle(p.id)} aria-pressed={on}
                     aria-label={`${p.name}: ${on ? 'present' : 'absent'}`}
-                    className="w-full flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-left"
+                    className={`w-full flex items-center gap-3 rounded-[12px] px-3 ${wide ? 'py-2' : 'py-2.5'} text-left`}
                     style={{ background: on ? 'rgb(var(--t-brand) / 0.08)' : 'rgb(var(--t-raised))', border: `1px solid ${on ? 'rgb(var(--t-brand) / 0.3)' : 'rgb(var(--t-line))'}` }}>
                     <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ background: on ? 'rgb(var(--t-brand))' : 'transparent', border: on ? 'none' : '1px solid rgb(var(--t-line-strong))' }}>
@@ -151,9 +151,11 @@ export function TakeRegister({ eventId, coachId, sessionId, squad: eventSquad = 
                         </span>
                       )}
                     </span>
-                    <span className="text-[11px]" style={{ ...font, color: on ? 'rgb(var(--t-brand))' : 'rgb(var(--t-ink-3))' }}>
+                    {/* TRAK-343 (Kostas, 3 Nov: as clean as the mockup): in the wide register the tick says it, so the
+                        name keeps the width. The button's name still says present or absent. */}
+                    {!wide && <span className="text-[11px]" style={{ ...font, color: on ? 'rgb(var(--t-brand))' : 'rgb(var(--t-ink-3))' }}>
                       {on ? 'Present' : 'Absent'}
-                    </span>
+                    </span>}
                   </button>
                 </li>
               )

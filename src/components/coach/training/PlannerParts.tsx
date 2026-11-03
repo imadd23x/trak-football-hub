@@ -11,21 +11,22 @@ import { Button } from '@/components/arc/button/button'
 
 export function DrillTile({ drill, picked, tag, onPick }: { drill: PlanDrill; picked: boolean; tag: string; onPick: () => void }) {
   const players = playersLine(drill)
+  // As the mockup (Kostas, 3 Nov): the tick sits in the corner of the picked drill, the name has the width, the rest is small.
   return <button type="button" aria-pressed={picked} onClick={onPick}
-    className={`flex h-full w-full flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${picked ? 'border-[1.5px] border-brand bg-brand/5' : 'border-line bg-surface hover:bg-raised'}`}>
-    <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${picked ? 'bg-brand text-on-brand' : 'border border-line text-transparent'}`}>
-      <Check aria-hidden size={14} /></span>
-    <span className="text-[15px] font-medium text-ink break-words">{drill.name}</span>
-    {picked && drill.how && <span className="text-sm text-ink-2 break-words">{drill.how}</span>}
-    {players && <span className="inline-flex items-center gap-1 text-[13px] text-ink-3"><Users aria-hidden size={14} />{players}</span>}
-    <span className="mt-auto"><Badge size="sm" tone={tag.startsWith('Your usual') || tag === 'My drill' ? 'success' : 'neutral'}>{tag}</Badge></span>
+    className={`relative flex h-full w-full flex-col items-start gap-1.5 rounded-[14px] border p-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${picked ? 'border-2 border-brand bg-brand/5' : 'border-line bg-surface hover:bg-raised'}`}>
+    {picked && <span className="absolute right-3 top-3 inline-flex h-[22px] w-[22px] items-center justify-center rounded-full bg-brand text-on-brand">
+      <Check aria-hidden size={13} /></span>}
+    <span className="pr-7 text-[15px] font-medium leading-snug text-ink break-words">{drill.name}</span>
+    {picked && drill.how && <span className="text-[13px] leading-snug text-ink-2 break-words">{drill.how}</span>}
+    {players && <span className="mt-auto inline-flex items-center gap-1.5 pt-1 text-[13px] text-ink-2"><Users aria-hidden size={14} />{players}</span>}
+    <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-medium ${tag.startsWith('Your usual') || tag === 'My drill' ? 'bg-brand/10 text-brand' : 'bg-raised text-ink-2'} ${players ? '' : 'mt-auto'}`}>{tag}</span>
   </button>
 }
 
 export function ActionTile({ icon, label, onClick }: { icon: 'plus' | 'search'; label: string; onClick: () => void }) {
   return <button type="button" onClick={onClick}
-    className="flex h-full min-h-28 w-full flex-col items-start justify-center gap-2 rounded-2xl border border-dashed border-line bg-surface p-4 text-left text-ink-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-    {icon === 'plus' ? <Plus aria-hidden size={20} /> : <Search aria-hidden size={20} />}
+    className="flex h-full min-h-28 w-full flex-col items-center justify-center gap-1.5 rounded-[14px] border border-dashed border-line bg-surface p-3.5 text-center text-brand hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+    {icon === 'plus' ? <Plus aria-hidden size={18} /> : <Search aria-hidden size={18} />}
     <span className="text-[15px] font-medium text-ink">{label}</span>
   </button>
 }
@@ -64,7 +65,7 @@ export function SessionCard({ parts, length, current, onOpen, onReorder, onMove,
     </div>
     <TimeBar parts={parts} length={length} current={current} />
     {fit && <p className={`text-sm ${length && totalMinutes(parts) > length ? 'text-warning' : 'text-ink-3'}`}>{fit}</p>}
-    <p className="text-[13px] text-ink-3">Drag a part to move it, or use the arrow keys on its handle. × removes it.</p>
+    <p className="text-[12px] text-ink-3">Drag a part to move it, or use the arrow keys on its handle. × removes it.</p>
     <Reorder.Group as="ol" axis="y" values={parts} onReorder={onReorder} aria-label="Parts of the session" className="grid gap-1.5">
       {parts.map((part, i) => <SessionRow key={part.key} part={part} index={i} count={parts.length}
         state={part.key === current ? 'now' : at >= 0 && i < at ? 'done' : 'next'}

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ArrowRight, Pencil, Plus, X } from 'lucide-react'
+import { ArrowRight, Pencil, Plus, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { trainingMinutes } from '@/lib/training/sessions'
 import type { PlannerState } from '@/lib/training/plans'
@@ -205,8 +205,9 @@ function PlannerBody({ training, saved, draft, past, drills }: {
               <Button size="sm" variant="ghost" onClick={() => setRenaming(part.name)}><Pencil aria-hidden size={14} />Rename</Button>
             </div>}
           </div>
-          <div className="grid gap-1.5">
-            <p id="how-long" className="text-sm text-ink-2">How long?</p>
+          {/* As the mockup: "How long?" on the same line as its minutes. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <p id="how-long" className="text-sm font-medium text-ink-2">How long?</p>
             <div role="group" aria-labelledby="how-long" className="flex flex-wrap gap-1.5">
               {minuteOptions(part.type, part.minutes).map(m => <button key={m} type="button" aria-pressed={part.minutes === m}
                 onClick={() => update(part.key, { minutes: m })}
@@ -214,7 +215,7 @@ function PlannerBody({ training, saved, draft, past, drills }: {
             </div>
           </div>
         </div>
-        <p className="max-w-[640px] text-[15px] text-ink-2">{partInfo(part.type).guide}</p>
+        <p className="max-w-[640px] text-sm text-ink-2">{partInfo(part.type).guide}</p>
         <div className="grid gap-3">
           {/* A part of the coach's own already says "Pick any drill, or write your own." in its guide line. */}
           <p className="text-sm font-medium text-ink">Pick a drill {part.type !== 'own' && <span className="font-normal text-ink-3">{part.drill
@@ -225,8 +226,9 @@ function PlannerBody({ training, saved, draft, past, drills }: {
             {part.type === 'own' && <li><ActionTile icon="search" label="Browse all drills" onClick={() => setSheet('more')} /></li>}
             <li><ActionTile icon="plus" label="Write your own" onClick={() => setSheet('own')} /></li>
           </ul>
-          {part.type !== 'own' && all.length > 3 && <div><Button size="sm" variant="ghost" onClick={() => setSheet('more')}>
-            See more drills ({all.length - 3})</Button></div>}
+          {part.type !== 'own' && all.length > 3 && <div><button type="button" onClick={() => setSheet('more')}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded px-1 text-sm font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <Search aria-hidden size={14} />See more drills ({all.length - 3})</button></div>}
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
           {start.only ? <>

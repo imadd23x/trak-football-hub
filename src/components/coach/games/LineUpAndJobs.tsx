@@ -7,7 +7,7 @@ import type { Candidate, useWhoCanCome } from './useGames'
 import { Pitch, type PitchPlayer } from './Pitch'
 import { PlayerPanel, type Target } from './PlayerPanel'
 import { LoadError } from '@/components/trak'
-import { Avatar } from '@/components/arc/avatar/avatar'
+import { PlayerFace } from '@/components/trak/PlayerFace'
 import { Badge } from '@/components/arc/badge/badge'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { ExpandableText } from '@/components/arc/expandable-text/expandable-text'
@@ -63,7 +63,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
   // The name opens the sheet. The job sits beside it, not inside the button: a long job has its own Read more.
   const row = (player: Candidate, detail: string) => (
     <li key={player.id} className="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-x-3 gap-y-1 px-2 py-3">
-      <Avatar name={player.name} size="sm" aria-hidden="true" />
+      <PlayerFace name={player.name} size="sm" aria-hidden="true" />
       <button type="button" onClick={() => setTarget({ kind: 'player', id: player.id })}
         className="justify-self-start rounded text-left text-base font-medium text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
         {player.name}<span className="font-normal text-ink-3">{detail}</span>
@@ -131,7 +131,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
           <h2 id="plan-cant" className="text-lg font-medium text-ink">Can’t make it</h2>
           <p className="text-sm text-ink-3">Their families said they can’t make it, so they can’t be placed.</p>
           <ul className="grid gap-2">{cantMakeIt.map(player => <li key={player.id} className="flex items-center gap-3 px-2 py-1">
-            <Avatar name={player.name} size="sm" aria-hidden="true" />
+            <PlayerFace name={player.name} size="sm" aria-hidden="true" />
             <span className="flex-1 text-base text-ink-2">{player.name}</span>
             <span className="arc"><Badge size="sm" tone="warning">Can’t make it</Badge></span>
           </li>)}</ul>

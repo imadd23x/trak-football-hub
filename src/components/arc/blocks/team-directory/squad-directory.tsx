@@ -4,7 +4,7 @@
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { ArrowDown, ArrowUp, ChevronLeft, Search, X } from "lucide-react";
-import { Avatar } from "../../avatar/avatar";
+import { PlayerFace } from "@/components/trak/PlayerFace";
 import { GlassSegmented } from "../../glass-segmented/glass-segmented";
 import { Sparkline } from "../../sparkline/sparkline";
 import { motionTokens } from "../../lib/motion-tokens";
@@ -132,7 +132,7 @@ export function SquadDirectory({ title, players, summary, renderProfile, default
                 transition={{ layout: listTransition, opacity: { duration: reduce ? 0 : motionTokens.duration.fast } }}>
                 <button type="button" className={styles.personRow} aria-pressed={isSelected} onClick={() => choose(player.id)}>
                   {isSelected && <RowHighlight layoutId={`${uid}-row-${filter}-${needle}`} reduce={Boolean(reduce)} />}
-                  <Avatar name={player.name} />
+                  <PlayerFace name={player.name} />
                   <span className={styles.personText}><span className={styles.personName}>{player.name}</span><span className={styles.personRole}>{player.position}{player.shirt != null ? ` · #${player.shirt}` : ""}</span></span>
                   {player.flag}
                   {/* Trak (Imad, 23 Oct): a sparkline of the player's ratings in place of the band chip; under two there's no line. */}

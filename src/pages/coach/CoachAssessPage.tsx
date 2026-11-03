@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { Avatar } from '@/components/arc/avatar/avatar'
+import { PlayerFace } from '@/components/trak/PlayerFace'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { fetchWaitReason, WAIT_TITLE, waitText, type WaitReason } from '@/lib/wait-reason'
@@ -593,7 +593,7 @@ function CoachAssessmentForm() {
         {/* ---- 2. player card (sq-item) ---- */}
         {selectedPlayer ? (
           <div className="flex items-center gap-3 p-3 rounded-[12px] bg-surface border border-line">
-            <Avatar name={selectedPlayer.player_name} size="md" className="arc" aria-hidden />
+            <PlayerFace name={selectedPlayer.player_name} size="md" className="arc" aria-hidden />
             <div className="min-w-0">
               <p className="text-[15px] font-medium text-ink truncate">
                 {selectedPlayer.player_name}

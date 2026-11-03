@@ -49,6 +49,8 @@ globalThis.IntersectionObserver ??= class {
 // pointer capture, which every browser Trak supports has and jsdom lacks.
 Element.prototype.scrollIntoView ??= function scrollIntoView() {}
 Element.prototype.hasPointerCapture ??= function hasPointerCapture() { return false }
+// TRAK-340: dragging a part in Plan session (motion's Reorder) captures the pointer; jsdom has no pointer capture.
+Element.prototype.setPointerCapture ??= function setPointerCapture() {}
 Element.prototype.releasePointerCapture ??= function releasePointerCapture() {}
 
 // TRAK-172: the assessment carousel's Next/Previous scroll its viewport, which

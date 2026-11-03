@@ -41,10 +41,10 @@ describe('TRAK-220: every Arc panel opened into <body> carries the arc class', (
       .filter(file => readFileSync(join(process.cwd(), file), 'utf8').includes('<BottomSheet'))
     // TRAK-263: the coach's player profile editor (foot, nationality, traits). Imad, 23 Oct: Home's Take register and View log.
     // TRAK-294: New drill. TRAK-285: a player's line-up sheet on a phone. TRAK-339: Use a past plan, and the register
-    // TRAK-296: add or swap a practice. TRAK-298: a training's Who's here and log.
+    // TRAK-340: the planner's Add a part, See more drills, Write your own and Leave. TRAK-298: a training's Who's here and log.
     expect(files.sort()).toEqual(['src/components/coach/CoachWeekStrip.tsx', 'src/components/coach/games/LineUpAndJobs.tsx',
-      'src/components/coach/squad/PlayerFactsEditor.tsx', 'src/components/coach/training/AddSheet.tsx', 'src/components/coach/training/DrillSheet.tsx',
-      'src/components/coach/training/PastPlanSheet.tsx', 'src/components/coach/training/RegisterSheet.tsx', 'src/components/trak/EventSheet.tsx'])
+      'src/components/coach/squad/PlayerFactsEditor.tsx', 'src/components/coach/training/DrillSheet.tsx',
+      'src/components/coach/training/PastPlanSheet.tsx', 'src/components/coach/training/PlannerSheets.tsx', 'src/components/coach/training/RegisterSheet.tsx', 'src/components/trak/EventSheet.tsx'])
     for (const file of files) {
       const sheets = readFileSync(join(process.cwd(), file), 'utf8').match(/<BottomSheet\b[^>]*>/gs) ?? []
       expect(sheets.length, file).toBeGreaterThan(0)

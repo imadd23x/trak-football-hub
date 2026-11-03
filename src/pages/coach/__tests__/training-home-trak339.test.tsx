@@ -86,6 +86,7 @@ beforeEach(() => {
       { session_id: 'session-done', squad_player_id: 'sp-2', status: 'present' }]),
     table('event_absences', []),
     table('coach_drills', []),
+    table('training_plan_drafts', []),
     rpc('coach_squad_player_consent_required', () => false),
     rpc('feature_on', () => true),
   )

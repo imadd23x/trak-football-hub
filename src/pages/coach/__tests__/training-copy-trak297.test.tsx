@@ -79,13 +79,12 @@ beforeEach(() => {
     table('event_absences', []),
     table('coach_drills', []),
     table('training_notes', []),
+    table('training_plan_drafts', []),
     rpc('feature_on', () => true),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals() })
 
-const practices = () => within(screen.getByRole('list', { name: 'Practices' })).queryAllByRole('listitem')
-  .map(item => item.querySelector('p')?.textContent)
 
 describe('TRAK-297: Copy a past session', { timeout: 30_000 }, () => {
   it('lists the coach’s planned sessions newest first, searches them, and copies one into the planner unsaved', async () => {
@@ -118,13 +117,16 @@ describe('TRAK-297: Copy a past session', { timeout: 30_000 }, () => {
     await user.click(within(copy).getByRole('button', { name: /^Use this plan: Pressing zones, / }))
 
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/next/plan'))
-    await waitFor(() => expect(practices()).toEqual(['Rondos 4v1', 'Pressing duels', 'Game 8v8']))
+    // TRAK-340: a plan from before parts comes in as one part per practice, named after it; the planner starts at the first.
+    const parts = await screen.findByRole('list', { name: 'Parts of the session' })
+    expect(within(parts).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+      expect.stringContaining('Rondos 4v1'), expect.stringContaining('Pressing duels'), expect.stringContaining('Game 8v8')])
     expect(screen.getByText(/Copied from Pressing zones, .+ Nothing is saved until you do\./)).toBeInTheDocument()
-    expect(screen.getByText('Library · Defending')).toBeInTheDocument()
-    expect(screen.getByText('70 of 90 min planned')).toBeInTheDocument()
+    expect(screen.getByText('70 of 90 min')).toBeInTheDocument()
     expect(saves).toHaveLength(0)
 
-    await user.click(screen.getByRole('button', { name: 'Save the plan' }))
+    for (let i = 0; i < 3; i++) await user.click(screen.getByRole('button', { name: /^Next: / }))
+    await user.click(await screen.findByRole('button', { name: 'Save the plan' }))
     await waitFor(() => expect(saves).toHaveLength(1))
     expect(saves[0].p_event_id).toBe('next')
     expect(saves[0].p_practices).toEqual([

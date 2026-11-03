@@ -93,6 +93,7 @@ beforeEach(() => {
     table('event_absences', []),
     table('training_plans', []),
     table('training_notes', []),
+    table('training_plan_drafts', []),
     rpc('feature_on', () => true),
   )
 })

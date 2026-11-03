@@ -1,37 +1,36 @@
-import type { Json, Tables } from '@/integrations/supabase/types'
-import { libraryOf, pitchOf, playersOf, sessionById, titleParts, type LibrarySession } from '@/lib/library/library'
-import { DRILL_LIMITS, blankDrill, cleanDrill, type Drill, type DrillDraft } from './sessions'
+import type { Tables } from '@/integrations/supabase/types'
+import { libraryOf, sessionById } from '@/lib/library/library'
+import type { Drill, DrillDraft } from './sessions'
 
 /* TRAK-295 (Training 2/5, spec TRAK-293): a training's plan, kept apart from the screens. A practice carries what a
    drill does, plus where it came from. The plan is saved whole by save_training_plan(); its limits are the
    database's (training_plan_practices), so change both together. */
 
-export const PLAN_MAX = 12
-
-/** Write my own, for one training. */
+/** Plan session, for one training (TRAK-340; was Write my own). */
 export const planPath = (eventId: string) => `/coach/training/${eventId}/plan`
 /** View: the plan read at the pitch side (TRAK-309). */
 export const viewPath = (eventId: string) => `/coach/training/${eventId}/view`
 /** What the planner can open with: a drill sent from Training › Drills (TRAK-296), or a past session's practices to
  *  copy (TRAK-297). */
-export type PlannerState = { addDrill?: Drill; copy?: SavedPractice[]; copiedFrom?: string } | null
+export type PlannerState = {
+  addDrill?: Drill & { part_type?: string | null; players_kind?: string | null; group_size?: number | null }
+  copy?: SavedPractice[]; copiedFrom?: string
+} | null
 
-export type PracticeSource = 'own' | 'drill' | 'library'
+export type PracticeSource = 'own' | 'drill' | 'library' | 'trak'
 export type Practice = DrillDraft & {
   source: PracticeSource
   drill_id: string | null
   library_session: string | null
   /** Written here and ticked "Save to My drills": the save makes it one of the coach's drills too. */
   saveToDrills: boolean
+  /** TRAK-340: the part it fills, as the coach named it. */
+  part?: string
 }
 
-/** A new practice to write: "Save to My drills" starts ticked (mockup board 3A). */
-export const blankPractice = (): Practice => ({
-  ...blankDrill(), source: 'own', drill_id: null, library_session: null, saveToDrills: true,
-})
-
 export type SavedPractice = Pick<Tables<'training_plan_practices'>, 'position' | 'name' | 'minutes' | 'how' | 'tell' | 'area'
-  | 'numbers' | 'direction' | 'targets' | 'conditions' | 'source' | 'drill_id' | 'library_session'>
+  | 'numbers' | 'direction' | 'targets' | 'conditions' | 'source' | 'drill_id' | 'library_session' | 'part' | 'part_type'
+  | 'trak_drill' | 'players_kind' | 'group_size'>
 
 /** The saved practices, in order, ready to change. One already saved is never saved to My drills again. */
 export function fromSaved(rows: SavedPractice[]): Practice[] {
@@ -40,16 +39,10 @@ export function fromSaved(rows: SavedPractice[]): Practice[] {
   }))
 }
 
-/** What save_training_plan() takes: the practices in order, trimmed. */
-export function toSave(practices: Practice[]): Json {
-  return practices.map(({ saveToDrills, source, drill_id, library_session, ...draft }) => ({
-    ...cleanDrill(draft), source, drill_id, library_session, save_to_drills: source === 'own' && saveToDrills,
-  }))
-}
-
 /** The tag beside a practice. Written here and ticked for My drills, it is the coach's drill once saved. A Library
  *  practice names its library. */
 export function sourceLabel(practice: Pick<Practice, 'source' | 'saveToDrills'> & { library_session?: string | null }): string {
+  if (practice.source === 'trak') return 'Trak drill'
   if (practice.source === 'library') {
     const session = practice.library_session ? sessionById(practice.library_session) : undefined
     return session ? `Library · ${libraryOf(session).label}` : 'Library'
@@ -57,69 +50,13 @@ export function sourceLabel(practice: Pick<Practice, 'source' | 'saveToDrills'> 
   return practice.source === 'drill' || practice.saveToDrills ? 'Your drill' : 'Written here'
 }
 
-/* TRAK-296 (Training 3/5): a practice from one of the coach's drills or a Library session, and the drills that fit a
-   slot best. */
-
-/** One of the coach's drills, as a practice: a copy, so changing the drill later never changes the plan. */
-export function fromDrill(drill: Drill): Practice {
-  const { id, updated_at: _at, ...draft } = drill
-  return { ...draft, source: 'drill', drill_id: id, library_session: null, saveToDrills: false }
-}
-
-/** A Library session, as a practice: its name, the slot's minutes (or 20), what it's about, and its pitch and
- *  players as the area and numbers. */
-export function fromLibrary(session: LibrarySession, minutes: number | null): Practice {
-  const cut = (text: string | undefined, max: number) => (text ?? '').slice(0, max)
-  return {
-    ...blankDrill(),
-    name: cut(titleParts(session).title, DRILL_LIMITS.name),
-    minutes: minutes ?? 20,
-    how: cut(session.summary, DRILL_LIMITS.how),
-    area: cut(pitchOf(session), DRILL_LIMITS.detail),
-    numbers: cut(playersOf(session), DRILL_LIMITS.detail),
-    source: 'library', drill_id: null, library_session: session.id, saveToDrills: false,
-  }
-}
-
-/** The minutes a new practice has room for: what's left of the training, to the nearest 5, kept to 10–30. Null
- *  when the training has no length or nothing is left. */
-export function roomFor(planned: number, length: number | null): number | null {
-  if (!length || length - planned <= 0) return null
-  return Math.min(30, Math.max(10, Math.round((length - planned) / 5) * 5))
-}
-
-/** The drills whose usual minutes are closest to the slot's, closest first (the newest first on a tie), at most 3. */
-export function bestFit<T extends { minutes: number }>(drills: T[], minutes: number, count = 3): T[] {
-  return drills.map((drill, i) => ({ drill, i })).sort((a, b) =>
-    Math.abs(a.drill.minutes - minutes) - Math.abs(b.drill.minutes - minutes) || a.i - b.i).slice(0, count).map(x => x.drill)
-}
-
 export const plannedMinutes = (practices: Pick<Practice, 'minutes'>[]) => practices.reduce((sum, p) => sum + p.minutes, 0)
-
-/** "40 of 90 min planned" and what's left, or just "40 min planned" when the training has no length. */
-export function minutesLine(planned: number, length: number | null): { planned: string; left: string | null } {
-  if (!length) return { planned: `${planned} min planned`, left: null }
-  const left = length - planned
-  return {
-    planned: `${planned} of ${length} min planned`,
-    left: left > 0 ? `${left} min left` : left < 0 ? `${-left} min over` : 'Fills the session',
-  }
-}
 
 /** Kostas, 28 Oct: a plan may run longer than the training was set for (the time may have been a mistake), so the
  *  coach can keep it; this says so plainly. Null when it fits or the training has no length. */
 export function overTime(planned: number, length: number | null): string | null {
   if (!length || planned <= length) return null
   return `You set this training for ${length} min. The plan runs ${planned - length} min over. You can keep it, or change the training's time in Schedule.`
-}
-
-/** The list with one practice moved up (-1) or down (+1); unchanged at either end. */
-export function move<T>(list: T[], index: number, by: -1 | 1): T[] {
-  const to = index + by
-  if (index < 0 || index >= list.length || to < 0 || to >= list.length) return list
-  const next = [...list]
-  ;[next[index], next[to]] = [next[to], next[index]]
-  return next
 }
 
 /* TRAK-297 (Training 4/5): Copy a past session. */

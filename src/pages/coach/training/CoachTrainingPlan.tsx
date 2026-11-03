@@ -1,28 +1,20 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowDown, ArrowLeftRight, ArrowUp, BookOpen, ClipboardList, PenLine, Pencil, Trash2, UserRound } from 'lucide-react'
-import { toast } from 'sonner'
+import { useState, type ReactNode } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ClipboardList } from 'lucide-react'
 import { registerProblem } from '@/lib/event-register'
-import { DRILL_DETAILS, DRILL_LIMITS, drillProblem, trainingEnd, trainingMinutes } from '@/lib/training/sessions'
+import { DRILL_DETAILS, trainingEnd, trainingMinutes } from '@/lib/training/sessions'
 import { loopNote, loopState, practiceStarts } from '@/lib/training/loop'
-import {
-  PLAN_MAX, blankPractice, fromDrill, fromSaved, minutesLine, move, overTime, planPath, plannedMinutes, roomFor, sourceLabel,
-  viewPath, type PlannerState, type Practice,
-} from '@/lib/training/plans'
+import { fromSaved, overTime, planPath, plannedMinutes, sourceLabel, viewPath, type Practice } from '@/lib/training/plans'
 import { gameWhen } from '@/components/coach/games/useGames'
-import { useNotes, usePlan, useRegisters, useSavePlan, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
+import { useNotes, usePlan, useRegisters, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
 import { CoachTrail } from '@/components/coach/CoachTrail'
-import { DetailFields, MinutesPicks, TellField } from '@/components/coach/training/fields'
 import { LoopStrip } from '@/components/coach/training/LoopStrip'
 import { RegisterSheet } from '@/components/coach/training/RegisterSheet'
-import { AddSheet, type AddTarget, type AddView } from '@/components/coach/training/AddSheet'
-import { useParked } from '@/components/trak/parked'
-import { LoadError } from '@/components/trak'
+import { LoadError, WIDE_COLUMN } from '@/components/trak'
+import { Planner } from './Planner'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
-import { Checkbox } from '@/components/arc/checkbox/checkbox'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
-import { Input } from '@/components/arc/input/input'
 
 /* TRAK-295 (Training 2/5, spec TRAK-293, mockup boards 3A and 5): a training's plan. Write my own
    (/coach/training/:eventId/plan) types practices one at a time and saves the plan whole; the plan
@@ -34,19 +26,18 @@ import { Input } from '@/components/arc/input/input'
    28 Oct). View (/coach/training/:eventId/view) is the plan read at the pitch side: TRAK-309 (Kostas, 29 Oct) took Run
    it out of the loop and named the button and its page View. */
 
-const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again. Nothing you typed is lost."
 const TRAINING_PATH = '/coach/training'
 const linkClass = 'rounded text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
-const iconButton = 'inline-flex h-11 w-11 flex-none items-center justify-center rounded-xl text-ink-2 hover:bg-raised disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
 /** The training and its plan, read together, so the page never shows "Not planned" before the plan arrives. */
-function WithTraining({ children }: { children: (training: Training, plan: Plan | null) => ReactNode }) {
+function WithTraining({ children, wide = false }: { children: (training: Training, plan: Plan | null) => ReactNode; wide?: boolean }) {
   const { eventId } = useParams()
   const training = useTraining(eventId)
   const plan = usePlan(eventId)
   return (
     <div className="min-h-screen bg-ground pb-28">
-      <div className="mx-auto w-full max-w-[1040px] px-5 tablet:px-8">
+      {/* TRAK-340: Plan session takes the coach pages' width (TRAK-307), for its two columns. */}
+      <div className={wide ? WIDE_COLUMN : 'mx-auto w-full max-w-[1040px] px-5 tablet:px-8'}>
         {training.error || plan.error
           ? <div className="pt-10"><LoadError what="this training" onRetry={() => { void training.refetch(); void plan.refetch() }}
               retrying={training.isFetching || plan.isFetching} /></div>
@@ -97,6 +88,8 @@ function PracticeRow({ practice, actions }: { practice: Practice; actions?: Reac
     <div className="arc flex flex-wrap items-start gap-x-3.5 gap-y-1 rounded-2xl border border-line bg-surface px-4 py-3.5 tablet:flex-nowrap tablet:px-5">
       <span className="w-11 flex-none pt-px text-center text-base font-medium text-ink">{practice.minutes}<span className="block text-[11px] font-normal text-ink-3">min</span></span>
       <div className="grid min-w-0 flex-1 gap-1">
+        {/* TRAK-340: the part it fills, when it's a different name. */}
+        {practice.part && practice.part !== practice.name && <p className="text-[13px] text-ink-3 break-words">{practice.part}</p>}
         <p className="text-[15px] font-medium text-ink break-words">{practice.name}</p>
         {practice.tell.trim() && <p className="text-sm text-ink-2 break-words">“{practice.tell.trim()}”</p>}
         {details && <p className="text-sm text-ink-3 break-words">{details}</p>}
@@ -108,171 +101,13 @@ function PracticeRow({ practice, actions }: { practice: Practice; actions?: Reac
   )
 }
 
-/* ── Write my own ─────────────────────────────────────────────────────────── */
+/* ── Plan session (TRAK-340) ──────────────────────────────────────────────── */
 
 export function PlanEditorRoute() {
-  return <WithTraining>{(training, plan) => training.status === 'cancelled'
+  return <WithTraining wide>{(training, plan) => training.status === 'cancelled'
     ? <><Header training={training}><Badge tone="danger">Cancelled</Badge></Header>
       <p className="pt-4 text-[15px] text-ink-2">This training was cancelled, so its plan can’t change.</p></>
-    : <Editor training={training} saved={plan} />}</WithTraining>
-}
-
-type Writing = { index: number | null; draft: Practice }
-
-function Editor({ training, saved }: { training: Training; saved: Plan | null }) {
-  const { parked, comingSoon } = useParked()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const save = useSavePlan(training.id)
-  const sent = (location.state as PlannerState)?.addDrill
-  // A copied session takes the place of what's there; the coach chose to start from it.
-  const copied = (location.state as PlannerState)?.copy
-  const [copiedFrom] = useState(() => copied?.length ? (location.state as PlannerState)?.copiedFrom ?? null : null)
-  const [practices, setPractices] = useState<Practice[]>(() => {
-    if (copied?.length) return fromSaved(copied).slice(0, PLAN_MAX)
-    const list = fromSaved(saved?.practices ?? [])
-    return sent && list.length < PLAN_MAX ? [...list, fromDrill(sent)] : list
-  })
-  // The practice being written: a new one (index null) or one of the list. An empty plan starts with one open.
-  const [writing, setWriting] = useState<Writing | null>(() => practices.length ? null : { index: null, draft: blankPractice() })
-  const [adding, setAdding] = useState<AddTarget | null>(null)
-  const [problem, setProblem] = useState<string | null>(null)
-  const length = trainingMinutes(training)
-  const line = minutesLine(plannedMinutes(practices), length)
-  const over = overTime(plannedMinutes(practices), length)
-  const full = practices.length >= PLAN_MAX
-  const inPlan = new Set(practices.flatMap(p => p.drill_id ? [p.drill_id] : []))
-
-  const add = (view: AddView) => { setProblem(null); setAdding({ view, swap: null, minutes: roomFor(plannedMinutes(practices), length) }) }
-  const use = (practice: Practice) => {
-    const swap = adding?.swap
-    setPractices(list => swap ? list.map((p, i) => i === swap.index ? practice : p) : list.length < PLAN_MAX ? [...list, practice] : list)
-    setAdding(null)
-    // A new practice nobody typed into gives way to the one picked.
-    if (!swap) setWriting(null)
-  }
-  const writeInstead = () => {
-    const swap = adding?.swap
-    setAdding(null)
-    setWriting({ index: swap ? swap.index : null, draft: blankPractice() })
-  }
-
-  const keep = (practice: Practice) => {
-    if (!writing) return
-    setPractices(list => writing.index === null ? [...list, practice] : list.map((p, i) => i === writing.index ? practice : p))
-    setWriting(null); setProblem(null)
-  }
-  const savePlan = () => {
-    if (parked) return comingSoon()
-    // A new practice nobody has typed into yet isn't in the way.
-    const typing = writing && (writing.index !== null || writing.draft.name.trim())
-    if (typing) return setProblem(writing.index === null
-      ? `Add practice ${practices.length + 1} or cancel it first.` : `Finish changing practice ${writing.index + 1} first.`)
-    if (!practices.length) return setProblem('Add a practice first.')
-    setWriting(null)
-    save.mutate(practices, {
-      // The plan replaces the planner in the history: Back never reopens it with a drill or a copy already used, which
-      // stay in the planner's own history entry so a reload or a change of layout doesn't lose them.
-      onSuccess: () => { toast.success('Plan saved'); navigate(`${TRAINING_PATH}/${training.id}`, { replace: true }) },
-      // The database's own words when it refuses (a cancelled training, too many practices); typing is kept.
-      onError: error => setProblem('code' in error && error.code === 'P0001' ? `${error.message}.` : SAVE_FAILED),
-    })
-  }
-
-  return <>
-    <Header training={training}>
-      <Badge>Only you see it</Badge>
-      <Button loading={save.isPending} onClick={savePlan}>Save the plan</Button>
-    </Header>
-    <div className="pt-2"><LoopStrip state={{ done: [true, false, false, false], at: 1, closed: false }} note="now" /></div>
-
-    <div className="mt-6 grid max-w-[720px] gap-3">
-      <div>
-        <p className="flex justify-between gap-3 text-[13px]"><span className="font-medium text-ink">{line.planned}</span>
-          {line.left && <span className={over ? 'font-medium text-warning' : 'text-ink-3'}>{line.left}</span>}</p>
-        {over && <OverTime text={over} />}
-      </div>
-
-      {copiedFrom && <p role="status" className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
-        Copied from {copiedFrom}. Change anything, then Save the plan. Nothing is saved until you do.</p>}
-      {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
-
-      <ol aria-label="Practices" className="grid gap-2.5">
-        {practices.map((practice, i) => <li key={i}>
-          {writing?.index === i
-            ? <PracticeForm number={i + 1} isNew={false} draft={writing.draft} onChange={draft => setWriting({ index: i, draft })}
-              onKeep={keep} onCancel={() => { setWriting(null); setProblem(null) }} />
-            : <PracticeRow practice={practice} actions={<div className="flex flex-none">
-              <button type="button" className={iconButton} aria-label={`Edit ${practice.name}`} disabled={!!writing}
-                onClick={() => { setProblem(null); setWriting({ index: i, draft: practice }) }}><Pencil aria-hidden size={18} /></button>
-              <button type="button" className={iconButton} aria-label={`Swap ${practice.name}`} disabled={!!writing}
-                onClick={() => { setProblem(null); setAdding({ view: practice.source === 'library' ? 'library' : 'drills', swap: { index: i, practice }, minutes: practice.minutes }) }}>
-                <ArrowLeftRight aria-hidden size={18} /></button>
-              <button type="button" className={iconButton} aria-label={`Move ${practice.name} up`} disabled={i === 0 || !!writing}
-                onClick={() => setPractices(list => move(list, i, -1))}><ArrowUp aria-hidden size={18} /></button>
-              <button type="button" className={iconButton} aria-label={`Move ${practice.name} down`} disabled={i === practices.length - 1 || !!writing}
-                onClick={() => setPractices(list => move(list, i, 1))}><ArrowDown aria-hidden size={18} /></button>
-              <button type="button" className={iconButton} aria-label={`Remove ${practice.name}`} disabled={!!writing}
-                onClick={() => setPractices(list => list.filter((_, at) => at !== i))}><Trash2 aria-hidden size={18} /></button>
-            </div>} />}
-        </li>)}
-      </ol>
-
-      {writing?.index === null && <PracticeForm number={practices.length + 1} isNew draft={writing.draft}
-        onChange={draft => setWriting({ index: null, draft })} onKeep={keep} onCancel={() => { setWriting(null); setProblem(null) }} />}
-
-      {/* Until the coach types into a new practice, My drills and the Library stay on offer beside it. */}
-      {(!writing || (writing.index === null && !writing.draft.name.trim())) && (full
-        ? <p className="text-sm text-ink-3">A plan holds up to {PLAN_MAX} practices.</p>
-        : <div className="arc flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-medium text-ink-2">{writing ? 'Or add:' : 'Add another:'}</span>
-          {!writing && <Button variant="secondary" size="sm" onClick={() => { setProblem(null); setWriting({ index: null, draft: blankPractice() }) }}>
-            <PenLine aria-hidden size={16} />Write it</Button>}
-          <Button variant="secondary" size="sm" onClick={() => add('drills')}><UserRound aria-hidden size={16} />From My drills</Button>
-          <Button variant="secondary" size="sm" onClick={() => add('library')}><BookOpen aria-hidden size={16} />From the Library</Button>
-        </div>)}
-    </div>
-
-    <AddSheet target={adding} onClose={() => setAdding(null)} when={gameWhen(training).day} squad={training.squad}
-      inPlan={inPlan} onUse={use} onWrite={writeInstead} />
-  </>
-}
-
-/** One practice, written here: a name, the minutes, what you'll tell them, the five details, and Save to My drills.
- *  Kept apart from the list until Add practice, so Cancel loses only this practice's typing. The page holds the
- *  typing, so Save the plan knows a practice is half-written. */
-function PracticeForm({ number, isNew, draft, onChange, onKeep, onCancel }: {
-  number: number; isNew: boolean; draft: Practice; onChange: (draft: Practice) => void; onKeep: (p: Practice) => void; onCancel: () => void
-}) {
-  const [problem, setProblem] = useState<string | null>(null)
-  const set = <K extends keyof Practice>(key: K, value: Practice[K]) => onChange({ ...draft, [key]: value })
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    const why = drillProblem(draft, 'practice')
-    setProblem(why)
-    if (!why) onKeep({ ...draft, name: draft.name.trim() })
-  }
-  return (
-    <form onSubmit={submit} noValidate aria-label={`Practice ${number}`}
-      className="arc grid gap-4 rounded-2xl border-[1.5px] border-brand bg-surface p-4 tablet:p-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[15px] font-medium text-ink">Practice {number}</h2>
-        <span className="text-[13px] text-ink-3">Write it yourself</span>
-      </div>
-      <Input label="Name" value={draft.name} maxLength={DRILL_LIMITS.name} autoComplete="off" required autoFocus
-        onChange={e => set('name', e.target.value)} />
-      <MinutesPicks legend="Minutes" value={draft.minutes} onChange={minutes => set('minutes', minutes)} />
-      <TellField value={draft.tell} onChange={tell => set('tell', tell)} />
-      <DetailFields draft={draft} onChange={set} />
-      {draft.source === 'own' && <Checkbox label="Save to My drills, so I can reuse it" checked={draft.saveToDrills}
-        onCheckedChange={on => set('saveToDrills', on === true)} />}
-      {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">{isNew ? 'Add practice' : 'Keep changes'}</Button>
-      </div>
-    </form>
-  )
+    : <Planner training={training} saved={plan} />}</WithTraining>
 }
 
 /* ── The plan ─────────────────────────────────────────────────────────────── */

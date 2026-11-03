@@ -423,6 +423,9 @@ export type Database = {
       }
       coach_drills: {
         Row: {
+          group_size: number | null
+          part_type: string | null
+          players_kind: string | null
           area: string
           coach_user_id: string
           conditions: string
@@ -438,6 +441,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          group_size?: number | null
+          part_type?: string | null
+          players_kind?: string | null
           area?: string
           coach_user_id?: string
           conditions?: string
@@ -453,6 +459,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          group_size?: number | null
+          part_type?: string | null
+          players_kind?: string | null
           area?: string
           coach_user_id?: string
           conditions?: string
@@ -1346,8 +1355,48 @@ export type Database = {
           },
         ]
       }
+      training_plan_drafts: {
+        Row: {
+          body: Json
+          coach_user_id: string
+          created_at: string
+          event_id: string
+          step: number
+          updated_at: string
+        }
+        Insert: {
+          body: Json
+          coach_user_id?: string
+          created_at?: string
+          event_id: string
+          step?: number
+          updated_at?: string
+        }
+        Update: {
+          body?: Json
+          coach_user_id?: string
+          created_at?: string
+          event_id?: string
+          step?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_plan_drafts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "coach_calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_plan_practices: {
         Row: {
+          group_size: number | null
+          part: string
+          part_type: string | null
+          players_kind: string | null
+          trak_drill: string | null
           area: string
           conditions: string
           direction: string
@@ -1364,6 +1413,11 @@ export type Database = {
           tell: string
         }
         Insert: {
+          group_size?: number | null
+          part?: string
+          part_type?: string | null
+          players_kind?: string | null
+          trak_drill?: string | null
           area?: string
           conditions?: string
           direction?: string
@@ -1380,6 +1434,11 @@ export type Database = {
           tell?: string
         }
         Update: {
+          group_size?: number | null
+          part?: string
+          part_type?: string | null
+          players_kind?: string | null
+          trak_drill?: string | null
           area?: string
           conditions?: string
           direction?: string
@@ -1414,18 +1473,21 @@ export type Database = {
       }
       training_plans: {
         Row: {
+          note: string
           coach_user_id: string
           created_at: string
           event_id: string
           updated_at: string
         }
         Insert: {
+          note?: string
           coach_user_id?: string
           created_at?: string
           event_id: string
           updated_at?: string
         }
         Update: {
+          note?: string
           coach_user_id?: string
           created_at?: string
           event_id?: string
@@ -1654,7 +1716,7 @@ export type Database = {
         Returns: undefined
       }
       save_training_plan: {
-        Args: { p_event_id: string; p_practices: Json }
+        Args: { p_event_id: string; p_practices: Json; p_note?: string }
         Returns: undefined
       }
       take_event_register: {

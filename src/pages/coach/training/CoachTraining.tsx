@@ -29,6 +29,7 @@ import { Stepper } from '@/components/arc/stepper/stepper'
 import { Textarea } from '@/components/arc/textarea/textarea'
 import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-294 (Training 1/5, spec TRAK-293): Training home, behind the academy's training switch. Sessions lists the
    coach's trainings from Schedule (Coming up, then Last week); Drills holds My drills, then the Library's tiles.
@@ -134,7 +135,7 @@ function SessionsView() {
   return (
     <Page view="sessions">
       {reads.some(r => r.error) ? <LoadError what="your trainings" onRetry={() => reads.forEach(r => void r.refetch())} retrying={reads.some(r => r.isFetching)} />
-        : reads.some(r => r.isPending) ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your trainings…</p>
+        : reads.some(r => r.isPending) ? <LoadingSkeleton label="Loading your trainings…" rows={3} className="pt-6" />
         : <div className="grid gap-6">
           {closed && <div role="status" className="arc flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-5 py-3.5">
             <Check aria-hidden size={18} className="text-brand" />
@@ -357,7 +358,7 @@ function PastTrainings() {
           <p className="text-sm text-ink-3">Look back at a session, or copy its plan into one coming up.</p>
         </header>
         {past.error ? <LoadError what="your past trainings" onRetry={() => void past.refetch()} retrying={past.isFetching} />
-          : past.isPending ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your past trainings…</p>
+          : past.isPending ? <LoadingSkeleton label="Loading your past trainings…" lines={2} rows={4} className="pt-6" />
           : inView.length === 0 ? <div className="arc"><EmptyState icon={<History size={24} strokeWidth={1.5} />} title="No past trainings yet"
               description="Once a training is over, it’s kept here with its plan and your notes." /></div>
           : <div className="grid gap-4">
@@ -425,7 +426,7 @@ function DrillsView() {
           <p className="text-sm text-ink-3">Only you see these.</p>
         </div>
         {drills.error ? <div className="mt-3"><LoadError what="your drills" onRetry={() => void drills.refetch()} retrying={drills.isFetching} /></div>
-          : drills.isPending ? <p role="status" className="mt-3 text-[13px] text-ink-3">Loading your drills…</p>
+          : drills.isPending ? <LoadingSkeleton label="Loading your drills…" lines={2} rows={3} className="mt-3" />
           : (drills.data ?? []).length === 0 ? <p className="mt-3 text-[15px] text-ink-2">No drills yet. Add one with New drill, and use it in any session.</p>
           : shown.length === 0 ? <p className="mt-3 text-[15px] text-ink-2">No drill matches “{query.trim()}”.</p>
           : <ul className="mt-3 grid gap-3 tablet:grid-cols-2 laptop:grid-cols-3">

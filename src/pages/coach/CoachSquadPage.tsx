@@ -7,6 +7,7 @@ import { SquadLoadError } from '@/components/coach/squad/SquadLoadError'
 import { PlayersTab } from '@/components/coach/squad/PlayersTab'
 import { AttributesTab } from '@/components/coach/squad/AttributesTab'
 import { AvailabilityTab } from '@/components/coach/squad/AvailabilityTab'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-250: Squad is a full-width coach workspace with views of the same
    roster. The view lives in the URL (?tab=), so a view can be linked and a
@@ -44,7 +45,7 @@ export default function CoachSquadPage() {
 
         <section aria-label={TABS.find(t => t.id === active)!.label} className="pb-8">
           {roster.error ? <SquadLoadError onRetry={roster.retry} />
-            : roster.isPending ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your squad…</p>
+            : roster.isPending ? <LoadingSkeleton label="Loading your squad…" lines={2} avatar rows={4} className="pt-6" />
             : roster.players.length === 0 ? <PreparingSquad />
             : active === 'players' ? <PlayersTab roster={roster} />
             : active === 'attributes' ? <AttributesTab roster={roster} />

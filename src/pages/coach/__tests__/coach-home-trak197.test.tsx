@@ -151,7 +151,7 @@ describe('TRAK-211: the Feedback and assessment tab', { timeout: 20_000 }, () =>
     server.use(http.get(`${SUPABASE_URL}/rest/v1/coach_assessments`, async () => { await held; return HttpResponse.json([]) }))
     await pickSquad('U14')
     expect(within(overview()).queryByText('Bo Lind')).toBeNull()
-    expect(within(overview()).getByRole('status')).toHaveTextContent('Loading your players…')
+    expect(within(overview()).getByRole('status', { name: 'Loading your players…' })).toHaveAttribute('aria-busy', 'true')
     release()
     expect(await within(overview()).findByText('Ade Okafor')).toBeInTheDocument()
     expect(within(overview()).queryByText('Bo Lind')).toBeNull()

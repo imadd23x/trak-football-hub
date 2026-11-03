@@ -14,6 +14,7 @@ import { loadPlayerAssessments } from '@/lib/coach-assessments'
 import type { Scores } from '@/lib/squad/season-profile'
 import { PlayerFactsEditor } from './PlayerFactsEditor'
 import type { PlayerFacts } from './usePlayerFacts'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 const FOOT = { left: 'Left', right: 'Right', both: 'Both' } as const
 /** The assessments shown here, newest first; the player's page has them all. */
@@ -69,7 +70,7 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
     <div className="grid gap-5 laptop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] laptop:items-start">
       <section aria-label={`About ${first}`} className="grid gap-2">
         {factsFailed ? <LoadError what={`${first}'s profile`} onRetry={onRetryFacts} />
-          : !facts ? <p role="status" className="text-sm text-ink-3">Loading {first}'s profile…</p>
+          : !facts ? <LoadingSkeleton label={`Loading ${first}'s profile…`} />
           : <>
             <dl className="m-0 border-t border-line">
               <Fact label="Preferred foot">{facts.foot ? FOOT[facts.foot] : notSet}</Fact>
@@ -100,7 +101,7 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
     </div>
 
     {assessments.isError ? <LoadError what={`${first}'s assessments`} onRetry={() => { void assessments.refetch() }} />
-      : !assessments.data ? <p role="status" className="text-sm text-ink-3">Loading {first}'s assessments…</p>
+      : !assessments.data ? <LoadingSkeleton label={`Loading ${first}'s assessments…`} lines={2} rows={2} />
       : <section aria-labelledby={`assessments-${player.id}`} className="grid grid-cols-[minmax(0,1fr)] gap-2">
         <div className="flex items-baseline justify-between gap-3">
           <h4 id={`assessments-${player.id}`} className="text-base font-medium text-ink">Assessments</h4>

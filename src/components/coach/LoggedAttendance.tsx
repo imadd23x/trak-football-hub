@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { People } from '@/components/coach/EventSheetCoach'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 type Person = { id: string; name: string }
 type Register = { came: Person[]; missed: Person[] }
@@ -31,7 +32,7 @@ export function LoggedAttendance({ sessionId, coachId }: { sessionId: string; co
 
   const heading = 'text-[15px] font-medium text-ink mb-2'
   if (failed) return <p role="alert" className="text-[13px] text-ink-2">Couldn't load who came.</p>
-  if (!register) return <p role="status" className="text-[13px] text-ink-2">Loading…</p>
+  if (!register) return <LoadingSkeleton label="Loading…" lines={1} avatar rows={3} />
   return (
     <div className="space-y-5">
       <div>

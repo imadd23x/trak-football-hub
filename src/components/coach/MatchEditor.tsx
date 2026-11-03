@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { MetadataLabel, LoadError } from '@/components/trak'
 import { matchRating } from '@/lib/match-rating'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-185 part 1 (J4, 16 Oct live run): correct a logged match. The score
    and each player's goals, assists and card, saved for every player at once by
@@ -71,7 +72,7 @@ export function MatchEditor({ sessionId, title, date }: { sessionId: string; tit
   }, [sessionId, attempt])
 
   if (failed) return <LoadError what="this match" onRetry={() => setAttempt(n => n + 1)} retrying={false} />
-  if (!rows) return <p role="status" className="text-[13px] text-ink-3">Loading the match…</p>
+  if (!rows) return <LoadingSkeleton label="Loading the match…" rows={2} />
   const heading = (
     <>
       <p className="text-[16px] text-ink">{title}</p>

@@ -13,6 +13,7 @@ import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { ExpandableText } from '@/components/arc/expandable-text/expandable-text'
 import { MorphSelect } from '@/components/arc/morph-select/morph-select'
 import { Progress } from '@/components/arc/progress/progress'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-285 (Games 3/8): plan step 2, line-up and jobs (TRAK-282; the mockup's Squad step merged in, Imad 27 Oct). The
    coach picks a format and a formation, places players who can come, and gives each a job and a note. Off the pitch,
@@ -40,7 +41,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
   }
 
   if (who.error) return <LoadError what="who can come" onRetry={who.retry} />
-  if (who.isPending) return <p role="status" className="pt-6 text-center text-[13px] text-ink-3">Loading who can come…</p>
+  if (who.isPending) return <LoadingSkeleton label="Loading who can come…" lines={1} avatar rows={4} className="pt-6" />
 
   const plan = (player: Candidate) => playerPlan(form.players, player.id)
   const starters = new Map<number, Candidate>()

@@ -20,6 +20,7 @@ import { SessionChip as Chip } from '@/components/coach/SessionChip'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Button } from '@/components/arc/button/button'
 import { useCoachSquad } from '@/lib/coach-squad'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 type SquadPlayer = {
   id: string
@@ -275,9 +276,9 @@ export default function CoachAddSession() {
   // A squad still loading is not an empty one (TRAK-72). Coaches don't add
   // players: the academy roster decides the squad (#164).
   const rosterEmpty = squad.length === 0 && notReady.length === 0 && !rosterFailed
-  const rosterEmptyText = rosterLoading
-    ? 'Loading your squad…'
-    : 'No squad yet. Players appear here once your academy adds them.'
+  const rosterEmptyText = 'No squad yet. Players appear here once your academy adds them.'
+  // TRAK-335: while the roster loads, Arc's skeleton of player rows in its place.
+  const rosterLoadingSkeleton = (className: string) => <LoadingSkeleton label="Loading your squad…" lines={1} avatar rows={3} className={className} />
 
   // Under each player list: why nobody is offered, or who is left out and why.
   const rosterNote = rosterFailed ? (
@@ -804,11 +805,11 @@ export default function CoachAddSession() {
                 </div>
               </div>
 
-              {rosterEmpty ? (
+              {rosterEmpty ? (rosterLoading ? rosterLoadingSkeleton('px-4 pb-4') : (
                 <p role="status" className="px-4 pb-4 text-[12px] text-ink-3">
                   {rosterEmptyText}
                 </p>
-              ) : (
+              )) : (
                 <div className="divide-y divide-line">
                   {squad.map(p => {
                     const d = details[p.id] ?? DEFAULT_DETAIL
@@ -1126,9 +1127,9 @@ export default function CoachAddSession() {
                     style={{ fontFamily: 'var(--t-font-mono)' }}>NONE</button>
                 </div>
               </div>
-              {rosterEmpty ? (
+              {rosterEmpty ? (rosterLoading ? rosterLoadingSkeleton('py-2') : (
                 <p role="status" className="text-[12px] text-ink-3 py-2">{rosterEmptyText}</p>
-              ) : (
+              )) : (
                 <div className="grid grid-cols-2 tablet:grid-cols-3 gap-2">
                   {squad.map(p => {
                     const on = attended.has(p.id)
@@ -1193,9 +1194,9 @@ export default function CoachAddSession() {
                     style={{ fontFamily: 'var(--t-font-mono)' }}>NONE</button>
                 </div>
               </div>
-              {rosterEmpty ? (
+              {rosterEmpty ? (rosterLoading ? rosterLoadingSkeleton('py-2') : (
                 <p role="status" className="text-[12px] text-ink-3 py-2">{rosterEmptyText}</p>
-              ) : (
+              )) : (
                 <div className="grid grid-cols-2 tablet:grid-cols-3 gap-2">
                   {squad.map(p => {
                     const on = attended.has(p.id)
@@ -1245,7 +1246,7 @@ export default function CoachAddSession() {
         {step === review && (rosterFailed || rosterLoading) && (
           <div className="rounded-[18px] border border-line bg-surface">
             {rosterFailed ? rosterNote : (
-              <p role="status" className="text-[12px] text-ink-2 px-4 py-3" style={{ fontFamily: 'var(--t-font)' }}>Loading your squad…</p>
+              <LoadingSkeleton label="Loading your squad…" lines={1} avatar rows={2} className="px-4 py-3" />
             )}
           </div>
         )}

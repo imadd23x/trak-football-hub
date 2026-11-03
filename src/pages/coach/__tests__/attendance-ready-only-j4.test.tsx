@@ -105,12 +105,12 @@ describe('J4 attendance offers only consent-confirmed players', { timeout: 20_00
     await matchAt('Squad')
 
     await waitFor(() => expect(asked).toBe(true), { timeout: 5000 })
-    expect(screen.getByText('Loading your squad…')).toBeInTheDocument()
+    expect(screen.getAllByRole('status', { name: 'Loading your squad…' }).length).toBeGreaterThan(0)
     expect(screen.queryByText(/No squad yet/)).toBeNull()
 
     release()
     expect(await screen.findByText('No squad yet. Players appear here once your academy adds them.')).toBeInTheDocument()
-    expect(screen.queryByText('Loading your squad…')).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Loading your squad…' })).toBeNull()
     expect(screen.queryByText(/Add players from the Squad tab/)).toBeNull()
   })
 

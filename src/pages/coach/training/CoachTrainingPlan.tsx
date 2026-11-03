@@ -20,6 +20,7 @@ import { WhosHere } from './WhosHere'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-295 (Training 2/5, spec TRAK-293, mockup boards 3A and 5): a training's plan. Write my own
    (/coach/training/:eventId/plan) types practices one at a time and saves the plan whole; the plan
@@ -46,7 +47,7 @@ function WithTraining({ children, wide = false }: { children: (training: Trainin
         {training.error || plan.error
           ? <div className="pt-10"><LoadError what="this training" onRetry={() => { void training.refetch(); void plan.refetch() }}
               retrying={training.isFetching || plan.isFetching} /></div>
-          : training.isPending || plan.isPending ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading the training…</p>
+          : training.isPending || plan.isPending ? <LoadingSkeleton label="Loading the training…" lines={4} rows={2} className="pt-6" />
           : !training.data ? <div className="grid gap-3 pt-10">
               <p className="text-[15px] text-ink-2">This training isn’t on your schedule.</p>
               <Link to={TRAINING_PATH} className={linkClass}>Back to Training</Link>

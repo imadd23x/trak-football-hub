@@ -17,6 +17,7 @@ import { Countdown } from '@/components/arc/countdown/countdown'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { ScrollArea } from '@/components/arc/scroll-area/scroll-area'
 import { MatchAction } from '@/components/coach/games/MatchAction'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-283 (Games 1/8): Games home. The next game with where it is in its loop and its one next action, the open
    drafts, and every match of the squad in view. Cards follow Home's Needs you pattern (Imad, 27 Oct). TRAK-320 (Imad,
@@ -77,7 +78,7 @@ export default function CoachGames() {
         {games.error || plans.error || shares.error || evaluations.error
             ? <LoadError what="your matches" onRetry={() => { void games.refetch(); void plans.refetch(); void shares.refetch(); void evaluations.refetch() }}
                 retrying={games.isFetching || plans.isFetching || shares.isFetching || evaluations.isFetching} />
-          : games.isPending || plans.isPending || shares.isPending || evaluations.isPending ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your matches…</p>
+          : games.isPending || plans.isPending || shares.isPending || evaluations.isPending ? <LoadingSkeleton label="Loading your matches…" rows={3} className="pt-6" />
           : ordered.length === 0 ? (
             <div className="arc pt-6">
               <EmptyState icon={<PitchIcon size={24} strokeWidth={1.5} />} title="No matches yet"
@@ -217,7 +218,7 @@ function TopScorers({ scorers }: { scorers: UseQueryResult<Scorer[]> }) {
       <h2 id="top-scorers" className="text-lg font-medium text-ink">Top scorers and assists</h2>
       <p className="mt-1 text-sm text-ink-3">This season, from your published evaluations.</p>
       {scorers.error ? <div className="mt-3"><LoadError what="the scorers" onRetry={() => void scorers.refetch()} retrying={scorers.isFetching} /></div>
-        : scorers.isPending ? <p role="status" className="mt-3 text-sm text-ink-3">Loading the scorers…</p>
+        : scorers.isPending ? <LoadingSkeleton label="Loading the scorers…" lines={1} avatar rows={3} className="mt-3" />
         : rows.length === 0 ? <p className="mt-3 text-sm text-ink-2">No goals or assists yet this season.</p>
         : <>
             <table className="mt-3 w-full table-fixed text-sm">

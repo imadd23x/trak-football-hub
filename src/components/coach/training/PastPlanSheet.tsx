@@ -8,6 +8,7 @@ import { Button } from '@/components/arc/button/button'
 import { SearchField } from '@/components/arc/search-field/search-field'
 import { usePastSessions, type Training } from './useTraining'
 import type { SavedPractice } from '@/lib/training/plans'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-297 (Training 4/5, spec TRAK-293): copying a past session opens the planner filled in; nothing saves until Save
    the plan. TRAK-339 (Training redo 1/5, spec TRAK-338, 2 Nov prototype): no more "How do you want to plan it?" (Kostas,
@@ -39,7 +40,7 @@ export function PastPlanSheet({ open, onOpenChange, training }: { open: boolean;
     description={`For ${training.title}, ${when(training)}. Then change anything before you save.`}>
     <div className="grid gap-4 pb-4">
       {past.error ? <LoadError what="your past plans" onRetry={() => void past.refetch()} retrying={past.isFetching} />
-        : past.isPending ? <p role="status" className="text-[13px] text-ink-3">Loading your past plans…</p>
+        : past.isPending ? <LoadingSkeleton label="Loading your past plans…" lines={2} rows={3} />
         : others.length === 0 ? <p className="text-[15px] text-ink-2">No past plans yet. Every plan you save is kept here.</p>
         : <>
           <SearchField label="Search past plans" placeholder="Search by name or drill" value={query} onValueChange={setQuery} />

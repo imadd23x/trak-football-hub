@@ -15,6 +15,7 @@ import { DatePicker } from '@/components/arc/date-picker/date-picker'
 import { SplitButton } from '@/components/arc/split-button/split-button'
 import { TimePicker } from '@/components/arc/time-picker/time-picker'
 import { PlanReview, type ReviewRow } from '@/components/arc/blocks/plan-review/plan-review'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-286 (Games 4/8): plan step 3, Share (TRAK-282). In the app only: no email, no push. TRAK-287: locked at kick-off,
    nothing is shared any more; the lock's alert says what wasn't. TRAK-290: Share at… behind the share button's chevron;
@@ -52,7 +53,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
   useEffect(() => setPicking(false), [sharedAt])
 
   if (who.error) return <LoadError what="who can come" onRetry={who.retry} />
-  if (who.isPending) return <p role="status" className="pt-6 text-center text-[13px] text-ink-3">Loading who can come…</p>
+  if (who.isPending) return <LoadingSkeleton label="Loading who can come…" rows={2} className="pt-6" />
 
   const reading = readers(form, who.players)
   const { placed, withJob } = lineUpCounts(form, who.players)

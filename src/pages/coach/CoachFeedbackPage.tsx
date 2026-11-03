@@ -13,6 +13,7 @@ import { localTodayISO } from '@/lib/event-time'
 import { openable } from '@/lib/openable'
 import { remember, remembered } from '@/lib/screen-memory'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-211: who needs attention moved off coach Home into its own coach tab,
    "Feedback and assessment". It lists every player, most urgent first, on the
@@ -130,7 +131,7 @@ export default function CoachFeedbackPage() {
               <button type="button" onClick={retry} className="underline text-brand">Retry</button>
             </p>
           ) : !overview ? (
-            <p role="status" className="text-[12px] text-ink-3" style={{ fontFamily: 'var(--t-font)' }}>Loading your players…</p>
+            <LoadingSkeleton label="Loading your players…" lines={2} avatar rows={4} />
           ) : overview.players === 0 ? (
             <div>
               <p className="text-[13px] font-medium text-ink-2" style={{ fontFamily: 'var(--t-font)' }}>Your squad is being prepared</p>

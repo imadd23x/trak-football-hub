@@ -7,6 +7,7 @@ import { ChevronLeft, Sparkles, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { trackEvent } from '@/lib/telemetry'
 import { useParked } from '@/components/trak/parked'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /**
  * T2 — the coach reviews every word before a child sees it.
@@ -192,7 +193,7 @@ export default function CoachReviewFeedback() {
 
       <div className="flex-1 px-5 py-4 space-y-4">
         {loading ? (
-          <p className="text-ink-3 text-sm">Loading…</p>
+          <LoadingSkeleton label="Loading…" rows={2} />
         ) : error ? (
           <div role="alert" className="rounded-[14px] p-4 border border-line bg-surface">
             <p className="text-[13px] text-ink-2">{error}</p>

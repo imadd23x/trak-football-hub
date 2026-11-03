@@ -8,6 +8,7 @@ import { fullTime } from '@/lib/games/loop'
 import { usePastSessions, useRegisters, useTrainings, type Training } from '@/components/coach/training/useTraining'
 import { gameTitle, gameWhen, useGamePlan, useGames, type Game } from '@/components/coach/games/useGames'
 import { LoadError } from '@/components/trak/LoadError'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-304 (Kostas, 28 Oct): when the coach opens Trak on a training or match day, Home shows that day's plan, as a
    reminder of what the coach planned and how to run it. It takes Squad shape's place; the week stays. Today's trainings
@@ -48,7 +49,7 @@ export function TodayPlan({ trainingOn, gamesOn, inView }: {
       {!today.length && !pending && !failed && <p className="text-sm text-ink-3">Nothing today</p>}
     </div>
     {failed ? <div className="mt-4"><LoadError what="today’s plan" onRetry={() => { void trainings.refetch(); void games.refetch() }} /></div>
-      : pending ? <div role="status" aria-label="Loading today’s plan" className="mt-4 h-[180px] rounded-xl bg-raised animate-pulse motion-reduce:animate-none" />
+      : pending ? <LoadingSkeleton label="Loading today’s plan" lines={4} rows={2} className="mt-4 h-[180px] content-start overflow-hidden" />
       : today.length ? <ul className="mt-3 grid gap-3 divide-y divide-line">
         {today.map(item => <li key={item.event.id} className="pt-3 first:pt-0">
           {item.kind === 'training' ? <TodayTraining training={item.event} named={today.length > 1} /> : <TodayMatch game={item.event} named={today.length > 1} />}

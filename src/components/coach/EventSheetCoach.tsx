@@ -14,6 +14,7 @@ import { shareableFromRow, squadLabelFrom, whatsAppShareText } from '@/lib/event
 import { ShareEventButton, ShareIcon } from '@/components/coach/ShareEventButton'
 import type { StripEvent } from '@/components/trak/WeekStrip'
 import { updatedNote } from '@/lib/alert-read-state'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-182: the coach's part of the event sheet. Publish (a draft) or
    Published; after the event, Take register (J8.15). Share (the
@@ -201,7 +202,7 @@ export function EventSheetCoach({ event, coachId, onChanged }: { event: StripEve
           ) : squad.isError ? (
             <p role="alert" className="text-[13px] text-ink-2">Couldn't load who's coming.{' '}
               <button type="button" className="underline" onClick={() => { void squad.refetch() }}>Retry</button></p>
-          ) : !squad.data ? <p role="status" className="text-[13px] text-ink-2">Loading…</p>
+          ) : !squad.data ? <LoadingSkeleton label="Loading…" lines={1} avatar rows={3} />
           : squad.data.coming.length + squad.data.away.length + squad.data.waiting.length === 0 ? (
             <p className="text-[13px] text-ink-2">No players in your squad yet.</p>
           ) : squad.data.came ? (

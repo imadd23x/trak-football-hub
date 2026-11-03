@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { EventRow } from '@/lib/coach-events'
 import { LoadError } from '@/components/trak'
 import { Timeline } from '@/components/arc/timeline/timeline'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-289 (Games 7/8): the game's History (TRAK-282), the visible start and end of its loop: created, plan drafted,
    shared and each change shared to N, locked at kick-off, evaluation draft saved, published. Newest first, grouped by
@@ -24,7 +25,7 @@ export function GameHistory({ game, planCreatedAt, savedAt, publishedAt }: {
     },
   })
   if (shares.error) return <LoadError what="this match’s history" onRetry={() => void shares.refetch()} />
-  if (shares.isPending) return <p role="status" className="text-[13px] text-ink-3">Loading the history…</p>
+  if (shares.isPending) return <LoadingSkeleton label="Loading the history…" lines={2} rows={2} />
   const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
   const events = [
     game.created_at ? [{ id: 'created', at: game.created_at, title: 'Match created' }] : [],

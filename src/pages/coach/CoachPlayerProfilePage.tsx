@@ -11,6 +11,7 @@ import { openable } from '@/lib/openable'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { CoachAssessmentCard } from '@/components/coach/CoachAssessmentCard'
 import { loadPlayerAssessments } from '@/lib/coach-assessments'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 function avgScore(a: any) {
   return (a.work_rate + a.tactical + a.attitude + a.technical + a.physical + a.coachability) / 6
@@ -71,7 +72,7 @@ export function CoachPlayerOverview({ id, embedded = false }: { id: string | und
 
   if (embedded && playerState !== 'found') return (
     <div className="px-1 py-6 text-center">
-      {playerState === 'loading' ? <p role="status" className="text-[13px] text-ink-3">Loading…</p>
+      {playerState === 'loading' ? <LoadingSkeleton label="Loading…" avatar />
         : playerState === 'failed' ? <LoadError what="this player" onRetry={() => { setPlayerState('loading'); void loadPlayer() }} />
         : <p className="text-[14px] text-ink-2">We couldn't find that player.</p>}
     </div>

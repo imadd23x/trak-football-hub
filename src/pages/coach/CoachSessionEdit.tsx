@@ -16,6 +16,7 @@ import {
   TRAINING_DURATIONS, TRAINING_INTENSITIES,
   parseTrainingNotes, parseTrainingTitle, trainingNotes, trainingTitle,
 } from '@/lib/session-form'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* J4 (TRAK-102): open a saved session and correct it. A coach who missed the
    note or an attendance tick used to have to log a second session, which the
@@ -243,7 +244,7 @@ export default function CoachSessionEdit() {
           ) : status === 'missing' ? (
             <p role="status" className="text-[13px] text-ink-2">This session isn't available. It may have been deleted.</p>
           ) : (
-            <p role="status" className="text-[13px] text-ink-3">Loading the session…</p>
+            <LoadingSkeleton label="Loading the session…" lines={4} rows={2} />
           )}
         </div>
       </MobileShell>

@@ -74,7 +74,8 @@ describe('TRAK-92 coach Feedback and assessment while loading', { timeout: 20_00
     await waitFor(() => expect([...asked]).toEqual(['squad_players']), { timeout: 5000 })
 
     // Still loading: nothing on screen may claim the squad is empty or fine.
-    expect(within(await region()).getByRole('status')).toHaveTextContent('Loading your players…')
+    // TRAK-335: Arc's skeleton, heard as what is loading.
+    expect(within(await region()).getByRole('status', { name: 'Loading your players…' })).toHaveAttribute('aria-busy', 'true')
     expect(screen.queryByText('Your squad is being prepared')).toBeNull()
     expect(screen.queryByText(/On track/)).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
@@ -154,7 +155,7 @@ describe('TRAK-92 coach Feedback and assessment while loading', { timeout: 20_00
     renderApp('/coach/feedback')
     const alert = await within(await region()).findByRole('alert', {}, { timeout: 5000 })
     expect(alert).toHaveTextContent("Couldn't load your players.")
-    expect(screen.queryByText('Loading your players…')).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Loading your players…' })).toBeNull()
 
     squadFails = false
     await act(async () => { within(alert).getByRole('button', { name: 'Retry' }).click() })

@@ -23,6 +23,7 @@ import { publishEvent } from '@/lib/event-publish'
 import { shareableFromRow, squadLabelFrom, whatsAppShareText } from '@/lib/event-share'
 import { eventHeading, toPlayerEvent } from '@/lib/player-events'
 import type { EventRow } from '@/lib/coach-events'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /**
  * TRAK-163: the coach's week on Home, drafts included, so the schedule is visible without hunting for it.
@@ -90,7 +91,7 @@ function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, label
 
   if (failed) return <div className="mb-4"><LoadError what="this week" onRetry={() => setAttempt(n => n + 1)} /></div>
   if (!week || week.monday !== dates[0]) {
-    return <div role="status" aria-label="Loading this week" className="h-[320px] rounded-2xl border border-line bg-surface animate-pulse motion-reduce:animate-none" />
+    return <LoadingSkeleton label="Loading this week" lines={4} rows={2} className="h-[320px] content-start rounded-2xl border border-line bg-surface p-5" />
   }
 
   const refresh = () => setAttempt(n => n + 1)

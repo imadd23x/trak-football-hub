@@ -115,7 +115,7 @@ describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_00
       goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }],
       format: 11, formation: null,
     }])
-    expect(await screen.findByText('Plan not shared')).toBeInTheDocument()
+    expect(await screen.findByText('Draft')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('What you know about them'), ' Their 7 drifts inside.')
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeInTheDocument()
@@ -125,7 +125,7 @@ describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_00
     expect(await screen.findByDisplayValue('Win it back in their half')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /Stronger/ })).toBeChecked()
     expect(screen.getByLabelText('What you know about them')).toHaveValue('Their keeper plays short.')
-    expect(screen.getByText('Plan not shared')).toBeInTheDocument()
+    expect(screen.getByText('Draft')).toBeInTheDocument()
   })
 
   it('takes up to three instructions: a fourth can\'t be added, and any can be removed, the last one too', async () => {

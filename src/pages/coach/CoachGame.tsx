@@ -24,7 +24,6 @@ import { CoachTrail } from '@/components/coach/CoachTrail'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
-import { Countdown } from '@/components/arc/countdown/countdown'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/arc/tabs/tabs'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
@@ -74,7 +73,7 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
   const [now, setNow] = useState(() => Date.now())
   const whistle = fullTime({ ...row, ends_at: row.ends_at ?? null })
   // TRAK-287, TRAK-288: the page reads the clock again at kick-off and at full time itself, so the plan locks and the
-  // evaluation opens with no reload, even when the header's countdown never ticked on screen. TRAK-290: and when a
+  // evaluation opens with no reload, whether or not a countdown is on screen. TRAK-290: and when a
   // scheduled plan goes out. A wait past setTimeout's limit (24 days) just wakes early and waits again.
   const sharesAt = sharedAt ? Date.parse(sharedAt) : NaN
   useEffect(() => {
@@ -112,10 +111,9 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
       <h1 className="text-[26px] font-medium tracking-[-0.01em] text-ink break-words">{gameTitle(row)}</h1>
       <p className="text-sm text-ink-2">{where.filter(Boolean).join(' · ')}</p>
       {academy && <p className="text-sm text-ink-3">{academy}</p>}
+      {/* TRAK-344 (Imad, 3 Nov): no countdown here; Game plan review has the one. */}
       <div className="flex flex-wrap items-center gap-3 pt-1">
         {cancelled ? <Badge tone="danger">Cancelled</Badge> : <Badge tone={state.tone}>{state.label}</Badge>}
-        {!cancelled && now < fullTime({ ...row, ends_at: row.ends_at ?? null }) && <Countdown variant="compact" units={['days', 'hours', 'minutes']}
-          target={row.starts_at} label="Kick-off in" completeLabel="Locked" />}
       </div>
     </header>
 
@@ -133,7 +131,7 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
               // Locked, it shows the plan as saved at kick-off: what the evaluation reads against.
               : <GamePlan game={row} form={(locked ? null : typed) ?? planToForm(plan.data ?? null, players.data ?? [])} onFormChange={setTyped}
                   step={planStep} onStep={setPlanStep} sharedAt={sharedAt} changes={changes} lockedAt={locked ? time : null}
-                  onEditLogistics={() => logistics.open?.()} planStartedAt={plan.data?.created_at ?? null} />}
+                  onEditLogistics={() => logistics.open?.()} />}
           </TabsContent>
           <TabsContent value="evaluation">
             {(evaluation.isError && evaluation.data === undefined) || (plan.isError && plan.data === undefined) || (players.isError && players.data === undefined)
@@ -209,7 +207,7 @@ function Logistics({ row, squad, onEdit, publish }: {
   return (
     <div className="grid gap-4 pt-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Badge tone={row.published ? 'success' : 'neutral'}>{row.published ? 'Shared with families' : 'Draft'}</Badge>
+        <Badge tone={row.published ? 'success' : 'neutral'}>{row.published ? 'Shared' : 'Draft'}</Badge>
         {!row.published && <Button loading={publish.isPending} onClick={() => publish.mutate()}>Publish</Button>}
         {onEdit && <Button variant="secondary" size="sm" onClick={onEdit}><Pencil size={14} aria-hidden="true" />Edit</Button>}
       </div>

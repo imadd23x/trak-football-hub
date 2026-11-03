@@ -93,7 +93,6 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(31_000) })
 
     expect(await screen.findByText(/^Locked at kick-off, \d\d:\d\d$/)).toBeInTheDocument()
-    expect(screen.getByRole('timer', { name: 'Kick-off in' })).toHaveTextContent('Locked')
     expect(screen.getByText(/Jobs and expectations are fixed, so the evaluation reads against what you expected before the game\./)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull()
     expect(screen.getByRole('textbox', { name: 'Instruction' })).toHaveAttribute('readonly')
@@ -111,7 +110,7 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     expect(await screen.findByRole('region', { name: 'Not shared' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Share plan' })).toBeNull()
     // TRAK-332: the review still reads every part, with nothing to edit.
-    const review = screen.getByRole('region', { name: 'Review & share' })
+    const review = screen.getByRole('region', { name: 'Game plan review' })
     expect(within(review).getByText('1 of 1 starters have one')).toBeInTheDocument()
     expect(within(review).queryByRole('button', { name: /^Edit/ })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Back' }))

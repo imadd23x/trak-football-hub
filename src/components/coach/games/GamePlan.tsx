@@ -28,7 +28,7 @@ const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again
 const SHARE_FAILED = "Couldn't share the plan. Check your connection and try again; everything you typed is still here."
 const SCHEDULE_FAILED = "Couldn't schedule the plan. Check your connection and try again; everything you typed is still here."
 
-export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, changes, lockedAt = null, onEditLogistics, planStartedAt = null }: {
+export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, changes, lockedAt = null, onEditLogistics }: {
   game: EventRow; form: PlanForm; onFormChange: (form: PlanForm) => void; step: number; onStep: (step: number) => void
   /** TRAK-286: when the plan was first shared, or null; and whose copies a share would change now. */
   sharedAt: string | null; changes: string[]
@@ -36,8 +36,6 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
   lockedAt?: string | null
   /** TRAK-332: Review & share's Logistics part pulls up the event's edit sheet (TRAK-331). */
   onEditLogistics: () => void
-  /** When the plan was first saved, for Review & share's countdown. */
-  planStartedAt?: string | null
 }) {
   const locked = lockedAt !== null
   const { user } = useAuth()
@@ -144,7 +142,7 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
       {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} form={form} onFormChange={change} locked={locked} />
         : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} />
         : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} onShare={shareNow} onSchedule={scheduleAt}
-            sharing={sharing} problem={shareProblem} locked={locked} onStep={onStep} onEditLogistics={onEditLogistics} planStartedAt={planStartedAt} />}
+            sharing={sharing} problem={shareProblem} locked={locked} onStep={onStep} onEditLogistics={onEditLogistics} />}
       <div className="flex flex-wrap items-center gap-3">
         {step > 0 && <Button variant="ghost" onClick={() => onStep(step - 1)}>Back</Button>}
         {!locked && <>

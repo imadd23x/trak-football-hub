@@ -77,7 +77,7 @@ describe('TRAK-284: plan drafts on Games home and in Needs you', { timeout: 30_0
     expect(within(drafts).getByText('Game plan · saved Tue 27 Oct, 21:40')).toBeInTheDocument()
 
     const next = screen.getByRole('region', { name: 'Next match' })
-    expect(within(next).getByText('Plan not shared')).toBeInTheDocument()
+    expect(within(next).getByText('Draft')).toBeInTheDocument()
     const strip = screen.getByRole('region', { name: 'Your matches' })
     expect(within(within(strip).getByRole('link', { name: /Riverside Rovers/ })).getByText('Plan not written')).toBeInTheDocument()
 

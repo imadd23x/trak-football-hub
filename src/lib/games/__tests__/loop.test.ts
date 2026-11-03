@@ -61,9 +61,9 @@ describe('a published evaluation (TRAK-289)', () => {
 })
 
 describe('a plan draft (TRAK-284)', () => {
-  it('a published match with a plan draft before kick-off has a plan that is not shared; sharing it is next (TRAK-286)', () => {
+  it('a published match with a plan draft before kick-off is a Draft (TRAK-344); sharing it is next (TRAK-286)', () => {
     expect(gameState(game(), KICK_OFF - 1000, { drafted: true })).toBe('planDraft')
-    expect(STATE.planDraft).toMatchObject({ label: 'Plan not shared', action: { label: 'Share plan', tab: 'plan', step: 'share' } })
+    expect(STATE.planDraft).toMatchObject({ label: 'Draft', action: { label: 'Share plan', tab: 'plan', step: 'share' } })
   })
 
   it('a draft changes nothing while the logistics wait, or after kick-off', () => {
@@ -73,7 +73,7 @@ describe('a plan draft (TRAK-284)', () => {
 })
 
 describe('a shared plan (TRAK-286)', () => {
-  it('a shared plan closes "Plan not shared"; there is nothing to do until kick-off', () => {
+  it('a shared plan closes the draft; there is nothing to do until kick-off', () => {
     expect(gameState(game(), KICK_OFF - 1000, { drafted: true, shared: true })).toBe('shared')
     expect(STATE.shared).toMatchObject({ label: 'Plan shared', tone: 'success' })
     expect(STATE.shared.action).toBeUndefined()

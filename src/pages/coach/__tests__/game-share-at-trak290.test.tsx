@@ -118,7 +118,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     const user = userEvent.setup()
     const calls = store()
     shareStep()
-    await screen.findByRole('region', { name: 'Review & share' })
+    await screen.findByRole('region', { name: 'Game plan review' })
     expect(screen.getByRole('button', { name: 'Share plan more actions' })).toBeDisabled()
 
     await user.click(screen.getByRole('checkbox', { name: /talked selection through/ }))
@@ -187,7 +187,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     server.use(http.post(`${SUPABASE_URL}/rest/v1/rpc/schedule_game_plan`, () =>
       HttpResponse.json({ code: 'P0001', message: 'Pick a time before kick-off' }, { status: 400 })))
     shareStep()
-    await screen.findByRole('region', { name: 'Review & share' })
+    await screen.findByRole('region', { name: 'Game plan review' })
     await user.click(screen.getByRole('checkbox', { name: /talked selection through/ }))
     await user.click(screen.getByRole('button', { name: 'Share plan more actions' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Share at…' }))

@@ -21,8 +21,9 @@ export const STATE: Record<GameState, {
   // Publishing the match in Schedule is "share the logistics" (TRAK-282, step 1).
   logistics: { label: 'Logistics not shared', tone: 'neutral', action: { label: 'Share logistics', tab: 'logistics' } },
   plan: { label: 'Plan not written', tone: 'warning', action: { label: 'Write plan', tab: 'plan' } },
-  // TRAK-284: a draft only the coach sees. Sharing it (TRAK-286) closes "Plan not shared".
-  planDraft: { label: 'Plan not shared', tone: 'warning', action: { label: 'Share plan', tab: 'plan', step: 'share' } },
+  // TRAK-284: a draft only the coach sees. Sharing it (TRAK-286) closes it. TRAK-344 (Imad, 3 Nov): "Draft", not
+  // "Plan not shared"; Home's Needs you line still says why the match needs the coach.
+  planDraft: { label: 'Draft', tone: 'warning', action: { label: 'Share plan', tab: 'plan', step: 'share' } },
   // TRAK-290: shared at a time still to come. Nothing to do: what's saved by then goes out.
   scheduled: { label: 'Plan scheduled', tone: 'info' },
   shared: { label: 'Plan shared', tone: 'success' },

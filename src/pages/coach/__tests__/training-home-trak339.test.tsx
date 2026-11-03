@@ -150,6 +150,8 @@ describe('TRAK-339: the Next training card', { timeout: 30_000 }, () => {
     renderApp('/coach/training')
     const card = await nextCard('Defending the box')
     expect(await within(card).findByText('2 here')).toBeInTheDocument()
+    expect(within(card).queryByText('No register taken')).toBeNull()
+    expect(within(card).queryByText('No plan written')).toBeNull()
     expect(within(card).getByText('Would you run this session again?')).toBeInTheDocument()
     await user.click(within(card).getByRole('button', { name: 'Yes, with changes' }))
     await user.type(within(card).getByLabelText('A note for next time'), '  Rondo grids too small. ')
@@ -165,6 +167,9 @@ describe('TRAK-339: the Next training card', { timeout: 30_000 }, () => {
     renderApp('/coach/training')
     const card = await nextCard('Defending the box')
     expect(within(card).getByText('Finished')).toBeInTheDocument()
+    // Live check, 3 Nov: no register, so Who's here isn't ticked; it says so.
+    expect(within(card).getAllByText('No register taken').length).toBeGreaterThan(0)
+    expect(within(card).getAllByText('No plan written').length).toBeGreaterThan(0)
     // No plan, so nothing to review.
     expect(within(card).queryByRole('button', { name: 'Review today’s plan' })).toBeNull()
     await user.click(within(card).getByRole('button', { name: 'Skip and close' }))

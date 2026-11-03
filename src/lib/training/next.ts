@@ -27,6 +27,23 @@ export function nextTraining<T extends TrainingEvent>(trainings: T[], now: numbe
   return coming ? { training: coming, phase: today(coming) ? 'day' : 'before' } : null
 }
 
+/** The card's loop: Logistics (from the schedule) → Plan → Who's here → Notes (optional). */
+export const LOOP = [
+  { id: 'logistics', label: 'Logistics', description: 'From the schedule' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'here', label: 'Who’s here' },
+  { id: 'notes', label: 'Notes', description: 'Optional' },
+]
+
+/** The loop's steps for the card. A step the card has moved past is ticked only if it really happened; otherwise it
+ *  says what's missing (live check, 3 Nov: a training that ended with no register showed Who's here ticked). */
+export function loopSteps({ current, planned, registered }: { current: number; planned: boolean; registered: boolean }) {
+  return LOOP.map((step, i) => i >= current ? step
+    : i === 1 && !planned ? { ...step, error: 'No plan written' }
+    : i === 2 && !registered ? { ...step, error: 'No register taken' }
+    : step)
+}
+
 export type Tone = 'success' | 'warning' | 'neutral'
 
 /** The badge a training carries, on the card and in Upcoming trainings. */

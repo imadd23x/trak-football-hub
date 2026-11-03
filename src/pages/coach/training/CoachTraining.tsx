@@ -9,7 +9,7 @@ import { ON_LIBRARY } from '@/lib/fixed-colours'
 import { searchDrills, splitTrainings, trainingMinutes, type Drill } from '@/lib/training/sessions'
 import { planPath, sessionSummary, type PlannerState } from '@/lib/training/plans'
 import { registerProblem } from '@/lib/event-register'
-import { AGAIN, NOTE_MAX, againLabel, nextTraining, searchPast, trainingBadge, type Again, type Phase } from '@/lib/training/next'
+import { AGAIN, NOTE_MAX, againLabel, loopSteps, nextTraining, searchPast, trainingBadge, type Again, type Phase } from '@/lib/training/next'
 import { gameWhen } from '@/components/coach/games/useGames'
 import {
   useDrills, useHere, useNotes, usePastTrainings, usePlannedTrainings, useRegisters, useSaveNotes, useTrainings, type Notes, type Training,
@@ -100,12 +100,6 @@ function Page({ view, action, children }: { view: 'sessions' | 'drills'; action?
    is in its loop and its one next action), Upcoming trainings in a row, and Past trainings at the very bottom (Kostas,
    2 Nov). After a training, its Notes are asked on the card. */
 
-const LOOP = [
-  { id: 'logistics', label: 'Logistics', description: 'From the schedule' },
-  { id: 'plan', label: 'Plan' },
-  { id: 'here', label: 'Who’s here' },
-  { id: 'notes', label: 'Notes', description: 'Optional' },
-]
 
 function SessionsView() {
   const { user } = useAuth()
@@ -199,6 +193,9 @@ function NextTraining({ training, phase, planned, sessionId, onStart, onClosed }
   const count = sessionId ? here.data?.get(sessionId) ?? null : null
   const badge = trainingBadge({ phase, planned, here: count })
   const current = phase === 'after' ? 3 : planned || phase === 'day' ? 2 : 1
+  // A step the card has moved past is ticked only if it really happened; otherwise it says what's missing (live check,
+  // 3 Nov: a training ended with no register showed Who's here ticked).
+  const steps = loopSteps({ current, planned, registered: !!sessionId })
   const message = training.family_note?.trim()
   // Who's here opens as the register does everywhere else: published, not cancelled, started.
   const registerWhy = registerProblem({ ...training, event_type: 'training' }, new Date())
@@ -218,7 +215,7 @@ function NextTraining({ training, phase, planned, sessionId, onStart, onClosed }
         <Badge tone={badge.tone}>{badge.label}</Badge>
       </div>
 
-      <Stepper label="Where this training is" steps={LOOP} current={current} />
+      <Stepper label="Where this training is" steps={steps} current={current} />
 
       {phase === 'after' ? <NotesForm training={training} planned={planned} onReview={review} onClosed={onClosed} />
         : <>

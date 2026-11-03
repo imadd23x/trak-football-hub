@@ -31,6 +31,8 @@ export interface StepperProps {
   orientation?: StepperOrientation;
   /** Called with the index of a completed step when it is chosen. Without it the stepper is a read-only indicator. */
   onStepSelect?: (index: number) => void;
+  /** Trak (TRAK-346, Imad 3 Nov): any step but the current one can be chosen, ahead as well as back. */
+  jumpAhead?: boolean;
   /** `current` shows only the active step's description, for tight spaces. Errors always show. */
   details?: "all" | "current";
   /** Markers only; labels stay available to assistive tech. Horizontal steppers switch to this below 30rem on their own
@@ -114,7 +116,7 @@ function Marker({ number, kind, current, glyphDelay, ringDelay, reduced }: { num
 
 const statusText: Record<StepperStatus, string> = { complete: "Completed", current: "", upcoming: "Not started", error: "Error" };
 
-export function Stepper({ steps, current, orientation = "horizontal", onStepSelect, details = "all", compact = false, label = "Progress", completeLabel = "All steps complete", className }: StepperProps) {
+export function Stepper({ steps, current, orientation = "horizontal", onStepSelect, jumpAhead = false, details = "all", compact = false, label = "Progress", completeLabel = "All steps complete", className }: StepperProps) {
   const reduced = useReducedMotion() ?? false;
   const count = steps.length;
   const active = Math.min(Math.max(Math.round(current), 0), count);
@@ -134,7 +136,7 @@ export function Stepper({ steps, current, orientation = "horizontal", onStepSele
   const done = active >= count;
   const now = done ? undefined : steps[active];
 
-  /** Arrow keys move between the steps you can reach; Home and End jump to the first and the current one. */
+  /** Arrow keys move between the steps you can reach; Home and End jump to the first and the last of them. */
   function onKeyDown(event: KeyboardEvent<HTMLOListElement>) {
     const rtl = !vertical && getComputedStyle(event.currentTarget).direction === "rtl";
     const back = ["ArrowUp", rtl ? "ArrowRight" : "ArrowLeft"], ahead = ["ArrowDown", rtl ? "ArrowLeft" : "ArrowRight"];
@@ -154,7 +156,7 @@ export function Stepper({ steps, current, orientation = "horizontal", onStepSele
       {steps.map((step, index) => {
         const isCurrent = index === active;
         const status: StepperStatus = step.error ? "error" : index < active ? "complete" : isCurrent ? "current" : "upcoming";
-        const clickable = interactive && index < active;
+        const clickable = interactive && (jumpAhead ? !isCurrent : index < active);
         const detail = step.error ?? (details === "all" || isCurrent ? step.description : undefined);
         const kind: GlyphKind = step.error ? "error" : index < active ? "check" : "number";
         const content: ReactNode = <>
@@ -170,7 +172,7 @@ export function Stepper({ steps, current, orientation = "horizontal", onStepSele
             <motion.span key={orientation} className={styles.fill} initial={false} animate={vertical ? { scaleY: index < active ? 1 : 0 } : { scaleX: index < active ? 1 : 0 }} transition={reduced ? still : { ...motionTokens.spring.smooth, delay: delayAt(index) }} />
           </span> : null}
           {interactive
-            ? <button type="button" className={styles.head} data-clickable={clickable || undefined} data-reachable={index <= active || undefined} aria-current={isCurrent ? "step" : undefined} aria-disabled={clickable ? undefined : true} tabIndex={clickable ? undefined : -1} onClick={clickable ? () => onStepSelect?.(index) : undefined}>{content}</button>
+            ? <button type="button" className={styles.head} data-clickable={clickable || undefined} data-reachable={jumpAhead || index <= active || undefined} aria-current={isCurrent ? "step" : undefined} aria-disabled={clickable ? undefined : true} tabIndex={clickable ? undefined : -1} onClick={clickable ? () => onStepSelect?.(index) : undefined}>{content}</button>
             : <span className={styles.head} aria-current={isCurrent ? "step" : undefined}>{content}</span>}
         </li>;
       })}

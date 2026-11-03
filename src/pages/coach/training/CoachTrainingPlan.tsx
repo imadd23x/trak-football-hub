@@ -1,9 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowDown, ArrowLeftRight, ArrowUp, BookOpen, ClipboardList, PenLine, Pencil, Trash2, UserRound } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useAuth } from '@/contexts/AuthContext'
 import { registerProblem } from '@/lib/event-register'
 import { DRILL_DETAILS, DRILL_LIMITS, drillProblem, trainingEnd, trainingMinutes } from '@/lib/training/sessions'
 import { loopNote, loopState, practiceStarts } from '@/lib/training/loop'
@@ -12,14 +10,11 @@ import {
   viewPath, type PlannerState, type Practice,
 } from '@/lib/training/plans'
 import { gameWhen } from '@/components/coach/games/useGames'
-import { usePlan, useRegisters, useSavePlan, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
-import { TakeRegister } from '@/components/coach/TakeRegister'
+import { useNotes, usePlan, useRegisters, useSavePlan, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
 import { CoachTrail } from '@/components/coach/CoachTrail'
-import { SessionLog } from '@/components/coach/SessionLog'
-import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { DetailFields, MinutesPicks, TellField } from '@/components/coach/training/fields'
 import { LoopStrip } from '@/components/coach/training/LoopStrip'
-import { PlanWaySheet } from '@/components/coach/training/PlanWaySheet'
+import { RegisterSheet } from '@/components/coach/training/RegisterSheet'
 import { AddSheet, type AddTarget, type AddView } from '@/components/coach/training/AddSheet'
 import { useParked } from '@/components/trak/parked'
 import { LoadError } from '@/components/trak'
@@ -189,7 +184,7 @@ function Editor({ training, saved }: { training: Training; saved: Plan | null })
       <Badge>Only you see it</Badge>
       <Button loading={save.isPending} onClick={savePlan}>Save the plan</Button>
     </Header>
-    <div className="pt-2"><LoopStrip state={{ done: [false, false, false], at: 0, closed: false }} note="now" /></div>
+    <div className="pt-2"><LoopStrip state={{ done: [true, false, false, false], at: 1, closed: false }} note="now" /></div>
 
     <div className="mt-6 grid max-w-[720px] gap-3">
       <div>
@@ -287,11 +282,9 @@ export function PlanRoute() {
 }
 
 function PlanView({ training, plan }: { training: Training; plan: Plan | null }) {
-  const { user } = useAuth()
   const navigate = useNavigate()
-  const client = useQueryClient()
   const registers = useRegisters()
-  const [asking, setAsking] = useState(false)
+  const notes = useNotes()
   const [sheet, setSheet] = useState<'register' | 'log' | null>(null)
   const [now] = useState(() => Date.now())
   const cancelled = training.status === 'cancelled'
@@ -301,11 +294,13 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
   const sessionId = registers.data?.get(training.id) ?? null
   const started = Date.parse(training.starts_at) <= now
   const over = trainingEnd(training) <= now
-  const loop = loopState({ planned: !!plan, registered: !!sessionId, started, over })
+  const loop = loopState({ planned: !!plan, registered: !!sessionId, noted: !!notes.data?.has(training.id), started, over })
   // Who's here opens as the register does everywhere else: published, not cancelled, started.
   const registerWhy = registerProblem({ ...training, event_type: 'training' }, new Date(now))
   const canRegister = !!registers.data && !sessionId && !registerWhy
   const view = () => navigate(viewPath(training.id))
+  // TRAK-339 (Kostas, 29 Oct): planning goes straight to the planner; no "How do you want to plan it?".
+  const planIt = () => navigate(planPath(training.id))
 
   return <>
     <Header training={training}>
@@ -320,7 +315,7 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
           {plan && <Button variant={canRegister ? 'secondary' : 'primary'} onClick={view}>View</Button>}
           {sessionId && <Button variant="ghost" onClick={() => setSheet('register')}>Edit register</Button>}
           {plan ? <Button variant="secondary" onClick={() => navigate(planPath(training.id))}>Change the plan</Button>
-            : <Button variant={canRegister ? 'secondary' : 'primary'} onClick={() => setAsking(true)}>Plan this session</Button>}
+            : <Button variant={canRegister ? 'secondary' : 'primary'} onClick={planIt}>Plan session</Button>}
         </>}
     </Header>
     {!cancelled && <div className="grid gap-2 pt-2">
@@ -344,21 +339,13 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
         <div className="arc">
           <EmptyState icon={<ClipboardList size={24} strokeWidth={1.5} />} title={cancelled ? 'This training was cancelled' : 'Not planned yet'}
             description={cancelled ? 'It had no plan.' : 'Plan it your way. Only you see the plan.'}
-            action={cancelled ? undefined : <Button onClick={() => setAsking(true)}>Plan this session</Button>} />
+            action={cancelled ? undefined : <Button onClick={planIt}>Plan session</Button>} />
         </div>
       </>}
       <Link to={`/coach/schedule?event=${training.id}`} className={`mt-2 justify-self-start ${linkClass}`}>Open in Schedule</Link>
     </section>
 
-    <PlanWaySheet open={asking} onOpenChange={setAsking} training={training} />
-    {user && <BottomSheet className="arc" open={!!sheet} onOpenChange={open => { if (!open) setSheet(null) }} detents={[0.62, 0.92]}
-      title={sheet === 'log' ? 'The log' : 'Who’s here'} description={[gameWhen(training).day, training.title].join(' · ')}>
-      <div className="pb-4">
-        {sheet === 'register' && <TakeRegister eventId={training.id} coachId={user.id} sessionId={sessionId} squad={training.squad ?? null}
-          onSaved={() => { setSheet(null); void client.invalidateQueries({ queryKey: ['coach', user.id, 'training-registers'] }) }} />}
-        {sheet === 'log' && sessionId && <SessionLog sessionId={sessionId} coachId={user.id} />}
-      </div>
-    </BottomSheet>}
+    <RegisterSheet training={training} sheet={sheet} sessionId={sessionId} onClose={() => setSheet(null)} />
   </>
 }
 

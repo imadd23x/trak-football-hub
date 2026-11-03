@@ -1,9 +1,8 @@
 import { Check } from 'lucide-react'
 import { LOOP_STEPS, type LoopState } from '@/lib/training/loop'
 
-/* TRAK-295 (Training 2/5, spec TRAK-293): every training's loop, Plan → Who's here → Close (TRAK-309: no Run it), and
-   where this one is. TRAK-298 (5/5): each step done or not comes from what exists (loopState); a closed training shows
-   them all done. */
+/* TRAK-295 (Training 2/5, spec TRAK-293): every training's loop and where this one is. TRAK-298 (5/5): each step done
+   or not comes from what exists (loopState). TRAK-339 (Training redo 1/5): Logistics → Plan → Who's here → Notes. */
 
 /** `note` says why the current step is there, e.g. "now". */
 export function LoopStrip({ state, note }: { state: Pick<LoopState, 'done' | 'at' | 'closed'>; note: string }) {
@@ -25,8 +24,8 @@ export function LoopStrip({ state, note }: { state: Pick<LoopState, 'done' | 'at
           </li>
         })}
       </ol>
-      <span className="text-[13px] text-ink-3">{state.closed ? 'Closed. Who came is in the log.'
-        : 'It closes when the training ends and the register is taken.'}</span>
+      <span className="text-[13px] text-ink-3">{state.closed ? 'Closed. It’s in Past trainings.'
+        : 'It closes when the training ends and the register is taken. Notes are optional.'}</span>
     </div>
   )
 }

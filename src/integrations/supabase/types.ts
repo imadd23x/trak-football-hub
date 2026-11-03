@@ -1311,6 +1311,41 @@ export type Database = {
           },
         ]
       }
+      training_notes: {
+        Row: {
+          again: string | null
+          coach_user_id: string
+          created_at: string
+          event_id: string
+          note: string
+          updated_at: string
+        }
+        Insert: {
+          again?: string | null
+          coach_user_id?: string
+          created_at?: string
+          event_id: string
+          note?: string
+          updated_at?: string
+        }
+        Update: {
+          again?: string | null
+          coach_user_id?: string
+          created_at?: string
+          event_id?: string
+          note?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_notes_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "coach_calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_plan_practices: {
         Row: {
           area: string

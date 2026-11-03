@@ -122,32 +122,6 @@ export function move<T>(list: T[], index: number, by: -1 | 1): T[] {
   return next
 }
 
-/* "How do you want to plan it?" remembers the coach's last way, on this device ("You used this last time"). Copy a
-   past session is TRAK-297 (Training 4/5); Build it with Trak is parked (TRAK-293). */
-
-export const PLAN_WAYS = ['write', 'copy'] as const
-export type PlanWay = (typeof PLAN_WAYS)[number]
-const wayKey = (userId: string) => `trak:training:plan-way:${userId}`
-
-export function lastPlanWay(userId: string | undefined): PlanWay | null {
-  if (!userId) return null
-  try {
-    const way = localStorage.getItem(wayKey(userId))
-    return PLAN_WAYS.find(w => w === way) ?? null
-  } catch {
-    return null
-  }
-}
-
-export function rememberPlanWay(userId: string | undefined, way: PlanWay) {
-  if (!userId) return
-  try {
-    localStorage.setItem(wayKey(userId), way)
-  } catch {
-    // Private windows can refuse storage; the sheet then just doesn't say which way was last.
-  }
-}
-
 /* TRAK-297 (Training 4/5): Copy a past session. */
 
 /** The past sessions whose title or a practice's name holds every word typed, in the order given. */

@@ -18,6 +18,7 @@ import { Alert } from '@/components/arc/alert/alert'
 import { Button } from '@/components/arc/button/button'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { Stepper } from '@/components/arc/stepper/stepper'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-288 (Games 6/8): the Evaluation tab. It opens at full time; before that it says when. Result, Team and Players,
    read against the plan as it locked at kick-off, as one draft only the coach sees: Save draft · sleep on it saves
@@ -105,7 +106,7 @@ export function Evaluation({ game, opensAt, plans, planGoals, form, onFormChange
       description="The result, whether the plan worked, and each player against what you expected. Only you see it until you publish it." /></div>
   }
   if (who.error) return <div className="pt-4"><LoadError what="who played" onRetry={who.retry} /></div>
-  if (who.isPending) return <p role="status" className="pt-6 text-center text-[13px] text-ink-3">Loading who played…</p>
+  if (who.isPending) return <LoadingSkeleton label="Loading who played…" lines={1} avatar rows={4} className="pt-6" />
 
   const { starters, bench } = lineUpAtKickOff(plans, who.players)
   const listed = [...starters.map(p => ({ id: p.id, name: p.name, starter: true })), ...bench.map(p => ({ id: p.id, name: p.name, starter: false }))]

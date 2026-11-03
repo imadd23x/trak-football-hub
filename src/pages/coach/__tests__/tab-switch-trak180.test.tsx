@@ -73,7 +73,7 @@ describe('TRAK-180 switching between Home and the overview tab', () => {
 
     await backToFeedback()
     expect(homeRow('Ade Okafor')).not.toBeNull()
-    expect(screen.queryByText('Loading your players…')).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Loading your players…' })).toBeNull()
     release()
     await waitFor(() => expect(homeRow('Bo Lind')).not.toBeNull(), HOME_LOAD)
   }, 20_000) // four tab switches take longer than 5 s on GitHub's runners

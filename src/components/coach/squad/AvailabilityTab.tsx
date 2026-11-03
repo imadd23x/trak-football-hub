@@ -12,6 +12,7 @@ import { Card, Missing } from './parts'
 import { SquadLoadError } from './SquadLoadError'
 import type { SquadRoster } from './useSquadRoster'
 import { absentKey, confirmedKey as confirmedKeyFor, loadConfirmed, loadReportedAbsent } from './availability-reads'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-250: Squad > Availability. Families confirm in the squad's WhatsApp group; the coach reads it
    and ticks each child Confirmed here. Everyone else is Not confirmed, and a guardian's "Can't make it"
@@ -176,7 +177,7 @@ export function AvailabilityTab({ roster }: { roster: SquadRoster }) {
   const isMatch = event?.event_type === 'match'
 
   if (events.error) return <SquadLoadError onRetry={() => { void events.refetch() }} title="Couldn't load upcoming events" />
-  if (events.isPending) return <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading upcoming events…</p>
+  if (events.isPending) return <LoadingSkeleton label="Loading upcoming events…" lines={2} rows={3} className="pt-6" />
   if (!event) {
     return (
       <div className="pt-2">
@@ -240,7 +241,7 @@ export function AvailabilityTab({ roster }: { roster: SquadRoster }) {
 
       {readError ? <SquadLoadError onRetry={retry} title="Couldn't load confirmations" />
         : confirmedQuery.isPending || absentQuery.isPending
-          ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading confirmations…</p>
+          ? <LoadingSkeleton label="Loading confirmations…" lines={1} avatar rows={4} className="pt-6" />
           : (
             <div className="mt-4 flex flex-col gap-4 laptop:flex-row laptop:items-start">
               <div className="min-w-0 flex-1">

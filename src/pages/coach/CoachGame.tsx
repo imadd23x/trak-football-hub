@@ -26,6 +26,7 @@ import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { Countdown } from '@/components/arc/countdown/countdown'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/arc/tabs/tabs'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-283 (Games 1/8): a game's page. Its header says where it is in the loop; Logistics, Game plan and
    Evaluation are peer panels of the one game (Arc tabs), and the panel lives in the URL (?tab=). TRAK-284 to
@@ -56,7 +57,7 @@ export default function CoachGame() {
         {game.error || shares.error ? <div className="pt-6"><LoadError what="this match" onRetry={() => { void game.refetch(); void shares.refetch() }}
             retrying={game.isFetching || shares.isFetching} /></div>
           : game.isPending || plan.isPending || players.isPending || shares.isPending || evaluation.isPending
-            ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading the match…</p>
+            ? <LoadingSkeleton label="Loading the match…" lines={4} rows={2} className="pt-6" />
           : !game.data ? <p className="pt-10 text-[15px] text-ink-2">This match isn’t in your matches.</p>
           // Keyed by match: a route that only changes :eventId must never carry one match's typing into another's.
           : <Game key={game.data.id} row={game.data} plan={plan} players={players} sharedAt={shares.data.get(game.data.id) ?? null} evaluation={evaluation} />}

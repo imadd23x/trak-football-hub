@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { LoadError } from '@/components/trak/LoadError'
 import { LoggedAttendance } from '@/components/coach/LoggedAttendance'
 import { parseTrainingNotes, parseTrainingTitle } from '@/lib/session-form'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* Imad, 23 Oct: "View log" on Home shows the log, read only; Edit log opens the edit page. A training: its focus,
    length, intensity and notes, and who came. A match: the score and each player's goals, assists and card, from
@@ -38,7 +39,7 @@ export function SessionLog({ sessionId, coachId }: { sessionId: string; coachId:
   })
 
   if (log.isError) return <LoadError what="this log" onRetry={() => { void log.refetch() }} retrying={log.isFetching} />
-  if (!log.data) return <p role="status" className="text-[13px] text-ink-2">Loading the log…</p>
+  if (!log.data) return <LoadingSkeleton label="Loading the log…" />
   const { session, match } = log.data
   const day = session.session_date ? format(parseISO(session.session_date), 'EEE d MMM') : null
 

@@ -49,6 +49,7 @@ import { Chip, EventEditSheet, Field, ScopeChoice } from '@/components/coach/Eve
 import {
   KIND_LABEL, SAVE_FAILED, competitionProblem, failed, font, inSeries, inputClass, mono, pastProblem, type EditSheet, type Scope,
 } from '@/lib/event-edit'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-127 (J8.4): the coach creates, edits and cancels events. A save is a
    draft only the coach sees; Publish sends it to families (Imad, 9 Oct). Once
@@ -160,6 +161,8 @@ export default function CoachSchedule() {
   const [coachEvents, setCoachEvents] = useState<EventRow[]>([])
   const [sessions,  setSessions]  = useState<any[]>([])
   const [loadFailed, setLoadFailed] = useState(false)
+  // TRAK-335: until the first read answers, the day shows a skeleton, not "Nothing planned".
+  const [loaded, setLoaded] = useState(false)
   const [retrying, setRetrying] = useState(false)
 
   const [sheet, setSheet] = useState<Sheet>({ kind: 'closed' })
@@ -182,6 +185,7 @@ export default function CoachSchedule() {
     if (events) {
       setCoachEvents(events)
       setCalEvents(events.filter(e => inView(e.squad)))
+      setLoaded(true)
     }
     if (!sess.error) setSessions((sess.data || []).filter(s => inView(s.squad)))
     return events
@@ -612,7 +616,8 @@ export default function CoachSchedule() {
 
           </div>
 
-          {selectedEvents.length === 0 ? (
+          {!loaded && !loadFailed ? <LoadingSkeleton label="Loading your schedule…" lines={2} rows={2} />
+          : selectedEvents.length === 0 ? (
             <div className="rounded-[14px] border border-line px-4 py-5 text-center"
               style={{ background: 'rgb(var(--t-surface))' }}>
               <p className="text-[12px] text-ink-3">Nothing planned. Tap + to schedule an event.</p>

@@ -2,6 +2,7 @@ import { RadarChart } from '@/components/arc/radar-chart/radar-chart'
 import { LoadError } from '@/components/trak/LoadError'
 import { ATTRIBUTES } from '@/lib/squad/attributes'
 import type { squadShape } from '@/lib/squad/shape'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /**
  * TRAK-262 (Imad, 22 Oct, the alternative he picked): Home's Squad shape. The squad's six-attribute average this
@@ -24,7 +25,7 @@ export function SquadShape({ squadLabel, shape, failed, onRetry }: {
       <p className="text-sm text-ink-3">{squadLabel}</p>
     </div>
     {failed ? <div className="mt-4"><LoadError what="the squad's shape" onRetry={onRetry} /></div>
-      : !shape ? <div role="status" aria-label="Loading the squad's shape" className="mt-4 h-[260px] rounded-xl bg-raised animate-pulse motion-reduce:animate-none" />
+      : !shape ? <LoadingSkeleton label="Loading the squad's shape" lines={5} rows={2} className="mt-4 h-[260px] content-start overflow-hidden" />
       : series.length === 0 ? <p className="mt-4 text-sm text-ink-2">No assessments this month or last. Assess a player and the squad's shape shows here.</p>
       : <RadarChart label="Squad average by attribute" size={260} rings={5} max={10}
           axes={ATTRIBUTES.map(([key, label]) => ({ key, label }))}

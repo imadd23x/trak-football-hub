@@ -3,6 +3,7 @@ import { Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { refusalWithNames, registerStart, type RegisterPlayer } from '@/lib/event-register'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /**
  * TRAK-138 (J8.15): the register of an event that went ahead. It opens
@@ -118,7 +119,7 @@ export function TakeRegister({ eventId, coachId, sessionId, squad: eventSquad = 
       </p>
     )
   }
-  if (!loaded) return <p className="text-[12px] text-ink-3" style={font}>Loading your squad…</p>
+  if (!loaded) return <LoadingSkeleton label="Loading your squad…" lines={1} avatar rows={4} />
 
   const absent = loaded.players.length - present.size
   return (

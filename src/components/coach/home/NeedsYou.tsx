@@ -4,6 +4,7 @@ import { Avatar } from '@/components/arc/avatar/avatar'
 import { ScrollArea } from '@/components/arc/scroll-area/scroll-area'
 import { LoadError } from '@/components/trak/LoadError'
 import type { NeedsYouItem } from '@/lib/coach-needs-you'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /** An event still waiting for its register or match log (Imad, 24 Oct), with the week's own next step. TRAK-290: an
  *  evaluation draft past its 09:00 reminder is urgent. */
@@ -26,7 +27,7 @@ export function NeedsYou({ items, events = [], failed, onRetry, onOpen }: {
       {count !== null && count > 1 && <span className="text-sm text-ink-3"><span className="[@media(pointer:fine)]:hidden">Swipe</span><span className="[@media(pointer:coarse)]:hidden">Scroll</span> for more</span>}
     </div>
     {failed ? <LoadError what="who needs you" onRetry={onRetry} />
-      : !items ? <div role="status" aria-label="Loading who needs you" className="h-[148px] rounded-2xl border border-line bg-surface animate-pulse motion-reduce:animate-none" />
+      : !items ? <LoadingSkeleton label="Loading who needs you" lines={2} rows={2} className="h-[148px] content-start overflow-hidden rounded-2xl border border-line bg-surface p-5" />
       : count === 0 ? <p className="rounded-2xl border border-line bg-surface p-5 text-sm text-ink-2">Every register and log is in, every player is assessed and no draft is waiting.</p>
       : <div className="arc -mx-1">
         <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="What needs you">

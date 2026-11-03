@@ -23,6 +23,7 @@ import { Button } from '@/components/arc/button/button'
 import { Input } from '@/components/arc/input/input'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Textarea } from '@/components/arc/textarea/textarea'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): Plan session. A plan is a list of parts; the coach goes
    through them one step each, then Review, and saves the plan whole. A new plan starts from the parts the coach saved
@@ -88,7 +89,7 @@ export function Planner({ training, saved }: { training: Training; saved: Plan |
   const reads = [drafts, drills, past]
   if (reads.some(r => r.error)) return <div className="pt-10"><LoadError what="your plans and drills"
     onRetry={() => reads.forEach(r => void r.refetch())} retrying={reads.some(r => r.isFetching)} /></div>
-  if (reads.some(r => r.isPending)) return <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your plans and drills…</p>
+  if (reads.some(r => r.isPending)) return <LoadingSkeleton label="Loading your plans and drills…" rows={2} className="pt-6" />
   const pastPlans: PastPlan[] = (past.data ?? []).filter(s => s.id !== training.id).map(s => ({ day: gameWhen(s).day, practices: s.practices }))
   return <PlannerBody training={training} saved={saved} draft={drafts.data!.get(training.id)} past={pastPlans} drills={drills.data ?? []} />
 }

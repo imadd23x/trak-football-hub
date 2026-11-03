@@ -22,6 +22,7 @@ import { Button } from '@/components/arc/button/button'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { Select } from '@/components/arc/select/select'
 import { APPEARANCE_LABEL } from '@/lib/types'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-219 (20 Oct live run, S7): a match is offered only to a player its log
    marks present, i.e. played (TRAK-100), so "Didn't play" would contradict the
@@ -695,7 +696,7 @@ function CoachAssessmentForm() {
               Could not load this assessment. Retry before editing or saving.
               <button type="button" onClick={() => setLoadAttempt(value => value + 1)} className="ml-2 underline">Retry</button>
             </div>
-          ) : <p role="status" className="text-sm text-ink-2">Loading assessment…</p>
+          ) : <LoadingSkeleton label="Loading assessment…" rows={2} />
         )}
         </>}
         {/* J5: a player waiting for a parent cannot be opened. If consent is

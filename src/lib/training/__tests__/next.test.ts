@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { againLabel, nextTraining, searchPast, trainingBadge } from '../next'
+import { againLabel, loopSteps, nextTraining, searchPast, trainingBadge } from '../next'
 
 /* TRAK-339 (Training redo 1/5, spec TRAK-338): which training the Next training card shows, and its badge. */
 
@@ -38,6 +38,23 @@ describe('the Next training card', () => {
     expect(trainingBadge({ phase: 'day', planned: false })).toEqual({ label: 'Today', tone: 'success' })
     expect(trainingBadge({ phase: 'after', planned: true, here: 15 })).toEqual({ label: '15 here', tone: 'success' })
     expect(trainingBadge({ phase: 'after', planned: true, here: null })).toEqual({ label: 'Finished', tone: 'neutral' })
+  })
+})
+
+describe('the card’s loop', () => {
+  const errors = (facts: Parameters<typeof loopSteps>[0]) => loopSteps(facts).map(step => 'error' in step ? step.error : null)
+
+  it('ticks a step it has passed only if it happened, else says what’s missing', () => {
+    // After the training, with a plan but no register (Dora's Counter-attacks, 3 Nov).
+    expect(errors({ current: 3, planned: true, registered: false })).toEqual([null, null, 'No register taken', null])
+    expect(errors({ current: 3, planned: false, registered: false })).toEqual([null, 'No plan written', 'No register taken', null])
+    expect(errors({ current: 3, planned: true, registered: true })).toEqual([null, null, null, null])
+    // On the day without a plan: Who's here is current, so only Plan is marked.
+    expect(errors({ current: 2, planned: false, registered: false })).toEqual([null, 'No plan written', null, null])
+  })
+
+  it('a step still to come is never marked', () => {
+    expect(errors({ current: 1, planned: false, registered: false })).toEqual([null, null, null, null])
   })
 })
 

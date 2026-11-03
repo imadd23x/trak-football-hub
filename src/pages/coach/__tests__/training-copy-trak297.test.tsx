@@ -1,6 +1,6 @@
 /**
- * TRAK-297 (Training 4/5, spec TRAK-293): Copy a past session. It shows in "How do you want to plan it?" once the coach
- * has planned another session. The list holds the coach's planned sessions, newest first, with their practices, and
+ * TRAK-297 (Training 4/5, spec TRAK-293): Copy a past session. TRAK-339 (Training redo 1/5): it is "Use a past plan"
+ * on the Next training card (no more "How do you want to plan it?"). The list holds the coach's planned sessions, newest first, with their practices, and
  * searches by name or drill. Copy opens Write my own filled in; nothing saves until Save the plan. Nothing new is
  * stored: a past session is its plan. Test people are named after footballers.
  */
@@ -78,13 +78,12 @@ beforeEach(() => {
     table('session_attendance', []),
     table('event_absences', []),
     table('coach_drills', []),
+    table('training_notes', []),
     rpc('feature_on', () => true),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals() })
 
-const card = (title: string) => within(screen.getByRole('region', { name: 'Coming up' })).getAllByRole('article')
-  .find(article => article.getAttribute('aria-label')?.endsWith(title))!
 const practices = () => within(screen.getByRole('list', { name: 'Practices' })).queryAllByRole('listitem')
   .map(item => item.querySelector('p')?.textContent)
 
@@ -105,20 +104,18 @@ describe('TRAK-297: Copy a past session', { timeout: 30_000 }, () => {
       ],
     })
     renderApp('/coach/training')
-    await waitFor(() => expect(within(card('Before Everton')).getByRole('button', { name: 'Create plan' })).toBeInTheDocument())
-    await user.click(within(card('Before Everton')).getByRole('button', { name: 'Create plan' }))
-    const how = await screen.findByRole('dialog', { name: 'How do you want to plan it?' })
-    await user.click(await within(how).findByRole('button', { name: /Copy a past session.*Start from Pressing zones/ }))
+    const next = await screen.findByRole('region', { name: 'Before Everton' })
+    await user.click(within(next).getByRole('button', { name: 'Use a past plan' }))
 
-    const copy = await screen.findByRole('dialog', { name: 'Copy a past session' })
-    const list = within(copy).getByRole('list', { name: 'Past sessions' })
+    const copy = await screen.findByRole('dialog', { name: 'Use a past plan' })
+    const list = await within(copy).findByRole('list', { name: 'Past plans' })
     expect(within(list).getAllByRole('listitem').map(item => item.querySelector('span')?.textContent))
       .toEqual(['Pressing zones', 'Finishing under pressure'])
     expect(within(list).getByText('3 practices · 70 min · Rondos 4v1, Pressing duels, Game 8v8')).toBeInTheDocument()
-    await user.type(within(copy).getByRole('searchbox', { name: 'Search past sessions' }), '3v2')
+    await user.type(within(copy).getByRole('searchbox', { name: 'Search past plans' }), '3v2')
     await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(1))
-    await user.clear(within(copy).getByRole('searchbox', { name: 'Search past sessions' }))
-    await user.click(within(copy).getByRole('button', { name: /^Copy Pressing zones, / }))
+    await user.clear(within(copy).getByRole('searchbox', { name: 'Search past plans' }))
+    await user.click(within(copy).getByRole('button', { name: /^Use this plan: Pressing zones, / }))
 
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/next/plan'))
     await waitFor(() => expect(practices()).toEqual(['Rondos 4v1', 'Pressing duels', 'Game 8v8']))
@@ -137,34 +134,13 @@ describe('TRAK-297: Copy a past session', { timeout: 30_000 }, () => {
     ])
   })
 
-  it('needs another planned session: never the training being planned', async () => {
+  it('with no other plan written, says so: never the training being planned', async () => {
     const user = userEvent.setup()
     database([training('next', onTheMinute(Date.now() + DAY), { title: 'Before Everton' })], {})
-    renderApp('/coach/training/next')
-    await user.click((await screen.findAllByRole('button', { name: 'Plan this session' }))[0])
-    const how = await screen.findByRole('dialog', { name: 'How do you want to plan it?' })
-    expect(within(how).getByRole('button', { name: /Write my own/ })).toBeInTheDocument()
-    await new Promise(resolve => setTimeout(resolve, 200))
-    expect(within(how).queryByRole('button', { name: /Copy a past session/ })).toBeNull()
-  })
-
-  it('remembers Copy as the last way', async () => {
-    const user = userEvent.setup()
-    const now = Date.now()
-    database([training('past', onTheMinute(now - 2 * DAY), { title: 'Pressing zones' }), training('next', onTheMinute(now + DAY))],
-      { past: [practice(1, 'Rondos 4v1')] })
-    renderApp('/coach/training/next')
-    await user.click((await screen.findAllByRole('button', { name: 'Plan this session' }))[0])
-    let how = await screen.findByRole('dialog', { name: 'How do you want to plan it?' })
-    await user.click(await within(how).findByRole('button', { name: /Copy a past session/ }))
-    await user.click(within(await screen.findByRole('dialog', { name: 'Copy a past session' })).getByRole('button', { name: /^Copy Pressing zones/ }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/next/plan'))
-
-    await user.click(await screen.findByRole('link', { name: 'Training' }))
-    await user.click((await screen.findAllByRole('button', { name: 'Create plan' }))[0])
-    how = await screen.findByRole('dialog', { name: 'How do you want to plan it?' })
-    const copyWay = await within(how).findByRole('button', { name: /Copy a past session/ })
-    expect(within(copyWay).getByText('You used this last time')).toBeInTheDocument()
-    expect(within(within(how).getByRole('button', { name: /Write my own/ })).queryByText('You used this last time')).toBeNull()
+    renderApp('/coach/training')
+    await user.click(within(await screen.findByRole('region', { name: 'Before Everton' })).getByRole('button', { name: 'Use a past plan' }))
+    const copy = await screen.findByRole('dialog', { name: 'Use a past plan' })
+    expect(await within(copy).findByText('No past plans yet. Every plan you save is kept here.')).toBeInTheDocument()
+    expect(within(copy).queryByRole('list', { name: 'Past plans' })).toBeNull()
   })
 })

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sessionById } from '@/lib/library/library'
 import {
-  bestFit, blankPractice, fromDrill, fromLibrary, fromSaved, lastPlanWay, minutesLine, move, plannedMinutes, rememberPlanWay,
+  bestFit, blankPractice, fromDrill, fromLibrary, fromSaved, minutesLine, move, plannedMinutes,
   overTime, roomFor, searchSessions, sessionSummary, sourceLabel, toSave, type SavedPractice,
 } from '../plans'
 
@@ -77,28 +77,6 @@ describe('the minutes', () => {
     expect(overTime(75, 60)).toBe('You set this training for 60 min. The plan runs 15 min over. You can keep it, or change the training\'s time in Schedule.')
     expect(overTime(60, 60)).toBeNull()
     expect(overTime(75, null)).toBeNull()
-  })
-})
-
-describe('the last way the coach planned', () => {
-  it('is remembered per coach, on this device', () => {
-    expect(lastPlanWay('coach-a')).toBeNull()
-    rememberPlanWay('coach-a', 'write')
-    expect(lastPlanWay('coach-a')).toBe('write')
-    expect(lastPlanWay('coach-b')).toBeNull()
-    expect(lastPlanWay(undefined)).toBeNull()
-    // TRAK-297: Copy a past session too; anything else stored there is no way at all.
-    rememberPlanWay('coach-a', 'copy')
-    expect(lastPlanWay('coach-a')).toBe('copy')
-    localStorage.setItem('trak:training:plan-way:coach-a', 'guided')
-    expect(lastPlanWay('coach-a')).toBeNull()
-  })
-
-  it('a device that refuses storage just forgets it', () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError') })
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError') })
-    expect(() => rememberPlanWay('coach-a', 'write')).not.toThrow()
-    expect(lastPlanWay('coach-a')).toBeNull()
   })
 })
 

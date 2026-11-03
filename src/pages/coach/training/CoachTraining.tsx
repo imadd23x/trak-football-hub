@@ -1,36 +1,48 @@
 import { useLayoutEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
-import { Plus, TrafficCone } from 'lucide-react'
+import { Check, Copy, History, Info, Plus, TrafficCone, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { localTodayISO, phoneEventTime } from '@/lib/event-time'
 import { LIBRARIES, SESSIONS, libraryPath } from '@/lib/library/library'
 import { ON_LIBRARY } from '@/lib/fixed-colours'
 import { searchDrills, splitTrainings, trainingMinutes, type Drill } from '@/lib/training/sessions'
-import { planPath, viewPath, type PlannerState } from '@/lib/training/plans'
+import { planPath, sessionSummary, type PlannerState } from '@/lib/training/plans'
+import { registerProblem } from '@/lib/event-register'
+import { AGAIN, NOTE_MAX, againLabel, nextTraining, searchPast, trainingBadge, type Again, type Phase } from '@/lib/training/next'
 import { gameWhen } from '@/components/coach/games/useGames'
-import { useDrills, usePlannedTrainings, useRegisters, useTrainings, type Training } from '@/components/coach/training/useTraining'
+import {
+  useDrills, useHere, useNotes, usePastTrainings, usePlannedTrainings, useRegisters, useSaveNotes, useTrainings, type Notes, type Training,
+} from '@/components/coach/training/useTraining'
 import { DrillSheet } from '@/components/coach/training/DrillSheet'
-import { PlanWaySheet } from '@/components/coach/training/PlanWaySheet'
+import { CopyTargetSheet, PastPlanSheet, type PlanToCopy } from '@/components/coach/training/PastPlanSheet'
+import { RegisterSheet } from '@/components/coach/training/RegisterSheet'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { PitchViewRoute, PlanEditorRoute, PlanRoute } from './CoachTrainingPlan'
 import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
+import { Countdown } from '@/components/arc/countdown/countdown'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
+import { ScrollArea } from '@/components/arc/scroll-area/scroll-area'
+import { Stepper } from '@/components/arc/stepper/stepper'
+import { Textarea } from '@/components/arc/textarea/textarea'
 import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 
 /* TRAK-294 (Training 1/5, spec TRAK-293): Training home, behind the academy's training switch. Sessions lists the
    coach's trainings from Schedule (Coming up, then Last week); Drills holds My drills, then the Library's tiles.
    Homework and Value of the month are parked (TRAK-293). TRAK-295 (Training 2/5): a training coming up says whether
-   it's planned; Plan this session and New session ask how (PlanWaySheet), and a plan has its own pages. TRAK-296: a
+   it's planned; Plan this session and New session asked how (TRAK-339: no more), and a plan has its own pages. TRAK-296: a
    drill can be added to the next training not planned yet. TRAK-298: Last week says which trainings are closed (ended
    with their register taken) and opens each one's page. TRAK-310 (Kostas, 29 Oct): a training coming up has View plan
    and Edit plan, or Create plan, and New session is gone, since every training coming up has its own Create plan.
-   TRAK-311 (Kostas, 29 Oct): View plan opens View, and a training last week has the same buttons. */
+   TRAK-311 (Kostas, 29 Oct): View plan opens View, and a training last week has the same buttons. TRAK-339 (Training
+   redo 1/5, spec TRAK-338): Sessions is laid out like Matches, from the 2 Nov prototype; see below. */
 
 export const TRAINING_PATH = '/coach/training'
+const PAST_PATH = `${TRAINING_PATH}/past`
 /** Schedule's quick hand-over (TRAK-182 part 8): New event, on its first step, with Training picked. */
 const ADD_TRAINING = { quickEvent: { kind: 'training' } }
 const linkClass = 'rounded text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
@@ -47,6 +59,7 @@ export default function CoachTraining() {
   return (
     <Routes>
       <Route index element={<SessionsView />} />
+      <Route path="past" element={<PastTrainings />} />
       <Route path="drills" element={<DrillsView />} />
       <Route path=":eventId" element={<PlanRoute />} />
       <Route path=":eventId/plan" element={<PlanEditorRoute />} />
@@ -66,7 +79,8 @@ function Page({ view, action, children }: { view: 'sessions' | 'drills'; action?
       <div className={WIDE_COLUMN}>
         <header className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-6 pb-4">
           <CoachMenuButton name={profile?.full_name || 'Coach'} />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Training</h1>
+          {/* Kostas, 30 Oct: "training" is too repetitive, so the page has no visible title. */}
+          <h1 className="sr-only">Training</h1>
           <div className="arc">
             <SegmentedControl label="Training view" value={view}
               options={[{ value: 'sessions', label: 'Sessions' }, { value: 'drills', label: 'Drills' }]}
@@ -82,6 +96,17 @@ function Page({ view, action, children }: { view: 'sessions' | 'drills'; action?
 
 /* ── Sessions ───────────────────────────────────────────────────────────── */
 
+/* TRAK-339 (Training redo 1/5, spec TRAK-338, 2 Nov prototype): laid out like Matches. The Next training card (where it
+   is in its loop and its one next action), Upcoming trainings in a row, and Past trainings at the very bottom (Kostas,
+   2 Nov). After a training, its Notes are asked on the card. */
+
+const LOOP = [
+  { id: 'logistics', label: 'Logistics', description: 'From the schedule' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'here', label: 'Who’s here' },
+  { id: 'notes', label: 'Notes', description: 'Optional' },
+]
+
 function SessionsView() {
   const { user } = useAuth()
   const coachSquad = useCoachSquad(user?.id)
@@ -89,100 +114,244 @@ function SessionsView() {
   const trainings = useTrainings()
   const planned = usePlannedTrainings()
   const registers = useRegisters()
-  // "How do you want to plan it?", for the training whose Create plan was pressed; kept while the sheet closes.
-  const [planning, setPlanning] = useState<{ training: Training; open: boolean } | null>(null)
+  const notes = useNotes()
+  const past = usePastTrainings()
+  // The countdown's end moves the card on, so the clock is read again then.
+  const [now, setNow] = useState(() => Date.now())
+  const [closed, setClosed] = useState<string | null>(null)
   // TRAK-305: All or one squad, as picked at the top of the frame.
   const { everySquad } = coachSquad
   const inView = (trainings.data ?? []).filter(t => everySquad || coachSquad.eventInSquad(t.squad))
-  const { comingUp, lastWeek } = splitTrainings(inView, Date.now())
-  const addTraining = () => navigate('/coach/schedule', { state: ADD_TRAINING })
-  const isPlanned = (training: Training) => planned.data?.has(training.id)
+  const isToday = (training: Training) => phoneEventTime(training).date === localTodayISO()
+  const next = nextTraining(inView, now, id => !!notes.data?.has(id), isToday)
+  const upcoming = splitTrainings(inView, now).comingUp
+  const pastInView = (past.data ?? []).filter(t => everySquad || coachSquad.eventInSquad(t.squad))
+  const reads = [trainings, planned, registers, notes]
 
   return (
     <Page view="sessions">
-      {trainings.error ? <LoadError what="your trainings" onRetry={() => void trainings.refetch()} retrying={trainings.isFetching} />
-        : trainings.isPending ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your trainings…</p>
-        : <div className="grid gap-8">
-          <section aria-labelledby="coming-up" className="grid gap-3">
-            <h2 id="coming-up" className="text-lg font-medium text-ink">Coming up</h2>
-            {comingUp.length === 0 ? (
-              <div className="arc">
-                <EmptyState icon={<TrafficCone size={24} strokeWidth={1.5} />} title="No training coming up"
-                  description="Add a training in Schedule. You'll plan it here."
-                  action={<Button onClick={addTraining}>Add a training</Button>} />
-              </div>
-            ) : <ul className="grid gap-3">
-              {comingUp.map(training => <li key={training.id}><ComingUp training={training} showSquad={everySquad}
-                planned={planned.data ? !!isPlanned(training) : null} onPlan={() => setPlanning({ training, open: true })} /></li>)}
-            </ul>}
-          </section>
+      {reads.some(r => r.error) ? <LoadError what="your trainings" onRetry={() => reads.forEach(r => void r.refetch())} retrying={reads.some(r => r.isFetching)} />
+        : reads.some(r => r.isPending) ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your trainings…</p>
+        : <div className="grid gap-6">
+          {closed && <div role="status" className="arc flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-5 py-3.5">
+            <Check aria-hidden size={18} className="text-brand" />
+            <p className="min-w-0 flex-1 text-[15px] text-ink"><span className="font-medium">{closed} is closed.</span>
+              <span className="text-ink-2"> It’s now in Past trainings.</span></p>
+            <Button size="sm" variant="secondary" onClick={() => navigate(PAST_PATH)}>Past trainings</Button>
+            <button type="button" aria-label="Close message" onClick={() => setClosed(null)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X aria-hidden size={16} /></button>
+          </div>}
 
-          {lastWeek.length > 0 && <section aria-labelledby="last-week" className="grid gap-3">
-            <h2 id="last-week" className="text-lg font-medium text-ink">Last week</h2>
-            <ul className="divide-y divide-line rounded-2xl border border-line bg-surface px-5">
-              {lastWeek.map(training => <li key={training.id}><LastWeek training={training} showSquad={everySquad}
-                // Every training here is over, so it is closed once its register is taken; unknown while that's read.
-                closed={registers.data ? registers.data.has(training.id) : null}
-                planned={planned.data ? !!isPlanned(training) : null} onPlan={() => setPlanning({ training, open: true })} /></li>)}
-            </ul>
+          {next ? <NextTraining key={next.training.id} training={next.training} phase={next.phase} planned={!!planned.data?.has(next.training.id)}
+            sessionId={registers.data?.get(next.training.id) ?? null} onStart={() => setNow(Date.now())}
+            onClosed={() => setClosed(next.training.title)} />
+            : <div className="arc">
+              <EmptyState icon={<TrafficCone size={24} strokeWidth={1.5} />} title="No training coming up"
+                description="Add a training in Schedule. You’ll plan it here."
+                action={<Button onClick={() => navigate('/coach/schedule', { state: ADD_TRAINING })}>Add a training</Button>} />
+            </div>}
+
+          {upcoming.length > 0 && <section aria-labelledby="upcoming" className="min-w-0">
+            <h2 id="upcoming" className="mb-2 text-lg font-medium text-ink">Upcoming trainings</h2>
+            <div className="arc -mx-1">
+              <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="Upcoming trainings">
+                <ul className="flex gap-3 px-1 pb-1">
+                  {upcoming.map(training => {
+                    const { day, time } = gameWhen(training)
+                    const badge = trainingBadge({ phase: isToday(training) ? 'day' : 'before', planned: !!planned.data?.has(training.id) })
+                    return <li key={training.id} className="w-[220px] flex-none" style={{ scrollSnapAlign: 'start' }}>
+                      <Link to={`${TRAINING_PATH}/${training.id}`}
+                        className="flex h-full flex-col gap-2.5 rounded-2xl border border-line bg-surface p-3.5 transition-transform active:scale-[.98] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                        <span className="grid min-w-0">
+                          <span className="truncate text-base font-medium text-ink">{training.title}</span>
+                          <span className="truncate text-sm text-ink-3">{[isToday(training) ? 'Today' : day, time, everySquad ? training.squad : null].filter(Boolean).join(' · ')}</span>
+                        </span>
+                        <span className="mt-auto"><Badge tone={badge.tone} size="sm">{badge.label}</Badge></span>
+                      </Link>
+                    </li>
+                  })}
+                </ul>
+              </ScrollArea>
+            </div>
           </section>}
+
+          <div className="arc flex flex-wrap items-center gap-3 border-t border-line pt-5">
+            <Button variant="secondary" onClick={() => navigate(PAST_PATH)}><History aria-hidden size={16} />Past trainings
+              {past.data && <Badge size="sm">{pastInView.length}</Badge>}</Button>
+            <span className="text-sm text-ink-3">Look back at a session, or copy its plan.</span>
+          </div>
         </div>}
-      {planning && <PlanWaySheet open={planning.open} onOpenChange={open => setPlanning({ ...planning, open })} training={planning.training} />}
     </Page>
   )
 }
 
-/** One training coming up: when and where, its title and length, and its plan buttons on the right. TRAK-310: the
-    buttons say whether it's planned, so no Planned badge, and Schedule has its own tab, so no Open in Schedule. */
-function ComingUp({ training, showSquad, planned, onPlan }: { training: Training; showSquad: boolean; planned: boolean | null; onPlan: () => void }) {
-  const { day, time, academy } = gameWhen(training)
-  const today = phoneEventTime(training).date === localTodayISO()
-  const minutes = trainingMinutes(training)
-  return (
-    <article aria-label={`${day}, ${training.title}`}
-      className="arc flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-line bg-surface p-5">
-      {/* At least 16rem wide, so on a phone the buttons go under it rather than squeezing it. */}
-      <div className="grid min-w-0 flex-[1_1_16rem] gap-2">
-        <p className="text-sm font-medium text-brand">{[today ? 'Today' : null, day, time, training.venue].filter(Boolean).join(' · ')}</p>
-        <p className="text-lg font-medium text-ink break-words">{training.title}</p>
-        <p className="text-sm text-ink-3">{[minutes ? `${minutes} min` : null, showSquad ? training.squad : null,
-          training.published ? null : 'Not published yet', academy].filter(Boolean).join(' · ')}</p>
-      </div>
-      <PlanButtons training={training} planned={planned} onPlan={onPlan} />
-    </article>
-  )
-}
-
-/** One training last week: its day and title, Closed or No register (nothing while the registers are read), and on its
-    right the same plan buttons as one coming up (Kostas, 29 Oct). The day and title still open the training's page,
-    where its register and log are (TRAK-298). */
-function LastWeek({ training, showSquad, closed, planned, onPlan }: { training: Training; showSquad: boolean; closed: boolean | null; planned: boolean | null; onPlan: () => void }) {
-  const { day } = gameWhen(training)
-  return (
-    <article aria-label={`${day}, ${training.title}`} className="arc flex min-h-14 flex-wrap items-center gap-x-6 gap-y-2 py-3">
-      <div className="grid min-w-0 flex-[1_1_16rem] justify-items-start gap-1">
-        <Link to={`${TRAINING_PATH}/${training.id}`} className="rounded text-[15px] text-ink break-words underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          <span className="font-medium">{day}</span> · {training.title}</Link>
-        {showSquad && training.squad && <p className="text-sm text-ink-3">{training.squad}</p>}
-        {closed !== null && <Badge size="sm" tone={closed ? 'success' : 'warning'}>{closed ? 'Closed' : 'No register'}</Badge>}
-      </div>
-      <PlanButtons training={training} planned={planned} onPlan={onPlan} past />
-    </article>
-  )
-}
-
-/** View plan and Edit plan, or Create plan when the training isn't planned yet; nothing while that's read (`planned`
-    null). Kostas, 29 Oct: View plan opens View, as the training's own View button does. A training that's over has
-    had its moment to be planned, so its Create plan is the quieter kind. */
-function PlanButtons({ training, planned, onPlan, past = false }: { training: Training; planned: boolean | null; onPlan: () => void; past?: boolean }) {
+/** The training the card shows: its name and badge, when and where, the loop, the message to families, and the one next
+ *  action. After the training, its Notes. */
+function NextTraining({ training, phase, planned, sessionId, onStart, onClosed }: {
+  training: Training; phase: Phase; planned: boolean; sessionId: string | null; onStart: () => void; onClosed: () => void
+}) {
   const navigate = useNavigate()
-  if (planned === null) return null
+  const here = useHere(sessionId ? [sessionId] : [])
+  const [sheet, setSheet] = useState<'register' | null>(null)
+  const [copying, setCopying] = useState(false)
+  const { day, time, academy } = gameWhen(training)
+  const minutes = trainingMinutes(training)
+  const count = sessionId ? here.data?.get(sessionId) ?? null : null
+  const badge = trainingBadge({ phase, planned, here: count })
+  const current = phase === 'after' ? 3 : planned || phase === 'day' ? 2 : 1
+  const message = training.family_note?.trim()
+  // Who's here opens as the register does everywhere else: published, not cancelled, started.
+  const registerWhy = registerProblem({ ...training, event_type: 'training' }, new Date())
+  const review = () => navigate(`${TRAINING_PATH}/${training.id}`)
+  const plan = () => navigate(planPath(training.id))
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {planned ? <>
-        <Button size="sm" variant="secondary" onClick={() => navigate(viewPath(training.id))}>View plan</Button>
-        <Button size="sm" variant="secondary" onClick={() => navigate(planPath(training.id))}>Edit plan</Button>
-      </> : <Button size="sm" variant={past ? 'secondary' : 'primary'} onClick={onPlan}>Create plan</Button>}
+    <section aria-labelledby="next-training" className="arc flex min-w-0 flex-col gap-4 rounded-2xl border border-line bg-surface p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid min-w-0 gap-1">
+          {/* Kostas, 30 Oct: no "Next training" heading; the name and badge lead the card. */}
+          <h2 id="next-training" className="text-[22px] font-medium tracking-[-0.01em] text-ink break-words">{training.title}</h2>
+          <p className="text-sm text-ink-2">{[phase !== 'before' && phoneEventTime(training).date === localTodayISO() ? 'Today' : day, time,
+            training.venue, minutes ? `${minutes} min` : null].filter(Boolean).join(' · ')}</p>
+          {academy && <p className="text-sm text-ink-3">{academy}</p>}
+        </div>
+        <Badge tone={badge.tone}>{badge.label}</Badge>
+      </div>
+
+      <Stepper label="Where this training is" steps={LOOP} current={current} />
+
+      {phase === 'after' ? <NotesForm training={training} planned={planned} onReview={review} onClosed={onClosed} />
+        : <>
+          {message && <p className="flex items-start gap-2 rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
+            <Info aria-hidden size={16} className="mt-0.5 flex-none text-ink-3" />
+            <span className="min-w-0 flex-1 break-words"><span className="font-medium text-ink">Message to players:</span> {message}</span>
+            <Link to={`/coach/schedule?event=${training.id}`} className={linkClass}>Edit</Link>
+          </p>}
+          <div className="flex flex-wrap items-center gap-3">
+            {phase === 'day' ? <>
+              <Button size="lg" disabled={!!registerWhy && !sessionId} onClick={() => setSheet('register')}>Who’s here</Button>
+              {planned ? <Button size="lg" variant="secondary" onClick={review}>Review plan</Button>
+                : <Button size="lg" variant="secondary" onClick={plan}>Plan session</Button>}
+            </> : planned ? <>
+              <Button size="lg" onClick={review}>Review plan</Button>
+              <Button variant="ghost" onClick={plan}>Edit plan</Button>
+            </> : <>
+              <Button size="lg" onClick={plan}>Plan session</Button>
+              <Button size="lg" variant="secondary" onClick={() => setCopying(true)}><Copy aria-hidden size={16} />Use a past plan</Button>
+            </>}
+            <Countdown variant="compact" units={['days', 'hours', 'minutes']} target={training.starts_at}
+              label="Starts in" completeLabel="Started" onComplete={onStart} className="ml-auto" />
+          </div>
+          <p className="text-sm text-ink-3">{phase === 'day'
+            ? registerWhy && !sessionId ? 'Who’s here opens when the training starts.'
+              : planned ? 'Tick who came and save the register.' : 'No plan yet. You can still take the register.'
+            : planned ? 'Planned for the whole squad. Who’s here opens on the day.' : 'Plan it, or start from a plan you’ve used before.'}</p>
+        </>}
+
+      <RegisterSheet training={training} sheet={sheet} sessionId={sessionId} onClose={() => setSheet(null)} />
+      <PastPlanSheet open={copying} onOpenChange={setCopying} training={training} />
+    </section>
+  )
+}
+
+/** Notes, after the training (Kostas, 2 Nov): one question for the whole session and a note for next time. Optional:
+ *  Skip and close closes it all the same. */
+function NotesForm({ training, planned, onReview, onClosed }: { training: Training; planned: boolean; onReview: () => void; onClosed: () => void }) {
+  const save = useSaveNotes()
+  const [again, setAgain] = useState<Again | null>(null)
+  const [note, setNote] = useState('')
+  const [problem, setProblem] = useState<string | null>(null)
+  const close = (notes: Notes) => {
+    setProblem(null)
+    save.mutate({ eventId: training.id, ...notes }, {
+      onSuccess: onClosed,
+      onError: () => setProblem('Couldn’t save. Check your connection and try again. Nothing you typed is lost.'),
+    })
+  }
+  return <div className="grid gap-4">
+    <div className="grid justify-items-start gap-2">
+      {/* The loop above already says Notes are optional. */}
+      <p aria-hidden="true" className="text-[15px] font-medium text-ink">Would you run this session again?</p>
+      <SegmentedControl label="Would you run this session again?" value={again ?? ''}
+        options={AGAIN.map(a => ({ value: a.value, label: a.label }))} onValueChange={value => setAgain(value as Again)} />
+    </div>
+    <Textarea label="A note for next time" rows={2} maxLength={NOTE_MAX} value={note} onChange={e => setNote(e.target.value)}
+      placeholder="For example: the rondo grids were too small for this group" />
+    {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
+    <div className="flex flex-wrap items-center gap-3">
+      <Button size="lg" loading={save.isPending} onClick={() => close({ again, note })}>Save and close</Button>
+      {planned && <Button size="lg" variant="secondary" onClick={onReview}>Review today’s plan</Button>}
+      <Button variant="ghost" disabled={save.isPending} onClick={() => close({ again: null, note: '' })}>Skip and close</Button>
+    </div>
+    <p className="text-sm text-ink-3">Notes are optional. Skip them and the training still closes.</p>
+  </div>
+}
+
+/* ── Past trainings ─────────────────────────────────────────────────────── */
+
+/** Every training that's over, newest first: what was planned, who came, and the Notes. View opens its page; Use this
+ *  plan asks which training to copy it into (Kostas, 30 Oct: Past trainings is a list of its own, not a row on the
+ *  front page). */
+function PastTrainings() {
+  const { user } = useAuth()
+  const coachSquad = useCoachSquad(user?.id)
+  const navigate = useNavigate()
+  const past = usePastTrainings()
+  const trainings = useTrainings()
+  const registers = useRegisters()
+  const [query, setQuery] = useState('')
+  const [copying, setCopying] = useState<PlanToCopy | null>(null)
+  const { everySquad } = coachSquad
+  const inView = (past.data ?? []).filter(t => everySquad || coachSquad.eventInSquad(t.squad))
+  const shown = searchPast(inView.map(t => ({ ...t, note: t.notes?.note ?? '' })), query)
+  const here = useHere(inView.flatMap(t => registers.data?.get(t.id) ?? []))
+  const coming = splitTrainings((trainings.data ?? []).filter(t => everySquad || coachSquad.eventInSquad(t.squad)), Date.now()).comingUp
+
+  return (
+    <div className="min-h-screen bg-ground pb-28">
+      <div className={WIDE_COLUMN}>
+        <header className="arc grid gap-3 pt-5 pb-4">
+          <CoachTrail current="Past trainings" />
+          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Past trainings</h1>
+          <p className="text-sm text-ink-3">Look back at a session, or copy its plan into one coming up.</p>
+        </header>
+        {past.error ? <LoadError what="your past trainings" onRetry={() => void past.refetch()} retrying={past.isFetching} />
+          : past.isPending ? <p role="status" className="pt-14 text-center text-[13px] text-ink-3">Loading your past trainings…</p>
+          : inView.length === 0 ? <div className="arc"><EmptyState icon={<History size={24} strokeWidth={1.5} />} title="No past trainings yet"
+              description="Once a training is over, it’s kept here with its plan and your notes." /></div>
+          : <div className="grid gap-4">
+            <div className="arc max-w-[560px]">
+              <SearchField label="Search past trainings" placeholder="Search by name, drill or note" value={query} onValueChange={setQuery} />
+            </div>
+            {shown.length === 0 ? <p className="text-[15px] text-ink-2">No past training matches “{query.trim()}”.</p>
+              : <ul aria-label="Past trainings" className="grid gap-3">
+                {shown.map(training => {
+                  const { day } = gameWhen(training)
+                  const sessionId = registers.data?.get(training.id)
+                  const count = sessionId ? here.data?.get(sessionId) : undefined
+                  const again = againLabel(training.notes?.again)
+                  return <li key={training.id} className="arc flex flex-wrap items-start gap-x-6 gap-y-3 rounded-2xl border border-line bg-surface p-5">
+                    <div className="grid min-w-0 flex-[1_1_16rem] gap-1.5">
+                      <p className="text-sm text-ink-3">{[day, everySquad ? training.squad : null, count != null ? `${count} here` : null].filter(Boolean).join(' · ')}</p>
+                      <p className="text-lg font-medium text-ink break-words">{training.title}</p>
+                      <p className="text-sm text-ink-2 break-words">{training.planned ? sessionSummary(training.practices) : 'No plan written'}</p>
+                      {(again || training.notes?.note) && <p className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
+                        {again && <Badge size="sm" tone={training.notes?.again === 'no' ? 'warning' : 'success'}>Run it again: {again}</Badge>}
+                        {training.notes?.note && <span className="break-words">“{training.notes.note}”</span>}
+                      </p>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => navigate(`${TRAINING_PATH}/${training.id}`)}
+                        aria-label={`View ${training.title}, ${day}`}>View</Button>
+                      {training.planned && training.practices.length > 0 && <Button size="sm" aria-label={`Use this plan: ${training.title}, ${day}`}
+                        onClick={() => setCopying({ title: training.title, day, practices: training.practices })}><Copy aria-hidden size={16} />Use this plan</Button>}
+                    </div>
+                  </li>
+                })}
+              </ul>}
+          </div>}
+      </div>
+      <CopyTargetSheet plan={copying} trainings={coming} onClose={() => setCopying(null)} />
     </div>
   )
 }

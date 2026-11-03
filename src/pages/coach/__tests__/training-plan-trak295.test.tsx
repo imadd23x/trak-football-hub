@@ -1,7 +1,6 @@
 /**
- * TRAK-295 (Training 2/5, spec TRAK-293): planning a training. A training coming up has View plan and Edit plan, or
- * Create plan (TRAK-310), which asks "How do you want to plan it?" and
- * remembers the last way. Write my own types practices one at a time (change, move, remove) and saves the plan whole
+ * TRAK-295 (Training 2/5, spec TRAK-293): planning a training. TRAK-339 (Training redo 1/5): Plan session goes
+ * straight to the planner; Training home's buttons are in training-home-trak339. Write my own types practices one at a time (change, move, remove) and saves the plan whole
  * through one database function; a failed save keeps everything typed. The plan page shows the practices with where
  * each came from, the loop, and Change the plan. Test people are named after footballers.
  */
@@ -77,62 +76,14 @@ beforeEach(() => {
     table('session_attendance', []),
     table('event_absences', []),
     table('coach_drills', []),
+    table('training_notes', []),
     rpc('feature_on', () => true),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals() })
 
-const card = (title: string) => within(screen.getByRole('region', { name: 'Coming up' })).getAllByRole('article')
-  .find(article => article.getAttribute('aria-label')?.endsWith(title))!
 const practices = () => within(screen.getByRole('list', { name: 'Practices' })).queryAllByRole('listitem')
   .map(item => item.querySelector('p')?.textContent)
-
-describe('TRAK-295: planning a training from Training home', { timeout: 20_000 }, () => {
-  it('a training not planned has Create plan; a planned one has View plan and Edit plan (TRAK-310)', async () => {
-    const user = userEvent.setup()
-    const now = Date.now()
-    database([training('soon', onTheMinute(now + DAY)), training('later', onTheMinute(now + 3 * DAY))],
-      { later: [practice(1, 'Rondos 4v1')] })
-    renderApp('/coach/training')
-    await waitFor(() => expect(within(card('Training soon')).getByRole('button', { name: 'Create plan' })).toBeInTheDocument())
-    expect(within(card('Training soon')).queryByRole('button', { name: /View plan|Edit plan/ })).toBeNull()
-    expect(within(card('Training later')).queryByRole('button', { name: 'Create plan' })).toBeNull()
-    // No New session: every training coming up has its own Create plan.
-    expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
-
-    // Kostas, 29 Oct: View plan opens View, the screen the training's own View button opens; back goes to Training.
-    await user.click(within(card('Training later')).getByRole('button', { name: 'View plan' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/later/view'))
-    expect(await screen.findByRole('list', { name: 'Practices to run' })).toHaveTextContent('Rondos 4v1')
-    // TRAK-334: the trail's first crumb, in place of Back to Training.
-    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Training' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training'))
-    await user.click(await within(await screen.findByRole('article', { name: /Training later$/ })).findByRole('button', { name: 'Edit plan' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/later/plan'))
-  })
-
-  it('Create plan asks how, Write my own opens the planner, and next time it says so', async () => {
-    const user = userEvent.setup()
-    database([training('soon', onTheMinute(Date.now() + DAY))])
-    renderApp('/coach/training')
-    await waitFor(() => expect(within(card('Training soon')).getByRole('button', { name: 'Create plan' })).toBeInTheDocument())
-    await user.click(within(card('Training soon')).getByRole('button', { name: 'Create plan' }))
-    let sheet = await screen.findByRole('dialog', { name: 'How do you want to plan it?' })
-    expect(within(sheet).getByText(/Pitch 2 · 90 min/)).toBeInTheDocument()
-    // Copy a past session is Training 4/5; Build it with Trak is parked.
-    expect(within(sheet).queryByText(/Copy a past session|Build it with Trak/)).toBeNull()
-    expect(within(sheet).queryByText('You used this last time')).toBeNull()
-    await user.click(within(sheet).getByRole('button', { name: /Write my own/ }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/soon/plan'))
-    expect(await screen.findByRole('form', { name: 'Practice 1' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('link', { name: 'Training' }))
-    await waitFor(() => expect(within(card('Training soon')).getByRole('button', { name: 'Create plan' })).toBeInTheDocument())
-    await user.click(within(card('Training soon')).getByRole('button', { name: 'Create plan' }))
-    sheet = await screen.findByRole('dialog', { name: 'How do you want to plan it?' })
-    expect(within(sheet).getByText('You used this last time')).toBeInTheDocument()
-  })
-})
 
 describe('TRAK-295: Write my own', { timeout: 30_000 }, () => {
   it('types practices one at a time, changes, moves and removes them, and saves the plan whole', async () => {
@@ -140,7 +91,7 @@ describe('TRAK-295: Write my own', { timeout: 30_000 }, () => {
     const saves = database([training('soon', onTheMinute(Date.now() + DAY))])
     renderApp('/coach/training/soon/plan')
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument()
-    expect(screen.getByRole('list', { name: 'Training loop' })).toHaveTextContent(/1 · Plan\s*\(now\)/)
+    expect(screen.getByRole('list', { name: 'Training loop' })).toHaveTextContent(/2 · Plan\s*\(now\)/)
     expect(screen.getByText('0 of 90 min planned')).toBeInTheDocument()
 
     // Practice 1, with what to tell them and a detail; Save to My drills starts ticked.
@@ -194,7 +145,7 @@ describe('TRAK-295: Write my own', { timeout: 30_000 }, () => {
 
     // The plan: Ready, the loop on Who's here next, each practice with where it came from.
     expect(await screen.findByText('Ready')).toBeInTheDocument()
-    expect(screen.getByRole('list', { name: 'Training loop' })).toHaveTextContent(/2 · Who’s here\s*\(next\)/)
+    expect(screen.getByRole('list', { name: 'Training loop' })).toHaveTextContent(/3 · Who’s here\s*\(next\)/)
     expect(screen.getByText('2 practices · 35 min')).toBeInTheDocument()
     const plan = screen.getByRole('region', { name: 'Practices' })
     expect(within(plan).getByText('Written here')).toBeInTheDocument()
@@ -250,9 +201,11 @@ describe('TRAK-295: Write my own', { timeout: 30_000 }, () => {
     database([training('soon', onTheMinute(Date.now() + DAY)), training('off', onTheMinute(Date.now() + 2 * DAY), { status: 'cancelled' })])
     renderApp('/coach/training/soon')
     expect(await screen.findByText('Not planned yet')).toBeInTheDocument()
-    expect(screen.getByRole('list', { name: 'Training loop' })).toHaveTextContent(/1 · Plan\s*\(now\)/)
-    await user.click(screen.getAllByRole('button', { name: 'Plan this session' })[0])
-    expect(await screen.findByRole('dialog', { name: 'How do you want to plan it?' })).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Training loop' })).toHaveTextContent(/2 · Plan\s*\(now\)/)
+    // TRAK-339: straight to the planner, no "How do you want to plan it?".
+    await user.click(screen.getAllByRole('button', { name: 'Plan session' })[0])
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/soon/plan'))
+    expect(await screen.findByRole('form', { name: 'Practice 1' })).toBeInTheDocument()
 
     cleanup()
     renderApp('/coach/training/off/plan')

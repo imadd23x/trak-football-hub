@@ -2,19 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Tables } from '@/integrations/supabase/types'
-import { WEEK, cleanDrill, type Drill, type DrillDraft } from '@/lib/training/sessions'
+import { WEEK, cleanDrill, trainingEnd, type Drill, type DrillDraft } from '@/lib/training/sessions'
 import { toSave, type Practice, type SavedPractice } from '@/lib/training/plans'
+import type { Again } from '@/lib/training/next'
 
 /* TRAK-294 (Training 1/5): the coach's own trainings for Training home, not cancelled (a published event is cancelled,
    never deleted), from a week ago on; and the coach's own drills (coach_drills, only they read them).
    TRAK-295 (Training 2/5): one training, its plan, which trainings are planned, and saving a plan whole.
    TRAK-297 (Training 4/5): every planned session, to copy. Nothing new is stored: a past session is its plan.
-   TRAK-298 (Training 5/5): which trainings have their register taken (the loop's Who's here and Close). */
+   TRAK-298 (Training 5/5): which trainings have their register taken (the loop's Who's here and Close).
+   TRAK-339 (Training redo 1/5, spec TRAK-338): each training's Notes, how many came, every past training, and the
+   message to families the card shows from Logistics. */
 
 export type Training = Pick<Tables<'coach_calendar_events'>, 'id' | 'squad' | 'title' | 'published' | 'status' | 'starts_at'
-  | 'ends_at' | 'event_date' | 'start_time' | 'venue'>
+  | 'ends_at' | 'event_date' | 'start_time' | 'venue' | 'family_note'>
 
-const TRAINING_COLUMNS = 'id, squad, title, published, status, starts_at, ends_at, event_date, start_time, venue'
+const TRAINING_COLUMNS = 'id, squad, title, published, status, starts_at, ends_at, event_date, start_time, venue, family_note'
 
 export function useTrainings() {
   const { user } = useAuth()
@@ -141,6 +144,7 @@ export function useSavePlan(eventId: string) {
       client.invalidateQueries({ queryKey: ['coach', user?.id, 'training-plan', eventId] }),
       client.invalidateQueries({ queryKey: ['coach', user?.id, 'training-plans'] }),
       client.invalidateQueries({ queryKey: ['coach', user?.id, 'past-sessions'] }),
+      client.invalidateQueries({ queryKey: ['coach', user?.id, 'past-trainings'] }),
       client.invalidateQueries({ queryKey: ['coach', user?.id, 'drills'] }),
     ]),
   })
@@ -187,5 +191,100 @@ export function useDeleteDrill() {
       if (error) throw error
     },
     onSuccess: () => client.invalidateQueries({ queryKey: ['coach', user?.id, 'drills'] }),
+  })
+}
+
+/* ── TRAK-339: Notes, who came, past trainings ──────────────────────────── */
+
+export type Notes = { again: Again | null; note: string }
+
+/** Every training the coach has answered Notes for (or skipped), by training. The database returns only their own. */
+export function useNotes() {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['coach', user?.id, 'training-notes'],
+    enabled: !!user,
+    queryFn: async (): Promise<Map<string, Notes>> => {
+      const { data, error } = await supabase.from('training_notes').select('event_id, again, note')
+      if (error) throw error
+      return new Map((data ?? []).map(row => [row.event_id, { again: row.again as Again | null, note: row.note }]))
+    },
+  })
+}
+
+/** Saves a training's Notes; no answer and no note is a skip. Either way the training leaves the Next training card. */
+export function useSaveNotes() {
+  const { user } = useAuth()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ eventId, again, note }: { eventId: string } & Notes) => {
+      const { error } = await supabase.from('training_notes')
+        .upsert({ event_id: eventId, again, note: note.trim() }, { onConflict: 'event_id' }).select('event_id').single()
+      if (error) throw error
+    },
+    onSuccess: () => Promise.all([
+      client.invalidateQueries({ queryKey: ['coach', user?.id, 'training-notes'] }),
+      client.invalidateQueries({ queryKey: ['coach', user?.id, 'past-trainings'] }),
+    ]),
+  })
+}
+
+/** How many were marked present in each register taken, by the session it made. */
+export function useHere(sessionIds: string[]) {
+  const { user } = useAuth()
+  const ids = [...new Set(sessionIds)].sort()
+  return useQuery({
+    queryKey: ['coach', user?.id, 'training-here', ids],
+    enabled: !!user && ids.length > 0,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase.from('session_attendance').select('session_id').in('session_id', ids).eq('status', 'present')
+      if (error) throw error
+      const counts = new Map(ids.map(id => [id, 0]))
+      for (const row of data ?? []) counts.set(row.session_id, (counts.get(row.session_id) ?? 0) + 1)
+      return counts
+    },
+  })
+}
+
+export type PastTraining = Training & { practices: SavedPractice[]; planned: boolean; notes: Notes | null }
+
+const PAST_SHOWN = 100
+
+/** The coach's trainings that are over, newest first (the last 100), not cancelled: each with its plan, if it had one,
+ *  and its Notes. */
+export function usePastTrainings() {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['coach', user?.id, 'past-trainings'],
+    enabled: !!user,
+    queryFn: async (): Promise<PastTraining[]> => {
+      const now = Date.now()
+      const events = await supabase.from('coach_calendar_events').select(TRAINING_COLUMNS)
+        .eq('coach_user_id', user!.id).eq('event_type', 'training').neq('status', 'cancelled')
+        .lte('starts_at', new Date(now).toISOString()).order('starts_at', { ascending: false }).limit(PAST_SHOWN)
+      if (events.error) throw events.error
+      const over = (events.data ?? []).filter(event => trainingEnd(event) <= now)
+        .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at))
+      const ids = over.map(event => event.id)
+      if (!ids.length) return []
+      const [plans, practices, notes] = await Promise.all([
+        supabase.from('training_plans').select('event_id').in('event_id', ids),
+        supabase.from('training_plan_practices').select(`event_id, ${PRACTICE_COLUMNS}`).in('event_id', ids).order('position'),
+        supabase.from('training_notes').select('event_id, again, note').in('event_id', ids),
+      ])
+      if (plans.error) throw plans.error
+      if (practices.error) throw practices.error
+      if (notes.error) throw notes.error
+      const planned = new Set((plans.data ?? []).map(plan => plan.event_id))
+      return over.map(event => {
+        const note = notes.data?.find(n => n.event_id === event.id)
+        return {
+          ...event,
+          planned: planned.has(event.id),
+          practices: (practices.data ?? []).filter(p => p.event_id === event.id).map(({ event_id: _e, ...p }) => p),
+          notes: note ? { again: note.again as Again | null, note: note.note } : null,
+        }
+      })
+    },
   })
 }

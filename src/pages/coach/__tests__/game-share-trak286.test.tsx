@@ -130,7 +130,7 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     expect(share).toBeDisabled()
     expect(within(card).getByText('Tick “I’ve talked selection through” to share')).toBeInTheDocument()
 
-    await user.click(within(card).getByRole('checkbox', { name: 'I’ve talked selection through with the players, face to face' }))
+    await user.click(within(card).getByRole('checkbox', { name: 'I’ve talked selection through with the players' }))
     expect(within(card).queryByText('Tick “I’ve talked selection through” to share')).toBeNull()
     await user.click(share)
 

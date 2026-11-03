@@ -123,7 +123,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
 
     await user.click(screen.getByRole('checkbox', { name: /talked selection through/ }))
     await user.click(screen.getByRole('button', { name: 'Share plan more actions' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Share at…' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Schedule' }))
     expect(screen.getByText('Any time before kick-off. Until then, only you see it.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Schedule' })).toBeDisabled()
 
@@ -190,7 +190,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     await screen.findByRole('region', { name: 'Game plan review' })
     await user.click(screen.getByRole('checkbox', { name: /talked selection through/ }))
     await user.click(screen.getByRole('button', { name: 'Share plan more actions' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Share at…' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Schedule' }))
     await pickDate(user, 'Day', '2026-11-07')
     await pickTime(user, 'Time', '11:00')
     await user.click(screen.getByRole('button', { name: 'Schedule for Sat 11:00' }))

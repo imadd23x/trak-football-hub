@@ -467,11 +467,12 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   })
 }
 
-// TRAK-290: Share at… sits behind Share plan's chevron and opens by keyboard; its day and time pickers fit the step. A
+// TRAK-290: Schedule (Share at… until TRAK-345) sits behind Share plan's chevron and opens by keyboard; its day and
+// time pickers fit the step, side by side under the button (TRAK-345), and Share plan is the app's green. A
 // scheduled plan waits with "Shares …", Change time opens the pickers on the time it has, and every control takes focus
 // from the keyboard. What's sent is the unit tests' (game-share-at-trak290).
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
-  test(`Share at… at ${width} px: the chevron by keyboard, then a scheduled plan waits`, async ({ page, context }, testInfo) => {
+  test(`Schedule at ${width} px: the chevron by keyboard, then a scheduled plan waits`, async ({ page, context }, testInfo) => {
     const plans = DRAFT()
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan&step=share', width, height, plans)
     await expect(page.getByRole('region', { name: 'Game plan review' })).toBeVisible()
@@ -480,10 +481,27 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.keyboard.press('Space')
     await page.getByRole('button', { name: 'Share plan more actions' }).focus()
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('menuitem', { name: 'Share at…' })).toBeFocused()
+    await expect(page.getByRole('menuitem', { name: 'Schedule' })).toBeFocused()
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('button', { name: /^Day\b/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Time\b/ })).toBeVisible()
+    const day = page.getByRole('button', { name: /^Day\b/ }), time = page.getByRole('button', { name: /^Time\b/ })
+    await expect(day).toBeVisible()
+    await expect(time).toBeVisible()
+    // Under Share plan, side by side.
+    const [shareBox, dayBox, timeBox] = await Promise.all([page.getByRole('button', { name: 'Share plan', exact: true }).boundingBox(), day.boundingBox(), time.boundingBox()])
+    expect(dayBox!.y).toBeGreaterThan(shareBox!.y + shareBox!.height)
+    expect(Math.abs(dayBox!.y - timeBox!.y)).toBeLessThanOrEqual(1)
+    expect(timeBox!.x).toBeGreaterThan(dayBox!.x + dayBox!.width)
+    // Share plan is Arc's accent, the app's green, as its primary buttons are.
+    const green = await page.getByRole('button', { name: 'Share plan', exact: true }).evaluate(button => {
+      const probe = document.createElement('span')
+      probe.style.background = 'var(--accent)'
+      button.parentElement!.appendChild(probe)
+      const accent = getComputedStyle(probe).backgroundColor
+      probe.remove()
+      return { button: getComputedStyle(button).backgroundColor, accent }
+    })
+    expect(green.button).toBe(green.accent)
+    expect(green.accent).not.toBe('rgba(0, 0, 0, 0)')
     await expect(page.locator('[role="tabpanel"]:not([hidden])').getByRole('button', { name: 'Schedule', exact: true })).toBeDisabled()
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`share-at-${width}.png`), fullPage: true })

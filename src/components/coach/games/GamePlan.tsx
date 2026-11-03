@@ -138,7 +138,8 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
           ? ' It wasn’t shared, so only you saw it.'
           : changes.length ? ` ${changes.length} ${changes.length === 1 ? 'player' : 'players'} didn’t get your last changes.` : ''}`}
       </Alert></div>}
-      <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Game plan" />
+      {/* TRAK-346 (Imad, 3 Nov): any step opens from here, ahead as well as back, so an Edit never means walking back. */}
+      <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Game plan" jumpAhead />
       {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} form={form} onFormChange={change} locked={locked} />
         : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} />
         : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} onShare={shareNow} onSchedule={scheduleAt}

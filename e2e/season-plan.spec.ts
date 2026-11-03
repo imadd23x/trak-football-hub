@@ -77,10 +77,11 @@ for (const [width, height] of [[1280, 800], [390, 844]] as const) {
     await page.getByRole('button', { name: 'Save draft' }).click()
     await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
 
+    // After the reload the plan comes back first, then its objectives: wait for each in turn, so a failure says which.
     await page.reload()
+    await expect(page.getByText('U16 · Draft, only you see it')).toBeVisible()
     await expect(page.getByLabel('Objective 1', { exact: true })).toHaveValue('Stay compact')
     await expect(page.getByLabel('Objective 2', { exact: true })).toHaveValue('Win the second ball')
-    await expect(page.getByText('U16 · Draft, only you see it')).toBeVisible()
     expect(unexpected).toEqual([])
   })
 }

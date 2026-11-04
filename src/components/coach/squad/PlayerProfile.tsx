@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
-import { Avatar } from '@/components/arc/avatar/avatar'
+import { PlayerFace } from '@/components/trak/PlayerFace'
 import { RadarChart } from '@/components/arc/radar-chart/radar-chart'
 import { ScrollArea } from '@/components/arc/scroll-area/scroll-area'
 import { BandChip, type SquadPlayer } from '@/components/arc/blocks/team-directory/squad-directory'
@@ -52,7 +52,7 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
   const list = assessments.data?.list ?? []
 
   const header = <div className="flex items-center gap-4">
-    <Avatar name={player.name} size="lg" />
+    <PlayerFace name={player.name} size="lg" />
     <div className="grid min-w-0 gap-0.5">
       <h3 className="truncate text-xl font-medium text-ink">{player.name}</h3>
       <p className="text-sm text-ink-2">{[player.shirt != null && `#${player.shirt}`, player.position, squad].filter(Boolean).join(' · ')}</p>

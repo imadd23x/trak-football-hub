@@ -15,6 +15,9 @@ import {
   useDrafts, useDrills, useHere, useNotes, usePastTrainings, usePlannedTrainings, useRegisters, useSaveNotes, useTrainings, type Draft, type Notes, type Training,
 } from '@/components/coach/training/useTraining'
 import { DrillSheet } from '@/components/coach/training/DrillSheet'
+import { startedLocked } from '@/lib/coach-events'
+import type { MyDrill } from '@/lib/training/parts'
+import { NOTE_STEP } from '@/lib/event-edit'
 import { CopyTargetSheet, PastPlanSheet, type PlanToCopy } from '@/components/coach/training/PastPlanSheet'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { PitchViewRoute, PlanEditorRoute, PlanRoute, WhosHereRoute } from './CoachTrainingPlan'
@@ -220,6 +223,7 @@ function NextTraining({ training, phase, planned, draft, sessionId, onStart, onC
   // 3 Nov: a training ended with no register showed Who's here ticked).
   const steps = loopSteps({ current, planned, registered: !!sessionId })
   const message = training.family_note?.trim()
+  const locked = startedLocked(training)
   // Who's here opens as the register does everywhere else: published, not cancelled, started.
   const registerWhy = registerProblem({ ...training, event_type: 'training' }, new Date())
   const review = () => navigate(`${TRAINING_PATH}/${training.id}`)
@@ -242,10 +246,12 @@ function NextTraining({ training, phase, planned, draft, sessionId, onStart, onC
 
       {phase === 'after' ? <NotesForm training={training} planned={planned} onReview={review} onClosed={onClosed} />
         : <>
-          {message && <p className="flex items-start gap-2 rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
+          {/* TRAK-367: always there to add one, until the training starts and its details are fixed. Edit opens the form at
+              the note, in Schedule, which alone can save it to this training and the ones after. */}
+          {(message || !locked) && <p className="flex items-start gap-2 rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
             <Info aria-hidden size={16} className="mt-0.5 flex-none text-ink-3" />
-            <span className="min-w-0 flex-1 break-words"><span className="font-medium text-ink">Message to players:</span> {message}</span>
-            <Link to={`/coach/schedule?event=${training.id}`} className={linkClass}>Edit</Link>
+            <span className="min-w-0 flex-1 break-words"><span className="font-medium text-ink">Message to players{message && ':'}</span> {message}</span>
+            {!locked && <Link to={`/coach/schedule?edit=${training.id}&step=${NOTE_STEP}`} className={linkClass}>{message ? 'Edit' : 'Add a message'}</Link>}
           </p>}
           <div className="flex flex-wrap items-center gap-3">
             {phase === 'day' ? <>
@@ -411,7 +417,7 @@ function DrillsView() {
   const nextDay = next ? gameWhen(next).day : null
   const [query, setQuery] = useState('')
   // The sheet: closed, a new drill, or one of the coach's drills to change.
-  const [sheet, setSheet] = useState<{ drill: Drill | null } | null>(null)
+  const [sheet, setSheet] = useState<{ drill: (Drill & MyDrill) | null } | null>(null)
   const shown = searchDrills(drills.data ?? [], query)
 
   return (

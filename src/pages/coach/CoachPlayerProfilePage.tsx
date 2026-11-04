@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Avatar } from '@/components/arc/avatar/avatar'
+import { PlayerFace } from '@/components/trak/PlayerFace'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -129,7 +129,7 @@ export function CoachPlayerOverview({ id, embedded = false }: { id: string | und
 
     {/* Player identity */}
     <div className="flex items-center gap-4 py-2">
-      <Avatar name={player.player_name} size="lg" className="arc" aria-hidden />
+      <PlayerFace name={player.player_name} size="lg" className="arc" aria-hidden />
       <div>
         <p className="text-[22px] font-light text-ink leading-tight"
           style={{ fontFamily: 'var(--t-font)', letterSpacing: '-0.02em' }}>

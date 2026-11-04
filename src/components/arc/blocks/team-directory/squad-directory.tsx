@@ -4,7 +4,7 @@
 import { useId, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
-import { Avatar } from "../../avatar/avatar";
+import { PlayerFace } from "@/components/trak/PlayerFace";
 import { GlassSegmented } from "../../glass-segmented/glass-segmented";
 import { Sparkline } from "../../sparkline/sparkline";
 import { motionTokens } from "../../lib/motion-tokens";
@@ -103,7 +103,7 @@ export function SquadDirectory({ title, players, summary, onOpen }: {
                 exit={{ opacity: 0, transition: { duration: reduce ? 0 : motionTokens.duration.exit } }}
                 transition={{ layout: listTransition, opacity: { duration: reduce ? 0 : motionTokens.duration.fast } }}>
                 <button type="button" className={styles.personRow} onClick={() => onOpen(player)}>
-                  <Avatar name={player.name} />
+                  <PlayerFace name={player.name} />
                   <span className={styles.personText}><span className={styles.personName}>{player.name}</span><span className={styles.personRole}>{player.position}{player.shirt != null ? ` · #${player.shirt}` : ""}</span></span>
                   {player.flag}
                   {/* Trak (Imad, 23 Oct): a sparkline of the player's ratings in place of the band chip; under two there's no line. */}

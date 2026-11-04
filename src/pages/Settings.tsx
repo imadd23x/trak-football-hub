@@ -20,6 +20,7 @@ import { ParentChildCredentials } from '@/components/parent/ParentChildCredentia
 import { ParentConsentWithdrawal } from '@/components/parent/ParentConsentWithdrawal'
 import { RosterConsentWithdrawals } from '@/components/parent/ApprovedAwaitingSignup'
 import { Avatar } from '@/components/arc/avatar/avatar'
+import { PlayerFace } from '@/components/trak/PlayerFace'
 import { Button } from '@/components/arc/button/button'
 import { Input } from '@/components/arc/input/input'
 import { SettingsPage, SettingsRow, SettingsRows, type SettingsSection } from '@/components/arc/blocks/settings-page/settings-page'
@@ -200,7 +201,7 @@ function AccountSettings({ userId }: { userId: string }) {
       description: 'Your name, and how you sign in.',
       content: <>
         <div className="mb-4 flex items-center gap-4">
-          <Avatar name={displayName || '?'} size="xl" />
+          {role === 'player' ? <PlayerFace name={displayName || '?'} size="xl" /> : <Avatar name={displayName || '?'} size="xl" />}
           <div className="grid min-w-0 gap-0.5">
             <strong className="truncate text-sm font-medium text-ink">{displayName || '—'}</strong>
             <span className="truncate text-sm text-ink-3">{subtitle}</span>

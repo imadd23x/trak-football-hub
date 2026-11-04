@@ -14,6 +14,7 @@ const PLACES: [prefix: string, screen: CoachScreen | null, title: string][] = [
   ['/coach/squad', 'squad', 'Squad'],
   ['/coach/player', 'squad', 'Player'],
   ['/coach/matches', 'games', 'Matches'], // TRAK-283: Games home and each game's page
+  ['/coach/training/drills', 'training', 'Drills'], // TRAK-367: so a page opened from Drills doesn't read Training / Training
   ['/coach/training', 'training', 'Training'], // TRAK-294: Training home, its drills and plans
   ['/coach/trainings', 'library', 'Library'],
   ['/settings', 'settings', 'Settings'],

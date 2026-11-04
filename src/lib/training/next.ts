@@ -66,6 +66,11 @@ export const NOTE_MAX = 500
 
 export const againLabel = (again: string | null | undefined) => AGAIN.find(a => a.value === again)?.label ?? null
 
+/** TRAK-367 (Kostas, 2 Nov): the plans the coach would run again first, the rest as they came. */
+export function yesFirst<T extends { id: string }>(plans: T[], yes: (id: string) => boolean): T[] {
+  return [...plans.filter(p => yes(p.id)), ...plans.filter(p => !yes(p.id))]
+}
+
 /** Past trainings with the words typed in their title, a practice's name or the note, newest first as given. */
 export function searchPast<T extends { title: string; practices: { name: string }[]; note: string }>(past: T[], query: string): T[] {
   const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean)

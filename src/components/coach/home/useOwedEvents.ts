@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { addDays, format } from 'date-fns'
 import { coachWeek, type WeekItem } from '@/lib/coach-week'
 import { loadWeek } from '@/lib/coach-week-load'
+import { useNotedTrainings } from '@/components/coach/training/useTraining'
 
 /** How far back Needs you looks for an event still waiting. ponytail: two weeks; widen if older ones go missing. */
 const DAYS = 14
@@ -12,6 +13,7 @@ const DAYS = 14
  * players. These are the events of the last two weeks still waiting, by the week's own rule (coachWeek), oldest first.
  */
 export function useOwedEvents(coachId: string | undefined, inView: (squad: string | null | undefined) => boolean, enabled: boolean, games = false) {
+  const noted = useNotedTrainings()
   const read = useQuery({
     queryKey: ['coach', coachId, 'owed-events', games],
     enabled: !!coachId && enabled,
@@ -22,8 +24,8 @@ export function useOwedEvents(coachId: string | undefined, inView: (squad: strin
     },
   })
   const items = useMemo<WeekItem[] | null>(() => read.data
-    ? [...coachWeek({ ...read.data, inView }).values()].flat().filter(item => item.state === 'needs-you')
-    : null, [read.data, inView])
+    ? [...coachWeek({ ...read.data, inView, noted }).values()].flat().filter(item => item.state === 'needs-you')
+    : null, [read.data, inView, noted])
   // TRAK-290: when each evaluation draft's 09:00 reminder falls.
   return { items, reminders: read.data?.reminders, failed: read.isError, retry: () => { void read.refetch() } }
 }

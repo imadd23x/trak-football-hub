@@ -426,8 +426,8 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
       await expect(page.getByRole('navigation', { name: 'Breadcrumb trail' })).toBeVisible()
       await expect(page.getByRole('navigation', { name: 'Breadcrumb', exact: true })).toHaveCount(0)
     }
-    // TRAK-344 (Imad, 3 Nov): the gauge, what's left and the countdown sit in three equal columns on one line; on a
-    // phone the countdown goes under the other two.
+    // TRAK-369 (Imad, 4 Nov): two equal halves, the gauge with what's left under it and the countdown, nothing between
+    // them; on a phone the countdown goes under the gauge.
     const box = async (locator: ReturnType<typeof page.getByRole>) => (await locator.boundingBox())!
     const [whole, gauge, left, label, clock] = await Promise.all([box(card), box(card.getByRole('img', { name: /parts ready/ })),
       // What's left is its icon and its words, centred together.
@@ -435,19 +435,21 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
       box(card.getByRole('timer', { name: 'Kick-off in' }))])
     const middleY = (top: number, bottom: number) => (top + bottom) / 2
     const centreX = (b: { x: number; width: number }) => b.x + b.width / 2
-    expect(Math.abs(middleY(gauge.y, gauge.y + gauge.height) - middleY(left.y, left.y + left.height))).toBeLessThanOrEqual(2)
+    expect(left.y).toBeGreaterThanOrEqual(gauge.y + gauge.height)
+    expect(Math.abs(centreX(left) - centreX(gauge))).toBeLessThanOrEqual(2)
     if (width >= 1024) {
-      expect(Math.abs(middleY(gauge.y, gauge.y + gauge.height) - middleY(label.y, clock.y + clock.height))).toBeLessThanOrEqual(2)
-      expect(Math.abs(centreX(left) - centreX(whole))).toBeLessThanOrEqual(2)
+      expect(Math.abs(middleY(gauge.y, left.y + left.height) - middleY(label.y, clock.y + clock.height))).toBeLessThanOrEqual(2)
       expect(Math.abs((centreX(gauge) + centreX(clock)) / 2 - centreX(whole))).toBeLessThanOrEqual(2)
-      // Arc's countdown digits are the gauge count's size.
-      expect(await card.getByRole('timer').evaluate(el => getComputedStyle(el.querySelector('[class*="units"]')!).fontSize)).toBe('28px')
+      expect(centreX(gauge)).toBeLessThan(centreX(whole))
     } else {
-      expect(label.y).toBeGreaterThan(gauge.y + gauge.height)
+      expect(label.y).toBeGreaterThan(left.y + left.height)
     }
+    // Arc's countdown digits are the gauge count's size.
+    expect(await card.getByRole('timer').evaluate(el => getComputedStyle(el.querySelector('[class*="units"]')!).fontSize)).toBe('28px')
     const share = card.getByRole('button', { name: 'Share plan', exact: true })
     await expect(share).toBeDisabled()
-    await expect(card.getByText('Tick “I’ve talked selection through” to share')).toBeVisible()
+    // TRAK-369: no line for who gets it and none for the tick before sharing.
+    await expect(card.getByText(/and their families|^Tick /)).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Preview' })).toHaveCount(0)
     await page.waitForTimeout(600)
     await page.screenshot({ path: testInfo.outputPath(`review-share-${width}.png`), fullPage: true })

@@ -76,8 +76,6 @@ describe('TRAK-345: Share plan', { timeout: 30_000 }, () => {
     const tick = within(card).getByRole('checkbox', { name: 'I’ve talked selection through with the players' })
     expect(tick).not.toHaveAccessibleDescription()
     expect(within(card).queryByText(/face to face|Before this goes out|hear it from you first/)).toBeNull()
-    // Who gets it stays (A5).
-    expect(within(card).getByText('2 players and their families, in the app only')).toBeInTheDocument()
   })
 
   it('the chevron offers Schedule, and Schedule opens the day and the time under the button', async () => {

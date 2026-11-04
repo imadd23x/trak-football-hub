@@ -109,7 +109,7 @@ describe('TRAK-339: the Next training card', { timeout: 30_000 }, () => {
     expect(within(card).getByText(/Pitch 2 · 90 min/)).toBeInTheDocument()
     for (const step of ['Logistics', 'Plan', 'Who’s here', 'Notes']) expect(within(card).getAllByText(step).length).toBeGreaterThan(0)
     expect(within(card).getByText('Bring shin pads.')).toBeInTheDocument()
-    expect(within(card).getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/coach/schedule?event=soon')
+    expect(within(card).getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/coach/schedule?edit=soon&step=2')
     expect(within(card).getByRole('button', { name: 'Use a past plan' })).toBeInTheDocument()
     await user.click(within(card).getByRole('button', { name: 'Plan session' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/soon/plan'))

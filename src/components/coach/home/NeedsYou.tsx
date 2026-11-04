@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { ArrowRight } from 'lucide-react'
-import { Avatar } from '@/components/arc/avatar/avatar'
+import { PlayerFace } from '@/components/trak/PlayerFace'
 import { ScrollArea } from '@/components/arc/scroll-area/scroll-area'
 import { LoadError } from '@/components/trak/LoadError'
 import type { NeedsYouItem } from '@/lib/coach-needs-you'
@@ -50,7 +50,7 @@ export function NeedsYou({ items, events = [], failed, onRetry, onOpen }: {
               <button type="button" onClick={() => onOpen(item)}
                 className="flex h-full w-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 text-left transition-transform active:scale-[.98] motion-reduce:transition-none">
                 <span className="flex items-center gap-3">
-                  <Avatar name={item.name} size="md" />
+                  <PlayerFace name={item.name} size="md" />
                   <span className="grid min-w-0">
                     <span className="truncate text-base font-medium text-ink">{item.name}</span>
                     {item.detail && <span className="truncate text-sm text-ink-3">{item.detail}</span>}

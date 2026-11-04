@@ -78,7 +78,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
   const incomplete = rows.filter(row => row.status !== 'good').length
   const band = incomplete === 0 ? { status: 'good' as const, label: 'Ready to share' }
     : { status: game.published ? 'watch' as const : 'risk' as const, label: `${incomplete} incomplete` }
-  const holdsBack = !game.published ? 'Publish the match in Logistics first' : !talked ? 'Tick “I’ve talked selection through” to share' : null
+  const holdsBack = !game.published || !talked
 
   return (
     <div className="arc">
@@ -90,13 +90,13 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
             <p className="text-sm text-ink-2">It wasn’t shared before kick-off, so only you saw it.</p>
           </section>
         ) : sharedAt == null ? <>
-          {/* TRAK-345 (Imad, 3 Nov): the tick says this and nothing else; Schedule (it was "Share at…") opens under the button. */}
+          {/* TRAK-345 (Imad, 3 Nov): the tick says this and nothing else; Schedule (it was "Share at…") opens under the button.
+              TRAK-369 (Imad, 4 Nov): no line for who gets it, nor one for the tick; only the logistics say why Share waits. */}
           <Checkbox label="I’ve talked selection through with the players" checked={talked} onCheckedChange={value => setTalked(value === true)} />
-          <p className="text-sm text-ink-3">{players(reading.length)} and their families, in the app only</p>
           <div className="flex flex-wrap items-center gap-3">
-            {holdsBack && <span className="text-sm text-ink-3">{holdsBack}</span>}
+            {!game.published && <span className="text-sm text-ink-3">Publish the match in Logistics first</span>}
             <span className="ml-auto"><SplitButton label={sharing ? 'Sharing…' : 'Share plan'} onClick={() => onShare(talked)}
-              disabled={!!holdsBack || sharing} actions={[{ label: 'Schedule', onSelect: () => setPicking(true), disabled: !!holdsBack }]} /></span>
+              disabled={holdsBack || sharing} actions={[{ label: 'Schedule', onSelect: () => setPicking(true), disabled: holdsBack }]} /></span>
           </div>
           {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta={when => when ? `Schedule for ${when}` : 'Schedule'}
             busy={sharing} ready={!holdsBack} onSchedule={at => onSchedule(at, talked)} onCancel={() => setPicking(false)} />}

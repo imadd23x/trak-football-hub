@@ -26,6 +26,7 @@ let placed: { id: string; position: string }[] = []
 let planWrites: unknown[] = []
 let failPlacing = false
 let switchOn = true
+let switchAnswered = false
 
 const param = (url: URL, key: string) => url.searchParams.get(key)?.replace(/^eq\./, '') ?? null
 const child = (i: number, position: string | null = null): Row => ({
@@ -42,6 +43,7 @@ beforeEach(() => {
   planWrites = []
   failPlacing = false
   switchOn = true
+  switchAnswered = false
   signInAs(COACH)
   server.use(
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Synthetic Coach', invite_code: 'ABCD' }]),
@@ -49,7 +51,7 @@ beforeEach(() => {
     table('organizations', [{ id: 'org-1', name: 'Rehearsal FC', logo_url: null }]),
     http.get(`${SUPABASE_URL}/rest/v1/squad_players`, () => HttpResponse.json(squad)),
     rpc('coach_squad_player_consent_required', args => waiting.has(String(args.p_squad_player_id))),
-    rpc('feature_on', args => args.p_feature !== 'season_plan' || switchOn),
+    rpc('feature_on', args => { if (args.p_feature === 'season_plan') switchAnswered = true; return args.p_feature !== 'season_plan' || switchOn }),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/set_player_position`, async ({ request }) => {
       const { p_squad_player_id: id, p_position: position } = await request.json() as { p_squad_player_id: string; p_position: string }
       if (failPlacing) return HttpResponse.json({ message: 'down' }, { status: 503 })
@@ -76,6 +78,8 @@ beforeEach(() => {
     table('season_objectives', []),
     http.post(`${SUPABASE_URL}/rest/v1/season_objectives`, () => new HttpResponse(null, { status: 201 })),
     table('training_notes', []),
+    table('squad_player_profiles', []),
+    rpc('coach_player_birth_dates', () => []),
     table('coach_assessments', []),
     table('coach_sessions', []),
     table('session_attendance', []),
@@ -192,6 +196,26 @@ describe('TRAK-352 positions', () => {
     await user().click(screen.getByRole('button', { name: 'Done' }))
     expect(await screen.findByRole('heading', { name: /^Needs you/ })).toBeInTheDocument()
     expect(screen.queryByText(/players? needs? a position$/)).not.toBeInTheDocument()
+  })
+
+  it('marks unplaced players "No position yet" in Squad where the season plan is on', async () => {
+    squad = [child(1), child(2, 'Attacker'), child(3)]
+    waiting = new Set(['p3'])
+    renderApp('/coach/squad')
+    // The mark follows the switch, which answers after the roster.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Synthetic Player 01/ })).toHaveTextContent('No position yet'))
+    expect(screen.getByRole('button', { name: /Synthetic Player 02/ })).toHaveTextContent('Attacker')
+    expect(screen.getByRole('button', { name: /Synthetic Player 03/ })).not.toHaveTextContent('No position yet')
+  })
+
+  it('leaves Squad as it was where the season plan is off', async () => {
+    squad = [child(1)]
+    switchOn = false
+    renderApp('/coach/squad')
+    const row = await screen.findByRole('button', { name: /Synthetic Player 01/ })
+    await waitFor(() => expect(switchAnswered).toBe(true))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(row).not.toHaveTextContent('No position yet')
   })
 
   it('shows no position card where the season plan is off', async () => {

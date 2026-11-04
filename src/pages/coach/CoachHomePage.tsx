@@ -26,6 +26,8 @@ import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { needsYou } from '@/lib/coach-needs-you'
+import { unplacedBySquad } from '@/lib/positions'
+import { Button } from '@/components/arc/button/button'
 import { squadShape } from '@/lib/squad/shape'
 import { localParts, localTodayISO } from '@/lib/event-time'
 
@@ -127,6 +129,17 @@ export default function CoachHomePage() {
       action: <MatchAction state={state} eventId={game.id} />,
     }]
   })
+  // TRAK-352: where the season plan is on, one card per squad with consented players still to place. A newly
+  // consented child has no position, so they join it.
+  const seasonPlanOn = useFeature('season_plan')
+  const positionEvents: OwedEvent[] = !seasonPlanOn || !loaded ? [] : unplacedBySquad(roster.players, roster.consentPending).map(({ squad, count }) => ({
+    id: `positions:${squad ?? ''}`,
+    title: `${count} ${count === 1 ? 'player needs' : 'players need'} a position`,
+    when: '',
+    squad: coachSquad.squads.length >= 2 ? squad : null,
+    reason: 'A player needs a position before they get objectives.',
+    action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad && squad) coachSquad.setSquad(squad); navigate('/coach/season-plan/positions') }}>Place them</Button></span>,
+  }))
 
 
   return (
@@ -147,7 +160,7 @@ export default function CoachHomePage() {
         </div>
         {/* Shown once the switch is known, so a coach who turned it off never sees it flash in. */}
         {(needsYouSwitch.data === true || needsYouSwitch.isError) && <div className={wide ? 'mt-6' : 'mt-5'}>
-          <NeedsYou items={needsReady ? cards : null} events={[...owedEvents, ...planEvents]} failed={!!roster.error || owed.failed || gamesFailed}
+          <NeedsYou items={needsReady ? cards : null} events={[...owedEvents, ...planEvents, ...positionEvents]} failed={!!roster.error || owed.failed || gamesFailed}
             onRetry={() => { roster.retry(); owed.retry(); if (gamesOn) { void games.refetch(); void plans.refetch(); void shares.refetch() } }}
             onOpen={item => item.kind === 'draft'
               // TRAK-200: the profile's assessment card says Draft and has Publish.

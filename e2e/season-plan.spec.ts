@@ -80,9 +80,13 @@ for (const [width, height] of [[1280, 800], [390, 844]] as const) {
     await page.getByRole('button', { name: 'Write your own' }).click()
     await page.getByLabel('Objective 2', { exact: true }).fill('Win the second ball')
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
-    await page.screenshot({ path: testInfo.outputPath(`season-plan-${width}.png`), fullPage: true })
+    await expect(page.getByLabel('Objective 1', { exact: true })).toHaveValue('Stay compact')
     await page.getByRole('button', { name: 'Save draft' }).click()
     await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
+    // Only once it's saved: a full-page screenshot can pass through a 1×1 window, the coach frame swaps to the phone
+    // layout and back, and the page is rebuilt with nothing typed in it. CI caught it at 1280 on 4 Nov ("click Save
+    // draft with inputs []" after "resize 1x1"). A saved plan comes back from the cache.
+    await page.screenshot({ path: testInfo.outputPath(`season-plan-${width}.png`), fullPage: true })
 
     // After the reload the plan comes back first, then its objectives: wait for each in turn, so a failure says which.
     seen.push('--- reload')

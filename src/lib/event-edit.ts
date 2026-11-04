@@ -31,6 +31,8 @@ export const EVENT_STEPS = [
   { id: 'review', label: 'Review' },
 ]
 export const REVIEW = EVENT_STEPS.length - 1
+/** TRAK-367: the step with the note for families, for a link straight to it. */
+export const NOTE_STEP = 2
 
 /** TRAK-127: a past date on New event, or moved to on an edit. TRAK-288: where Games is on, a new match that has
  *  been played is saved to be evaluated instead (Imad, 28 Oct), so its date isn't a problem. */

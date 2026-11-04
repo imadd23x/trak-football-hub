@@ -25,6 +25,8 @@ const database = vi.hoisted(() => ({
 
 // The feature switch is independent of how the enabled strip loads its week. TRAK-288: Games off, so a match is logged.
 vi.mock('@/components/trak/parked', () => ({ useFeature: (feature?: string) => feature !== 'games' }))
+// TRAK-367: Training's Notes have their own tests; none here.
+vi.mock('@/components/coach/training/useTraining', () => ({ useNotedTrainings: () => new Set<string>() }))
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     rpc: (name: string) => database.rpc(name),

@@ -116,7 +116,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
     // TRAK-182: Review shows everything before the save.
     await eventStep(sheet, 'Review')
     for (const [term, value] of [['Opponent', 'Synthetic United (Away)'], ['Title', 'vs Synthetic United'], ['Venue', 'United Ground'],
-      ['Kickoff', '16:00'], ['Meet', '15:15'], ['Length', '75 min'], ['Kit', 'Red shirts'], ['Note for families', 'None']]) {
+      ['Kickoff', '16:00'], ['Meet', '15:15'], ['Length', '75 min'], ['Kit', 'Red shirts'], ['Message to players', 'None']]) {
       expect(within(sheet).getByText(term).nextElementSibling).toHaveTextContent(value)
     }
     await saveEventWith(sheet, 'Save draft')
@@ -153,7 +153,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
     await pickTime(userEvent, 'Start', '17:00')
     await eventStep(sheet, 'For families')
     await userEvent.type(within(sheet).getByLabelText('Kit'), 'Green kits')
-    const note = within(sheet).getByLabelText('Note for families')
+    const note = within(sheet).getByLabelText('Message to players')
     expect(note).toHaveAttribute('maxlength', '200')
     expect(within(sheet).getByText(/players and parents see this/i)).toBeInTheDocument()
     await userEvent.type(note, 'Bring extra water, it is a hot day')
@@ -175,18 +175,18 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
     await eventStep(sheet, 'When')
     await pickTime(userEvent, 'Start', '17:00')
     await eventStep(sheet, 'For families')
-    const note = within(sheet).getByLabelText('Note for families')
+    const note = within(sheet).getByLabelText('Message to players')
     await userEvent.type(note, 'Bring water')
     expect(within(sheet).queryByText(/families won't see this note/i)).toBeNull()
     await userEvent.type(note, ', Omar brings the bibs')
-    expect(await within(sheet).findByText("Families won't see this note: it names a player.")).toBeInTheDocument()
+    expect(await within(sheet).findByText("Players and parents won't see this message: it names a player.")).toBeInTheDocument()
     await userEvent.clear(note)
     await userEvent.type(note, 'Directions: maps.app.goo.gl/abc')
-    expect(within(sheet).getByText("Families won't see this note: it has a link.")).toBeInTheDocument()
+    expect(within(sheet).getByText("Players and parents won't see this message: it has a link.")).toBeInTheDocument()
     expect(note).toHaveAccessibleDescription(/it has a link/)
     // Review says it again, before the coach saves.
     await eventStep(sheet, 'Review')
-    expect(within(sheet).getByText("Families won't see this note: it has a link.")).toBeInTheDocument()
+    expect(within(sheet).getByText("Players and parents won't see this message: it has a link.")).toBeInTheDocument()
   })
 
   it('picks a venue the coach has used before', async () => {

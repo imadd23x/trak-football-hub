@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useNotedTrainings } from '@/components/coach/training/useTraining'
 import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
@@ -69,6 +70,7 @@ function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, label
     published: Set<string> } | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const noted = useNotedTrainings()
   // The share message names the squad and leaves out players' names (J8.16), as the event sheet's Share.
   const roster = useQuery({
     queryKey: ['coach', coachId, 'week-roster'],
@@ -95,7 +97,7 @@ function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, label
   }
 
   const refresh = () => setAttempt(n => n + 1)
-  const byDate = coachWeek({ dates, events: week.events, sessions: week.sessions, inView, evaluated: week.evaluated, published: week.published })
+  const byDate = coachWeek({ dates, events: week.events, sessions: week.sessions, inView, evaluated: week.evaluated, published: week.published, noted })
   const strips = new Map<string, { item: WeekItem; event: StripEvent }>()
   for (const item of [...byDate.values()].flat()) {
     const event = toPlayerEvent(item.source)

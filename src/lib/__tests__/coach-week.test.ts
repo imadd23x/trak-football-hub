@@ -18,6 +18,14 @@ const week = (events: EventRow[], sessions: WeekSession[] = [], inView: (s: stri
 const one = (events: EventRow[], sessions: WeekSession[] = []) => week(events, sessions)[0]
 
 describe('coach week', () => {
+  // TRAK-367: Training closes a training with its Notes saved or skipped, so Home and Schedule don't ask for its register.
+  it('a training with its Notes answered owes no register; a match never reads them', () => {
+    const items = (noted: string[], extra = {}) => [...coachWeek({ dates, events: [event('t', '2026-10-20', '18:00', extra)], sessions: [], inView: all, now, noted: new Set(noted) }).values()].flat()
+    expect(items([])[0]).toMatchObject({ state: 'needs-you', step: 'register' })
+    expect(items(['t'])[0]).toMatchObject({ state: 'published', note: 'Closed', step: null })
+    expect(items(['t'], { event_type: 'match' })[0]).toMatchObject({ state: 'needs-you', step: 'log' })
+  })
+
   it('a draft is publishable and only the coach sees it', () => {
     expect(one([event('d', '2026-10-23', '18:00', { published: false })])).toMatchObject({ state: 'draft', step: 'publish' })
   })

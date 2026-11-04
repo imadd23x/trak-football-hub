@@ -31,7 +31,7 @@ export function EventSummary({ form, repeat, noteProblem, squad }: {
     ...(repeat?.on && form.kind !== 'match' && !repeatProblem(form, repeat)
       ? [['Repeats', `${repeat.days.map(d => WEEKDAYS[d]).join(', ')} until ${formatEventDay(repeat.until)}`] as [string, string]] : []),
     ['Kit', form.kitSnapshot ? describeEventKit(form.kitSnapshot) : form.kit.trim() || 'None'],
-    ['Note for families', form.familyNote.trim() || 'None'],
+    ['Message to players', form.familyNote.trim() || 'None'],
   ]
   return <>
     <dl className="rounded-[14px] border border-line divide-y divide-line" style={font}>
@@ -45,7 +45,7 @@ export function EventSummary({ form, repeat, noteProblem, squad }: {
     {form.kitSnapshot && <KitAnnouncement kit={form.kitSnapshot.design} slot={form.kitSnapshot.slot} animated={false} />}
     {noteProblem && (
       <p role="status" className="text-[11px] text-warning" style={font}>
-        Families won't see this note: {noteProblem === 'link' ? 'it has a link' : 'it names a player'}.
+        Players and parents won't see this message: {noteProblem === 'link' ? 'it has a link' : 'it names a player'}.
       </p>
     )}
   </>

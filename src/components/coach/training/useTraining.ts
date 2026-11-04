@@ -1,6 +1,8 @@
+import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
+import { useFeature } from '@/components/trak/parked'
 import type { Json, Tables } from '@/integrations/supabase/types'
 import { WEEK, cleanDrill, trainingEnd, type Drill, type DrillDraft } from '@/lib/training/sessions'
 import type { SavedPractice } from '@/lib/training/plans'
@@ -205,7 +207,7 @@ export function useSaveDrill() {
   const { user } = useAuth()
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, draft }: { id?: string; draft: DrillDraft }) => {
+    mutationFn: async ({ id, draft }: { id?: string; draft: DrillDraft & Pick<MyDrill, 'part_type' | 'players_kind' | 'group_size'> }) => {
       const drill = cleanDrill(draft)
       const { error } = id
         ? await supabase.from('coach_drills').update(drill).eq('id', id).eq('coach_user_id', user!.id).select('id').single()
@@ -248,17 +250,26 @@ export function useDeleteDrill() {
 export type Notes = { again: Again | null; note: string }
 
 /** Every training the coach has answered Notes for (or skipped), by training. The database returns only their own. */
-export function useNotes() {
+export function useNotes(enabled = true) {
   const { user } = useAuth()
   return useQuery({
     queryKey: ['coach', user?.id, 'training-notes'],
-    enabled: !!user,
+    enabled: !!user && enabled,
     queryFn: async (): Promise<Map<string, Notes>> => {
       const { data, error } = await supabase.from('training_notes').select('event_id, again, note')
       if (error) throw error
       return new Map((data ?? []).map(row => [row.event_id, { again: row.again as Again | null, note: row.note }]))
     },
   })
+}
+
+const NOTHING_NOTED = new Set<string>()
+
+/** TRAK-367: the trainings with Notes saved or skipped, for the pages outside Training that ask for a register. Nothing
+ *  where Training is off. */
+export function useNotedTrainings(): Set<string> {
+  const { data } = useNotes(useFeature('training'))
+  return useMemo(() => data ? new Set(data.keys()) : NOTHING_NOTED, [data])
 }
 
 /** Saves a training's Notes; no answer and no note is a skip. Either way the training leaves the Next training card. */

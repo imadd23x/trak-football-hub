@@ -207,6 +207,35 @@ export function minuteOptions(type: PartType, minutes: number): number[] {
 }
 
 /** The list with one item moved from `from` to `to`. */
+/** What every drill says. */
+export type DrillAnswers = { name: string; how: string; kind: PlayersKind | null; size: number }
+
+export const blankAnswers = (): DrillAnswers => ({ name: '', how: '', kind: null, size: 4 })
+
+export function answerProblems({ name, how, kind }: DrillAnswers): Record<string, string> {
+  const found: Record<string, string> = {}
+  if (!name.trim()) found.name = 'Give the drill a name.'
+  if (!how.trim()) found.how = 'Say what the players do.'
+  if (!kind) found.kind = 'Say how many players it takes.'
+  return found
+}
+
+/** What makes two rows the same part, whatever their keys. */
+const sameRow = (p: Part) => JSON.stringify([p.type, p.name, p.minutes, p.drill?.name ?? null])
+
+/** TRAK-367: the parts in the same order, by what they are, not their keys. */
+export const sameOrder = (a: Part[], b: Part[]) => a.length === b.length && a.every((p, i) => sameRow(p) === sameRow(b[i]))
+
+/** TRAK-367: a saved plan read again: each part keeps the key it had, so a part just moved stays the same row on screen
+ *  (and keeps the keyboard's focus). */
+export function keepKeys(before: Part[], after: Part[]): Part[] {
+  const free = [...before]
+  return after.map(part => {
+    const at = free.findIndex(p => sameRow(p) === sameRow(part))
+    return at < 0 ? part : { ...part, key: free.splice(at, 1)[0].key }
+  })
+}
+
 export function moveTo<T>(list: T[], from: number, to: number): T[] {
   if (from === to || from < 0 || from >= list.length || to < 0 || to >= list.length) return list
   const next = [...list]

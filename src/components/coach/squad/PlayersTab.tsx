@@ -7,6 +7,7 @@ import { BANDS } from '@/lib/types'
 import { bandMoves } from '@/lib/squad/snapshot'
 import { seasonAverages } from '@/lib/squad/season-profile'
 import { seasonWindow } from '@/lib/squad/season'
+import { seasonStartLabel, useSeasonPlan } from '@/lib/season-plan'
 import { localParts, localTodayISO } from '@/lib/event-time'
 import { PlayerProfile } from './PlayerProfile'
 import { usePlayerFacts } from './usePlayerFacts'
@@ -35,7 +36,11 @@ export function PlayersTab({ roster }: { roster: SquadRoster }) {
     }
     return byPlayer
   }, [roster.assessments])
-  const season = useMemo(() => seasonAverages(roster.assessments, seasonWindow(localTodayISO()).from, dateOf), [roster.assessments])
+  // TRAK-350: the season starts when the squad's season plan says, where there is one; otherwise on 1 July.
+  const squadLabel = roster.squad ?? (roster.squads.length === 1 ? roster.squads[0] : null)
+  const seasonPlan = useSeasonPlan(user?.id, squadLabel)
+  const seasonFrom = seasonPlan.plan?.starts_on ?? seasonWindow(localTodayISO()).from
+  const season = useMemo(() => seasonAverages(roster.assessments, seasonFrom, dateOf), [roster.assessments, seasonFrom])
   // TRAK-266 (Imad, 22 Oct): the colour key only where the coach is needed: amber for a player to assess or a draft
   // families can't see yet, by Home's Needs you rule. Everyone else gets no badge.
   const owed = useMemo(() => {
@@ -58,10 +63,9 @@ export function PlayersTab({ roster }: { roster: SquadRoster }) {
     }
   })
   const squadOf = new Map(roster.players.map(p => [p.id, p.age_group?.trim() || null]))
-  const squadLabel = roster.squad ?? (roster.squads.length === 1 ? roster.squads[0] : null)
 
   return <SquadDirectory title={squadLabel ? `${squadLabel} players` : 'Players'} players={players}
     renderProfile={player => user && <PlayerProfile player={player} squad={squadOf.get(player.id) ?? squadLabel} coachId={user.id}
       facts={facts.data?.get(player.id)} factsFailed={facts.isError} onRetryFacts={() => { void facts.refetch() }}
-      season={season.players.get(player.id)} squadSeason={season.squad} />} />
+      season={season.players.get(player.id)} squadSeason={season.squad} since={seasonStartLabel(seasonFrom)} />} />
 }

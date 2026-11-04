@@ -1207,6 +1207,77 @@ export type Database = {
           },
         ]
       }
+      season_objectives: {
+        Row: {
+          created_at: string
+          id: string
+          looks_like: string
+          place: number
+          plan_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          looks_like?: string
+          place: number
+          plan_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          looks_like?: string
+          place?: number
+          plan_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "season_objectives_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "season_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      season_plans: {
+        Row: {
+          coach_user_id: string
+          created_at: string
+          ends_on: string | null
+          id: string
+          shared_at: string | null
+          squad: string
+          starts_on: string | null
+          updated_at: string
+        }
+        Insert: {
+          coach_user_id?: string
+          created_at?: string
+          ends_on?: string | null
+          id?: string
+          shared_at?: string | null
+          squad: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Update: {
+          coach_user_id?: string
+          created_at?: string
+          ends_on?: string | null
+          id?: string
+          shared_at?: string | null
+          squad?: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       session_attendance: {
         Row: {
           created_at: string | null

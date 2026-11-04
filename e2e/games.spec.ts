@@ -145,6 +145,8 @@ async function backend(context: BrowserContext, unexpected: string[], plans: Pla
       return json([...plans.entries()].filter(([key]) => key.startsWith(`line-up:${one}:`)).map(([, row]) => row))
     }
     if (path === '/rest/v1/rpc/my_session_is_live' || path === '/rest/v1/rpc/feature_on') return json(true)
+    // TRAK-350: the season plan's switch is on here, so Home asks for the squad's plan; there is none.
+    if (path === '/rest/v1/season_plans') return json([])
     if (path === '/rest/v1/coach_calendar_events') {
       const one = url.searchParams.get('id')?.replace(/^eq\./, '')
       return json(one ? MATCHES.filter(m => m.id === one) : MATCHES)

@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react'
-import { Reorder, useDragControls } from 'motion/react'
+import { Reorder, useDragControls, type DragControls } from 'motion/react'
 import { Check, GripVertical, Pencil, Plus, Search, Users, X } from 'lucide-react'
 import { fitLine, partColour, partLine, playersLine, totalMinutes, type Part, type PlanDrill } from '@/lib/training/parts'
 import { Badge } from '@/components/arc/badge/badge'
@@ -81,20 +81,31 @@ export function SessionCard({ parts, length, current, onOpen, onReorder, onMove,
   </aside>
 }
 
+/** What moves a part, in Your session and on Review: drag it, or the up and down arrow keys. `busy` ignores both for now,
+ *  without taking the keyboard's focus off it. */
+function MoveHandle({ name, index, count, controls, onMove, busy = false }: {
+  name: string; index: number; count: number; controls: DragControls; onMove: (by: -1 | 1) => void; busy?: boolean
+}) {
+  const keys = (event: KeyboardEvent) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    event.preventDefault()
+    if (busy) return
+    if (event.key === 'ArrowUp' && index > 0) onMove(-1)
+    if (event.key === 'ArrowDown' && index < count - 1) onMove(1)
+  }
+  return <button type="button" aria-label={`Move ${name}. Use the up and down arrow keys.`} title="Drag to move" onKeyDown={keys}
+    onPointerDown={event => { if (!busy && typeof (event.target as Element).setPointerCapture === 'function') controls.start(event) }} style={{ touchAction: 'none' }}
+    className="inline-flex h-11 w-7 flex-none cursor-grab items-center justify-center rounded-lg text-ink-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+    <GripVertical aria-hidden size={16} /></button>
+}
+
 function SessionRow({ part, index, count, state, onOpen, onMove, onRemove }: {
   part: Part; index: number; count: number; state: 'now' | 'done' | 'next'; onOpen: () => void; onMove: (by: -1 | 1) => void; onRemove: () => void
 }) {
   const controls = useDragControls()
-  const keys = (event: KeyboardEvent) => {
-    if (event.key === 'ArrowUp' && index > 0) { event.preventDefault(); onMove(-1) }
-    if (event.key === 'ArrowDown' && index < count - 1) { event.preventDefault(); onMove(1) }
-  }
   return <Reorder.Item as="li" value={part} dragListener={false} dragControls={controls}
     className="flex items-center gap-1 rounded-xl bg-surface">
-    <button type="button" aria-label={`Move ${part.name}. Use the up and down arrow keys.`} title="Drag to move" onKeyDown={keys}
-      onPointerDown={event => { if (typeof (event.target as Element).setPointerCapture === 'function') controls.start(event) }} style={{ touchAction: 'none' }}
-      className="inline-flex h-11 w-7 flex-none cursor-grab items-center justify-center rounded-lg text-ink-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-      <GripVertical aria-hidden size={16} /></button>
+    <MoveHandle name={part.name} index={index} count={count} controls={controls} onMove={onMove} />
     <button type="button" onClick={onOpen} aria-current={state === 'now' ? 'step' : undefined}
       className={`flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${state === 'now' ? 'bg-brand/10' : 'hover:bg-raised'}`}>
       <span className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full border border-line text-[12px] text-ink-2">
@@ -115,29 +126,39 @@ function SessionRow({ part, index, count, state, onOpen, onMove, onRemove }: {
 
 
 /** The plan as a list: each part's minutes, name, drill and players, with Edit (or Pick a drill) and ×. TRAK-341: the
- *  planner's Review step and a saved plan's Review page show the same list. */
-export function PlanRows({ parts, onEdit, onRemove, busy = false }: {
-  parts: Part[]; onEdit: (index: number) => void; onRemove: (index: number) => void; busy?: boolean
+ *  planner's Review step and a saved plan's Review page show the same list. TRAK-367 (Kostas, 3 Nov): a part moves here
+ *  as it does in Your session. `onDrop` is the end of a drag. */
+export function PlanRows({ parts, onEdit, onRemove, onReorder, onMove, onDrop, busy = false }: {
+  parts: Part[]; onEdit: (index: number) => void; onRemove: (index: number) => void; onReorder: (parts: Part[]) => void
+  onMove: (index: number, by: -1 | 1) => void; onDrop?: () => void; busy?: boolean
 }) {
   if (!parts.length) return <p className="py-3 text-[15px] text-ink-2">No parts in this plan yet. Add one below.</p>
-  return <ol aria-label="The plan" className="grid divide-y divide-line">
-    {parts.map((part, i) => {
-      // TRAK-342: once Who's here set it up for the players who came, that set-up shows instead.
-      const players = part.drill?.numbers.trim() ? `Today: ${part.drill.numbers.trim()}` : part.drill ? playersLine(part.drill) : null
-      return <li key={part.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-        <span className="w-10 flex-none text-center text-base font-medium text-ink">{part.minutes}<span className="block text-[11px] font-normal text-ink-3">min</span></span>
-        <span className="grid min-w-0 flex-[1_1_14rem] gap-0.5">
-          <span className="flex items-center gap-1.5 text-[13px] text-ink-3">
-            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: partColour(i, parts.length) }} />{partLine(part, i)}</span>
-          <span className={`text-[15px] font-medium break-words ${part.drill ? 'text-ink' : 'text-ink-3'}`}>{part.drill?.name ?? 'No drill yet'}</span>
-          {players && <span className="text-[13px] text-ink-3">{players}</span>}
-        </span>
-        <span className="flex flex-none gap-1">
-          <Button size="sm" variant="ghost" disabled={busy} aria-label={`${part.drill ? 'Edit' : 'Pick a drill for'} ${part.name}`} onClick={() => onEdit(i)}>
-            <Pencil aria-hidden size={14} />{part.drill ? 'Edit' : 'Pick a drill'}</Button>
-          <Button size="sm" variant="ghost" disabled={busy} aria-label={`Remove ${part.name}`} onClick={() => onRemove(i)}><X aria-hidden size={16} /></Button>
-        </span>
-      </li>
-    })}
-  </ol>
+  return <Reorder.Group as="ol" axis="y" values={parts} onReorder={onReorder} aria-label="The plan" className="grid divide-y divide-line">
+    {parts.map((part, i) => <PlanRow key={part.key} part={part} index={i} count={parts.length} onEdit={() => onEdit(i)}
+      onRemove={() => onRemove(i)} onMove={by => onMove(i, by)} onDrop={onDrop} busy={busy} />)}
+  </Reorder.Group>
+}
+
+function PlanRow({ part, index, count, onEdit, onRemove, onMove, onDrop, busy }: {
+  part: Part; index: number; count: number; onEdit: () => void; onRemove: () => void; onMove: (by: -1 | 1) => void; onDrop?: () => void; busy: boolean
+}) {
+  const controls = useDragControls()
+  // TRAK-342: once Who's here set it up for the players who came, that set-up shows instead.
+  const players = part.drill?.numbers.trim() ? `Today: ${part.drill.numbers.trim()}` : part.drill ? playersLine(part.drill) : null
+  return <Reorder.Item as="li" value={part} dragListener={false} dragControls={controls} onDragEnd={onDrop}
+    className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-surface py-3">
+    <MoveHandle name={part.name} index={index} count={count} controls={controls} onMove={onMove} busy={busy} />
+    <span className="w-10 flex-none text-center text-base font-medium text-ink">{part.minutes}<span className="block text-[11px] font-normal text-ink-3">min</span></span>
+    <span className="grid min-w-0 flex-[1_1_11rem] gap-0.5">
+      <span className="flex items-center gap-1.5 text-[13px] text-ink-3">
+        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: partColour(index, count) }} />{partLine(part, index)}</span>
+      <span className={`text-[15px] font-medium break-words ${part.drill ? 'text-ink' : 'text-ink-3'}`}>{part.drill?.name ?? 'No drill yet'}</span>
+      {players && <span className="text-[13px] text-ink-3">{players}</span>}
+    </span>
+    <span className="flex flex-none gap-1">
+      <Button size="sm" variant="ghost" disabled={busy} aria-label={`${part.drill ? 'Edit' : 'Pick a drill for'} ${part.name}`} onClick={onEdit}>
+        <Pencil aria-hidden size={14} />{part.drill ? 'Edit' : 'Pick a drill'}</Button>
+      <Button size="sm" variant="ghost" disabled={busy} aria-label={`Remove ${part.name}`} onClick={onRemove}><X aria-hidden size={16} /></Button>
+    </span>
+  </Reorder.Item>
 }

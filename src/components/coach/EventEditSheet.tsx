@@ -359,17 +359,17 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
           </Field>}
 
           <div className="space-y-1">
-            <Field label="Note for families">
+            <Field label="Message to players">
               <input value={sheet.form.familyNote} onChange={e => setForm({ familyNote: e.target.value })}
                 maxLength={FAMILY_NOTE_MAX} aria-describedby={noteProblem ? "family-note-hint family-note-problem" : "family-note-hint"}
                 placeholder="e.g. Bring extra water, it's a hot day" className={inputClass} style={font} />
             </Field>
             <p id="family-note-hint" className="text-[11px] text-ink-3" style={font}>
-              Players and parents see this. A note with a player's name or a link isn't shown to them.
+              Players and parents see this. A message with a player's name or a link isn't shown to them.
             </p>
             {noteProblem && (
               <p id="family-note-problem" role="status" className="text-[11px] text-warning" style={font}>
-                Families won't see this note: {noteProblem === 'link' ? 'it has a link' : 'it names a player'}.
+                Players and parents won't see this message: {noteProblem === 'link' ? 'it has a link' : 'it names a player'}.
               </p>
             )}
           </div>

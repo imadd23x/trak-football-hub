@@ -75,7 +75,7 @@ In Coach Schedule, open Add event (or Edit), then For families. Set up or edit
 the squad's three kits, save the set, and choose one for the event. The event
 Review shows that exact design. Saving templates alone does not select a kit.
 Use text instructions instead for bibs or other clothing; extra instructions
-belong in Note for families. Match venue and kit choice are independent.
+belong in Message to players. Match venue and kit choice are independent.
 
 `coach_team_kits` stores a versioned set per academy, coach and roster squad;
 an empty squad key means the whole roster, matching a null event squad. RLS

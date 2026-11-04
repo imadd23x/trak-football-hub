@@ -3,7 +3,7 @@ import { Check, Plus, Users } from 'lucide-react'
 import { DRILL_LIMITS, blankDrill } from '@/lib/training/sessions'
 import { PART_TYPES, type PartType } from '@/lib/training/shelf'
 import {
-  PART_NAME_MAX, drillKey, fromMyDrill, isSameDrill, playersLine, tagFor, type Part, type PlanDrill, type PlayersKind, type Usage,
+  PART_NAME_MAX, answerProblems, blankAnswers, drillKey, fromMyDrill, isSameDrill, playersLine, tagFor, type DrillAnswers, type Part, type PlanDrill, type PlayersKind, type Usage,
 } from '@/lib/training/parts'
 import { useAddDrill } from './useTraining'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
@@ -109,27 +109,46 @@ const KINDS: { value: PlayersKind; label: string }[] = [
   { value: 'any', label: 'Any number' }, { value: 'pairs', label: 'In pairs' }, { value: 'groups', label: 'In groups' }, { value: 'teams', label: 'Two teams' },
 ]
 
+/** The same three questions wherever a coach writes a drill (TRAK-367): Write your own, New drill, Edit drill. */
+export function DrillQuestions({ answers, onChange, errors }: { answers: DrillAnswers; onChange: (change: Partial<DrillAnswers>) => void; errors: Record<string, string> }) {
+  const { name, how, kind, size } = answers
+  return <>
+    <Input label="1. Name it" description="Short, and says what happens. For example: Rondo 4 v 2 with a target." value={name}
+      maxLength={DRILL_LIMITS.name} autoComplete="off" error={errors.name} onChange={e => onChange({ name: e.target.value })} />
+    <Textarea label="2. What do the players do?" rows={3} maxLength={DRILL_LIMITS.how} value={how} error={errors.how}
+      description="One or two sentences. Set-up first, then the action. For example: 15 × 15 m square. Four keep the ball from two; five passes in a row is a point."
+      onChange={e => onChange({ how: e.target.value })} />
+    <div className="grid justify-items-start gap-2">
+      <p aria-hidden="true" className="text-sm font-medium text-ink">3. How many players?</p>
+      <p className="text-sm text-ink-3">Trak uses this to adjust the drill when fewer players turn up.</p>
+      <SegmentedControl label="3. How many players?" value={kind ?? ''} options={KINDS} onValueChange={value => onChange({ kind: value as PlayersKind })} />
+      {kind === 'groups' && <div className="flex items-center gap-3">
+        <span id="group-size" className="text-sm text-ink-2">Players in each group</span>
+        <Button type="button" size="sm" variant="secondary" aria-label="One fewer" disabled={size <= 2} onClick={() => onChange({ size: size - 1 })}>−</Button>
+        <span aria-labelledby="group-size" className="w-6 text-center text-base font-medium text-ink">{size}</span>
+        <Button type="button" size="sm" variant="secondary" aria-label="One more" disabled={size >= 12} onClick={() => onChange({ size: size + 1 })}>+</Button>
+      </div>}
+      {errors.kind && <p role="alert" className="text-sm text-danger">{errors.kind}</p>}
+    </div>
+  </>
+}
+
 /** Write your own: the same three things as every drill. Ticked (the default), it's saved to My drills under this part
  *  straight away; otherwise it lives only in this plan. */
 export function OwnDrillSheet({ part, onClose, onSaved }: { part: Part | null; onClose: () => void; onSaved: (drill: PlanDrill) => void }) {
   const add = useAddDrill()
-  const [name, setName] = useState('')
-  const [how, setHow] = useState('')
-  const [kind, setKind] = useState<PlayersKind | null>(null)
-  const [size, setSize] = useState(4)
+  const [answers, setAnswers] = useState(blankAnswers)
   const [keep, setKeep] = useState(true)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [failed, setFailed] = useState(false)
-  useEffect(() => { if (part) { setName(''); setHow(''); setKind(null); setSize(4); setKeep(true); setErrors({}); setFailed(false) } }, [part?.key]) // eslint-disable-line react-hooks/exhaustive-deps -- a new part starts afresh
+  useEffect(() => { if (part) { setAnswers(blankAnswers()); setKeep(true); setErrors({}); setFailed(false) } }, [part?.key]) // eslint-disable-line react-hooks/exhaustive-deps -- each opening starts blank
   if (!part) return null
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    const found: Record<string, string> = {}
-    if (!name.trim()) found.name = 'Give the drill a name.'
-    if (!how.trim()) found.how = 'Say what the players do.'
-    if (!kind) found.kind = 'Say how many players it takes.'
+    const found = answerProblems(answers)
     setErrors(found)
     if (Object.keys(found).length) return
+    const { name, how, kind, size } = answers
     const draft = { ...blankDrill(), name: name.trim(), how: how.trim(), minutes: part.minutes }
     const players = { players_kind: kind, group_size: kind === 'groups' ? size : null }
     if (!keep) {
@@ -145,23 +164,7 @@ export function OwnDrillSheet({ part, onClose, onSaved }: { part: Part | null; o
   return <BottomSheet className="arc" open onOpenChange={next => { if (!next) onClose() }} detents={[0.92]} title="Write your own drill"
     description="Every drill in Trak has the same three things: a name, what the players do, and how many players. Fill them in and yours will look like all the others.">
     <form noValidate onSubmit={submit} aria-label="Write your own drill" className="grid gap-5 pb-4">
-      <Input label="1. Name it" description="Short, and says what happens. For example: Rondo 4 v 2 with a target." value={name}
-        maxLength={DRILL_LIMITS.name} autoComplete="off" error={errors.name} onChange={e => setName(e.target.value)} />
-      <Textarea label="2. What do the players do?" rows={3} maxLength={DRILL_LIMITS.how} value={how} error={errors.how}
-        description="One or two sentences. Set-up first, then the action. For example: 15 × 15 m square. Four keep the ball from two; five passes in a row is a point."
-        onChange={e => setHow(e.target.value)} />
-      <div className="grid justify-items-start gap-2">
-        <p aria-hidden="true" className="text-sm font-medium text-ink">3. How many players?</p>
-        <p className="text-sm text-ink-3">Trak uses this to adjust the drill when fewer players turn up.</p>
-        <SegmentedControl label="3. How many players?" value={kind ?? ''} options={KINDS} onValueChange={value => setKind(value as PlayersKind)} />
-        {kind === 'groups' && <div className="flex items-center gap-3">
-          <span id="group-size" className="text-sm text-ink-2">Players in each group</span>
-          <Button type="button" size="sm" variant="secondary" aria-label="One fewer" disabled={size <= 2} onClick={() => setSize(size - 1)}>−</Button>
-          <span aria-labelledby="group-size" className="w-6 text-center text-base font-medium text-ink">{size}</span>
-          <Button type="button" size="sm" variant="secondary" aria-label="One more" disabled={size >= 12} onClick={() => setSize(size + 1)}>+</Button>
-        </div>}
-        {errors.kind && <p role="alert" className="text-sm text-danger">{errors.kind}</p>}
-      </div>
+      <DrillQuestions answers={answers} onChange={change => setAnswers(a => ({ ...a, ...change }))} errors={errors} />
       <Checkbox label="Save it to My drills, so I can use it again" checked={keep} onCheckedChange={on => setKeep(on === true)} />
       {failed && <p role="alert" className="text-[15px] text-danger">Couldn’t save the drill. Check your connection and try again. Nothing you typed is lost.</p>}
       <p className="text-sm text-ink-3">It goes next to the other drills for {part.name}.</p>

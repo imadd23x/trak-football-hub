@@ -227,7 +227,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     expect(placeOf('/coach/matches')).toEqual({ screen: 'games', title: 'Matches' }) // TRAK-283
     expect(placeOf('/coach/matches/ev-1')).toEqual({ screen: 'games', title: 'Matches' })
     expect(placeOf('/coach/training')).toEqual({ screen: 'training', title: 'Training' }) // TRAK-294
-    expect(placeOf('/coach/training/drills')).toEqual({ screen: 'training', title: 'Training' })
+    expect(placeOf('/coach/training/drills')).toEqual({ screen: 'training', title: 'Drills' }) // TRAK-367
     expect(placeOf('/coach/trainings/defending')).toEqual({ screen: 'library', title: 'Library' })
     expect(placeOf('/coach/player/abc')).toEqual({ screen: 'squad', title: 'Player' })
     expect(placeOf('/coach/sessions/list')).toEqual({ screen: 'home', title: 'Log' })

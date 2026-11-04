@@ -4,7 +4,7 @@ import { LayoutGroup } from 'motion/react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar } from '@/components/trak'
-import { Avatar } from '@/components/arc/avatar/avatar'
+import { PlayerFace } from '@/components/trak/PlayerFace'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { QuickAdd } from '@/components/coach/QuickAdd'
 import { useCoachSquad } from '@/lib/coach-squad'
@@ -152,7 +152,7 @@ export default function CoachFeedbackPage() {
                   style={{ background: 'rgb(var(--t-raised))', borderLeft: `3px solid ${LEVEL[row.level].color}` }}
                   // TRAK-179: the player's profile, as Squad → Open profile.
                   {...openable(`Open ${row.name}'s profile: ${LEVEL[row.level].word}`, () => navigate(`/coach/player/${row.playerId}`))}>
-                  <Avatar name={row.name} size="sm" className="arc flex-shrink-0" aria-hidden />
+                  <PlayerFace name={row.name} size="sm" className="arc flex-shrink-0" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-[13px] font-medium text-ink" style={{ fontFamily: 'var(--t-font)' }}>{row.name}</span>
@@ -210,7 +210,7 @@ function FeedbackTable({ rows, show, onShow, onOpen, onAssess }: {
               <td className="py-2.5 pr-3">
                 <button type="button" onClick={() => onOpen(row.playerId)} aria-label={`Open ${row.name}'s profile`}
                   className="flex items-center gap-3 text-left text-[13px] font-medium text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
-                  <Avatar name={row.name} size="sm" className="arc flex-shrink-0" aria-hidden />
+                  <PlayerFace name={row.name} size="sm" className="arc flex-shrink-0" aria-hidden />
                   {row.name}
                 </button>
               </td>

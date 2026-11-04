@@ -5,7 +5,7 @@ import { Ban, Check, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { publishEvent } from '@/lib/event-publish'
-import { Avatar } from '@/components/arc/avatar/avatar'
+import { FaceDrawing, PlayerFace } from '@/components/trak/PlayerFace'
 import { AvatarGroup } from '@/components/arc/avatar-group/avatar-group'
 import { TakeRegister } from '@/components/coach/TakeRegister'
 import { startedLocked, type EventRow } from '@/lib/coach-events'
@@ -93,7 +93,7 @@ export function People({ heading, people }: { heading: string; people: Person[] 
     {people.length > 0 && <>
       <button type="button" aria-expanded={open} aria-label={`${open ? 'Hide' : 'Show'} names: ${heading}`}
         onClick={() => setOpen(o => !o)} className="arc rounded-full focus-visible:ring-2 focus-visible:ring-primary">
-        <AvatarGroup members={people.map(p => ({ name: p.name }))} max={6} size="sm" label={heading} />
+        <AvatarGroup members={people.map(p => ({ name: p.name, fallback: <FaceDrawing name={p.name} /> }))} max={6} size="sm" label={heading} />
       </button>
       {open && (
         <ul aria-label={heading} className="mt-3 space-y-2">
@@ -214,7 +214,7 @@ export function EventSheetCoach({ event, coachId, onChanged }: { event: StripEve
               <ul className="space-y-2">
                 {squad.data.away.map(p => (
                   <li key={p.id} className="flex items-center gap-3">
-                    <Avatar name={p.name} size="sm" className="arc" aria-hidden />
+                    <PlayerFace name={p.name} size="sm" className="arc" aria-hidden />
                     <span className="text-[14px] text-ink">{p.name}</span>
                     {p.reason && <span className="text-[12px] text-ink-2 truncate">{p.reason}</span>}
                   </li>

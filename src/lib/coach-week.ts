@@ -50,7 +50,7 @@ const kindOf = (type: string | null | undefined): WeekItem['kind'] =>
   type === 'match' || type === 'training' ? type : 'other'
 
 /** The week's items by date, in time order. `inView` is the squad filter; clashes count every squad, as the database does. */
-export function coachWeek({ dates, events, sessions, inView, now = new Date(), evaluated = null, published }: {
+export function coachWeek({ dates, events, sessions, inView, now = new Date(), evaluated = null, published, noted }: {
   dates: string[]
   events: EventRow[]
   sessions: WeekSession[]
@@ -60,6 +60,8 @@ export function coachWeek({ dates, events, sessions, inView, now = new Date(), e
   evaluated?: Set<string> | null
   /** TRAK-289: the matches whose evaluation is published: their session opens the review, never the old log. */
   published?: Set<string>
+  /** TRAK-367: the trainings with their Notes saved or skipped. Those are closed (Training's rule), so no register is owed. */
+  noted?: Set<string>
 }): Map<string, WeekItem[]> {
   const clashes = draftClashes(events)
   const done = new Set(sessions.map(s => s.event_id).filter(Boolean))
@@ -84,6 +86,7 @@ export function coachWeek({ dates, events, sessions, inView, now = new Date(), e
       else items.push({ ...base, state: 'needs-you', note: 'Evaluate the match', step: 'evaluate' })
     }
     else if (kind === 'match') items.push({ ...base, state: 'needs-you', note: 'Log the match', step: 'log' })
+    else if (kind === 'training' && noted?.has(row.id)) items.push({ ...base, state: 'published', note: 'Closed', step: null })
     else if (!registerProblem(row, now)) items.push({ ...base, state: 'needs-you', note: 'Take the register', step: 'register' })
     else items.push({ ...base, state: 'published', note: 'Published', step: null })
   }

@@ -175,7 +175,8 @@ function PlannerBody({ training, saved, draft, past, drills }: {
 
   return <div className="grid gap-5 pt-5">
     <header className="arc grid gap-2">
-      <CoachTrail current="Plan session" />
+      {/* TRAK-367: the trail says which training; its name can be long, so by its day. */}
+      <CoachTrail current={`Plan session · ${day}`} />
       <h1 className="text-[24px] font-medium tracking-[-0.01em] text-ink break-words">{start.only && part
         ? `${start.only === 'add' ? 'Add' : 'Edit'}: ${part.name}` : `Plan session: ${training.title}`}</h1>
       <p className="text-sm text-ink-2">{[start.only ? training.title : null, day, time, training.venue, length ? `${length} min` : null].filter(Boolean).join(' · ')}</p>
@@ -250,7 +251,8 @@ function PlannerBody({ training, saved, draft, past, drills }: {
           </>}
         </div>
       </section> : <Review parts={parts} length={length} note={note} onNote={value => { setNote(value); setDirty(true) }}
-        onEdit={i => { setFromReview(true); go(i) }} onRemove={remove} onAdd={() => setSheet('add')}
+        onEdit={i => { setFromReview(true); go(i) }} onRemove={remove} onReorder={setParts} onMove={(i, by) => setParts(moveTo(parts, i, i + by))}
+        onAdd={() => setSheet('add')}
         onBack={() => parts.length ? go(parts.length - 1) : leave()} onDraft={keepDraft} onSave={save}
         saving={savePlan.isPending} drafting={saveDraft.isPending} />}
 
@@ -271,9 +273,10 @@ function PlannerBody({ training, saved, draft, past, drills }: {
 }
 
 /** The last step, and a saved plan opened again: the whole plan, a part to change, remove or add, and a note. */
-function Review({ parts, length, note, onNote, onEdit, onRemove, onAdd, onBack, onDraft, onSave, saving, drafting }: {
+function Review({ parts, length, note, onNote, onEdit, onRemove, onReorder, onMove, onAdd, onBack, onDraft, onSave, saving, drafting }: {
   parts: Part[]; length: number | null; note: string; onNote: (note: string) => void; onEdit: (index: number) => void
-  onRemove: (index: number) => void; onAdd: () => void; onBack: () => void; onDraft: () => void; onSave: () => void
+  onRemove: (index: number) => void; onReorder: (parts: Part[]) => void; onMove: (index: number, by: -1 | 1) => void
+  onAdd: () => void; onBack: () => void; onDraft: () => void; onSave: () => void
   saving: boolean; drafting: boolean
 }) {
   return <section aria-labelledby="review" className="arc grid min-w-0 gap-4 rounded-2xl border border-line bg-surface p-5">
@@ -285,7 +288,7 @@ function Review({ parts, length, note, onNote, onEdit, onRemove, onAdd, onBack, 
       <TotalLine parts={parts} length={length} />
     </div>
     <TimeBar parts={parts} length={length} />
-    <PlanRows parts={parts} onEdit={onEdit} onRemove={onRemove} />
+    <PlanRows parts={parts} onEdit={onEdit} onRemove={onRemove} onReorder={onReorder} onMove={onMove} />
     <div><Button size="sm" variant="secondary" onClick={onAdd}><Plus aria-hidden size={16} />Add a part</Button></div>
     {/* Kostas, 30 Oct: one optional note at the end, not one per drill. */}
     <Textarea label="A note for you (optional)" description="Anything to remember on the day. Only you see it." rows={2} maxLength={NOTE_MAX}
@@ -308,7 +311,7 @@ function OnTheDay({ parts, title = 'On the day' }: { parts: Part[]; title?: stri
     <div className="grid gap-1.5 rounded-xl bg-raised p-4">
       <p className="flex justify-between text-sm"><span className="font-medium text-ink">Training plan</span><span className="text-ink-3">{totalMinutes(parts)} min</span></p>
       {parts.filter(p => p.drill).map(p => <p key={p.key} className="flex justify-between gap-3 text-sm text-ink-2">
-        <span className="truncate">{p.drill!.name}</span><span className="flex-none">{p.minutes} min</span></p>)}
+        <span className="truncate">{p.name === p.drill!.name ? p.name : `${p.name} · ${p.drill!.name}`}</span><span className="flex-none">{p.minutes} min</span></p>)}
     </div>
     <p className="text-sm text-ink-3">Planned for your whole squad.</p>
   </aside>

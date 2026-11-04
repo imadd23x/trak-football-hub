@@ -18,3 +18,5 @@ export const ON_LIBRARY_BUTTON = 'rgb(0 0 0 / 0.22)'
 export const ON_TINT_BUTTON = 'rgb(255 255 255 / 0.7)'
 /** TRAK-334: a page's trail (CoachTrail) on a library's colour: white, as the header's own text, with ring-white chevrons. */
 export const ON_COLOUR_TRAIL = { '--text-secondary': ON_LIBRARY, '--text-muted': ON_LIBRARY, '--accent-strong': ON_LIBRARY, '--border-strong': ON_LIBRARY_RING } as CSSProperties
+/** TRAK-349: the hair on a player's drawn face (lib/player-face.ts), from the mockup. Hair is hair in every theme. */
+export const HAIR_COLOURS = ['#1F1A17', '#3B2A1F', '#6B4428', '#A8763E', '#2B2B2B'] as const

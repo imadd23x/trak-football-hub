@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ClipboardList, Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -6,7 +6,7 @@ import { registerProblem } from '@/lib/event-register'
 import { DRILL_DETAILS, trainingEnd, trainingMinutes } from '@/lib/training/sessions'
 import { loopNote, loopState, practiceStarts } from '@/lib/training/loop'
 import { fromSaved, herePath, overTime, planPath, viewPath, type PlannerState, type Practice } from '@/lib/training/plans'
-import { partsFromSaved, totalMinutes } from '@/lib/training/parts'
+import { keepKeys, moveTo, partsFromSaved, sameOrder, totalMinutes, type Part } from '@/lib/training/parts'
 import { gameWhen } from '@/components/coach/games/useGames'
 import { useNotes, usePlan, useRegisters, useSavePlan, useTraining, type Plan, type Training } from '@/components/coach/training/useTraining'
 import { PlanRows, TimeBar, TotalLine } from '@/components/coach/training/PlannerParts'
@@ -170,14 +170,18 @@ export function WhosHereRoute() {
 /* ── Review (TRAK-341) ──────────────────────────────────────────────────────── */
 
 /** A saved plan, to review and change part by part (Kostas, 30 Oct): Edit opens only that part in the planner, ×
- *  removes one at once (with Undo), Add a part adds one. Each change saves the plan whole. */
+ *  removes one at once (with Undo), Add a part adds one. TRAK-367 (Kostas, 3 Nov): a part moves as it does while
+ *  planning, saved once it lands. Each change saves the plan whole. */
 function SavedReview({ training, plan, cancelled }: { training: Training; plan: Plan; cancelled: boolean }) {
   const navigate = useNavigate()
   const save = useSavePlan(training.id)
   const [adding, setAdding] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
-  // Read once per saved plan, so each part keeps its key between renders.
-  const parts = useMemo(() => partsFromSaved(plan.practices), [plan.practices])
+  // Read once per saved plan, and each part keeps its key when the plan comes back saved: a part just moved stays the
+  // same row, with the keyboard's focus on it. Held here so a part can move before it's saved.
+  const [parts, setParts] = useState(() => partsFromSaved(plan.practices))
+  const [read, setRead] = useState(plan.practices)
+  if (read !== plan.practices) { setRead(plan.practices); setParts(keepKeys(parts, partsFromSaved(plan.practices))) }
   const length = trainingMinutes(training)
   const over = overTime(totalMinutes(parts), length)
   const edit = (index: number) => navigate(planPath(training.id), { state: { editPart: index } satisfies PlannerState })
@@ -190,6 +194,19 @@ function SavedReview({ training, plan, cancelled }: { training: Training; plan: 
       onError: () => setProblem('Couldn’t remove it. Check your connection and try again.'),
     })
   }
+  const saveOrder = (next: Part[]) => {
+    setProblem(null)
+    save.mutate({ parts: next, note: plan.note }, {
+      onError: () => { setParts(keepKeys(next, partsFromSaved(plan.practices))); setProblem('Couldn’t move it. Check your connection and try again.') },
+    })
+  }
+  const move = (index: number, by: -1 | 1) => {
+    if (save.isPending) return
+    const next = moveTo(parts, index, index + by)
+    setParts(next)
+    saveOrder(next)
+  }
+  const drop = () => { if (!sameOrder(parts, partsFromSaved(plan.practices))) saveOrder(parts) }
   return <div className="mt-6 grid gap-5 laptop:grid-cols-[minmax(0,1fr)_320px] laptop:items-start">
     <section aria-labelledby="review" className="arc grid min-w-0 gap-4 rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -202,7 +219,7 @@ function SavedReview({ training, plan, cancelled }: { training: Training; plan: 
       {cancelled
         ? <ol aria-label="The plan" className="grid divide-y divide-line">{parts.map((part, i) => <li key={part.key} className="py-3 text-[15px] text-ink">
             {part.minutes} min · {part.drill?.name}</li>)}</ol>
-        : <PlanRows parts={parts} onEdit={edit} onRemove={remove} busy={save.isPending} />}
+        : <PlanRows parts={parts} onEdit={edit} onRemove={remove} onReorder={setParts} onMove={move} onDrop={drop} busy={save.isPending} />}
       {!cancelled && <div><Button size="sm" variant="secondary" onClick={() => setAdding(true)}><Plus aria-hidden size={16} />Add a part</Button></div>}
       {plan.note && <div className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2"><span className="font-medium text-ink">Your note:</span> {plan.note}</div>}
     </section>

@@ -145,7 +145,8 @@ describe('TRAK-294: Training home', { timeout: 20_000 }, () => {
 })
 
 describe('TRAK-294: My drills', { timeout: 20_000 }, () => {
-  it('New drill saves a drill with its details, trimmed, and it shows first in My drills', async () => {
+  // TRAK-367: the same questions as the planner's Write your own, plus the part, which puts it among that part's drills.
+  it('New drill asks what Write your own asks, and the part; it saves trimmed and shows first in My drills', async () => {
     const user = userEvent.setup()
     eventsRead([])
     const sent = drillsTable([drill('d-1', 'Rondos 4v1', { how: 'Four round one' })])
@@ -154,23 +155,23 @@ describe('TRAK-294: My drills', { timeout: 20_000 }, () => {
 
     await user.click(screen.getByRole('button', { name: 'New drill' }))
     const sheet = await screen.findByRole('dialog', { name: 'New drill' })
-    await user.type(within(sheet).getByLabelText('Name'), '  1v1 in channels ')
-    await user.click(within(sheet).getByRole('button', { name: '20' }))
-    await user.type(within(sheet).getByLabelText('How it works'), 'Four channels, 10 m wide.')
-    await user.click(within(sheet).getByText('Add details'))
-    await user.type(within(sheet).getByLabelText('Area'), '10 × 20 m')
+    await user.type(within(sheet).getByLabelText(/1\. Name it/), '  1v1 in channels ')
+    await user.type(within(sheet).getByLabelText(/2\. What do the players do/), 'Four channels, 10 m wide.')
+    await user.click(within(sheet).getByRole('button', { name: 'In pairs' }))
+    await user.click(within(sheet).getByRole('button', { name: 'Finishing' }))
     await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New drill' })).toBeNull())
     expect(sent).toHaveLength(1)
     expect(sent[0].body).toEqual({
-      name: '1v1 in channels', minutes: 20, how: 'Four channels, 10 m wide.', tell: '',
-      area: '10 × 20 m', numbers: '', direction: '', targets: '', conditions: '',
+      name: '1v1 in channels', minutes: 15, how: 'Four channels, 10 m wide.', tell: '',
+      area: '', numbers: '', direction: '', targets: '', conditions: '',
+      part_type: 'finishing', players_kind: 'pairs', group_size: null,
     })
-    await waitFor(() => expect(myDrills()).toEqual(['1v1 in channels, 20 min. Edit', 'Rondos 4v1, 15 min. Edit']))
+    await waitFor(() => expect(myDrills()).toEqual(['1v1 in channels, 15 min. Edit', 'Rondos 4v1, 15 min. Edit']))
   })
 
-  it('a drill needs a name; a failed save keeps everything typed and says so', async () => {
+  it('a drill needs its three answers; a failed save keeps everything typed and says so', async () => {
     const user = userEvent.setup()
     eventsRead([])
     drillsTable([])
@@ -181,32 +182,36 @@ describe('TRAK-294: My drills', { timeout: 20_000 }, () => {
     await user.click(screen.getByRole('button', { name: 'New drill' }))
     const sheet = await screen.findByRole('dialog', { name: 'New drill' })
     await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
-    expect(await within(sheet).findByRole('alert')).toHaveTextContent('Give the drill a name.')
+    expect(await within(sheet).findByText('Give the drill a name.')).toBeInTheDocument()
+    expect(within(sheet).getByText('Say what the players do.')).toBeInTheDocument()
+    expect(within(sheet).getByText('Say how many players it takes.')).toBeInTheDocument()
 
-    await user.type(within(sheet).getByLabelText('Name'), 'Finishing 3v2')
+    await user.type(within(sheet).getByLabelText(/1\. Name it/), 'Finishing 3v2')
+    await user.type(within(sheet).getByLabelText(/2\. What do the players do/), 'Three attack two.')
+    await user.click(within(sheet).getByRole('button', { name: 'Any number' }))
     await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
-    await waitFor(() => expect(within(sheet).getByRole('alert')).toHaveTextContent(/Couldn't save the drill/))
-    expect(within(sheet).getByLabelText('Name')).toHaveValue('Finishing 3v2')
+    expect(await within(sheet).findByText(/Couldn't save the drill/)).toBeInTheDocument()
+    expect(within(sheet).getByLabelText(/1\. Name it/)).toHaveValue('Finishing 3v2')
   })
 
-  it("a drill opens to change it, and Delete asks first; each write names the coach's own drill", async () => {
+  it("a drill opens to change it, keeping what the form doesn't ask; Delete asks first; each write names the coach's own drill", async () => {
     const user = userEvent.setup()
     eventsRead([])
-    const sent = drillsTable([drill('d-1', 'Rondos 4v1', { area: '10 × 10 m' }), drill('d-2', 'Possession 6v6 + 2')])
+    const sent = drillsTable([drill('d-1', 'Rondos 4v1', { how: 'Four round one', area: '10 × 10 m', minutes: 20, players_kind: 'groups', group_size: 5, part_type: 'rondo' }),
+      drill('d-2', 'Possession 6v6 + 2')])
     renderApp('/coach/training/drills')
-    await user.click(await screen.findByRole('button', { name: 'Rondos 4v1, 15 min. Edit' }))
+    await user.click(await screen.findByRole('button', { name: 'Rondos 4v1, 20 min. Edit' }))
     let sheet = await screen.findByRole('dialog', { name: 'Edit drill' })
-    // A drill with details opens with them showing.
-    expect(within(sheet).getByLabelText('Area')).toHaveValue('10 × 10 m')
-    await user.click(within(sheet).getByRole('button', { name: '25' }))
+    expect(within(sheet).getByLabelText(/1\. Name it/)).toHaveValue('Rondos 4v1')
+    expect(within(sheet).getByRole('button', { name: 'Rondo' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(sheet).getByRole('button', { name: 'One more' }))
     await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
     await waitFor(() => expect(sent.map(s => s.method)).toEqual(['PATCH']))
     expect(sent[0].url.searchParams.get('id')).toBe('eq.d-1')
     expect(sent[0].url.searchParams.get('coach_user_id')).toBe(`eq.${COACH.id}`)
-    expect(sent[0].body).toMatchObject({ name: 'Rondos 4v1', minutes: 25 })
-    await waitFor(() => expect(myDrills()).toContain('Rondos 4v1, 25 min. Edit'))
+    expect(sent[0].body).toMatchObject({ name: 'Rondos 4v1', minutes: 20, area: '10 × 10 m', group_size: 6, part_type: 'rondo' })
 
-    await user.click(screen.getByRole('button', { name: 'Possession 6v6 + 2, 15 min. Edit' }))
+    await user.click(await screen.findByRole('button', { name: 'Possession 6v6 + 2, 15 min. Edit' }))
     sheet = await screen.findByRole('dialog', { name: 'Edit drill' })
     await user.click(within(sheet).getByRole('button', { name: 'Delete drill' }))
     expect(sent).toHaveLength(1) // asked first, nothing sent
@@ -214,7 +219,7 @@ describe('TRAK-294: My drills', { timeout: 20_000 }, () => {
     await waitFor(() => expect(sent.map(s => s.method)).toEqual(['PATCH', 'DELETE']))
     expect(sent[1].url.searchParams.get('id')).toBe('eq.d-2')
     expect(sent[1].url.searchParams.get('coach_user_id')).toBe(`eq.${COACH.id}`)
-    await waitFor(() => expect(myDrills()).toEqual(['Rondos 4v1, 25 min. Edit']))
+    await waitFor(() => expect(myDrills()).toEqual(['Rondos 4v1, 20 min. Edit']))
   })
 
   it("search finds drills by any word typed; the Library's tiles open each library", async () => {

@@ -4,9 +4,11 @@ import { planPath, searchSessions, sessionSummary, type PlannerState } from '@/l
 import { gameWhen } from '@/components/coach/games/useGames'
 import { LoadError } from '@/components/trak'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
+import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { SearchField } from '@/components/arc/search-field/search-field'
-import { usePastSessions, type Training } from './useTraining'
+import { useNotes, usePastSessions, type Training } from './useTraining'
+import { yesFirst } from '@/lib/training/next'
 import type { SavedPractice } from '@/lib/training/plans'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
@@ -29,13 +31,16 @@ function useCopyInto() {
     { state: { copy: plan.practices, copiedFrom: `${plan.title}, ${plan.day}` } satisfies PlannerState })
 }
 
-/** Use a past plan, for `training`: every plan the coach has written, newest first, searchable by name or drill. */
+/** Use a past plan, for `training`: every plan the coach has written, the ones they'd run again first, then newest first,
+ *  searchable by name or drill. */
 export function PastPlanSheet({ open, onOpenChange, training }: { open: boolean; onOpenChange: (open: boolean) => void; training: Training }) {
   const copyInto = useCopyInto()
   const past = usePastSessions(open)
+  const notes = useNotes(open)
   const [query, setQuery] = useState('')
   const others = (past.data ?? []).filter(session => session.id !== training.id)
-  const shown = searchSessions(others, query)
+  const again = (id: string) => notes.data?.get(id)?.again === 'yes'
+  const shown = yesFirst(searchSessions(others, query), again)
   return <BottomSheet className="arc" open={open} onOpenChange={onOpenChange} detents={[0.92]} title="Use a past plan"
     description={`For ${training.title}, ${when(training)}. Then change anything before you save.`}>
     <div className="grid gap-4 pb-4">
@@ -51,6 +56,7 @@ export function PastPlanSheet({ open, onOpenChange, training }: { open: boolean;
                   <p className="text-[15px] text-ink break-words"><span className="font-medium">{session.title}</span>
                     <span className="text-sm text-ink-3"> · {gameWhen(session).day}</span></p>
                   <p className="text-[13px] text-ink-3 break-words">{sessionSummary(session.practices)}</p>
+                  {again(session.id) && <span className="mt-1 inline-block"><Badge size="sm" tone="success">You’d run it again</Badge></span>}
                 </div>
                 <Button size="sm" variant="secondary" aria-label={`Use this plan: ${session.title}, ${gameWhen(session).day}`}
                   onClick={() => { onOpenChange(false); copyInto(training, { ...session, day: gameWhen(session).day }) }}>Use this plan</Button>

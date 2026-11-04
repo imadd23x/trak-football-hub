@@ -5,7 +5,8 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 // TRAK-295 (Training 2/5): planning a training: "How do you want to plan it?", Write my own, and the plan, at the
 // same two widths. TRAK-296 (Training 3/5): the Add/Swap sheet's My drills and Library views, and a Library preview.
 // TRAK-297 (Training 4/5): Copy a past session. TRAK-298 (Training 5/5): View (TRAK-309: was Run it), and a closed training's log.
-// TRAK-304: Home's Today card with a training planned today: the week first, then the day's practices.
+// TRAK-304: Home's Today card with a training planned today: the week first, then the day's practices; a training's
+// name, however long, isn't on it.
 // TRAK-306: the side menu (a laptop's sidebar, a phone's sheet) cuts no letter: g, q and p keep their tails.
 // TRAK-310: each training coming up has View plan and Edit plan, or Create plan, on its right.
 // TRAK-339 (Training redo 1/5): Training home like Matches: the Next training card, Upcoming trainings, Past trainings;
@@ -93,7 +94,7 @@ async function backend(context: BrowserContext, unexpected: string[], trainings 
     }
     if (path === '/rest/v1/coach_calendar_events') return json(trainings.filter(t => matches('id')(t.id)))
     if (path === '/rest/v1/training_plans') {
-      return json([...plans.keys()].filter(matches('event_id')).map(event_id => ({ event_id, updated_at: '2026-10-28T10:00:00Z' })))
+      return json([...plans.keys()].filter(matches('event_id')).map(event_id => ({ event_id, updated_at: '2026-10-28T10:00:00Z', note: '' })))
     }
     if (path === '/rest/v1/training_plan_practices') {
       return json([...plans].filter(([id]) => matches('event_id')(id)).flatMap(([event_id, rows]) => rows.map(row => ({ event_id, ...row }))))
@@ -218,9 +219,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
 
     await page.getByRole('button', { name: 'New drill' }).click()
     const sheet = page.getByRole('dialog', { name: 'New drill' })
-    await expect(sheet.getByLabel('Name')).toBeVisible()
-    await sheet.getByLabel('Name').fill('1v1 in channels')
-    await sheet.getByText('Add details').click()
+    await expect(sheet.getByLabel(/1\. Name it/)).toBeVisible()
+    await sheet.getByLabel(/1\. Name it/).fill('1v1 in channels')
+    await sheet.getByRole('button', { name: 'In groups' }).click()
     await page.waitForTimeout(600)
     await page.screenshot({ path: testInfo.outputPath(`training-new-drill-${width}.png`) })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
@@ -357,6 +358,31 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   })
 
   // TRAK-342: Who's here, with the register saved: one of the two U16 players came; Trak checks each part.
+  // TRAK-367 (Kostas, 3 Nov): a part moves on Review as it does while planning: by its handle, with a finger or a mouse.
+  test(`Moving a part on Review at ${width} px`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, '/coach/training/t-tue', width, height)
+    const rows = page.getByRole('list', { name: 'The plan' }).getByRole('listitem')
+    await expect(rows.first()).toContainText('Warm-up: rondos 4v1')
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-review-move-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+
+    const from = await page.getByRole('button', { name: /^Move Pressing on the trigger/ }).boundingBox()
+    const to = await rows.first().boundingBox()
+    await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(from!.x + from!.width / 2, to!.y + 10, { steps: 12 })
+    await page.mouse.move(from!.x + from!.width / 2, to!.y - 6, { steps: 6 })
+    await page.mouse.up()
+    await expect(rows.first()).toContainText('Pressing on the trigger')
+    // Saved once it lands: the page read again keeps the new order.
+    await page.waitForTimeout(500)
+    await page.reload()
+    await expect(rows.first()).toContainText('Pressing on the trigger')
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+
   test(`Who's here at ${width} px: the register, then Trak's suggestions`, async ({ page, context }, testInfo) => {
     const started = Date.now() - 10 * MINUTE
     const here = { ...training('t-here', 'U16', 0, '18:00', 'Pressing triggers'), starts_at: new Date(started).toISOString(),
@@ -442,6 +468,47 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   })
 }
 
+// Kostas, 29 Oct: a rehearsal coach's training had a whole session plan pasted as its name (1,000+ characters), and
+// Today showed all of it. Today names no training ("keep it simple"; the week above cuts the name to one line), and a
+// long name never widens the card or the page.
+const PASTED = `How To Win Games${' '.repeat(40)}OBJECTIVES ORGANISATION ${'Players will develop their understanding of how to organise their team effectively. '.repeat(12)}`
+for (const [width, height] of [[390, 844], [1440, 900]] as const) {
+  test(`Home at ${width} px: a training with a long name keeps Today a small snapshot`, async ({ page, context }, testInfo) => {
+    const today = [...TRAININGS.map(t => t.id === 't-tue' ? training('t-tue', 'U16', 0, '18:00', 'Receiving under pressure') : t),
+      training('t-long', 'U14', 0, '19:45', PASTED)]
+    await page.route('**/rest/v1/coach_calendar_events*', route => {
+      const type = new URL(route.request().url()).searchParams.get('event_type')
+      const rows = type && type !== 'eq.training' ? [] : today
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify(rows), headers: { 'content-range': '0-0/1' } })
+    })
+    const { unexpected, errors } = await open(page, context, '/coach/home', width, height)
+    const card = page.getByRole('region', { name: 'Today' })
+    const planned = card.getByRole('article', { name: 'Training, Receiving under pressure' })
+    const long = card.getByRole('article', { name: /^Training, How To Win Games/ })
+    await expect(long.getByRole('link', { name: 'Plan this session' })).toBeVisible()
+    // Each header is one line: as tall as its words on their own. This coach has U14 and U16, and Home starts on All, so
+    // each says its age group (Kostas, 29 Oct).
+    for (const [article, text] of [[planned, 'Training plan · U16'], [long, 'Training plan · U14']] as const) {
+      await expect(article.getByText(text, { exact: true })).toBeVisible()
+      const words = (await article.getByText(text, { exact: true }).boundingBox())!
+      const label = (await article.getByText(text, { exact: true }).locator('..').boundingBox())!
+      expect(Math.round(label.height)).toBe(Math.round(words.height))
+    }
+    await expect(card.getByText(/How To Win Games|Receiving under pressure/)).toHaveCount(0)
+    // The total time on the label's line, on the right.
+    const [total, words] = [(await planned.getByText('40 min', { exact: true }).boundingBox())!, (await planned.getByText('Training plan · U16', { exact: true }).boundingBox())!]
+    expect(Math.abs(total.y - words.y)).toBeLessThanOrEqual(2)
+    expect(total.x).toBeGreaterThan(words.x + words.width)
+    // The card stays a snapshot: the long one is no taller than the planned one with its two practices.
+    expect((await long.boundingBox())!.height).toBeLessThan((await planned.boundingBox())!.height)
+    await card.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: testInfo.outputPath(`home-today-long-name-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}
+
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   test(`Home at ${width} px: today's training as a quick snapshot, after the week`, async ({ page, context }, testInfo) => {
     // Receiving under pressure (planned) moved to today, 18:00.
@@ -456,8 +523,11 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const card = page.getByRole('region', { name: 'Today' })
     const list = card.getByRole('list', { name: 'Today’s practices' })
     await expect(list.getByRole('listitem')).toHaveText(['Warm-up: rondos 4v115 min', 'Pressing on the trigger25 min'])
-    await expect(card.getByText('Training plan · 40 min')).toBeVisible()
-    await expect(card.getByRole('link', { name: 'Run it' })).toBeVisible()
+    // Kostas, 29 Oct: which age group the plan is for (this coach has U14 and U16; Home starts on All).
+    await expect(card.getByText('Training plan · U16', { exact: true })).toBeVisible()
+    // Kostas, 29 Oct: no Run it; the total time is on the right.
+    await expect(card.getByText('40 min', { exact: true })).toBeVisible()
+    await expect(card.getByRole('link', { name: 'Run it' })).toHaveCount(0)
     if (width < 1024) {
       // Kostas, 28 Oct: on a phone the week comes first.
       const week = await page.getByRole('heading', { name: 'This week' }).boundingBox()

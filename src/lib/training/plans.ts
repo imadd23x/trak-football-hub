@@ -65,6 +65,11 @@ export function overTime(planned: number, length: number | null): string | null 
   return `You set this training for ${length} min. The plan runs ${planned - length} min over. You can keep it, or change the training's time in Schedule.`
 }
 
+/** TRAK-367: a practice on one line: its part, then its drill ("Rondo · Rondo 4 v 2 with a target"). Only the name when
+ *  they're the same, or it's an older plan with no parts. */
+export const practiceLine = (practice: { name: string; part?: string | null }) =>
+  practice.part && practice.part !== practice.name ? `${practice.part} · ${practice.name}` : practice.name
+
 /* TRAK-297 (Training 4/5): Copy a past session. */
 
 /** The past sessions whose title or a practice's name holds every word typed, in the order given. */

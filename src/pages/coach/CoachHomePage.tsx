@@ -141,7 +141,8 @@ export default function CoachHomePage() {
           {user && <CoachWeekStrip coachId={user.id} version={weekVersion} everySquad={everySquad} />}
           {showToday
             // Kostas, 28 Oct: on a phone the week comes first, then today's plan.
-            ? <TodayPlan trainingOn={trainingOn} gamesOn={gamesOn} inView={squad => everySquad || coachSquad.eventInSquad(squad)} />
+            ? <TodayPlan trainingOn={trainingOn} gamesOn={gamesOn} inView={squad => everySquad || coachSquad.eventInSquad(squad)}
+              squadOf={everySquad && coachSquad.squads.length >= 2 ? squadName : null} />
             : <SquadShape squadLabel={squadLabel} shape={shape} failed={!!roster.error} onRetry={roster.retry} />}
         </div>
         {/* Shown once the switch is known, so a coach who turned it off never sees it flash in. */}

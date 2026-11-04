@@ -29,9 +29,9 @@ function event(id: string, type: 'training' | 'match', starts: string, over: Rec
     event_date: starts.slice(0, 10), start_time: `${starts.slice(11, 16)}:00`, venue: 'Pitch 2', opponent: null, home_away: null, ...over,
   }
 }
-const practice = (event_id: string, position: number, name: string, minutes: number) => ({
+const practice = (event_id: string, position: number, name: string, minutes: number, part = '') => ({
   event_id, position, name, minutes, how: '', tell: '', area: '', numbers: '', direction: '', targets: '', conditions: '',
-  source: 'own', drill_id: null, library_session: null,
+  source: 'own', drill_id: null, library_session: null, part,
 })
 
 function home({ events, practices = [], gamePlans = [], features = ['events', 'training', 'games'] }: {
@@ -51,6 +51,7 @@ function home({ events, practices = [], gamePlans = [], features = ['events', 't
     rpc('game_plan_changes', () => []),
     rpc('coach_squad_player_consent_required', () => false),
     rpc('feature_on', ({ p_feature }) => features.includes(String(p_feature))),
+    table('training_notes', []),
     http.get(`${SUPABASE_URL}/rest/v1/coach_calendar_events`, ({ request }) => {
       const type = new URL(request.url).searchParams.get('event_type')?.replace(/^eq\./, '')
       return HttpResponse.json(type ? events.filter(e => e.event_type === type) : events)
@@ -87,8 +88,10 @@ describe('TRAK-304: today’s plan on coach Home', { timeout: 20_000 }, () => {
     const list = await within(training).findByRole('list', { name: 'Today’s practices' })
     const rows = within(list).getAllByRole('listitem')
     expect(rows.map(row => row.textContent)).toEqual(['Rondos 4v115 min', 'Pressing on the trigger25 min'])
-    expect(within(training).getByText('Training plan · 40 min')).toBeInTheDocument()
-    expect(within(training).getByRole('link', { name: 'Run it' })).toHaveAttribute('href', '/coach/training/t1/run')
+    expect(within(training).getByText('Training plan')).toBeInTheDocument()
+    // Kostas, 29 Oct: no Run it; the training's total time sits where it was, on the right.
+    expect(within(training).getByText('40 min')).toBeInTheDocument()
+    expect(within(training).queryByRole('link')).toBeNull()
     // Kostas, 28 Oct: the week above already says the time, the place and the title; the card doesn't repeat them.
     expect(within(training).queryByText(/Pitch 2/)).toBeNull()
     expect(within(training).queryByText(/16:/)).toBeNull()
@@ -105,15 +108,55 @@ describe('TRAK-304: today’s plan on coach Home', { timeout: 20_000 }, () => {
     expect(within(list).getAllByRole('listitem').map(row => row.textContent)).toEqual(names.map(name => `${name}10 min`))
   })
 
-  it('with two things today, each says which it is', async () => {
+  it('with two trainings today, each is just its plan, never its name: the week above has it (Kostas, 29 Oct)', async () => {
     home({
       events: [event('t1', 'training', '2026-11-04T10:00', { title: 'Pressing zones' }), event('t2', 'training', '2026-11-04T18:00', { title: 'Finishing' })],
       practices: [practice('t1', 1, 'Rondos 4v1', 15)],
     })
     renderApp('/coach/home')
     const card = await today()
-    expect(await within(card).findByText('Training plan · Pressing zones · 15 min')).toBeInTheDocument()
-    expect(await within(card).findByText('Training plan · Finishing')).toBeInTheDocument()
+    const pressing = await within(card).findByRole('article', { name: 'Training, Pressing zones' })
+    const finishing = within(card).getByRole('article', { name: 'Training, Finishing' })
+    // Its total, on the right, and its one practice's minutes.
+    await waitFor(() => expect(within(pressing).getAllByText('15 min')).toHaveLength(2))
+    for (const training of [pressing, finishing]) expect(within(training).getByText('Training plan')).toBeInTheDocument()
+    expect(within(card).queryByText(/Pressing zones|Finishing/)).toBeNull()
+  })
+
+  it('with All picked, a coach of two age groups sees which one each plan is for (Kostas, 29 Oct)', async () => {
+    home({
+      events: [event('t1', 'training', '2026-11-04T10:00', { title: 'Pressing zones' }), event('t2', 'training', '2026-11-04T18:00', { title: 'Finishing', squad: 'U14' })],
+      practices: [practice('t1', 1, 'Rondos 4v1', 15)],
+    })
+    server.use(table('squad_players', [
+      { id: 'sp-1', coach_user_id: COACH.id, player_name: 'Mohamed Salah', age_group: 'U16', status: 'active', created_at: '2026-10-01T08:00:00Z' },
+      { id: 'sp-2', coach_user_id: COACH.id, player_name: 'Trent Alexander-Arnold', age_group: 'U14', status: 'active', created_at: '2026-10-01T08:00:00Z' },
+    ]))
+    renderApp('/coach/home')
+    const card = await today()
+    const u16 = await within(card).findByRole('article', { name: 'Training, Pressing zones' })
+    const u14 = within(card).getByRole('article', { name: 'Training, Finishing' })
+    await waitFor(() => expect(within(u16).getByText('Training plan · U16')).toBeInTheDocument())
+    expect(within(u14).getByText('Training plan · U14')).toBeInTheDocument()
+  })
+
+  it('with one age group picked, the plans need no age group: the switcher says it', async () => {
+    localStorage.setItem(`trak:coach-squad-all:${COACH.id}`, '0')
+    localStorage.setItem(`trak:coach-squad:${COACH.id}`, 'U16')
+    home({
+      events: [event('t1', 'training', '2026-11-04T10:00', { title: 'Pressing zones' }), event('t2', 'training', '2026-11-04T18:00', { title: 'Finishing', squad: 'U14' })],
+      practices: [practice('t1', 1, 'Rondos 4v1', 15)],
+    })
+    server.use(table('squad_players', [
+      { id: 'sp-1', coach_user_id: COACH.id, player_name: 'Mohamed Salah', age_group: 'U16', status: 'active', created_at: '2026-10-01T08:00:00Z' },
+      { id: 'sp-2', coach_user_id: COACH.id, player_name: 'Trent Alexander-Arnold', age_group: 'U14', status: 'active', created_at: '2026-10-01T08:00:00Z' },
+    ]))
+    renderApp('/coach/home')
+    const card = await today()
+    const u16 = await within(card).findByRole('article', { name: 'Training, Pressing zones' })
+    await waitFor(() => expect(within(u16).getByText('Training plan')).toBeInTheDocument())
+    expect(within(card).queryByRole('article', { name: 'Training, Finishing' })).toBeNull()
+    expect(within(card).queryByText(/U16|U14/)).toBeNull()
   })
 
   it('on a phone the week comes first, then today’s plan (Kostas, 28 Oct)', async () => {
@@ -157,10 +200,28 @@ describe('TRAK-304: today’s plan on coach Home', { timeout: 20_000 }, () => {
     renderApp('/coach/home')
     const card = await today()
     const training = await within(card).findByRole('article', { name: 'Training, Morning session' })
-    await waitFor(() => expect(within(training).getByText(/Closed/)).toBeInTheDocument())
-    expect(within(training).getByRole('link', { name: 'Open the plan' })).toHaveAttribute('href', '/coach/training/t0')
+    await waitFor(() => expect(within(training).getByText('Closed · 15 min')).toBeInTheDocument())
+    expect(within(training).queryByRole('link')).toBeNull()
     expect(within(card).queryByText('Nothing today')).toBeNull()
     expect(within(training).queryByRole('link', { name: 'Run it' })).toBeNull()
+  })
+
+  // TRAK-367: Training's rule on Home too: Notes saved or skipped close a finished training with no register.
+  it('a training closed by its Notes reads Closed, with no register taken', async () => {
+    home({ events: [event('t0', 'training', '2026-11-04T08:00', { title: 'Morning session' })], practices: [practice('t0', 1, 'Rondos 4v1', 15)] })
+    server.use(table('training_notes', [{ event_id: 't0', again: null, note: '' }]))
+    renderApp('/coach/home')
+    const training = await within(await today()).findByRole('article', { name: 'Training, Morning session' })
+    await waitFor(() => expect(within(training).getByText('Closed · 15 min')).toBeInTheDocument())
+  })
+
+  it('each row names its part, then its drill; a plan from before parts, just its drill (TRAK-367)', async () => {
+    home({ events: [event('t1', 'training', '2026-11-04T16:00', { title: 'Pressing zones' })],
+      practices: [practice('t1', 1, 'Rondos 4v1', 15, 'Rondo'), practice('t1', 2, 'Mirror drill', 10)] })
+    renderApp('/coach/home')
+    const training = await within(await today()).findByRole('article', { name: 'Training, Pressing zones' })
+    expect(await within(training).findByText('Rondo · Rondos 4v1')).toBeInTheDocument()
+    expect(within(training).getByText('Mirror drill')).toBeInTheDocument()
   })
 
   it('with nothing today, the next training or match coming up', async () => {

@@ -129,7 +129,8 @@ export function PositionsStep({ coachId, squad, plan, onBack, onDone }: {
   const row = (player: Player) => (
     <li key={player.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2">
       <PlayerFace name={player.player_name} size="sm" />
-      <span className="grid min-w-0 flex-1">
+      {/* A floor for the name, so on a phone the buttons drop to their own line rather than hide who it is. */}
+      <span className="grid min-w-[9rem] flex-1">
         <span className="truncate text-sm font-medium text-ink">{player.player_name}</span>
         {player.shirt_number != null && <span className="text-xs text-ink-3">#{player.shirt_number}</span>}
       </span>
@@ -152,7 +153,8 @@ export function PositionsStep({ coachId, squad, plan, onBack, onDone }: {
           <h2 id="positions-progress" className="text-lg font-medium text-ink">{board.placed} of {board.total} placed</h2>
           {change}
         </div>
-        <Progress value={board.placed} max={Math.max(board.total, 1)} label={`${board.placed} of ${board.total} players placed`} />
+        {/* Named by the heading above it; a visible label would say the count twice. */}
+        <Progress value={board.placed} max={Math.max(board.total, 1)} aria-labelledby="positions-progress" />
         {waitingLine}
       </section>
       {problem && <Alert tone="danger" title={problem} />}

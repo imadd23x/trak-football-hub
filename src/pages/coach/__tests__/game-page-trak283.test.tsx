@@ -89,7 +89,7 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     expect(screen.getByText('Shared')).toBeInTheDocument()
     expect(row('Type')).toHaveTextContent('Match')
     expect(row('Opponent')).toHaveTextContent('Parkview Athletic (Home)')
-    expect(row('Note for families')).toHaveTextContent('Bring water')
+    expect(row('Message to players')).toHaveTextContent('Bring water')
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Edit in Schedule' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Publish' })).toBeNull()

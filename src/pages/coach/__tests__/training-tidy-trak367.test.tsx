@@ -180,7 +180,8 @@ describe('TRAK-367: the message to players', { timeout: 30_000 }, () => {
   it('Schedule opens the event straight at its note', async () => {
     database([training('soon', onTheMinute(Date.now() + 2 * DAY), { family_note: 'Bring shin pads.' })])
     renderApp('/coach/schedule?edit=soon&step=2')
-    expect(await screen.findByDisplayValue('Bring shin pads.', {}, { timeout: 8000 })).toBeInTheDocument()
+    // Kostas, 3 Nov: one name for it, here and on Training's card.
+    expect(await screen.findByLabelText('Message to players', {}, { timeout: 8000 })).toHaveValue('Bring shin pads.')
   })
 })
 

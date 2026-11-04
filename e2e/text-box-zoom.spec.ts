@@ -75,7 +75,7 @@ test.describe('TRAK-178 on a phone', () => {
     await sheet.getByRole('button', { name: 'Next' }).click()
     await expect(sheet.getByLabel('Kit', { exact: true })).toBeVisible()
     eventForm.push(...await boxSizes(page))
-    expect(eventForm.map(b => b.box)).toEqual(expect.arrayContaining(['Venue', 'Kit', 'Note for families']))
+    expect(eventForm.map(b => b.box)).toEqual(expect.arrayContaining(['Venue', 'Kit', 'Message to players']))
     for (const { box, px } of eventForm) expect(px, `event form: ${box}`).toBeGreaterThanOrEqual(16)
 
     // The match log's big boxes keep their size; its small ones grow.

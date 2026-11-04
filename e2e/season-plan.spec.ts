@@ -10,7 +10,7 @@ const players = ['Synthetic Player Pat', 'Synthetic Player Quinn'].map((name, i)
 }))
 type Row = Record<string, unknown>
 
-async function backend(context: BrowserContext, unexpected: string[]) {
+async function backend(context: BrowserContext, unexpected: string[], seen: string[] = []) {
   const plans: Row[] = [], objectives: Row[] = []
   const user = { id: coachId, email: 'coach@season350.test', email_confirmed_at: '2026-10-01T00:00:00Z',
     created_at: '2026-10-01T00:00:00Z', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {} }
@@ -26,6 +26,8 @@ async function backend(context: BrowserContext, unexpected: string[]) {
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (url.hostname !== 'xbykbqolvqyqmipikuae.supabase.co') { unexpected.push(req.url()); return route.abort() }
     const path = url.pathname, eq = (key: string) => url.searchParams.get(key)?.replace(/^eq\./, '')
+    // What the page asked for, in order: printed if the test fails, as CI keeps no trace.
+    if (/season_|feature_on|squad_players/.test(path)) seen.push(`${Date.now() % 100000} ${req.method()} ${path}${url.search} ${req.postData() ?? ''}`.slice(0, 220))
     if (path === '/auth/v1/user') return json(user)
     if (path === '/rest/v1/telemetry_events') return route.fulfill({ status: 201, body: '' })
     if (path === '/rest/v1/profiles') return json([{ user_id: coachId, id: coachId, role: 'coach', full_name: 'Synthetic Coach' }])
@@ -65,8 +67,8 @@ const noSidewaysScroll = (page: Page) => page.evaluate(() => document.documentEl
 
 for (const [width, height] of [[1280, 800], [390, 844]] as const) {
   test(`season plan step 1 at ${width} px: start from Home, two objectives, save, reload`, async ({ context, page }, testInfo) => {
-    const unexpected: string[] = []
-    await backend(context, unexpected)
+    const unexpected: string[] = [], seen: string[] = []
+    await backend(context, unexpected, seen)
     await page.setViewportSize({ width, height })
     await page.goto('/coach/home')
     const row = page.getByRole('region', { name: 'Season plan' })
@@ -83,10 +85,16 @@ for (const [width, height] of [[1280, 800], [390, 844]] as const) {
     await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
 
     // After the reload the plan comes back first, then its objectives: wait for each in turn, so a failure says which.
+    seen.push('--- reload')
     await page.reload()
-    await expect(page.getByText('U16 · Draft, only you see it')).toBeVisible()
-    await expect(page.getByLabel('Objective 1', { exact: true })).toHaveValue('Stay compact')
-    await expect(page.getByLabel('Objective 2', { exact: true })).toHaveValue('Win the second ball')
+    try {
+      await expect(page.getByText('U16 · Draft, only you see it')).toBeVisible()
+      await expect(page.getByLabel('Objective 1', { exact: true })).toHaveValue('Stay compact')
+      await expect(page.getByLabel('Objective 2', { exact: true })).toHaveValue('Win the second ball')
+    } catch (error) {
+      console.log(`season-plan ${width}: requests\n${seen.join('\n')}\npage:\n${(await page.locator('body').innerText()).slice(0, 1500)}`)
+      throw error
+    }
     expect(unexpected).toEqual([])
   })
 }

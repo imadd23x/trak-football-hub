@@ -13,8 +13,9 @@ import styles from "./plan-review.module.css";
 /* Trak (TRAK-332, Imad 2 Nov): Review & share. Account health's card (a gauge, a countdown, signal rows, one next step)
    reads a game plan instead of a customer: the gauge counts the parts that are ready, the countdown runs to kick-off,
    each row is a part of the plan with its own Edit, and the footer holds what shares it. No time ranges, no sparklines
-   and no AI summary: Trak has no history to draw and no AI writing it. TRAK-344 (Imad, 3 Nov): one row of three equal
-   columns (the gauge, what's left, Arc's countdown), and each part's status is its icon, a word only for screen readers. */
+   and no AI summary: Trak has no history to draw and no AI writing it. TRAK-344 (Imad, 3 Nov): each part's status is
+   its icon, a word only for screen readers. TRAK-369 (Imad, 4 Nov): the top row is two halves, the gauge with what's
+   left under it, and Arc's countdown. */
 
 export type ReviewStatus = "good" | "watch" | "risk";
 export type ReviewRow = {
@@ -98,8 +99,6 @@ export function PlanReview({ title, rows, band, countdown, readOnly = false, chi
               </svg>
               <span className={styles.scoreNumber} aria-hidden="true">{ready}/{rows.length}</span>
             </div>
-          </div>
-          <div className={styles.cell}>
             <span className={styles.band} data-status={band.status}>
               <StatusIcon status={band.status} />
               <span>{band.label}</span>

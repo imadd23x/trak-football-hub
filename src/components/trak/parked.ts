@@ -24,12 +24,18 @@ export function useParked() {
    deploy (public.academy_features). The database enforces it; this only
    decides whether the screen shows the pill. Loading, a failed read or no
    feature all count as off. TRAK-283: Games is switched on the same way, and
-   TRAK-294 Training. */
-export type Feature = 'events' | 'games' | 'training'
+   TRAK-294 Training, and TRAK-350 the season plan. */
+export type Feature = 'events' | 'games' | 'training' | 'season_plan'
 
 export function useFeature(feature?: Feature): boolean {
+  return useFeatureState(feature).on
+}
+
+/** TRAK-350: also whether the switch has answered, for a screen that must not treat "not known yet" as off. A failed
+ *  read counts as known, and off. */
+export function useFeatureState(feature?: Feature): { on: boolean; known: boolean } {
   const { user } = useAuth()
-  const { data } = useQuery({
+  const { data, isSuccess, isError } = useQuery({
     queryKey: ['feature', user?.id, feature],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('feature_on', { p_feature: feature! })
@@ -38,5 +44,5 @@ export function useFeature(feature?: Feature): boolean {
     },
     enabled: !!feature && !!user,
   })
-  return data === true
+  return { on: data === true, known: isSuccess || isError }
 }

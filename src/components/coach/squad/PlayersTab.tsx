@@ -10,6 +10,7 @@ import { BANDS } from '@/lib/types'
 import { bandMoves } from '@/lib/squad/snapshot'
 import { seasonAverages } from '@/lib/squad/season-profile'
 import { seasonWindow } from '@/lib/squad/season'
+import { seasonStartLabel, useSeasonPlan } from '@/lib/season-plan'
 import { localParts, localTodayISO } from '@/lib/event-time'
 import { PlayerProfile } from './PlayerProfile'
 import { usePlayerFacts } from './usePlayerFacts'
@@ -45,7 +46,11 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
     }
     return byPlayer
   }, [roster.assessments])
-  const season = useMemo(() => seasonAverages(roster.assessments, seasonWindow(localTodayISO()).from, dateOf), [roster.assessments])
+  // TRAK-350: the season starts when the squad's season plan says, where there is one; otherwise on 1 July.
+  const squadLabel = roster.squad ?? (roster.squads.length === 1 ? roster.squads[0] : null)
+  const seasonPlan = useSeasonPlan(user?.id, squadLabel)
+  const seasonFrom = seasonPlan.plan?.starts_on ?? seasonWindow(localTodayISO()).from
+  const season = useMemo(() => seasonAverages(roster.assessments, seasonFrom, dateOf), [roster.assessments, seasonFrom])
   // TRAK-266 (Imad, 22 Oct): the colour key only where the coach is needed: amber for a player to assess or a draft
   // families can't see yet, by Home's Needs you rule. Everyone else gets no badge.
   const owed = useMemo(() => {
@@ -68,7 +73,6 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
     }
   })
   const squadOf = new Map(roster.players.map(p => [p.id, p.age_group?.trim() || null]))
-  const squadLabel = roster.squad ?? (roster.squads.length === 1 ? roster.squads[0] : null)
 
   const open = openId == null ? undefined : players.find(player => player.id === openId)
   return <>
@@ -81,7 +85,7 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
       {open && user ? <article aria-label={`${open.name}, ${open.position || 'no position yet'}`} className="rounded-2xl border border-line bg-surface p-6">
         <PlayerProfile player={open} squad={squadOf.get(open.id) ?? squadLabel} coachId={user.id}
           facts={facts.data?.get(open.id)} factsFailed={facts.isError} onRetryFacts={() => { void facts.refetch() }}
-          season={season.players.get(open.id)} squadSeason={season.squad} />
+          season={season.players.get(open.id)} squadSeason={season.squad} since={seasonStartLabel(seasonFrom)} />
       </article> : !open && <p className="text-sm text-ink-2">This player isn't in the squad you're looking at. Pick All at the top to see every squad.</p>}
     </div>}
   </>

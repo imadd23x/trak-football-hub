@@ -87,6 +87,8 @@ const CoachAssistant = lazy(() => import("./pages/coach/CoachAssistant"));
 const CoachSchedule = lazy(() => import("./pages/coach/CoachSchedule"));
 // TRAK-283: Games, parked until the academy's games switch is on.
 const CoachGames = lazy(() => import("./pages/coach/CoachGames"));
+// TRAK-350: the season plan, parked until the academy's season_plan switch is on.
+const CoachSeasonPlan = lazy(() => import("./pages/coach/CoachSeasonPlan"));
 const CoachGame = lazy(() => import("./pages/coach/CoachGame"));
 const CoachTraining = lazy(() => import("./pages/coach/training/CoachTraining"));
 const CoachRecognition = lazy(() => import("./pages/coach/CoachRecognition"));
@@ -188,6 +190,7 @@ const App = () => (
             <Route path="/coach/award" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachAwardPlayer /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/schedule" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="events"><CoachSchedule /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/matches" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="games"><CoachGames /></ParkedScreen></RouteGuard>} />
+            <Route path="/coach/season-plan" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="season_plan"><CoachSeasonPlan /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/matches/:eventId" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="games"><CoachGame /></ParkedScreen></RouteGuard>} />
             {/* TRAK-315: Games became Matches; an old link or bookmark still opens the same match. */}
             <Route path="/coach/games/*" element={<OldGamesLink />} />

@@ -18,11 +18,11 @@
 .root [data-status="risk"] { --pr-tone: var(--danger); }
 .statusIcon { flex: none; color: var(--pr-tone); }
 
-/* Header and overview. Trak (TRAK-344): three equal columns, each centred on one line, a hairline between them. */
+/* Header and overview. Trak (TRAK-369): two equal halves, each centred, a hairline between them. */
 .top { display: flex; flex-direction: column; gap: 24px; padding: var(--pr-pad); }
 .name { overflow: hidden; font-size: var(--text-base); font-weight: 500; line-height: 1.375; text-overflow: ellipsis; white-space: nowrap; }
 
-.overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding-inline: 16px; }
 .cell + .cell { border-left: 1px solid var(--border-subtle); }
 
@@ -56,7 +56,7 @@
   .top, .rows, .footer { --pr-pad: 16px; }
 }
 @container (max-width: 440px) {
-  .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cell + .countdownCell { grid-column: 1 / -1; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-subtle); border-left: 0; }
+  .overview { grid-template-columns: minmax(0, 1fr); }
+  .cell + .countdownCell { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-subtle); border-left: 0; }
   .row { column-gap: 8px; }
 }

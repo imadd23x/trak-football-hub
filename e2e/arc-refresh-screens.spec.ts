@@ -65,6 +65,8 @@ async function coachBackend(context: BrowserContext, unexpected: string[], withM
     if (path === '/rest/v1/notification_settings') return json([])
     if (path.startsWith('/rest/v1/rpc/coach_squad_player_consent_required')) return json(false)
     if (path === '/rest/v1/rpc/my_session_is_live' || path === '/rest/v1/rpc/feature_on') return json(true)
+    // TRAK-350: the season plan's switch is on here, so Home asks for the squad's plan; there is none.
+    if (path === '/rest/v1/season_plans') return json([])
     if (path.startsWith('/rest/v1/rpc/')) return json([])
     if (path === '/rest/v1/session_attendance') return json(players.map(p => ({ session_id: 'session-1', squad_player_id: p.id, status: 'present' })))
     // TRAK-262: notification_settings is Home's Needs you switch (no row: on).
@@ -572,7 +574,8 @@ test.describe('The "+" form\'s pickers on a phone', () => {
     expect(calendar.top, JSON.stringify(calendar)).toBeGreaterThanOrEqual(0)
     expect(calendar.inside, JSON.stringify(calendar)).toBe(true)
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: /^Start/ }).click()
+    // The form's own Start time (TRAK-350 put the season plan's Start on Home, behind the form).
+    await page.getByRole('dialog', { name: 'New event' }).getByRole('button', { name: /^Start/ }).click()
     await page.waitForTimeout(500)
     const times = await whole('[role="listbox"]')
     expect(times.top, JSON.stringify(times)).toBeGreaterThanOrEqual(0)

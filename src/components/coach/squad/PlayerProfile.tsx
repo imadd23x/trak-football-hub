@@ -34,7 +34,7 @@ const notSet = <span className="text-ink-3">Not set</span>
  * coach's assessment card exactly as it is elsewhere. Imad, 23 Oct: one row of cards, the latest first, swiping to
  * earlier ones, with no date line above them (the card's quick look has the date and session).
  */
-export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRetryFacts, season, squadSeason }: {
+export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRetryFacts, season, squadSeason, since = '1 July' }: {
   player: SquadPlayer
   squad: string | null
   coachId: string
@@ -43,6 +43,8 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
   onRetryFacts: () => void
   season: { scores: Scores; count: number } | undefined
   squadSeason: Scores | null
+  /** TRAK-350: when the season started, from the squad's season plan when there is one. */
+  since?: string
 }) {
   const navigate = useNavigate()
   const client = useQueryClient()
@@ -90,7 +92,7 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
         <div className="grid gap-0.5">
           <h4 id={`season-${player.id}`} className="text-base font-medium text-ink">Season so far</h4>
           <p className="text-sm text-ink-3">{season
-            ? `Average of ${season.count} ${season.count === 1 ? 'assessment' : 'assessments'} since 1 July, out of 10, against the squad`
+            ? `Average of ${season.count} ${season.count === 1 ? 'assessment' : 'assessments'} since ${since}, out of 10, against the squad`
             : 'No assessment this season yet.'}</p>
         </div>
         {season && <RadarChart label={`${player.name}'s season average against the squad`} size={240} rings={5} max={10}

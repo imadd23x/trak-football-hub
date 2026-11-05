@@ -19,16 +19,17 @@ import { Input } from '@/components/arc/input/input'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Textarea } from '@/components/arc/textarea/textarea'
 import { PositionsStep } from '@/components/coach/season-plan/PositionsStep'
+import { ObjectivesStep } from '@/components/coach/season-plan/ObjectivesStep'
 
 /* TRAK-350 (Season plan 2/18, spec TRAK-348): the season plan's set-up, step 1. The season's dates and up to three
    season objectives (the mockup's six, or the coach's own), each editable and deletable. It saves as a draft only the
    coach sees, with or without objectives; a failed save keeps everything typed and says so, as Game plan's does. No
-   Focus and no Fill in for me (Tarek, 3 Nov). The stepper shows only steps that exist: TRAK-352 adds Positions;
-   Player objectives and Share arrive with TRAK-354 and TRAK-356. Step 1 stays mounted while another step shows, so
+   Focus and no Fill in for me (Tarek, 3 Nov). The stepper shows only steps that exist: TRAK-352 adds Positions,
+   TRAK-354 Player objectives; Share arrives with TRAK-356. Step 1 stays mounted while another step shows, so
    moving between steps never loses what was typed. */
 
-const STEPS = [{ id: 'season', label: 'Season and objectives' }, { id: 'positions', label: 'Positions' }]
-const STEP_PATHS = ['/coach/season-plan', '/coach/season-plan/positions']
+const STEPS = [{ id: 'season', label: 'Season and objectives' }, { id: 'positions', label: 'Positions' }, { id: 'objectives', label: 'Player objectives' }]
+const STEP_PATHS = ['/coach/season-plan', '/coach/season-plan/positions', '/coach/season-plan/objectives']
 const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again; everything you typed is still here."
 const NO_TITLE = 'Give each objective a title, or delete it.'
 const END_BEFORE_START = 'The season has to end after it starts.'
@@ -60,7 +61,8 @@ export default function CoachSeasonPlan() {
     enabled: !!season.plan,
   })
   const loaded = !!squad && !season.isPending && !season.error && (!season.plan || objectives.isSuccess)
-  const step = useMatch('/coach/season-plan/positions') ? 1 : 0
+  const onPositions = !!useMatch('/coach/season-plan/positions'), onObjectives = !!useMatch('/coach/season-plan/objectives')
+  const step = onPositions ? 1 : onObjectives ? 2 : 0
   const goTo = (index: number) => navigate(STEP_PATHS[index])
 
   return (
@@ -84,7 +86,9 @@ export default function CoachSeasonPlan() {
             <div className={step === 0 ? undefined : 'hidden'}>
               <SetUp key={squad} squad={squad} plan={season.plan} saved={objectives.data ?? []} onNext={() => goTo(1)} />
             </div>
-            {step === 1 && user && <PositionsStep coachId={user.id} squad={squad} plan={season.plan} onBack={() => goTo(0)} onDone={() => navigate('/coach/home')} />}
+            {step === 1 && user && <PositionsStep coachId={user.id} squad={squad} plan={season.plan} onBack={() => goTo(0)} onNext={() => goTo(2)} />}
+            {step === 2 && user && <ObjectivesStep coachId={user.id} seasonObjectives={objectives.data ?? []}
+              onBack={() => goTo(1)} onPositions={() => goTo(1)} onDone={() => navigate('/coach/home')} />}
           </div>}
       </div>
       <NavBar role="coach" activeTab={location.pathname} onNavigate={navigate} />

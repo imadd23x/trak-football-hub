@@ -69,6 +69,8 @@ async function coachBackend(context: BrowserContext, unexpected: string[], withM
     if (path === '/rest/v1/season_plans') return json([])
     // TRAK-353: so a player's page lists their Can also play and roles; there are none.
     if (path === '/rest/v1/squad_player_also_plays' || path === '/rest/v1/squad_player_roles') return json([])
+    // TRAK-354: so a player's page lists their objectives; there are none.
+    if (path === '/rest/v1/player_objectives') return json([])
     if (path.startsWith('/rest/v1/rpc/')) return json([])
     if (path === '/rest/v1/session_attendance') return json(players.map(p => ({ session_id: 'session-1', squad_player_id: p.id, status: 'present' })))
     // TRAK-262: notification_settings is Home's Needs you switch (no row: on).

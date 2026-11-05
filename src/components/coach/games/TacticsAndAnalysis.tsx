@@ -11,7 +11,7 @@ import { Tooltip } from '@/components/arc/tooltip/tooltip'
    words, and nothing can be added or removed. TRAK-328 (Imad, 2 Nov): the step is Tactics & analysis; the goals are
    Instructions, none shown until the coach adds one; their likely line-up is gone; how strong they are asks only its
    question, with his lock saying who sees it (Arc tooltip, which a tap opens too). TRAK-337 (Imad, 2 Nov): Scouting has
-   the same lock. */
+   the same lock. TRAK-371 (Imad, 5 Nov): example text in the boxes says what to write, in place of a helper line. */
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
 
@@ -37,17 +37,16 @@ export function TacticsAndAnalysis({ eventId, opponent, form, onFormChange, lock
       <div className="grid gap-4 laptop:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] laptop:items-start">
         <div className="grid min-w-0 gap-4">
         <section aria-labelledby="plan-goals" className={card}>
-          <div>
-            <h2 id="plan-goals" className="text-lg font-medium text-ink">Instructions</h2>
-            <p className="mt-1 text-sm text-ink-3">Up to three. Players see them once you share the plan.</p>
-          </div>
+          <h2 id="plan-goals" className="text-lg font-medium text-ink">Instructions</h2>
           {form.goals.length > 0 && <ol className="grid gap-5">
             {form.goals.map((goal, index) => <li key={index}>
               <fieldset className="grid grid-cols-[28px_minmax(0,1fr)] gap-3">
                 <legend className="sr-only">Instruction {index + 1}</legend>
                 <span aria-hidden="true" className="row-span-3 grid size-7 place-items-center rounded-full bg-ink text-sm font-medium text-surface">{index + 1}</span>
-                <Input label="Instruction" value={goal.title} maxLength={LIMITS.title} readOnly={locked} onChange={event => setGoal(index, { title: event.target.value })} />
+                <Input label="Instruction" value={goal.title} maxLength={LIMITS.title} readOnly={locked}
+                  placeholder="e.g. Press together when their keeper has the ball" onChange={event => setGoal(index, { title: event.target.value })} />
                 <Textarea label="What it looks like" rows={2} value={goal.looksLike} maxLength={LIMITS.looksLike} readOnly={locked}
+                  placeholder="e.g. The nearest player goes at the keeper; the other two cut off the short pass."
                   onChange={event => setGoal(index, { looksLike: event.target.value })} />
                 {!locked && <span><Button variant="ghost" size="sm" aria-label={`Remove instruction ${index + 1}`}
                   onClick={() => change({ goals: form.goals.filter((_, i) => i !== index) })}>Remove</Button></span>}
@@ -65,6 +64,7 @@ export function TacticsAndAnalysis({ eventId, opponent, form, onFormChange, lock
             <OnlyYou what="scouting" />
           </div>
           <Textarea label="What you know about them" rows={4} value={form.scouting} maxLength={LIMITS.scouting} readOnly={locked}
+            placeholder="e.g. Their number 9 is quick and runs in behind. They go long when pressed."
             onChange={event => change({ scouting: event.target.value })} />
         </section>
         </div>

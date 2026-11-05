@@ -46,3 +46,29 @@ export function watchState({ since, rule, timeZone, sessions, now }: {
     progress: byTrainings ? `${Math.min(went, n)} of ${plural(n, 'training')} so far` : `${Math.min(Math.floor(days / 7), n)} of ${plural(n, 'week')} so far`,
   }
 }
+
+export type WatchedPlayer = { playerId: string; name: string; since: string; ready: boolean; why: string | null; progress: string; step: 'positions' | 'objectives' }
+
+/** Every watched player without objectives (one with objectives is set up), with whether they're due and where the
+ *  coach sets them up: Positions while they have none, else Player objectives. Oldest watch first. */
+export function watchedPlayers({ players, watches, objectives, sessions, rule, timeZone, now }: {
+  players: { id: string; player_name: string; position: string | null }[]
+  watches: { squad_player_id: string; since: string }[]
+  /** Players with an open objective. */
+  objectives: Set<string>
+  /** Each player's register, by player. */
+  sessions: Record<string, RegisterSession[]>
+  rule: WatchRule
+  timeZone: string
+  now: Date
+}): WatchedPlayer[] {
+  const byId = new Map(players.map(p => [p.id, p]))
+  return watches
+    .filter(w => byId.has(w.squad_player_id) && !objectives.has(w.squad_player_id))
+    .sort((a, b) => a.since.localeCompare(b.since))
+    .map(w => {
+      const player = byId.get(w.squad_player_id)!
+      const state = watchState({ since: w.since, rule, timeZone, sessions: sessions[player.id] ?? [], now })
+      return { playerId: player.id, name: player.player_name, since: w.since, ...state, step: player.position ? 'objectives' : 'positions' }
+    })
+}

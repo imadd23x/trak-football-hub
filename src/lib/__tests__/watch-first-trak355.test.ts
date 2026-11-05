@@ -5,7 +5,7 @@
  * training has no register, so it never counts. Synthetic dates.
  */
 import { describe, expect, it } from 'vitest'
-import { WATCH_RULES, watchState } from '@/lib/watch-first'
+import { WATCH_RULES, watchState, watchedPlayers } from '@/lib/watch-first'
 
 // Watching from 10:00 Dubai on Monday 2 November 2026.
 const since = '2026-11-02T06:00:00Z'
@@ -48,5 +48,32 @@ describe('TRAK-355 watch first', () => {
   it('says when the rule is met before the net', () => {
     expect(watchState({ since, rule: 'w4', timeZone: 'Asia/Dubai', sessions: [], now: at('2026-11-30T08:00:00Z') }))
       .toMatchObject({ ready: true, why: 'Watched 4 weeks' })
+  })
+})
+
+describe('TRAK-355 who is watched, and who is due', () => {
+  const players = [
+    { id: 'p1', player_name: 'Synthetic Omar', position: null },
+    { id: 'p2', player_name: 'Synthetic Bea', position: 'Defender' },
+    { id: 'p3', player_name: 'Synthetic Cal', position: 'Attacker' },
+    { id: 'p4', player_name: 'Synthetic Dee', position: 'Midfielder' },
+  ]
+  const watches = [
+    { squad_player_id: 'p1', since: '2026-10-19T06:00:00Z' }, // watched four weeks and more: the net
+    { squad_player_id: 'p2', since: since }, // watched since 2 Nov
+    { squad_player_id: 'p3', since: '2026-10-19T06:00:00Z' }, // has objectives now: set up, not watched
+  ]
+  const list = (now: string, rule: 'w2' | 't2' = 'w2', sessions: Record<string, { date: string; type: string; present: boolean }[]> = {}) =>
+    watchedPlayers({ players, watches, objectives: new Set(['p3']), sessions, rule, timeZone: 'Asia/Dubai', now: at(now) })
+
+  it('lists only watched players without objectives, each with where to set them up', () => {
+    expect(list('2026-11-05T08:00:00Z').map(w => [w.playerId, w.ready, w.step])).toEqual([['p1', true, 'positions'], ['p2', false, 'objectives']])
+  })
+
+  it('a player comes back once their own rule is met', () => {
+    // Omar's four weeks meet the two-week rule too; the rule's reason comes first.
+    expect(list('2026-11-16T08:00:00Z').map(w => [w.playerId, w.ready, w.why])).toEqual([['p1', true, 'Watched 2 weeks'], ['p2', true, 'Watched 2 weeks']])
+    expect(list('2026-11-05T08:00:00Z', 't2', { p2: [training('2026-11-03'), training('2026-11-04')] }).find(w => w.playerId === 'p2'))
+      .toMatchObject({ ready: true, why: 'Watched 2 trainings' })
   })
 })

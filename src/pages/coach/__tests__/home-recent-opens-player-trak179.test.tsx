@@ -23,6 +23,8 @@ function serve() {
       table('coach_assessments', [{ id: 'a-1', coach_user_id: COACH.id, squad_player_id: 'sp-1', coach_rating: 7,
         created_at: '2026-10-15T10:00:00Z', appearance: 'training', squad_players: { player_name: 'Ade Okafor' } }]),
       table('coach_sessions', []),
+      // TRAK-353: the player's Can also play and roles; none.
+      table('squad_player_also_plays', []), table('squad_player_roles', []),
       table('session_attendance', []),
       table('coach_calendar_events', []),
       rpc('feature_on', () => true),

@@ -120,9 +120,10 @@ describe('TRAK-352 positions', () => {
     expect(screen.queryByText('Synthetic Player 24')).not.toBeInTheDocument()
 
     const pick = ['Goalkeeper', 'Goalkeeper', ...Array(7).fill('Defender'), ...Array(7).fill('Midfielder'), ...Array(6).fill('Attacker')]
+    const tapper = user()
     for (const [i, position] of pick.entries()) {
       const name = `Synthetic Player ${String(i + 1).padStart(2, '0')}`
-      await user().click(within(groupOf(name)).getByRole('button', { name: position }))
+      await tapper.click(within(groupOf(name)).getByRole('button', { name: position }))
       expect(await screen.findByRole('heading', { name: `${i + 1} of 22 placed` })).toBeInTheDocument()
     }
     expect(screen.getByText('Everyone is placed.')).toBeInTheDocument()
@@ -132,7 +133,8 @@ describe('TRAK-352 positions', () => {
       expect(screen.getByRole('heading', { name: `${line} · ${count}` })).toBeInTheDocument()
     }
     expect(within(groupOf('Synthetic Player 01')).getByRole('button', { name: 'Goalkeeper' })).toHaveAttribute('aria-pressed', 'true')
-  })
+  // 22 taps: 1.9 s here, over Vitest's 5 s default on CI's runner (5 Nov). Long journeys here get their own limit.
+  }, 30_000)
 
   it('saves Not yet with nobody placed, and Place some now opens the list', async () => {
     squad = [child(1), child(2)]

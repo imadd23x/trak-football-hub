@@ -3,8 +3,9 @@ import type { EventRow } from '@/lib/coach-events'
 import { matchClock } from '@/lib/games/loop'
 import { LockIcon } from '@/components/icons/LockIcon'
 
-/* TRAK-373 (Imad, 5 Nov): Game plan review's top right after kick-off. While the match is on, the minute ("14'", or
-   "HT") over a green bar of the playing time gone; once it's over, "Locked" with the lock. It moves on its own. */
+/* TRAK-373 (Imad, 5 Nov): Game plan review's top right after kick-off. While the match is on, the minute, counted as on
+   TV ("15'" 14 minutes in, or "HT"), over a green bar of the playing time gone; once it's over, "Locked" with the lock.
+   It moves on its own. */
 
 export function MatchClock({ game }: { game: EventRow }) {
   const [now, setNow] = useState(() => Date.now())
@@ -24,7 +25,7 @@ export function MatchClock({ game }: { game: EventRow }) {
     <div className="grid w-full max-w-[224px] justify-items-center gap-2">
       <p aria-hidden="true" className="text-[28px] font-normal leading-7 tracking-[-0.02em] text-ink tabular-nums">{ht ? 'HT' : `${clock.minute}'`}</p>
       <div role="progressbar" aria-label="Match clock" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(clock.share * 100)}
-        aria-valuetext={ht ? 'Half-time' : `${clock.minute} ${clock.minute === 1 ? 'minute' : 'minutes'} played`}
+        aria-valuetext={ht ? 'Half-time' : `Minute ${clock.minute}`}
         className="h-[7px] w-full overflow-hidden rounded-full border border-line bg-raised">
         <span className="block h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${clock.share * 100}%` }} />
       </div>

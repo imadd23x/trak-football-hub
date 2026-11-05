@@ -1,6 +1,7 @@
 /**
  * TRAK-373 (Imad, 5 Nov, Matches round 5): Game plan review's top right after kick-off. While the match is on, a green
- * bar with the minute over it ("14'"), "HT" for the 15 minutes of half-time; once it's over, "Locked" with the lock.
+ * bar with the minute over it, counted as on TV ("15'" 14 minutes in), "HT" for the 15 minutes of half-time; once it's
+ * over, "Locked" with the lock.
  * It moves on its own, with no reload. Test people are named after footballers.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -65,18 +66,18 @@ afterEach(() => { cleanup(); localStorage.clear(); vi.useRealTimers() })
 const card = () => screen.findByRole('region', { name: 'Game plan review' })
 
 describe('TRAK-373: the match clock', { timeout: 30_000 }, () => {
-  it('14 minutes in: the minute over a green bar, and no countdown', async () => {
+  it('14 minutes in: 15\' over a green bar, as on TV, and no countdown', async () => {
     setup(14 * MINUTE + 10_000)
     renderApp('/coach/matches/g1?tab=plan&step=share')
     const review = await card()
     const clock = await within(review).findByRole('progressbar', { name: 'Match clock' })
-    expect(clock).toHaveAttribute('aria-valuetext', '14 minutes played')
-    expect(within(review).getByText('14\'')).toBeInTheDocument()
+    expect(clock).toHaveAttribute('aria-valuetext', 'Minute 15')
+    expect(within(review).getByText('15\'')).toBeInTheDocument()
     expect(within(review).queryByRole('timer')).toBeNull()
     expect(within(review).queryByText('Locked')).toBeNull()
   })
 
-  it('half-time reads HT, and the second half picks up at the 45th minute, with no reload', async () => {
+  it('half-time reads HT, and the second half picks up at 46\', with no reload', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     setup(59 * MINUTE + 50_000)
     renderApp('/coach/matches/g1?tab=plan&step=share')
@@ -86,7 +87,7 @@ describe('TRAK-373: the match clock', { timeout: 30_000 }, () => {
 
     await act(async () => { await vi.advanceTimersByTimeAsync(20_000) })
 
-    expect(await within(review).findByText('45\'')).toBeInTheDocument()
+    expect(await within(review).findByText('46\'')).toBeInTheDocument()
     expect(within(review).queryByText('HT')).toBeNull()
   })
 

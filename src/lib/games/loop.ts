@@ -47,9 +47,9 @@ const MINUTE = 60_000
 const HALF_TIME = 15 * MINUTE
 
 /** TRAK-373 (Imad, 5 Nov): the match clock, from kick-off to full time. Half-time is 15 minutes in the middle of the
- *  match's slot, so each half is (slot − 15) ÷ 2; a slot of 30 minutes or less has no break. The minute is the minutes
- *  played as the coach's watch reads them (9:14 for a 9:00 kick-off is 14'), from 1'. `share`: how much of the playing
- *  time has gone. */
+ *  match's slot, so each half is (slot − 15) ÷ 2; a slot of 30 minutes or less has no break. The minute is counted as
+ *  on TV (Imad's pick): the first minute is 1', 14 minutes played is 15', so two halves of 45 read 1'–45', HT, 46'–90'.
+ *  `share`: how much of the playing time has gone. */
 export function matchClock(game: GameEvent, now: number): { minute: number | 'HT'; share: number } | 'before' | 'over' {
   const kickOff = Date.parse(game.starts_at)
   const end = fullTime(game)
@@ -60,7 +60,7 @@ export function matchClock(game: GameEvent, now: number): { minute: number | 'HT
   const elapsed = now - kickOff
   if (pause && elapsed >= playing / 2 && elapsed < playing / 2 + pause) return { minute: 'HT', share: 0.5 }
   const played = elapsed < playing / 2 ? elapsed : elapsed - pause
-  return { minute: Math.max(1, Math.floor(played / MINUTE)), share: played / playing }
+  return { minute: Math.floor(played / MINUTE) + 1, share: played / playing }
 }
 
 export function gameState(game: GameEvent, now: number, plan: PlanProgress = {}): GameState {

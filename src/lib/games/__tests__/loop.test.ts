@@ -191,12 +191,12 @@ describe('matchClock (TRAK-373)', () => {
     expect(matchClock(slot, at(200))).toBe('over')
   })
 
-  it('reads the minutes played, as the coach\'s watch does: 14 minutes in is 14\', and the first minute is 1\'', () => {
+  it('counts the minute as on TV: the first minute is 1\', 14 minutes played is 15\', the last of the half 45\'', () => {
     expect(matchClock(slot, KICK_OFF)).toEqual({ minute: 1, share: 0 })
     expect(matchClock(slot, at(0, 59))).toMatchObject({ minute: 1 })
-    expect(matchClock(slot, at(14))).toEqual({ minute: 14, share: 14 / 90 })
-    expect(matchClock(slot, at(14, 59))).toMatchObject({ minute: 14 })
-    expect(matchClock(slot, at(44, 59))).toMatchObject({ minute: 44 })
+    expect(matchClock(slot, at(14))).toEqual({ minute: 15, share: 14 / 90 })
+    expect(matchClock(slot, at(14, 59))).toMatchObject({ minute: 15 })
+    expect(matchClock(slot, at(44, 59))).toMatchObject({ minute: 45 })
   })
 
   it('is HT for the 15 minutes in the middle of the slot, the bar halfway', () => {
@@ -205,22 +205,22 @@ describe('matchClock (TRAK-373)', () => {
   })
 
   it('picks up the second half where the first stopped, to the last minute', () => {
-    expect(matchClock(slot, at(60))).toEqual({ minute: 45, share: 0.5 })
-    expect(matchClock(slot, at(61))).toMatchObject({ minute: 46 })
-    expect(matchClock(slot, at(104, 59))).toMatchObject({ minute: 89 })
+    expect(matchClock(slot, at(60))).toEqual({ minute: 46, share: 0.5 })
+    expect(matchClock(slot, at(61))).toMatchObject({ minute: 47 })
+    expect(matchClock(slot, at(104, 59))).toMatchObject({ minute: 90 })
   })
 
   it('a match with no end runs 90 minutes after kick-off, half-time included', () => {
     const open = game({ ends_at: null })
-    expect(matchClock(open, at(37))).toMatchObject({ minute: 37 })
+    expect(matchClock(open, at(37))).toMatchObject({ minute: 38 })
     expect(matchClock(open, at(37, 30))).toEqual({ minute: 'HT', share: 0.5 })
-    expect(matchClock(open, at(52, 30))).toMatchObject({ minute: 37 })
+    expect(matchClock(open, at(52, 30))).toMatchObject({ minute: 38 })
     expect(matchClock(open, at(90))).toBe('over')
   })
 
   it('a slot of 30 minutes or less has no half-time', () => {
     const short = game({ ends_at: '2026-10-31T09:30:00+00:00' })
-    expect(matchClock(short, at(15))).toEqual({ minute: 15, share: 0.5 })
-    expect(matchClock(short, at(29, 59))).toMatchObject({ minute: 29 })
+    expect(matchClock(short, at(15))).toEqual({ minute: 16, share: 0.5 })
+    expect(matchClock(short, at(29, 59))).toMatchObject({ minute: 30 })
   })
 })

@@ -152,7 +152,7 @@ describe('TRAK-344: the match page says each thing once', { timeout: 30_000 }, (
     await act(async () => { await vi.advanceTimersByTimeAsync(2 * MINUTE) })
 
     const locked = screen.getByRole('region', { name: 'Game plan review' })
-    expect(await within(locked).findByRole('progressbar', { name: 'Match clock' })).toHaveAttribute('aria-valuetext', '1 minute played')
+    expect(await within(locked).findByRole('progressbar', { name: 'Match clock' })).toHaveAttribute('aria-valuetext', 'Minute 2')
     expect(within(locked).queryByRole('timer')).toBeNull()
   })
 })

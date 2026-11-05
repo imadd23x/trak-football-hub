@@ -578,7 +578,7 @@ test("the player's event page at 390 px: the shared game plan", async ({ page, c
 // half-time (15 minutes in the middle of the 90-minute slot), then "Locked" with the lock. The page's clock is set to
 // 14 minutes after Lakeside's kick-off, then moved on.
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
-  test(`the match clock at ${width} px: the minute over a green bar, HT, then Locked`, async ({ page, context }, testInfo) => {
+  test(`the match clock at ${width} px: the minute (as on TV) over a green bar, HT, then Locked`, async ({ page, context }, testInfo) => {
     const lakeside = MATCHES.find(m => m.id === 'm-past')!
     await page.clock.install({ time: new Date(Date.parse(lakeside.starts_at) + 14 * MINUTE + 10_000) })
     const plans: Plans = new Map([['m-past', { event_id: 'm-past', strength: 'similar', their_formation: null, key_players: [], scouting: '',
@@ -586,8 +586,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-past?tab=plan&step=share', width, height, plans)
     const card = page.getByRole('region', { name: 'Game plan review' })
     const clock = card.getByRole('progressbar', { name: 'Match clock' })
-    await expect(clock).toHaveAttribute('aria-valuetext', '14 minutes played')
-    await expect(card.getByText('14\'', { exact: true })).toBeVisible()
+    // Counted as on TV: 14 minutes played is 15'.
+    await expect(clock).toHaveAttribute('aria-valuetext', 'Minute 15')
+    await expect(card.getByText('15\'', { exact: true })).toBeVisible()
     await expect(card.getByRole('timer')).toHaveCount(0)
     // Trak's green, a fifth of the way along (14 of 75 minutes of play).
     const fill = clock.locator('span')

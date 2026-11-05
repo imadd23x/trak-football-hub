@@ -43,6 +43,26 @@ export function fullTime(game: GameEvent): number {
   return game.ends_at ? Date.parse(game.ends_at) : Date.parse(game.starts_at) + 90 * 60_000
 }
 
+const MINUTE = 60_000
+const HALF_TIME = 15 * MINUTE
+
+/** TRAK-373 (Imad, 5 Nov): the match clock, from kick-off to full time. Half-time is 15 minutes in the middle of the
+ *  match's slot, so each half is (slot − 15) ÷ 2; a slot of 30 minutes or less has no break. The minute is counted as
+ *  on TV (Imad's pick): the first minute is 1', 14 minutes played is 15', so two halves of 45 read 1'–45', HT, 46'–90'.
+ *  `share`: how much of the playing time has gone. */
+export function matchClock(game: GameEvent, now: number): { minute: number | 'HT'; share: number } | 'before' | 'over' {
+  const kickOff = Date.parse(game.starts_at)
+  const end = fullTime(game)
+  if (now < kickOff) return 'before'
+  if (now >= end) return 'over'
+  const pause = end - kickOff > 2 * HALF_TIME ? HALF_TIME : 0
+  const playing = end - kickOff - pause
+  const elapsed = now - kickOff
+  if (pause && elapsed >= playing / 2 && elapsed < playing / 2 + pause) return { minute: 'HT', share: 0.5 }
+  const played = elapsed < playing / 2 ? elapsed : elapsed - pause
+  return { minute: Math.floor(played / MINUTE) + 1, share: played / playing }
+}
+
 export function gameState(game: GameEvent, now: number, plan: PlanProgress = {}): GameState {
   if (!game.published) return 'logistics' // a draft can still be published after its time (TRAK-230)
   if (now < Date.parse(game.starts_at)) {

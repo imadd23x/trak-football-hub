@@ -1,11 +1,11 @@
 /**
  * TRAK-287 (Games 5/8): locked at kick-off. With the page open, the plan turns read-only at kick-off, with no reload:
- * an alert says so, Save and Share go, the fields read only, and the pickers show their choice in words. The alert
- * says what wasn't shared (Imad, 28 Oct). Home's plan card closes at kick-off too. Test people are named after
- * footballers.
+ * Save and Share go, and the pickers show their choice in words. Home's plan card closes at kick-off too. TRAK-372
+ * (Imad, 5 Nov): no alert; what was written reads as written, with no text boxes, and nothing written says so. Test
+ * people are named after footballers.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
@@ -92,22 +92,28 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
 
     await act(async () => { await vi.advanceTimersByTimeAsync(31_000) })
 
-    expect(await screen.findByText(/^Locked at kick-off, \d\d:\d\d$/)).toBeInTheDocument()
-    expect(screen.getByText(/Jobs and expectations are fixed, so the evaluation reads against what you expected before the game\./)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull()
-    expect(screen.getByRole('textbox', { name: 'Instruction' })).toHaveAttribute('readonly')
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull())
+    expect(screen.queryByText(/^Locked at kick-off, \d\d:\d\d$/)).toBeNull()
+    expect(screen.queryByText(/Jobs and expectations are fixed/)).toBeNull()
+    // TRAK-372: written, not boxes.
+    const panel = screen.getByRole('tabpanel')
+    expect(within(panel).queryAllByRole('textbox')).toEqual([])
+    expect(within(panel).getByText('Win the second ball')).toBeInTheDocument()
+    expect(within(panel).getByText('First to every loose ball in midfield.')).toBeInTheDocument()
+    expect(within(panel).getByText('Their 9 is quick.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Add instruction|Remove instruction/ })).toBeNull()
     // The pickers show their choice in words.
     expect(screen.queryByRole('group', { name: /^How strong are/ })).toBeNull()
     expect(screen.getByText('Similar')).toBeInTheDocument()
   })
 
-  it('locked as a draft, the alert says only the coach saw it, and Share is gone', async () => {
+  it('locked as a draft, the review says it was never shared, and Share is gone', async () => {
     const user = userEvent.setup()
     setup({ kickOffIn: -MINUTE })
     renderApp('/coach/matches/g1?tab=plan&step=share')
-    expect(await screen.findByText(/It wasn’t shared, so only you saw it\./)).toBeInTheDocument()
-    expect(await screen.findByRole('region', { name: 'Not shared' })).toBeInTheDocument()
+    const notShared = await screen.findByRole('region', { name: 'Not shared' })
+    expect(notShared).toHaveTextContent('It wasn’t shared before kick-off, so only you saw it.')
+    expect(screen.queryByText(/^Locked at kick-off, \d\d:\d\d$/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Share plan' })).toBeNull()
     // TRAK-332: the review still reads every part, with nothing to edit.
     const review = screen.getByRole('region', { name: 'Game plan review' })
@@ -117,23 +123,24 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     expect(await screen.findByRole('heading', { name: '4-4-2' })).toBeInTheDocument()
   })
 
-  it('shared with changes still unshared, the alert counts who didn\'t get them; there is no Share changes', async () => {
+  it('shared with changes still unshared: no alert, and there is no Share changes', async () => {
     setup({ kickOffIn: -MINUTE, shared: true, changes: ['zagorakis', 'charisteas'] })
     renderApp('/coach/matches/g1?tab=plan&step=share')
-    expect(await screen.findByText(/2 players didn’t get your last changes\./)).toBeInTheDocument()
-    const shared = screen.getByRole('region', { name: 'Shared' })
+    const shared = await screen.findByRole('region', { name: 'Shared' })
+    expect(screen.queryByText(/didn’t get your last changes|^Locked at kick-off, /)).toBeNull()
     expect(within(shared).queryByRole('button', { name: /Share changes/ })).toBeNull()
     expect(shared).not.toHaveTextContent('Edits stay with you')
   })
 
-  it('the player\'s sheet only shows: the job reads only, context and expectation are words, nothing moves', async () => {
+  it('the player\'s sheet only shows: the job is written, context and expectation are words, nothing moves', async () => {
     const user = userEvent.setup()
     setup({ kickOffIn: -MINUTE })
     renderApp('/coach/matches/g1?tab=plan')
     await user.click(await screen.findByRole('button', { name: 'Next: Line-up and jobs' }))
     await user.click(await screen.findByRole('button', { name: /^Theodoros Zagorakis, slot 4/ }))
     const sheet = await screen.findByRole('complementary', { name: 'Theodoros Zagorakis' })
-    expect(within(sheet).getByRole('textbox', { name: /^Job · / })).toHaveAttribute('readonly')
+    expect(within(sheet).queryAllByRole('textbox')).toEqual([])
+    expect(within(sheet).getByText('Stay tight to their winger.')).toBeInTheDocument()
     expect(within(sheet).getByText('Out of position')).toBeInTheDocument()
     expect(within(sheet).getByText('Stretch')).toBeInTheDocument()
     expect(within(sheet).queryByRole('button', { name: 'Move to bench' })).toBeNull()
@@ -141,6 +148,24 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Slot 1, empty' }))
     expect(await screen.findByText('Nobody was placed here before kick-off.')).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Who plays here?' })).toBeNull()
+  })
+
+  it('TRAK-372: nothing written reads "No instructions.", "No scouting." and "No job.", with no boxes', async () => {
+    const user = userEvent.setup()
+    setup({ kickOffIn: -MINUTE })
+    server.use(
+      table('game_plans', [{ ...PLAN, scouting: '', goals: [] }]),
+      table('game_plan_players', [{ ...LINE_UP[0], job: '' }]),
+    )
+    renderApp('/coach/matches/g1?tab=plan')
+    expect(await screen.findByText('No instructions.')).toBeInTheDocument()
+    expect(screen.getByText('No scouting.')).toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel')).queryAllByRole('textbox')).toEqual([])
+    await user.click(screen.getByRole('button', { name: 'Next: Line-up and jobs' }))
+    await user.click(await screen.findByRole('button', { name: /^Theodoros Zagorakis, slot 4/ }))
+    const sheet = await screen.findByRole('complementary', { name: 'Theodoros Zagorakis' })
+    expect(within(sheet).getByText('No job.')).toBeInTheDocument()
+    expect(within(sheet).queryAllByRole('textbox')).toEqual([])
   })
 
   it('Home\'s plan card closes at kick-off, with Home open', async () => {

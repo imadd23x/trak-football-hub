@@ -151,9 +151,9 @@ describe('TRAK-344: the match page says each thing once', { timeout: 30_000 }, (
 
     await act(async () => { await vi.advanceTimersByTimeAsync(2 * MINUTE) })
 
-    expect(await screen.findByText(/^Locked at kick-off, \d\d:\d\d$/)).toBeInTheDocument()
+    // TRAK-372: no lock alert; the card itself says so.
+    expect(await within(screen.getByRole('region', { name: 'Game plan review' })).findByText('Kick-off')).toBeInTheDocument()
     const locked = screen.getByRole('region', { name: 'Game plan review' })
-    expect(within(locked).getByText('Kick-off')).toBeInTheDocument()
     expect(within(locked).getByRole('timer', { name: 'Kick-off' })).toHaveTextContent('Locked')
   })
 })

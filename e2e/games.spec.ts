@@ -574,9 +574,10 @@ test("the player's event page at 390 px: the shared game plan", async ({ page, c
   expect(errors).toEqual([])
 })
 
-// TRAK-287: a match that has kicked off shows its plan locked: read only, with no Save or Share, and the lock's note.
+// TRAK-287: a match that has kicked off shows its plan locked, with no Save or Share. TRAK-372 (Imad, 5 Nov): no lock
+// alert, and what was written reads as written, with no boxes.
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
-  test(`a locked plan at ${width} px: read only, with the lock's note`, async ({ page, context }, testInfo) => {
+  test(`a locked plan at ${width} px: written, not boxes, with no lock alert`, async ({ page, context }, testInfo) => {
     const plans: Plans = new Map([
       ['m-past', { event_id: 'm-past', strength: 'similar', their_formation: '4-3-3', key_players: [], scouting: 'Their 9 is quick.', format: 11,
         formation: '4-4-2', goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }],
@@ -585,15 +586,16 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
         note: '', context: [], expectation: 'usual' }],
     ])
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-past?tab=plan', width, height, plans)
-    await expect(page.getByText(/^Locked at kick-off, \d\d:\d\d$/)).toBeVisible()
-    await expect(page.getByText(/It wasn’t shared, so only you saw it\./)).toBeVisible()
+    await expect(page.getByText('Win it back in their half', { exact: true })).toBeVisible()
+    await expect(page.getByText('Press when their keeper plays short.', { exact: true })).toBeVisible()
+    await expect(page.getByText('Their 9 is quick.', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^Locked at kick-off, \d\d:\d\d$/)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Save draft' })).toHaveCount(0)
-    await expect(page.getByRole('textbox', { name: 'Instruction' })).toHaveAttribute('readonly', '')
+    await expect(page.locator('[role="tabpanel"]:not([hidden])').getByRole('textbox')).toHaveCount(0)
     await expect(page.getByRole('button', { name: /Add instruction/ })).toHaveCount(0)
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`locked-plan-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
-    // Read-only fields still take focus, so the plan can be read with the keyboard.
     const keyboard = await everyControlByKeyboard(page, '[role="tabpanel"]:not([hidden])', true)
     expect(keyboard.count).toBeGreaterThan(3)
     expect(keyboard.missed).toEqual([])

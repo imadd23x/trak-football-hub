@@ -84,6 +84,7 @@ const sheet = (first: string) => screen.findByRole('dialog', { name: `${first}'s
 const choice = (scope: HTMLElement, name: string) => within(scope).getByRole('button', { name })
 
 describe('TRAK-353 Can also play and roles', () => {
+  // Many taps and some typing: on CI this ran past the 5 s default (5 Nov), as TRAK-352's 22 taps did.
   it('from a Positions name: two Can also play, a third refused with the reason, roles and your own, then Save · next', async () => {
     renderApp('/coach/season-plan/positions')
     await user().click(await screen.findByRole('button', { name: /^Synthetic Pat Defender/ }))
@@ -115,7 +116,7 @@ describe('TRAK-353 Can also play and roles', () => {
     await waitFor(() => expect(within(bo).getByRole('group', { name: 'As a midfielder' })).toBeInTheDocument())
     expect(choice(within(bo).getByRole('group', { name: 'Yours' }), 'Win the second ball')).toHaveAttribute('aria-pressed', 'false')
     expect(within(bo).getByRole('button', { name: 'Save · next: Synthetic Cy Attacker' })).toBeInTheDocument()
-  })
+  }, 30_000)
 
   it('a new main position leaves Can also play', async () => {
     also = [{ squad_player_id: 'p1', position: 'Midfielder' }]
@@ -129,7 +130,7 @@ describe('TRAK-353 Can also play and roles', () => {
     expect(choice(cover(), 'Defender')).toHaveAttribute('aria-pressed', 'false')
     await user().click(within(pat).getByRole('button', { name: /^Save/ }))
     await waitFor(() => expect(saves[0]).toMatchObject({ p_position: 'Midfielder', p_also_plays: [] }))
-  })
+  }, 30_000)
 
   it("on the player's page: shows, edits and keeps them after a reload; the history shows the main position's changes", async () => {
     roles = [{ squad_player_id: 'p1', role: 'Stopper' }]

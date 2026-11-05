@@ -646,8 +646,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   })
 }
 
-// TRAK-288: after full time, the evaluation as one draft: Result, Team and Players, read against the plan as it locked,
-// saved with Save draft · sleep on it and reloaded. Every field is reachable by keyboard, and nothing scrolls sideways.
+// TRAK-288: after full time, the evaluation as one draft, read against the plan as it locked, saved and reloaded. Every
+// field is reachable by keyboard, and nothing scrolls sideways. TRAK-374 (Imad, 5 Nov): Result (with "Did the plan
+// work?") and Player evaluation, each player's job shown, "Did the job?", and a Draft badge in place of the alert.
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   test(`an evaluation at ${width} px: every step by keyboard, saved as a draft and reloaded`, async ({ page, context }, testInfo) => {
     const plans: Plans = new Map([
@@ -668,6 +669,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.getByRole('option', { name: 'Theodoros Zagorakis' }).click()
     await page.getByRole('checkbox', { name: 'Angelos Charisteas' }).click()
     await page.getByRole('textbox', { name: 'How their goals came' }).fill('A corner at the back post.')
+    await page.getByRole('group', { name: 'Win it back in their half' }).getByText('Worked').click()
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`evaluation-result-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
@@ -675,21 +677,15 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(keyboard.count).toBeGreaterThan(10)
     expect(keyboard.missed).toEqual([])
 
-    // Team: did the plan work?
-    await page.getByRole('button', { name: 'Next: Team' }).click()
-    await page.getByRole('group', { name: 'Win it back in their half' }).getByText('Worked').click()
-    await page.waitForTimeout(400)
-    await page.screenshot({ path: testInfo.outputPath(`evaluation-team-${width}.png`), fullPage: true })
-    expect(await sideways(page)).toBeLessThanOrEqual(0)
-
-    // Players: everyone starts at Did the job · Met; Zagorakis did part of his job, above what was expected.
-    await page.getByRole('button', { name: 'Next: Players' }).click()
+    // Player evaluation: everyone starts at Did the job · Met; Zagorakis did part of his job, above what was expected.
+    await page.getByRole('button', { name: 'Next: Player evaluation' }).click()
     const card = page.getByRole('button', { name: /^Theodoros Zagorakis/ })
     await expect(card).toContainText('Did the job · Met')
     await expect(card).toContainText('Expected: Stretch')
     await card.click()
     const expanded = page.locator('article').filter({ has: card })
-    await expanded.getByRole('group', { name: 'Did the job' }).getByText('Partly').click()
+    await expect(expanded.getByText('Stay tight to their winger.', { exact: true })).toBeVisible()
+    await expanded.getByRole('group', { name: 'Did the job?' }).getByText('Partly').click()
     await expanded.getByRole('group', { name: 'Against expectation' }).getByText('Above').click()
     await expanded.getByRole('textbox', { name: /^Note to Theodoros/ }).fill('Brave all game.')
     await expect(card).toContainText('Did part of the job · Above')
@@ -699,8 +695,10 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     keyboard = await everyControlByKeyboard(page, '[role="tabpanel"]:not([hidden])', true)
     expect(keyboard.missed).toEqual([])
 
-    await page.getByRole('button', { name: 'Save draft · sleep on it' }).click()
-    await expect(page.getByText(/^Draft saved \d\d:\d\d$/)).toBeVisible()
+    await expect(page.getByText('Draft', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Save draft' }).click()
+    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
+    await expect(page.getByText(/^Draft saved/)).toHaveCount(0)
     await expect(page.getByText('Evaluation draft')).toBeVisible()
     await page.evaluate(() => window.scrollTo(0, 0))
     await page.waitForTimeout(400)
@@ -732,10 +730,14 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
         p_players: [{ id: 'sq-1', played: true, did_job: 'partly', against_expectation: 'above', note: 'Brave all game.' }, { id: 'sq-4', played: true }] }],
     ])
     const coach = await open(page, context, '/coach/matches/m-past?tab=evaluation', width, height, plans)
-    await page.getByRole('button', { name: 'Next: Team' }).click()
-    await page.getByRole('button', { name: 'Next: Players' }).click()
+    await page.getByRole('button', { name: 'Next: Player evaluation' }).click()
     await page.getByRole('button', { name: 'Next: Publish' }).click()
-    await expect(page.getByText('2 players · 1 changed from “Met” · 1 note')).toBeVisible()
+    // TRAK-375 (Imad, 5 Nov): one Evaluation review card, with no preview or "Who sees what".
+    const review = page.getByRole('region', { name: 'Evaluation review' })
+    await expect(review.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(4)
+    await expect(review.getByText('Won 2–1 · 1 goal without a scorer', { exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Preview' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Who sees what' })).toHaveCount(0)
     // This match was made before New event asked the competition (Imad, 29 Oct): the Publish step asks it.
     await expect(page.getByText('Pick the competition first.')).toBeVisible()
     await page.getByRole('group', { name: 'Competition' }).getByText('League').click()

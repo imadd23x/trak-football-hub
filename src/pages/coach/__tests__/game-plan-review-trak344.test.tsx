@@ -152,7 +152,8 @@ describe('TRAK-344: the match page says each thing once', { timeout: 30_000 }, (
     await act(async () => { await vi.advanceTimersByTimeAsync(2 * MINUTE) })
 
     const locked = screen.getByRole('region', { name: 'Game plan review' })
-    expect(await within(locked).findByRole('progressbar', { name: 'Match clock' })).toHaveAttribute('aria-valuetext', 'Minute 2')
+    // Kick-off is the next whole minute, 30 to 90 s away, so two minutes on the clock reads Minute 1 or Minute 2.
+    expect(await within(locked).findByRole('progressbar', { name: 'Match clock' })).toHaveAttribute('aria-valuetext', expect.stringMatching(/^Minute [12]$/))
     expect(within(locked).queryByRole('timer')).toBeNull()
   })
 })

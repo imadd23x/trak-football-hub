@@ -1,11 +1,10 @@
 import { Plus } from 'lucide-react'
 import { LIMITS, MAX_GOALS, STRENGTHS, emptyGoal, type Goal, type PlanForm, type Strength } from '@/lib/games/plan'
-import { LockIcon } from '@/components/icons/LockIcon'
 import { Button } from '@/components/arc/button/button'
 import { Input } from '@/components/arc/input/input'
 import { RadioGroup } from '@/components/arc/radio-group/radio-group'
 import { Textarea } from '@/components/arc/textarea/textarea'
-import { Tooltip } from '@/components/arc/tooltip/tooltip'
+import { OnlyYou } from './OnlyYou'
 
 /* TRAK-284 (Games 2/8): plan step 1 (TRAK-282). TRAK-287: locked at kick-off, the fields read only, the picker becomes
    words, and nothing can be added or removed. TRAK-328 (Imad, 2 Nov): the step is Tactics & analysis; the goals are
@@ -15,16 +14,6 @@ import { Tooltip } from '@/components/arc/tooltip/tooltip'
    TRAK-372 (Imad, 5 Nov): locked, what was written reads as written, with no boxes; nothing written says so. */
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
-
-/** Imad's lock at a card's top right: "Only you can see this" on hover, focus or a tap. `what` names it for screen readers. */
-function OnlyYou({ what }: { what: string }) {
-  return <Tooltip content="Only you can see this" openOnTap>
-    <button type="button" aria-label={`Who sees ${what}`}
-      className="-m-1.5 grid size-9 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-      <LockIcon size={20} />
-    </button>
-  </Tooltip>
-}
 
 /** The instructions as they locked: each numbered, its title over what it looks like. */
 function Written({ goals }: { goals: Goal[] }) {

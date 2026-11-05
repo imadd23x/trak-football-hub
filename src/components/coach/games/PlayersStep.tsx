@@ -4,10 +4,13 @@ import { Badge } from '@/components/arc/badge/badge'
 import { ExpandableCard } from '@/components/arc/expandable-card/expandable-card'
 import { Input } from '@/components/arc/input/input'
 import { RadioGroup } from '@/components/arc/radio-group/radio-group'
+import { LockedValue } from './LockedValue'
 
 /* TRAK-288 (Games 6/8): the evaluation's Players step (TRAK-282). A card for each player who played: closed, how they
    did ("Did the job · Met") with the context and the expectation from the plan as it locked at kick-off; open, the
-   two answers and a note only that player will read. Everyone starts at Yes · Met. */
+   two answers and a note only that player will read. Everyone starts at Yes · Met. TRAK-374 (Imad, 5 Nov): the step is
+   Player evaluation; an open card shows the player's job from the plan first, to judge against; "Did the job?"; the
+   note shows an example. */
 
 const first = (name: string) => name.split(/\s+/)[0] || name
 
@@ -21,7 +24,7 @@ export function PlayersStep({ eventId, form, onFormChange, played, plans }: {
     <section aria-labelledby="evaluation-players" className="grid min-w-0 content-start gap-4">
       <div>
         <h2 id="evaluation-players" className="text-lg font-medium text-ink">Against what you expected</h2>
-        <p className="mt-1 text-sm text-ink-3">{played.length ? 'Everyone starts at “Did the job · Met”. Change only who stood out.' : 'Nobody is ticked as playing. Tick who played in Result first.'}</p>
+        {!played.length && <p className="mt-1 text-sm text-ink-3">Nobody is ticked as playing. Tick who played in Result first.</p>}
       </div>
       <ul className="grid gap-3">
         {played.map(player => {
@@ -35,12 +38,13 @@ export function PlayersStep({ eventId, form, onFormChange, played, plans }: {
                 {`Expected: ${EXPECTATIONS.find(e => e.value === plan.expectation)!.label}`}</Badge>
             </>}>
               <div className="grid gap-4 p-4 tablet:grid-cols-2">
-                <RadioGroup label="Did the job" name={`did-job-${eventId}-${player.id}`} options={DID_JOB} value={answer.didJob}
+                <div className="tablet:col-span-2"><LockedValue label="Job" value={plan.job.trim() || 'No job.'} /></div>
+                <RadioGroup label="Did the job?" name={`did-job-${eventId}-${player.id}`} options={DID_JOB} value={answer.didJob}
                   onValueChange={value => set(player.id, { didJob: value as DidJob })} />
                 <RadioGroup label="Against expectation" name={`against-${eventId}-${player.id}`} options={AGAINST} value={answer.against}
                   onValueChange={value => set(player.id, { against: value as Against })} />
                 <div className="tablet:col-span-2">
-                  <Input label={`Note to ${name} · only ${name} sees it`} placeholder="Optional. One sentence." value={answer.note}
+                  <Input label={`Note to ${name}`} placeholder="e.g. Your runs in behind stretched them all game. Next time, look up before you cross." value={answer.note}
                     maxLength={EVALUATION_LIMITS.note} onChange={event => set(player.id, { note: event.target.value })} />
                 </div>
               </div>

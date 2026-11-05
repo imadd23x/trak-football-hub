@@ -139,7 +139,7 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     expect(slot(1)).toHaveAccessibleName('Slot 1, empty')
     expect(slot(2)).toHaveAccessibleName('Theodoros Zagorakis, slot 2')
 
-    await user.click(screen.getByRole('button', { name: 'Take off the pitch' }))
+    await user.click(screen.getByRole('button', { name: 'Move to bench' }))
     expect(slot(2)).toHaveAccessibleName('Slot 2, empty')
     expect(within(jobs()).getByRole('button', { name: /Theodoros Zagorakis/ })).toHaveTextContent('Bench')
   })

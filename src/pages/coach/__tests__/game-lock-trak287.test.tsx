@@ -136,7 +136,7 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     expect(within(sheet).getByRole('textbox', { name: /^Job · / })).toHaveAttribute('readonly')
     expect(within(sheet).getByText('Out of position')).toBeInTheDocument()
     expect(within(sheet).getByText('Stretch')).toBeInTheDocument()
-    expect(within(sheet).queryByRole('button', { name: 'Take off the pitch' })).toBeNull()
+    expect(within(sheet).queryByRole('button', { name: 'Move to bench' })).toBeNull()
     expect(within(sheet).queryByRole('group', { name: /Expectation/ })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Slot 1, empty' }))
     expect(await screen.findByText('Nobody was placed here before kick-off.')).toBeInTheDocument()

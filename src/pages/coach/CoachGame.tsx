@@ -130,7 +130,7 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
                   retrying={plan.isFetching || players.isFetching} /></div>
               // Locked, it shows the plan as saved at kick-off: what the evaluation reads against.
               : <GamePlan game={row} form={(locked ? null : typed) ?? planToForm(plan.data ?? null, players.data ?? [])} onFormChange={setTyped}
-                  step={planStep} onStep={setPlanStep} sharedAt={sharedAt} changes={changes} lockedAt={locked ? time : null}
+                  step={planStep} onStep={setPlanStep} sharedAt={sharedAt} changes={changes} locked={locked}
                   onEditLogistics={() => logistics.open?.()} />}
           </TabsContent>
           <TabsContent value="evaluation">

@@ -16,7 +16,7 @@ import userEvent from '@testing-library/user-event'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
-import { SUPABASE_URL, table } from '../../../../tests/msw/supabase'
+import { SUPABASE_URL, rpc, rpcRows, table } from '../../../../tests/msw/supabase'
 import { http, HttpResponse } from 'msw'
 
 const COACH = { id: 'coach-72' }
@@ -109,15 +109,28 @@ describe('TRAK-72 How Trak works', () => {
 
 describe('TRAK-72 player page', () => {
   it('keeps position and shirt number, and drops the assessment count', async () => {
-    signedInCoach()
-    // The page reads one roster row by id (maybeSingle), so serve exactly one.
+    // TRAK-368: the player's own page in Squad, with the reads Squad makes. Its header line is "#8 · Midfielder · U16".
+    // A coach of its own: the app's query cache outlives a test, and the other tests here sign in as COACH.
+    const OWN = { id: 'coach-72-player-page' }
+    signInAs(OWN)
     server.use(
-      table('squad_players', [{ id: 'sp-1', coach_user_id: COACH.id, player_name: 'Alex Synthetic', linked_player_id: 'child-1', position: 'Midfielder', shirt_number: 8 }]),
+      table('profiles', [{ id: 'p-72b', user_id: OWN.id, role: 'coach', full_name: 'Coach Synthetic', invite_code: null }]),
+      table('coach_details', [{ user_id: OWN.id, coach_role: 'Head Coach', team: 'U16s', current_club: null, organization_id: null }]),
+      table('notification_settings', []),
+      table('squad_players', [{ id: 'sp-1', coach_user_id: OWN.id, player_name: 'Alex Synthetic', linked_player_id: 'child-1', position: 'Midfielder', shirt_number: 8, age_group: 'U16', status: 'active' }]),
       table('coach_shared_feedback', []),
+      table('coach_assessments', []),
+      table('coach_assessment_notes', []),
+      table('coach_sessions', []),
+      table('squad_player_profiles', []),
+      rpc('coach_squad_player_consent_required', () => false),
+      rpc('feature_on', () => false),
+      rpc('coach_squad_season', () => []),
+      rpcRows('coach_player_birth_dates', []),
     )
-    renderApp('/coach/player/sp-1')
-    expect(await screen.findByText('Midfielder')).toBeInTheDocument()
-    expect(screen.getByText('#8')).toBeInTheDocument()
+    renderApp('/coach/squad/player/sp-1')
+    const page = await screen.findByRole('article', { name: /^Alex Synthetic/ })
+    expect(page).toHaveTextContent('#8 · Midfielder · U16')
     expect(screen.queryByText(/^\d+ assessments?$/)).toBeNull()
   })
 })

@@ -110,7 +110,7 @@ describe('TRAK-347: on a laptop, the top bar is the trail', { timeout: 30_000 },
   it('while a page\'s name loads, the top bar shows its nav row\'s: Squad for a player', async () => {
     // The squad never answers, so the player's page never learns the name.
     server.use(http.get(`${SUPABASE_URL}/rest/v1/squad_players`, () => new Promise<never>(() => {})))
-    renderApp('/coach/player/sp-1')
+    renderApp('/coach/squad/player/sp-1')
     expect(await crumbs('Squad')).toEqual(['Squad'])
   })
 

@@ -88,10 +88,11 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
     writes.start.mutate(FORMATION_SEEDS.map(seed => ({ ...seed, starters: firstXI(pickable, seed.shape) })))
   }, [list, unplaced, roles.isPending, consented, writes.start])
 
-  if (unplaced > 0) return <section aria-labelledby="formations-locked" className="grid justify-items-start gap-3 rounded-2xl border border-line bg-surface p-6">
+  // Arc's styles apply inside .arc; a phone's frame doesn't give one (the laptop's does), so each view brings its own.
+  if (unplaced > 0) return <section aria-labelledby="formations-locked" className="arc grid justify-items-start gap-3 rounded-2xl border border-line bg-surface p-6">
     <h2 id="formations-locked" className="text-lg font-medium text-ink">Place {plural(unplaced, 'player')} to open Formations</h2>
     <p className="max-w-prose text-sm text-ink-2">A formation is built from where each player plays, so every player in {squad} needs a position first.</p>
-    <span className="arc"><Button variant="secondary" onClick={() => navigate('/coach/season-plan/positions')}>Go to Positions</Button></span>
+    <Button variant="secondary" onClick={() => navigate('/coach/season-plan/positions')}>Go to Positions</Button>
   </section>
   if (formations.isError || roles.isError) return <LoadError what="your formations" onRetry={() => { void formations.refetch(); void roles.refetch() }} />
   if (!list || roles.isPending || writes.start.isPending) return <LoadingSkeleton label="Loading your formations…" lines={3} rows={2} />
@@ -131,7 +132,7 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
     })
   }
 
-  if (!saved || !current) return <div className="grid gap-5">
+  if (!saved || !current) return <div className="arc grid gap-5">
     {header}
     <div className="grid justify-items-center gap-2 rounded-2xl border border-line bg-surface p-8 text-center">
       <p className="text-[15px] font-medium text-ink">No formations yet</p>
@@ -172,7 +173,7 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
   const starting = new Set(Object.values(current.starters))
   const bench = [...boardPlayers.values()].filter(p => p.canPlay && !starting.has(p.id))
 
-  return <div className="grid gap-5">
+  return <div className="arc grid gap-5">
     {header}
     <div role="group" aria-label="Saved formations" className="grid gap-2 tablet:grid-cols-2 laptop:grid-cols-3">
       {list.map(f => {

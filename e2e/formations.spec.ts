@@ -65,9 +65,15 @@ const noSidewaysScroll = (page: Page) => page.evaluate(() => document.documentEl
 const pitch = (page: Page) => page.getByRole('group', { name: /starting players\. Attacking upwards\.$/ })
 const place = (page: Page, slot: number) => pitch(page).getByRole('button', { name: new RegExp(`place ${slot}\\.`) })
 
-/** A real drag with the mouse's pointer events: press, move in steps, release over the target. */
+/** A real drag with the mouse's pointer events: press, move in steps, release over the target. The pitch is
+ *  centred first, so both ends are on screen (a coach's own drag scrolls the page near its edges). */
 async function drag(page: Page, from: ReturnType<Page['getByRole']>, to: ReturnType<Page['getByRole']>) {
+  const height = page.viewportSize()!.height
+  const [a0, b0] = [(await from.boundingBox())!, (await to.boundingBox())!]
+  // Scroll so the midway point between the two is in the middle of the screen.
+  await page.evaluate(by => window.scrollBy(0, by), (Math.min(a0.y, b0.y) + Math.max(a0.y + a0.height, b0.y + b0.height)) / 2 - height / 2)
   const a = (await from.boundingBox())!, b = (await to.boundingBox())!
+  expect(a.y >= 0 && a.y + a.height <= height && b.y >= 0 && b.y + b.height <= height, 'both ends of the drag are on screen').toBe(true)
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
   await page.mouse.down()
   await page.mouse.move(a.x + a.width / 2 + 10, a.y + a.height / 2 + 10, { steps: 3 })
@@ -125,12 +131,13 @@ test('every width from 320 to 1440: no clipped faces or controls, no sideways sc
   for (const width of [320, 360, 390, 430, 600, 768, 834, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     await expect(place(page, 11)).toBeVisible()
-    expect(await noSidewaysScroll(page), `${width} px scrolls sideways`).toBeLessThanOrEqual(0)
-    const box = (await pitch(page).boundingBox())!
-    for (const slot of [1, 2, 5, 6, 9, 11]) {
-      const b = (await place(page, slot).boundingBox())!
-      expect(b.x >= box.x - 1 && b.x + b.width <= box.x + box.width + 1, `${width} px: place ${slot} leaves the pitch`).toBe(true)
-    }
+    await expect.poll(() => noSidewaysScroll(page), { message: `${width} px scrolls sideways` }).toBeLessThanOrEqual(0)
+    // The pitch and its places in one snapshot, once the layout has settled (at 1024 the frame swaps to the laptop's).
+    await expect.poll(() => pitch(page).evaluate(el => {
+      const box = el.getBoundingClientRect()
+      return [...el.querySelectorAll('[data-spot^="slot:"]')].map(place => place.getBoundingClientRect())
+        .filter(b => b.left < box.left - 1 || b.right > box.right + 1 || b.top < box.top - 1 || b.bottom > box.bottom + 1).length
+    }), { message: `${width} px: every place stays inside the pitch` }).toBe(0)
   }
   // Focus is visible on a place on the pitch, from the keyboard.
   await page.keyboard.press('Tab')

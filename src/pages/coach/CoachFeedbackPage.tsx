@@ -142,7 +142,7 @@ export default function CoachFeedbackPage() {
             <p className="text-[12px] text-ink-2" style={{ fontFamily: 'var(--t-font)' }}>Your players are waiting for a parent's approval.</p>
           ) : (
             asTable ? <FeedbackTable rows={overview.rows} show={show} onShow={setShow}
-              onOpen={id => navigate(`/coach/player/${id}`)}
+              onOpen={id => navigate(`/coach/squad/player/${id}`)}
               onAssess={id => navigate('/coach/assess', { state: { preselectedPlayerId: id } })} /> :
             // TRAK-252: two columns on a coach's upright tablet.
             <ul className="flex flex-col gap-2 tablet:grid tablet:grid-cols-2">
@@ -151,7 +151,7 @@ export default function CoachFeedbackPage() {
                   className="flex items-center gap-3 rounded-[10px] py-2.5 px-3 cursor-pointer active:scale-[0.99] transition-transform"
                   style={{ background: 'rgb(var(--t-raised))', borderLeft: `3px solid ${LEVEL[row.level].color}` }}
                   // TRAK-179: the player's profile, as Squad → Open profile.
-                  {...openable(`Open ${row.name}'s profile: ${LEVEL[row.level].word}`, () => navigate(`/coach/player/${row.playerId}`))}>
+                  {...openable(`Open ${row.name}'s profile: ${LEVEL[row.level].word}`, () => navigate(`/coach/squad/player/${row.playerId}`))}>
                   <PlayerFace name={row.name} size="sm" className="arc flex-shrink-0" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="flex items-baseline justify-between gap-2">

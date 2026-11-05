@@ -131,7 +131,7 @@ describe('TRAK-211: the Feedback and assessment tab', { timeout: 20_000 }, () =>
     home({ players: [player('a', 'Ade Okafor')], present: cameToAll('a') })
     renderApp('/coach/feedback')
     await userEvent.click(await screen.findByRole('button', { name: "Open Ade Okafor's profile: Urgent" }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/player/a'))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/squad/player/a'))
   })
 
   it('with two squads, shows only the squad picked, and switches with it', async () => {
@@ -233,7 +233,7 @@ describe('TRAK-262: coach Home', () => {
     const needs = await screen.findByRole('region', { name: /Needs you/ }, { timeout: 5000 })
     const card = await within(needs).findByRole('button', { name: /Finish draft/ })
     await userEvent.click(card)
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/player/a'))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/squad/player/a'))
   })
 
   it('Squad shape says so when nothing was assessed this month or last', async () => {

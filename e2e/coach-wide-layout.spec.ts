@@ -186,13 +186,14 @@ test("a player's Home keeps the phone column on a laptop", async ({ page, contex
 
 // TRAK-250: Squad is a coach workspace of views. TRAK-263 (Imad, 22 Oct): Players (Arc's team
 // directory) replaced Snapshot, and the views sit on Arc's glass segmented control. On a tablet
-// or a laptop it uses the room: a page wider than the phone column, the profile beside the list.
+// or a laptop it uses the room: a page wider than the phone column. TRAK-351 (Tarek, 3 Nov): a player opens as their
+// own full page, with no list beside it, and Back returns to the list.
 // [screen, width, height, rail]
 for (const [label, width, height, rail] of [
   ['an upright tablet', 820, 1180, 0],
   ['a laptop', 1440, 900, 240],
 ] as const) {
-  test(`coach Squad on ${label}: the three views across a wide page, a player's profile beside the list, no sheet`, async ({ page, context }, testInfo) => {
+  test(`coach Squad on ${label}: the three views across a wide page, a player's own full page, no sheet`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, 'coach', '/coach/squad', width, height)
     const views = page.getByRole('radiogroup', { name: 'Squad view' }).getByRole('radio')
     await expect(views).toHaveText(['Players', 'Attributes', 'Availability']) // TRAK-283: Games left Squad
@@ -204,16 +205,21 @@ for (const [label, width, height, rail] of [
     expect(Math.round(panel.width)).toBe(Math.min(1280, width - rail) - 64)
     expect(Math.round(panel.x)).toBeGreaterThanOrEqual(rail)
 
-    // Picking a player opens their profile beside the list.
-    const first = playersView.getByRole('list', { name: 'Players' }).getByRole('button').first()
+    // Picking a player opens their own page: their address, the page's whole width, and no list beside it.
+    const list = playersView.getByRole('list', { name: 'Players' })
     const name = players[0].player_name
-    await first.click()
+    await list.getByRole('button').first().click()
+    await expect(page).toHaveURL(/\/coach\/squad\/player\/sq-1$/)
     // The profile is the article named after the player (their assessment cards are articles too).
     const profile = playersView.getByRole('article', { name: new RegExp(`^${name},`) })
     await expect(profile.getByRole('heading', { level: 3, name })).toBeVisible()
-    expect((await profile.boundingBox())!.x).toBeGreaterThan((await first.boundingBox())!.x + (await first.boundingBox())!.width - 1)
+    await expect(list).toBeHidden()
+    await expect(page.getByRole('radiogroup', { name: 'Squad view' })).toBeHidden()
+    expect((await profile.boundingBox())!.width).toBeGreaterThan(panel.width * 0.95)
     await page.waitForTimeout(600) // let the radar draw in for the screenshot
     await page.screenshot({ path: testInfo.outputPath(`coach-squad-${width}.png`) })
+    await page.getByRole('button', { name: 'Back' }).click()
+    await expect(list).toBeVisible()
 
     // Each view opens in place: no Arc sheet, and no read the backend does not answer.
     for (const name of ['Attributes', 'Availability', 'Players']) {

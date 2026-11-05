@@ -1,7 +1,10 @@
 import { useMemo } from 'react'
+import { ChevronLeft } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { SquadDirectory, type PositionGroup, type SquadPlayer } from '@/components/arc/blocks/team-directory/squad-directory'
 import { Badge } from '@/components/arc/badge/badge'
+import { Button } from '@/components/arc/button/button'
+import { CoachTrail } from '@/components/coach/CoachTrail'
 import { needsYou } from '@/lib/coach-needs-you'
 import { BANDS } from '@/lib/types'
 import { bandMoves } from '@/lib/squad/snapshot'
@@ -20,10 +23,17 @@ const TREND = 6
 
 /**
  * TRAK-263 (Imad, 22 Oct): Squad's Players view, replacing Snapshot. Every roster player in Arc's team directory
- * (position filters, search by name or shirt number); a player's profile beside the list, or in its place on a phone.
- * Imad, 23 Oct: each row ends with a sparkline of the player's ratings, and there's no band bar above.
+ * (position filters, search by name or shirt number). Imad, 23 Oct: each row ends with a sparkline of the player's
+ * ratings, and there's no band bar above. TRAK-351 (Tarek, 3 Nov): a player opens as their own full page, with no list
+ * beside it and a Back button; the list stays mounted behind it, so Back finds its filter and search as left.
  */
-export function PlayersTab({ roster }: { roster: SquadRoster }) {
+export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = () => {} }: {
+  roster: SquadRoster
+  /** The player whose page is open (their address, /coach/squad/player/:id), or null for the list. */
+  openId?: string | null
+  onOpen?: (id: string) => void
+  onBack?: () => void
+}) {
   const { user } = useAuth()
   const ids = useMemo(() => roster.players.map(p => p.id), [roster.players])
   const facts = usePlayerFacts(user?.id, ids)
@@ -68,8 +78,19 @@ export function PlayersTab({ roster }: { roster: SquadRoster }) {
   })
   const squadOf = new Map(roster.players.map(p => [p.id, p.age_group?.trim() || null]))
 
-  return <SquadDirectory title={squadLabel ? `${squadLabel} players` : 'Players'} players={players}
-    renderProfile={player => user && <PlayerProfile player={player} squad={squadOf.get(player.id) ?? squadLabel} coachId={user.id}
-      facts={facts.data?.get(player.id)} factsFailed={facts.isError} onRetryFacts={() => { void facts.refetch() }}
-      season={season.players.get(player.id)} squadSeason={season.squad} since={seasonStartLabel(seasonFrom)} />} />
+  const open = openId == null ? undefined : players.find(player => player.id === openId)
+  return <>
+    <div hidden={openId != null}>
+      <SquadDirectory title={squadLabel ? `${squadLabel} players` : 'Players'} players={players} onOpen={player => onOpen(player.id)} />
+    </div>
+    {openId != null && <div className="grid gap-4 pt-4">
+      <span className="arc"><Button variant="ghost" size="sm" onClick={onBack}><ChevronLeft size={16} aria-hidden="true" />Back</Button></span>
+      {open && <CoachTrail current={open.name} />}
+      {open && user ? <article aria-label={`${open.name}, ${open.position || 'no position yet'}`} className="rounded-2xl border border-line bg-surface p-6">
+        <PlayerProfile player={open} squad={squadOf.get(open.id) ?? squadLabel} coachId={user.id}
+          facts={facts.data?.get(open.id)} factsFailed={facts.isError} onRetryFacts={() => { void facts.refetch() }}
+          season={season.players.get(open.id)} squadSeason={season.squad} since={seasonStartLabel(seasonFrom)} />
+      </article> : !open && <p className="text-sm text-ink-2">This player isn't in the squad you're looking at. Pick All at the top to see every squad.</p>}
+    </div>}
+  </>
 }

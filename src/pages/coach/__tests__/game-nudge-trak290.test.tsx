@@ -1,7 +1,7 @@
 /**
  * TRAK-290 (Games 8/8): the morning-after nudge. An evaluation draft's reminder is the first 09:00 after it was saved,
- * on the academy's clock (the database stamps remind_at); the page works it out when it's read. Before then the draft
- * alert says when it will remind; from then it says good morning, and Home's Needs you card for the draft is urgent.
+ * on the academy's clock (the database stamps remind_at); the page works it out when it's read. From then Home's Needs
+ * you card for the draft is urgent. TRAK-374 (Imad, 5 Nov): the evaluation's own draft alert is gone.
  * In app only. The clock is faked: the draft was saved Wed 14 Oct 2026 at 17:40 in Dubai. Test people are named after
  * footballers.
  */
@@ -63,18 +63,17 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); cleanup(); localStorage.clear() })
 
 describe('TRAK-290: the morning-after nudge', { timeout: 30_000 }, () => {
-  it('the draft alert says when it will remind, then from 09:00 the next morning says good morning', async () => {
+  it('TRAK-374 (Imad, 5 Nov): the evaluation itself has no draft alert, before or after 09:00; a Draft badge instead', async () => {
     vi.setSystemTime(EVENING)
     renderApp('/coach/matches/match-1?tab=evaluation')
-    expect(await screen.findByText('Draft saved 17:40')).toBeInTheDocument()
-    expect(screen.getByText('Only you can see it. We’ll remind you tomorrow at 09:00.')).toBeInTheDocument()
-    expect(screen.queryByText(/Good morning/)).toBeNull()
+    expect(await screen.findByText('Draft', { exact: true })).toBeInTheDocument()
+    expect(screen.queryByText(/^Draft saved|We’ll remind you|Only you can see it\./)).toBeNull()
     cleanup()
 
     vi.setSystemTime(MORNING)
     renderApp('/coach/matches/match-1?tab=evaluation')
-    expect(await screen.findByText('Draft saved Wed 17:40')).toBeInTheDocument()
-    expect(screen.getByText('Good morning. Add anything you remembered overnight, then publish.')).toBeInTheDocument()
+    expect(await screen.findByText('Draft', { exact: true })).toBeInTheDocument()
+    expect(screen.queryByText(/Good morning|^Draft saved/)).toBeNull()
   })
 
   it('Home\'s Needs you card for the draft turns urgent from 09:00 the next morning', async () => {

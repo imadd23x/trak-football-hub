@@ -66,7 +66,9 @@ export function useSquadRoster({ everySquad: always = false }: { everySquad?: bo
 
   const consentPending = useMemo(() => new Set(consent.data ?? NONE), [consent.data])
 
-  const error = (failed ? new Error("Couldn't load your squads") : null) ?? all.error ?? consent.error ?? assessments.error ?? null
+  // TRAK-368: a player's page needs the players and consent; it says on its own when only the assessments failed.
+  const rosterError = (failed ? new Error("Couldn't load your squads") : null) ?? all.error ?? consent.error ?? null
+  const error = rosterError ?? assessments.error ?? null
 
   return {
     /** The squad in view: none when every squad is (TRAK-266's All), so a view asks for them all. */
@@ -76,6 +78,9 @@ export function useSquadRoster({ everySquad: always = false }: { everySquad?: bo
     players,
     consentPending,
     assessments: assessments.data ?? NONE,
+    /** TRAK-368: the players or consent failed; `error` also counts a failed assessments read. */
+    rosterError,
+    assessmentsFailed: assessments.isError,
     /** True until every read has answered; a failed read is `error`, not pending. */
     isPending: !error && (!ready || all.isPending || consent.isPending || assessments.isPending),
     error,

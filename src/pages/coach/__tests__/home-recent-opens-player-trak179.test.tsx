@@ -59,7 +59,7 @@ describe('TRAK-179: a player in the overview opens the player (TRAK-211: on Feed
   it('a profile opened with nothing behind it starts its trail at Squad', async () => {
     signInAs(COACH)
     serve()
-    renderApp('/coach/player/sp-1')
+    renderApp('/coach/squad/player/sp-1')
     const trail = await screen.findByRole('navigation', { name: 'Breadcrumb trail' })
     expect(within(trail).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Squad', 'Ade Okafor'])
     await userEvent.click(within(trail).getByRole('link', { name: 'Squad' }))

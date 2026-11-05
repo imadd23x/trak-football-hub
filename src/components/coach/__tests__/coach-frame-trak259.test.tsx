@@ -137,7 +137,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
   })
 
   it('keeps the phone bar off pages that had none: their own actions sit at the bottom', async () => {
-    for (const path of ['/settings', '/coach/manual', '/coach/player/sp-1', '/coach/sessions/add', '/coach/sessions/quick', '/coach/sessions/abc'])
+    for (const path of ['/settings', '/coach/manual', '/coach/squad/player/sp-1', '/coach/sessions/add', '/coach/sessions/quick', '/coach/sessions/abc'])
       expect(BARLESS.test(path)).toBe(true)
     for (const path of ['/coach/home', '/coach/sessions', '/coach/sessions/list', '/coach/assess', '/coach/squad', '/coach/trainings'])
       expect(BARLESS.test(path)).toBe(false)
@@ -229,7 +229,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     expect(placeOf('/coach/training')).toEqual({ screen: 'training', title: 'Training' }) // TRAK-294
     expect(placeOf('/coach/training/drills')).toEqual({ screen: 'training', title: 'Drills' }) // TRAK-367
     expect(placeOf('/coach/trainings/defending')).toEqual({ screen: 'library', title: 'Library' })
-    expect(placeOf('/coach/player/abc')).toEqual({ screen: 'squad', title: 'Player' })
+    expect(placeOf('/coach/squad/player/abc')).toEqual({ screen: 'squad', title: 'Player' }) // TRAK-368: the only player page
     expect(placeOf('/coach/sessions/list')).toEqual({ screen: 'home', title: 'Log' })
     expect(placeOf('/coach/schedule')).toEqual({ screen: 'calendar', title: 'Schedule' }) // TRAK-255
     expect(placeOf('/coach/homework')).toEqual({ screen: null, title: 'Trak' })

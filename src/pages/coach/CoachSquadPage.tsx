@@ -63,7 +63,8 @@ export default function CoachSquadPage() {
         </header>}
 
         <section aria-label={TABS.find(t => t.id === active)!.label} className="pb-8">
-          {roster.error ? <SquadLoadError onRetry={roster.retry} />
+          {/* TRAK-368: a player's page stays up when only the assessments failed, and says so there. */}
+          {(openId != null && active === 'players' ? roster.rosterError : roster.error) ? <SquadLoadError onRetry={roster.retry} />
             : roster.isPending ? <LoadingSkeleton label="Loading your squad…" lines={2} avatar rows={4} className="pt-6" />
             : roster.players.length === 0 ? <PreparingSquad />
             : active === 'players' ? <PlayersTab roster={roster} openId={openId} onOpen={openPlayer} onBack={back} />

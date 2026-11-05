@@ -4,6 +4,8 @@
  * note and which were the message, and to add to it later. Tapping it on coach
  * home, on the player's latest assessment or in the player's history now opens
  * that exact row in the form, and saving updates it instead of adding another.
+ * TRAK-368: the history is on the player's own page in Squad, every assessment a
+ * card with Edit; the older /coach/player/:id page is gone.
  *
  * The real App, AuthProvider and SDK, with a small in-memory table behind MSW
  * that honours the filters the pages send, so "that exact row" is what the
@@ -19,6 +21,8 @@ import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
 import { SUPABASE_URL } from '../../../../tests/msw/supabase'
+import { scoreToBand } from '@/lib/rating-engine'
+import { BANDS } from '@/lib/types'
 
 type Row = Record<string, unknown>
 const COACH = { id: 'coach-1' }
@@ -64,6 +68,7 @@ function seed() {
     coach_shared_feedback: [
       { assessment_id: 'assess-old', coach_user_id: COACH.id, body: 'Great pressing, keep it up.', published_at: '2026-09-20T19:00:00Z' },
     ],
+    squad_player_profiles: [],
   }
   writes = []
 }
@@ -101,7 +106,7 @@ beforeEach(() => {
   signInAs(COACH)
   server.use(
     ...Object.keys({ profiles: 1, coach_details: 1, squad_players: 1, coach_sessions: 1, coach_assessments: 1,
-      coach_assessment_notes: 1, coach_shared_feedback: 1 }).map(table =>
+      coach_assessment_notes: 1, coach_shared_feedback: 1, squad_player_profiles: 1 }).map(table =>
       http.get(`${SUPABASE_URL}/rest/v1/${table}`, ({ request }) => HttpResponse.json(read(table, new URL(request.url))))),
     http.patch(`${SUPABASE_URL}/rest/v1/coach_assessments`, async ({ request }) => {
       const id = new URL(request.url).searchParams.get('id')?.replace(/^eq\./, '') ?? null
@@ -119,6 +124,10 @@ beforeEach(() => {
         return HttpResponse.json([])
       })),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_player_consent_required`, () => HttpResponse.json(false)),
+    // The player's own page in Squad (TRAK-368) also asks for the switches, the squad's season and birth dates.
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/feature_on`, () => HttpResponse.json(false)),
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_squad_season`, () => HttpResponse.json([])),
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/coach_player_birth_dates`, () => HttpResponse.json([])),
     // The Feedback and assessment overview reads registers and "Can't make it" (TRAK-197); none here.
     ...['session_attendance', 'event_absences'].map(table => http.get(`${SUPABASE_URL}/rest/v1/${table}`, () => HttpResponse.json([]))),
   )
@@ -140,12 +149,19 @@ async function openLatest(user: ReturnType<typeof userEvent.setup>) {
   await user.click(within(card).getByRole('button', { name: /more actions$/ }))
   await user.click(await screen.findByRole('menuitem', { name: 'Edit' }))
 }
+// TRAK-368: an older assessment is a card in the player's history too; the 20 Sep one is vs Olympiacos Academy.
+// The date reads "20 Sep" or "20 Sept" depending on the runtime's English data.
+const olderCard = () => screen.findByRole('article', { name: /assessment, .*20 Sept?$/ })
+async function openOlder(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(within(await olderCard()).getByRole('button', { name: /more actions$/ }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Edit' }))
+}
 
 describe('TRAK-69: a coach opens a saved assessment and edits that row', { timeout: 20_000 }, () => {
   it("opens an older assessment from the player's history, with its scores, note and message", async () => {
     const user = userEvent.setup()
-    renderApp('/coach/player/player-a')
-    await user.click(await screen.findByRole('button', { name: /Open assessment .*vs Olympiacos Academy/ }))
+    renderApp('/coach/squad/player/player-a')
+    await openOlder(user)
     expect(await screen.findByText(/Editing your assessment for vs Olympiacos Academy/)).toBeInTheDocument()
     await toStep('Ratings')
     expect(sliderValues()).toEqual([3, 4, 5, 6, 7, 2])
@@ -157,8 +173,8 @@ describe('TRAK-69: a coach opens a saved assessment and edits that row', { timeo
 
   it('saving the opened assessment updates that row and adds none', async () => {
     const user = userEvent.setup()
-    renderApp('/coach/player/player-a')
-    await user.click(await screen.findByRole('button', { name: /Open assessment .*vs Olympiacos Academy/ }))
+    renderApp('/coach/squad/player/player-a')
+    await openOlder(user)
     await toStep('Ratings')
     expect(sliderValues()).toEqual([3, 4, 5, 6, 7, 2])
     setSlider(screen.getAllByRole('slider')[0], 9)
@@ -169,7 +185,7 @@ describe('TRAK-69: a coach opens a saved assessment and edits that row', { timeo
 
   it("opens the player's latest assessment from its card", async () => {
     const user = userEvent.setup()
-    renderApp('/coach/player/player-a')
+    renderApp('/coach/squad/player/player-a')
     await openLatest(user)
     expect(await screen.findByText(/Editing your assessment for vs Olympiacos Youth/)).toBeInTheDocument()
     await toStep('Note')
@@ -188,15 +204,17 @@ describe('TRAK-69: a coach opens a saved assessment and edits that row', { timeo
   })
 
   // TRAK-179 (Kostas, 15 Oct): the way back is the screen the coach came from. TRAK-334: the trail, in place of Back.
+  // TRAK-368: from the whole history, the way back keeps the whole history open.
   it("the trail from an assessment opened in the player's history goes back to that player", async () => {
     const user = userEvent.setup()
-    renderApp('/coach/player/player-a')
-    await user.click(await screen.findByRole('button', { name: /Open assessment .*vs Olympiacos Academy/ }))
+    renderApp('/coach/squad/player/player-a?history=all')
+    await openOlder(user)
     expect(await screen.findByText(/Editing your assessment for vs Olympiacos Academy/)).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Squad', 'Manos Synthetic', 'Assessment'])
     await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Manos Synthetic' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/player/player-a'))
-    expect(await screen.findByRole('article', { name: /assessment, / })).toBeInTheDocument()
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/squad/player/player-a'))
+    expect(window.location.search).toBe('?history=all')
+    expect(await olderCard()).toBeInTheDocument()
   })
 
   it('the trail from an assessment reached from the overview goes back to that player', async () => {
@@ -240,13 +258,23 @@ describe('TRAK-69: a coach opens a saved assessment and edits that row', { timeo
     expect(nextButton()).toBeDisabled()
   })
 
-  it('history shows session, band and whether a message was sent; the note is labelled private', async () => {
-    renderApp('/coach/player/player-a')
-    const row = await screen.findByRole('button', { name: /Open assessment .*vs Olympiacos Academy/ })
-    expect(within(row).getByText('vs Olympiacos Academy')).toBeInTheDocument()
-    expect(within(row).getByText('Message sent')).toBeInTheDocument()
-    // TRAK-200: the latest card's quick look carries the message state and the private note.
-    const card = screen.getByRole('article', { name: /assessment, / })
+  // TRAK-368: the old history row's session, band and "Message sent" are the older card's band and its quick look.
+  it("an older assessment's card shows its band, and its quick look the session, the message and the private note", async () => {
+    renderApp('/coach/squad/player/player-a')
+    const card = await olderCard()
+    const band = scoreToBand((3 + 4 + 5 + 6 + 7 + 2) / 6)
+    expect(within(card).getAllByText(BANDS.find(b => b.word.toLowerCase() === band)!.word).length).toBeGreaterThan(0)
+    await userEvent.click(within(card).getByRole('heading').querySelector('button')!)
+    const look = await screen.findByRole('dialog')
+    expect(within(look).getByText('vs Olympiacos Academy')).toBeInTheDocument()
+    expect(within(look).getByText('Great pressing, keep it up.')).toBeInTheDocument()
+    expect(within(look).getByText(/Private note/i)).toBeInTheDocument()
+    expect(within(look).getByText(/Talk to his dad about boots/)).toBeInTheDocument()
+  })
+
+  it("the latest card's quick look says no message went, and labels the note private", async () => {
+    renderApp('/coach/squad/player/player-a')
+    const [card] = await screen.findAllByRole('article', { name: /assessment, / })
     await userEvent.click(within(card).getByRole('heading').querySelector('button')!)
     const latest = await screen.findByRole('dialog')
     expect(within(latest).getByText(/No message/)).toBeInTheDocument()

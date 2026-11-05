@@ -3,7 +3,7 @@ import { WifiOff } from 'lucide-react'
 /** A failed squad read: said as a failure with a way to retry, never shown as an empty squad. */
 export function SquadLoadError({ onRetry, title = "Couldn't load your squad" }: { onRetry: () => void; title?: string }) {
   return (
-    <div className="flex flex-col items-center text-center pt-14 px-6">
+    <div role="alert" className="flex flex-col items-center text-center pt-14 px-6">
       <div
         className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
         style={{ background: 'rgb(var(--t-warning) / 0.08)', border: '1px solid rgb(var(--t-warning) / 0.15)' }}

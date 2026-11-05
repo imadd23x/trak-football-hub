@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
-import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
+import { table, rpc, rpcRows, SUPABASE_URL } from '../../../../tests/msw/supabase'
 
 /**
  * TRAK-200 (Imad, 18 Oct): a coach couldn't tell a draft from a published
@@ -13,6 +13,8 @@ import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
  * Draft or Published, the bands, the overall band, and Publish (or Published,
  * with Edit and Unpublish) on the card. Tapping it opens the quick look:
  * opponent, message, private note. History rows mark drafts.
+ * TRAK-368: the player's own page in Squad (/coach/squad/player/:id) shows the
+ * same card; the older /coach/player/:id page is gone.
  */
 const COACH = { id: 'coach-200' }
 const scores = { work_rate: 6, tactical: 6, attitude: 9, technical: 6, physical: 8, coachability: 9 }
@@ -27,7 +29,9 @@ let published: Record<string, unknown>[]
 let publishFails: boolean
 let patches: { table: string }[]
 
-function serve(rows: Record<string, unknown>[] = [DRAFT, PUBLISHED]) {
+function serve(given: Record<string, unknown>[] = [DRAFT, PUBLISHED]) {
+  // Copies, so a publish remembered in one test never leaks into the next.
+  const rows = given.map(row => ({ ...row }))
   published = []
   publishFails = false
   patches = []
@@ -35,8 +39,8 @@ function serve(rows: Record<string, unknown>[] = [DRAFT, PUBLISHED]) {
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach', invite_code: 'ABCD' }]),
     table('coach_details', [{ user_id: COACH.id, team: 'U16s', coach_role: 'Head Coach' }]),
     table('squad_players', [
-      { id: 'sp-1', coach_user_id: COACH.id, player_name: 'Ade Okafor', created_at: '2026-09-01T00:00:00Z' },
-      { id: 'sp-2', coach_user_id: COACH.id, player_name: 'Bo Lind', created_at: '2026-09-01T00:00:00Z' },
+      { id: 'sp-1', coach_user_id: COACH.id, player_name: 'Ade Okafor', created_at: '2026-09-01T00:00:00Z', age_group: 'U16', status: 'active' },
+      { id: 'sp-2', coach_user_id: COACH.id, player_name: 'Bo Lind', created_at: '2026-09-01T00:00:00Z', age_group: 'U16', status: 'active' },
     ]),
     http.get(`${SUPABASE_URL}/rest/v1/coach_assessments`, ({ request }) => {
       const player = new URL(request.url).searchParams.get('squad_player_id')?.replace('eq.', '')
@@ -49,9 +53,16 @@ function serve(rows: Record<string, unknown>[] = [DRAFT, PUBLISHED]) {
     table('coach_calendar_events', []),
     rpc('feature_on', () => true),
     rpc('coach_squad_player_consent_required', () => false),
+    rpc('coach_squad_season', () => []),
+    table('squad_player_profiles', []),
+    table('season_plans', []),
+    rpcRows('coach_player_birth_dates', []),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/set_assessment_published`, async ({ request }) => {
       if (publishFails) return HttpResponse.json({ code: 'XX000', message: 'synthetic failure' }, { status: 500 })
-      published.push(await request.json() as Record<string, unknown>)
+      const call = await request.json() as { p_assessment_id: string; p_published: boolean }
+      published.push(call)
+      // The page reads the history again after a change, so the stand-in remembers it.
+      for (const row of rows) if (row.id === call.p_assessment_id) row.published_at = call.p_published ? '2026-10-19T12:00:00Z' : null
       return HttpResponse.json('2026-10-19T12:00:00Z')
     }),
     // The card never writes the two tables one by one any more.
@@ -64,12 +75,11 @@ beforeEach(() => signInAs(COACH))
 afterEach(() => cleanup())
 
 describe("TRAK-200: the assessment card on the coach's player profile", () => {
-  // The profile reads its player by id with maybeSingle; the mock returns every row given.
-  const onlyAde = () => server.use(table('squad_players', [{ id: 'sp-1', coach_user_id: COACH.id, player_name: 'Ade Okafor', created_at: '2026-09-01T00:00:00Z' }]))
+  const onlyAde = () => server.use(table('squad_players', [{ id: 'sp-1', coach_user_id: COACH.id, player_name: 'Ade Okafor', created_at: '2026-09-01T00:00:00Z', age_group: 'U16', status: 'active' }]))
 
   it('a draft says Draft, offers Publish, and opens a quick look with the opponent, message and private note', async () => {
     serve(); onlyAde()
-    renderApp('/coach/player/sp-1')
+    renderApp('/coach/squad/player/sp-1')
     const card = await screen.findByRole('article', { name: /Draft/ })
     expect(within(card).getByRole('heading', { name: 'Draft' })).toBeInTheDocument()
     expect(within(card).getByRole('button', { name: 'Publish' })).toBeInTheDocument()
@@ -84,7 +94,7 @@ describe("TRAK-200: the assessment card on the coach's player profile", () => {
 
   it('Publish on the card publishes the bands and the message, and the card says Published', async () => {
     serve(); onlyAde()
-    renderApp('/coach/player/sp-1')
+    renderApp('/coach/squad/player/sp-1')
     const card = await screen.findByRole('article', { name: /Draft/ })
     await userEvent.click(within(card).getByRole('button', { name: 'Publish' }))
     await waitFor(() => expect(published).toEqual([{ p_assessment_id: 'as-draft', p_published: true }]))
@@ -94,7 +104,7 @@ describe("TRAK-200: the assessment card on the coach's player profile", () => {
 
   it("Unpublish, from a published card's menu, hides the bands and the message again", async () => {
     serve([{ ...DRAFT, published_at: '2026-10-18T11:00:00Z' }]); onlyAde()
-    renderApp('/coach/player/sp-1')
+    renderApp('/coach/squad/player/sp-1')
     const card = await screen.findByRole('article', { name: /Published/ })
     await userEvent.click(within(card).getByRole('button', { name: 'Published more actions' }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Unpublish' }))
@@ -105,7 +115,7 @@ describe("TRAK-200: the assessment card on the coach's player profile", () => {
   // Tarek's review of #364, finding 1: a refused publish changes nothing, and the card says so truthfully.
   it('a refused publish leaves the card a Draft and says Not published', async () => {
     serve(); onlyAde(); publishFails = true
-    renderApp('/coach/player/sp-1')
+    renderApp('/coach/squad/player/sp-1')
     const card = await screen.findByRole('article', { name: /Draft/ })
     await userEvent.click(within(card).getByRole('button', { name: 'Publish' }))
     expect(await screen.findByText(/Not published/)).toBeInTheDocument()
@@ -117,7 +127,7 @@ describe("TRAK-200: the assessment card on the coach's player profile", () => {
   it('a failed message read still publishes the message, and the quick look says it did not load', async () => {
     serve(); onlyAde()
     server.use(http.get(`${SUPABASE_URL}/rest/v1/coach_shared_feedback`, () => HttpResponse.json({ message: 'offline' }, { status: 500 })))
-    renderApp('/coach/player/sp-1')
+    renderApp('/coach/squad/player/sp-1')
     const card = await screen.findByRole('article', { name: /Draft/ })
     await userEvent.click(within(card).getByRole('button', { name: 'Publish' }))
     await waitFor(() => expect(published).toEqual([{ p_assessment_id: 'as-draft', p_published: true }]))

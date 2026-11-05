@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { PlayerFace } from '@/components/trak/PlayerFace'
@@ -17,7 +17,7 @@ import type { PlayerFacts } from './usePlayerFacts'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 const FOOT = { left: 'Left', right: 'Right', both: 'Both' } as const
-/** The assessments shown here, newest first; the player's page has them all. */
+/** The assessments shown at first, newest first. TRAK-368: "All N" shows the rest here too. */
 const SHOWN = 6
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -34,7 +34,7 @@ const notSet = <span className="text-ink-3">Not set</span>
  * coach's assessment card exactly as it is elsewhere. Imad, 23 Oct: one row of cards, the latest first, swiping to
  * earlier ones, with no date line above them (the card's quick look has the date and session).
  */
-export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRetryFacts, season, squadSeason, since = '1 July' }: {
+export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRetryFacts, season, squadSeason, since = '1 July', seasonFailed = false, onRetrySeason }: {
   player: SquadPlayer
   squad: string | null
   coachId: string
@@ -45,6 +45,9 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
   squadSeason: Scores | null
   /** TRAK-350: when the season started, from the squad's season plan when there is one. */
   since?: string
+  /** TRAK-368: the squad's assessments didn't load, so the season can't be told; never "No assessment this season yet". */
+  seasonFailed?: boolean
+  onRetrySeason?: () => void
 }) {
   const navigate = useNavigate()
   const client = useQueryClient()
@@ -52,6 +55,19 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
   const key = ['coach', coachId, 'player-assessments', player.id]
   const assessments = useQuery({ queryKey: key, queryFn: () => loadPlayerAssessments(player.id, coachId), enabled: !player.waiting })
   const list = assessments.data?.list ?? []
+  // TRAK-368: the whole history, in place. The address keeps it open, so coming back from an assessment (or a reload)
+  // finds the list as it was left.
+  const [params, setParams] = useSearchParams()
+  const all = params.get('history') === 'all'
+  const showAll = (on: boolean) => setParams(current => {
+    const next = new URLSearchParams(current)
+    if (on) next.set('history', 'all')
+    else next.delete('history')
+    return next
+  }, { replace: true })
+  const card = (assessment: (typeof list)[number]) => <CoachAssessmentCard assessment={assessment} playerName={player.name}
+    message={assessments.data?.messages[assessment.id]} messageFailed={assessments.data?.sent === undefined} note={assessments.data?.notes[assessment.id]}
+    onChanged={() => { void client.invalidateQueries({ queryKey: key }) }} />
 
   const header = <div className="flex items-center gap-4">
     <PlayerFace name={player.name} size="lg" />
@@ -91,11 +107,11 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
       <section aria-labelledby={`season-${player.id}`}>
         <div className="grid gap-0.5">
           <h4 id={`season-${player.id}`} className="text-base font-medium text-ink">Season so far</h4>
-          <p className="text-sm text-ink-3">{season
+          {seasonFailed ? <LoadError what={`${first}'s season`} onRetry={onRetrySeason} /> : <p className="text-sm text-ink-3">{season
             ? `Average of ${season.count} ${season.count === 1 ? 'assessment' : 'assessments'} since ${since}, out of 10, against the squad`
-            : 'No assessment this season yet.'}</p>
+            : 'No assessment this season yet.'}</p>}
         </div>
-        {season && <RadarChart label={`${player.name}'s season average against the squad`} size={240} rings={5} max={10}
+        {season && !seasonFailed && <RadarChart label={`${player.name}'s season average against the squad`} size={240} rings={5} max={10}
           axes={ATTRIBUTES.map(([k, label]) => ({ key: k, label }))}
           series={[{ key: 'player', label: first, values: season.scores }, ...(squadSeason ? [{ key: 'squad', label: 'Squad average', values: squadSeason }] : [])]}
           formatValue={value => value.toFixed(1)} />}
@@ -108,10 +124,13 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
         <div className="flex items-baseline justify-between gap-3">
           <h4 id={`assessments-${player.id}`} className="text-base font-medium text-ink">Assessments</h4>
           {list.length > SHOWN
-            ? <Link to={`/coach/player/${player.id}`} className="text-sm font-medium text-brand">All {list.length}</Link>
+            ? <button type="button" onClick={() => showAll(!all)} className="text-sm font-medium text-brand">{all ? `Show the latest ${SHOWN}` : `All ${list.length}`}</button>
             : list.length > 1 && <span className="text-sm text-ink-3 [@media(pointer:fine)]:hidden">Swipe for earlier</span>}
         </div>
         {list.length === 0 ? <p className="text-sm text-ink-2">No assessment yet.</p>
+          : all && list.length > SHOWN ? <ol className="m-0 grid list-none gap-3 p-0 laptop:grid-cols-2" aria-label={`All of ${first}'s assessments`}>
+            {list.map(assessment => <li key={assessment.id} className="min-w-0">{card(assessment)}</li>)}
+          </ol>
           : <div className="arc">
             {/* As ParentAssessmentCarousel: the viewport is the row, so 88% is of what's visible and the next card peeks in. */}
             {/* Imad, 24 Oct: room above and below, so a card lifted on hover keeps its edge and shadow; firm snapping only
@@ -119,9 +138,7 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
             <ScrollArea orientation="horizontal" snap="x mandatory" fade={0} label={`${first}'s assessments`} className="-mt-2 -mb-4" viewportClassName="flex gap-3 pt-2 pb-4">
               {list.slice(0, SHOWN).map((assessment, index) => <div key={assessment.id} role="group" aria-label={`Assessment ${index + 1} of ${Math.min(list.length, SHOWN)}`}
                 className="min-w-0 basis-[88%] laptop:basis-[calc(50%-6px)] shrink-0 grow-0" style={{ scrollSnapAlign: 'start' }}>
-                <CoachAssessmentCard assessment={assessment} playerName={player.name}
-                  message={assessments.data.messages[assessment.id]} messageFailed={assessments.data.sent === undefined} note={assessments.data.notes[assessment.id]}
-                  onChanged={() => { void client.invalidateQueries({ queryKey: key }) }} />
+                {card(assessment)}
               </div>)}
             </ScrollArea>
           </div>}

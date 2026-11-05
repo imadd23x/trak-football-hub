@@ -12,6 +12,7 @@ import {
 import { NavBar, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { CoachTrail } from '@/components/coach/CoachTrail'
+import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { Alert } from '@/components/arc/alert/alert'
 import { Button } from '@/components/arc/button/button'
 import { DatePicker } from '@/components/arc/date-picker/date-picker'
@@ -51,7 +52,7 @@ const dateToIso = (date: Date | undefined) => (date
 export default function CoachSeasonPlan() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const squad = planSquad(useCoachSquad(user?.id))
   const season = useSeasonPlan(user?.id, squad)
   const objectives = useQuery({
@@ -68,10 +69,14 @@ export default function CoachSeasonPlan() {
       <div className={WIDE_COLUMN}>
         <CoachTrail className="mt-5" current="Season plan" />
         <header className="pt-4 pb-4">
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Season plan</h1>
+          <div className="flex items-center gap-2">
+            {/* TRAK-378: on a phone the avatar opens the side menu, where the squad picker is (TRAK-376). */}
+            <CoachMenuButton name={profile?.full_name || 'Coach'} />
+            <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Season plan</h1>
+          </div>
           {squad && !season.isPending && <p className="mt-1 text-sm text-ink-3">{squad} · {season.plan ? 'Draft, only you see it' : 'Not started'}</p>}
         </header>
-        {!squad ? <p className="text-sm text-ink-2">Pick one squad at the top of the page to plan its season.</p>
+        {!squad ? <p className="text-sm text-ink-2">Pick one squad in the menu to plan its season.</p>
           : season.error || objectives.error ? (
             <div className="arc grid justify-items-start gap-3">
               <p className="text-sm text-ink-2">Couldn't load your season plan.</p>

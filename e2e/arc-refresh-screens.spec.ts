@@ -117,7 +117,8 @@ test.describe('TRAK-182 coach screens', () => {
     ['feedback', '/coach/feedback', 'Hugo Lloris'],
     ['squad', '/coach/squad', 'Bukayo Saka'],
     ['assess', '/coach/assess', 'Assessment'],
-    ['player', '/coach/player/sq-2', 'Bukayo Saka'],
+    // TRAK-368: the player's own page in Squad; the list behind it is hidden, so wait for the page's own section.
+    ['player', '/coach/squad/player/sq-2', 'Season so far'],
   ] as const) {
     test(`coach ${name}`, async ({ page, context }, testInfo) => {
       const unexpected: string[] = [], errors: string[] = []
@@ -298,8 +299,9 @@ test.describe('TRAK-220 Arc panels opened over the page', () => {
   test('the card menu, the expanded card and its backdrop are opaque', async ({ page, context }, testInfo) => {
     const unexpected: string[] = []
     await coachBackend(context, unexpected)
-    await page.goto('/coach/player/sq-2')
-    const card = page.getByRole('article').or(page.locator('[aria-label*="assessment, Bukayo Saka"]')).first()
+    await page.goto('/coach/squad/player/sq-2')
+    // TRAK-368: the player's page is an article too, so the card is picked by its name.
+    const card = page.getByRole('article', { name: /assessment, Bukayo Saka/ }).first()
     await card.getByRole('button', { name: /more actions$/ }).click()
     const menu = page.getByRole('menu')
     await expect(menu.getByRole('menuitem', { name: 'Edit' })).toBeVisible()

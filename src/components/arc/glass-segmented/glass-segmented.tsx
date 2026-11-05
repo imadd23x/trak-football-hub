@@ -198,13 +198,14 @@ export function GlassSegmented({ options, value: valueProp, defaultValue, onValu
   };
 
   // The drop thins as it stretches, like liquid conserving its volume.
-  const pillH = trackH - PAD * 2;
+  // Trak (TRAK-368): a hidden control measures 0 tall, and a negative pill is an invalid SVG rect; never below 0.
+  const pillH = Math.max(0, trackH - PAD * 2);
   const squash = useTransform(() => clamp((right.get() - left.get() - rest.get()) * .03, -1.5, pillH * .16));
   const x = useTransform(() => left.get());
   const width = useTransform(() => Math.max(pillH * .6, right.get() - left.get()));
   const y = useTransform(() => PAD + squash.get());
-  const height = useTransform(() => pillH - squash.get() * 2);
-  const rx = useTransform(() => (pillH - squash.get() * 2) / 2);
+  const height = useTransform(() => Math.max(0, pillH - squash.get() * 2));
+  const rx = useTransform(() => Math.max(0, pillH - squash.get() * 2) / 2);
   const shown = over ?? value;
 
   return <div

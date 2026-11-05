@@ -302,6 +302,33 @@ test("a phone's sidebar sheet takes a tap: the row opens its page and the sheet 
   expect(errors).toEqual([])
 })
 
+// TRAK-377 (Imad, 5 Nov): the sidebar sometimes stayed on screen until a refresh. On a phone's network a page's code
+// takes a moment; the sheet must still slide away while it loads, and stay away once it has.
+test("a phone's sidebar sheet closes while a page's code is still on its way", async ({ page, context }) => {
+  const { unexpected, errors } = await open(page, context, 'coach', '/coach/home', 390, 844)
+  await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
+  await page.route(/\/assets\/.+\.js$/, async route => { await new Promise(done => setTimeout(done, 1500)); await route.continue() })
+  await page.getByRole('button', { name: 'Open menu' }).click()
+  const sheet = page.getByRole('navigation', { name: 'Your academy' })
+  await sheet.getByRole('button', { name: 'Squad', exact: true }).click()
+  await expect(page).toHaveURL(/\/coach\/squad$/)
+  await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0, { timeout: 5000 })
+  // The page's code arrives: the sheet must not slide back in, nor leave the page under it blocked.
+  await page.unrouteAll({ behavior: 'wait' })
+  await page.waitForTimeout(1200)
+  await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0)
+  expect(await page.evaluate(() => document.body.style.pointerEvents)).toBe('')
+  // The page takes taps (Home from the tab bar), and the menu still opens and closes there.
+  await page.getByRole('tab', { name: 'Home' }).or(page.getByRole('button', { name: 'Home', exact: true })).first().click()
+  await expect(page).toHaveURL(/\/coach\/home$/)
+  await page.getByRole('button', { name: 'Open menu' }).click()
+  await expect(page.getByRole('dialog', { name: 'Menu' })).toBeVisible()
+  await page.getByRole('button', { name: 'Close menu' }).click()
+  await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
+})
+
 test("a laptop's breadcrumb names the page, one title after several moves", async ({ page, context }) => {
   const { errors } = await open(page, context, 'coach', '/coach/home', 1440, 900)
   const side = page.getByRole('navigation', { name: 'Your academy' })

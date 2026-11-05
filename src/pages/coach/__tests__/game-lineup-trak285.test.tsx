@@ -139,7 +139,7 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     expect(slot(1)).toHaveAccessibleName('Slot 1, empty')
     expect(slot(2)).toHaveAccessibleName('Theodoros Zagorakis, slot 2')
 
-    await user.click(screen.getByRole('button', { name: 'Take off the pitch' }))
+    await user.click(screen.getByRole('button', { name: 'Move to bench' }))
     expect(slot(2)).toHaveAccessibleName('Slot 2, empty')
     expect(within(jobs()).getByRole('button', { name: /Theodoros Zagorakis/ })).toHaveTextContent('Bench')
   })
@@ -182,17 +182,17 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     expect(progress).toHaveAttribute('aria-valuemax', '11')
   })
 
-  it('TRAK-317: a starter expected to stretch shows yellow on the pitch, with a key and "stretch" in the slot\'s name', async () => {
+  it('TRAK-317, TRAK-370: a starter expected to stretch shows orange on the pitch, with a key and "stretch" in the slot\'s name', async () => {
     const user = userEvent.setup()
     store()
     await openLineUp(user)
     await pick(user, 3, /Zagorakis/)
     expect(slot(3)).toHaveAccessibleName('Theodoros Zagorakis, slot 3')
-    expect(screen.queryByText('Yellow: stretch')).toBeNull()
+    expect(screen.queryByText('Orange: stretch')).toBeNull()
     await user.click(screen.getByRole('radio', { name: /^Stretch/ }))
     expect(slot(3)).toHaveAccessibleName('Theodoros Zagorakis, slot 3, stretch')
     expect(slot(3)).toHaveAttribute('data-stretch')
-    expect(screen.getByText('Yellow: stretch')).toBeVisible()
+    expect(screen.getByText('Orange: stretch')).toBeVisible()
   })
 
   it('TRAK-329: one formation dropdown on the pitch, a header per format; a shape in a smaller format benches the starters it has no slot for', async () => {

@@ -24,7 +24,8 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    and in the card itself the face-to-face tick and Share plan. Share waits only for the logistics and the tick (Imad,
    28 Oct); the other parts never block. Who sees what and the preview are gone. TRAK-344 (Imad, 3 Nov):
    Game plan review says each thing once: no match or time (the header has them), "N incomplete", one countdown, and
-   no detail for Logistics or Tactics & analysis. */
+   no detail for Logistics or Tactics & analysis. TRAK-371 (Imad, 5 Nov): Jobs is ready once any starter has a job; a
+   coach never has to give everyone one. */
 
 const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
 const list = (names: string[]) => names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
@@ -72,7 +73,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
       detail: instructions ? `${instructions} ${instructions === 1 ? 'instruction' : 'instructions'}` : 'None yet' },
     { id: 'line-up', label: 'Line-up', status: placed === form.format ? 'good' : 'watch', onEdit: () => onStep(1),
       detail: `${placed} of ${form.format} placed · ${bench} on the bench` },
-    { id: 'jobs', label: 'Jobs', status: placed > 0 && withJob === placed ? 'good' : 'watch', onEdit: () => onStep(1),
+    { id: 'jobs', label: 'Jobs', status: withJob > 0 ? 'good' : 'watch', onEdit: () => onStep(1),
       detail: placed === 0 ? 'Nobody is on the pitch yet' : `${withJob} of ${placed} starters have one` },
   ]
   const incomplete = rows.filter(row => row.status !== 'good').length

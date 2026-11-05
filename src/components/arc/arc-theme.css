@@ -111,6 +111,11 @@
   --warning: rgb(var(--t-warning));
   --attention: rgb(var(--t-attention));
   --danger: rgb(var(--t-danger));
+  /* TRAK-370 (Imad, 5 Nov): Arc's current badge. Its info tone keeps the green it had; its categorical colours are
+     Trak's: amber is Trak's orange (stretch, context), sky Trak's blue (lead). */
+  --info: var(--accent);
+  --tone-amber: rgb(var(--t-orange));
+  --tone-sky: rgb(var(--t-info));
   --shadow-resting: 0 1px 2px hsl(0 0% 0% / .06);
   --shadow-raised: 0 8px 22px hsl(0 0% 0% / .08);
   --shadow-floating: 0 22px 55px hsl(0 0% 0% / .14);

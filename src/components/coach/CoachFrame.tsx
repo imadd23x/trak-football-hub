@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, House, Settings, TrafficCone, Users } from 'lucide-react'
@@ -30,7 +30,9 @@ import { CoachTrailProvider, TrailLink, type Trail } from '@/components/coach/Co
    TRAK-305 (Kostas, 28 Oct): a coach with two squads or more picks All or one
    squad here, once, and every coach page shows only that: in the top bar on a
    laptop (top right), in a row at the top of the page on a phone. TRAK-347 (Imad, 3 Nov): a laptop's top bar is the
-   trail, "Matches / vs Mirdif Rangers", and no longer starts with the club. */
+   trail, "Matches / vs Mirdif Rangers", and no longer starts with the club. TRAK-377 (Imad, 5 Nov): the page waits for
+   its code inside the frame, so the frame never does; when the app's own wait held the frame too, a phone's sidebar
+   tapped shut while a page loaded slid back in and stayed, the page under it blocked until a refresh. */
 
 type Screen = CoachScreen
 const TO = COACH_SCREEN_PATH
@@ -113,7 +115,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
       actions={<><CoachAlertsBell coachId={userId} /><CoachCreate placement="top" onSaved={saved} /></>}>
       {/* TRAK-307: the menu pages' margins, so the pills end where the page does. */}
       {!wide && !barred && coachSquad.view && <div className="flex justify-end bg-ground px-5 pt-3 tablet:px-8">{switcher}</div>}
-      <Outlet />
+      <Suspense fallback={<div className="min-h-screen bg-ground" />}><Outlet /></Suspense>
     </SidebarRail>
     {!wide && !barred && <div className="arc fixed inset-x-0 z-50 px-3 pointer-events-none" style={{ bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
       <GlassTabBar label="Coach" value={screen ?? ''} onValueChange={value => navigate(TO[value as Screen])}

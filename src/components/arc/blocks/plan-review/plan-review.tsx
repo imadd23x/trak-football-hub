@@ -15,7 +15,8 @@ import styles from "./plan-review.module.css";
    each row is a part of the plan with its own Edit, and the footer holds what shares it. No time ranges, no sparklines
    and no AI summary: Trak has no history to draw and no AI writing it. TRAK-344 (Imad, 3 Nov): each part's status is
    its icon, a word only for screen readers. TRAK-369 (Imad, 4 Nov): the top row is two halves, the gauge with what's
-   left under it, and Arc's countdown. */
+   left under it, and Arc's countdown. TRAK-373 (Imad, 5 Nov): after kick-off, `aside` takes the countdown's half (the
+   match clock, then "Locked"). */
 
 export type ReviewStatus = "good" | "watch" | "risk";
 export type ReviewRow = {
@@ -34,7 +35,9 @@ export interface PlanReviewProps {
   /** The gauge's word: "Ready to share", "3 incomplete". */
   band: { status: ReviewStatus; label: string };
   /** The countdown: its label ("Kick-off in"), kick-off, and what it says once kick-off has passed. */
-  countdown: { label: string; end: Date | string; completeLabel: string };
+  countdown?: { label: string; end: Date | string; completeLabel: string };
+  /** In the countdown's half instead, such as the match clock. */
+  aside?: ReactNode;
   /** Read only: the rows have no Edit. */
   readOnly?: boolean;
   /** What shares the plan, under the rows. */
@@ -55,7 +58,7 @@ function StatusIcon({ status, spoken = false }: { status: ReviewStatus; spoken?:
     {...(spoken ? { role: "img", "aria-label": label } : { "aria-hidden": true })} />;
 }
 
-export function PlanReview({ title, rows, band, countdown, readOnly = false, children }: PlanReviewProps) {
+export function PlanReview({ title, rows, band, countdown, aside, readOnly = false, children }: PlanReviewProps) {
   const reduced = useReducedMotion() ?? false;
   const rootRef = useRef<HTMLElement>(null);
   const titleId = useId();
@@ -104,12 +107,13 @@ export function PlanReview({ title, rows, band, countdown, readOnly = false, chi
               <span>{band.label}</span>
             </span>
           </div>
-          <div className={`${styles.cell} ${styles.countdownCell}`}>
+          {aside ? <div className={`${styles.cell} ${styles.countdownCell}`}>{aside}</div>
+            : countdown ? <div className={`${styles.cell} ${styles.countdownCell}`}>
             {/* The timer is named by the same words, so they're said once. */}
             <p className={styles.countdownLabel} aria-hidden="true">{countdown.label}</p>
             <Countdown className={styles.countdown} target={countdown.end} units={["days", "hours", "minutes"]}
               label={countdown.label} completeLabel={countdown.completeLabel} />
-          </div>
+          </div> : null}
         </div>
       </div>
 

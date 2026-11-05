@@ -16,6 +16,7 @@ import { SplitButton } from '@/components/arc/split-button/split-button'
 import { TimePicker } from '@/components/arc/time-picker/time-picker'
 import { PlanReview, type ReviewRow } from '@/components/arc/blocks/plan-review/plan-review'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { MatchClock } from './MatchClock'
 
 /* TRAK-286 (Games 4/8): plan step 3, Share (TRAK-282). In the app only: no email, no push. TRAK-287: locked at kick-off,
    nothing is shared any more; the lock's alert says what wasn't. TRAK-290: Share at… behind the share button's chevron;
@@ -83,8 +84,9 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
 
   return (
     <div className="arc">
-      <PlanReview title="Game plan review" rows={rows} band={band} readOnly={locked}
-        countdown={{ label: locked ? 'Kick-off' : 'Kick-off in', end: game.starts_at, completeLabel: 'Locked' }}>
+      {/* TRAK-373 (Imad, 5 Nov): after kick-off, the match clock, then "Locked", in the countdown's place. */}
+      <PlanReview title="Game plan review" rows={rows} band={band} readOnly={locked} aside={locked ? <MatchClock game={game} /> : undefined}
+        countdown={{ label: 'Kick-off in', end: game.starts_at, completeLabel: 'Locked' }}>
         {sharedAt == null && locked ? (
           <section aria-labelledby="plan-not-shared" className="grid gap-1">
             <h4 id="plan-not-shared" className={sub}>Not shared</h4>

@@ -142,7 +142,7 @@ describe('TRAK-344: the match page says each thing once', { timeout: 30_000 }, (
     expect(screen.queryByRole('timer')).toBeNull()
   })
 
-  it('at kick-off, with the card open, its countdown column reads Kick-off over Locked', async () => {
+  it('at kick-off, with the card open, the countdown gives way to the match clock (TRAK-373)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     setup({ kickOffIn: 30_000 })
     review()
@@ -151,9 +151,8 @@ describe('TRAK-344: the match page says each thing once', { timeout: 30_000 }, (
 
     await act(async () => { await vi.advanceTimersByTimeAsync(2 * MINUTE) })
 
-    // TRAK-372: no lock alert; the card itself says so.
-    expect(await within(screen.getByRole('region', { name: 'Game plan review' })).findByText('Kick-off')).toBeInTheDocument()
     const locked = screen.getByRole('region', { name: 'Game plan review' })
-    expect(within(locked).getByRole('timer', { name: 'Kick-off' })).toHaveTextContent('Locked')
+    expect(await within(locked).findByRole('progressbar', { name: 'Match clock' })).toHaveAttribute('aria-valuetext', '1 minute played')
+    expect(within(locked).queryByRole('timer')).toBeNull()
   })
 })

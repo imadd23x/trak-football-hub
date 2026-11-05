@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { format } from 'date-fns'
-import { STATE, fullTime, gameState, gameStatus, matchActions, needsAPlan, orderGames, type GameEvent } from '../loop'
+import { STATE, fullTime, gameState, gameStatus, matchActions, matchClock, needsAPlan, orderGames, type GameEvent } from '../loop'
 
 // Kick-off Sat 31 Oct 2026, 11:00 in Athens (09:00Z); the clock is an instant, so the device's zone never matters.
 const KICK_OFF = Date.parse('2026-10-31T09:00:00Z')
@@ -176,5 +176,51 @@ describe('matchActions (TRAK-333)', () => {
   it('nothing while the match is on, or once it is published', () => {
     expect(matchActions('locked')).toBeNull()
     expect(matchActions('published')).toBeNull()
+  })
+})
+
+// TRAK-373 (Imad, 5 Nov): the match clock. A 09:00 to 10:45 slot: two halves of 45 minutes and 15 of half-time.
+describe('matchClock (TRAK-373)', () => {
+  const MIN = 60_000
+  const slot = game({ ends_at: '2026-10-31T10:45:00+00:00' })
+  const at = (minutes: number, seconds = 0) => KICK_OFF + minutes * MIN + seconds * 1000
+
+  it('waits before kick-off, and is over from full time', () => {
+    expect(matchClock(slot, KICK_OFF - 1000)).toBe('before')
+    expect(matchClock(slot, at(105))).toBe('over')
+    expect(matchClock(slot, at(200))).toBe('over')
+  })
+
+  it('reads the minutes played, as the coach\'s watch does: 14 minutes in is 14\', and the first minute is 1\'', () => {
+    expect(matchClock(slot, KICK_OFF)).toEqual({ minute: 1, share: 0 })
+    expect(matchClock(slot, at(0, 59))).toMatchObject({ minute: 1 })
+    expect(matchClock(slot, at(14))).toEqual({ minute: 14, share: 14 / 90 })
+    expect(matchClock(slot, at(14, 59))).toMatchObject({ minute: 14 })
+    expect(matchClock(slot, at(44, 59))).toMatchObject({ minute: 44 })
+  })
+
+  it('is HT for the 15 minutes in the middle of the slot, the bar halfway', () => {
+    expect(matchClock(slot, at(45))).toEqual({ minute: 'HT', share: 0.5 })
+    expect(matchClock(slot, at(59, 59))).toEqual({ minute: 'HT', share: 0.5 })
+  })
+
+  it('picks up the second half where the first stopped, to the last minute', () => {
+    expect(matchClock(slot, at(60))).toEqual({ minute: 45, share: 0.5 })
+    expect(matchClock(slot, at(61))).toMatchObject({ minute: 46 })
+    expect(matchClock(slot, at(104, 59))).toMatchObject({ minute: 89 })
+  })
+
+  it('a match with no end runs 90 minutes after kick-off, half-time included', () => {
+    const open = game({ ends_at: null })
+    expect(matchClock(open, at(37))).toMatchObject({ minute: 37 })
+    expect(matchClock(open, at(37, 30))).toEqual({ minute: 'HT', share: 0.5 })
+    expect(matchClock(open, at(52, 30))).toMatchObject({ minute: 37 })
+    expect(matchClock(open, at(90))).toBe('over')
+  })
+
+  it('a slot of 30 minutes or less has no half-time', () => {
+    const short = game({ ends_at: '2026-10-31T09:30:00+00:00' })
+    expect(matchClock(short, at(15))).toEqual({ minute: 15, share: 0.5 })
+    expect(matchClock(short, at(29, 59))).toMatchObject({ minute: 29 })
   })
 })

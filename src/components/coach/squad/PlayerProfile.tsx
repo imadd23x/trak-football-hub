@@ -15,6 +15,7 @@ import type { Scores } from '@/lib/squad/season-profile'
 import { PlayerFactsEditor } from './PlayerFactsEditor'
 import type { PlayerFacts } from './usePlayerFacts'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { PlayerObjectivesSection } from '@/components/coach/season-plan/PlayerObjectivesSection'
 
 const FOOT = { left: 'Left', right: 'Right', both: 'Both' } as const
 /** The assessments shown at first, newest first. TRAK-368: "All N" shows the rest here too. */
@@ -34,7 +35,7 @@ const notSet = <span className="text-ink-3">Not set</span>
  * coach's assessment card exactly as it is elsewhere. Imad, 23 Oct: one row of cards, the latest first, swiping to
  * earlier ones, with no date line above them (the card's quick look has the date and session).
  */
-export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRetryFacts, season, squadSeason, since = '1 July', seasonFailed = false, onRetrySeason }: {
+export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRetryFacts, season, squadSeason, since = '1 July', seasonFailed = false, onRetrySeason, placement }: {
   player: SquadPlayer
   squad: string | null
   coachId: string
@@ -48,6 +49,8 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
   /** TRAK-368: the squad's assessments didn't load, so the season can't be told; never "No assessment this season yet". */
   seasonFailed?: boolean
   onRetrySeason?: () => void
+  /** TRAK-354: where the season plan is on, the roster's position, and the player's objectives show here. */
+  placement?: { position: string | null }
 }) {
   const navigate = useNavigate()
   const client = useQueryClient()
@@ -117,6 +120,8 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
           formatValue={value => value.toFixed(1)} />}
       </section>
     </div>
+
+    {placement && <PlayerObjectivesSection coachId={coachId} id={player.id} name={player.name} position={placement.position} squad={squad} />}
 
     {assessments.isError ? <LoadError what={`${first}'s assessments`} onRetry={() => { void assessments.refetch() }} />
       : !assessments.data ? <LoadingSkeleton label={`Loading ${first}'s assessments…`} lines={2} rows={2} />

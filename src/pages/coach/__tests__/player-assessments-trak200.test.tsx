@@ -55,6 +55,8 @@ function serve(given: Record<string, unknown>[] = [DRAFT, PUBLISHED]) {
     rpc('coach_squad_player_consent_required', () => false),
     rpc('coach_squad_season', () => []),
     table('squad_player_profiles', []),
+    // TRAK-354: the player's objectives; none.
+    table('player_objectives', []),
     table('season_plans', []),
     rpcRows('coach_player_birth_dates', []),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/set_assessment_published`, async ({ request }) => {

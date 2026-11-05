@@ -79,6 +79,8 @@ beforeEach(() => {
     http.post(`${SUPABASE_URL}/rest/v1/season_objectives`, () => new HttpResponse(null, { status: 201 })),
     table('training_notes', []),
     table('squad_player_profiles', []),
+    // TRAK-354: step 3 and the player's page read the players' objectives; none.
+    table('player_objectives', []),
     rpc('coach_player_birth_dates', () => []),
     table('coach_assessments', []),
     table('coach_sessions', []),
@@ -195,7 +197,9 @@ describe('TRAK-352 positions', () => {
     await user().click(within(await screen.findByRole('group', { name: "Synthetic Player 01's position" })).getByRole('button', { name: 'Goalkeeper' }))
     await user().click(within(groupOf('Synthetic Player 02')).getByRole('button', { name: 'Defender' }))
     expect(await screen.findByRole('heading', { name: '2 of 2 placed' })).toBeInTheDocument()
-    await user().click(screen.getByRole('button', { name: 'Done' }))
+    // TRAK-354: Positions goes on to Player objectives, whose Done goes Home.
+    await user().click(screen.getByRole('button', { name: 'Next: Player objectives' }))
+    await user().click(await screen.findByRole('button', { name: 'Done' }))
     expect(await screen.findByRole('heading', { name: /^Needs you/ })).toBeInTheDocument()
     expect(screen.queryByText(/players? needs? a position$/)).not.toBeInTheDocument()
   })

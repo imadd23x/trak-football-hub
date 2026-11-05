@@ -17,6 +17,7 @@ import { useCoachSquad } from '@/lib/coach-squad'
 import { squadName } from '@/lib/coach-week'
 import { askToEmailFamilies } from '@/lib/event-emails'
 import { useAuth } from '@/contexts/AuthContext'
+import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { MobileShell, NavBar, LoadError } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
 import { useGameEvaluations } from '@/components/coach/games/useGames'
@@ -142,7 +143,7 @@ export default function CoachSchedule() {
   const navigate = useNavigate()
   // TRAK-275: a card's actions carry words only where the side menu shows (a laptop).
   const wide = useSideMenuScreen()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   // TRAK-176: the squad picked; its events and the whole-roster ones show, and new ones are saved for it.
   const coachSquad = useCoachSquad(user?.id)
   // TRAK-305: All or one squad, as picked at the top of the frame (Imad, 24 Oct: never another squad's events hidden
@@ -543,6 +544,8 @@ export default function CoachSchedule() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
+            <CoachMenuButton name={profile?.full_name || 'Coach'} />
             {/* TRAK-272: a phone has no Schedule tab, so a Back (where the coach came from, else Home). A laptop has the sidebar. */}
             <div className="laptop:hidden"><BackButton fallback="/coach/home" label="Back" /></div>
             <h1 className="text-[22px] font-light text-ink tracking-tight"

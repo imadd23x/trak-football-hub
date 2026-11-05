@@ -175,13 +175,27 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(errors).toEqual([])
   })
 
-  // TRAK-305, TRAK-324: one squad switcher (the sidebar on a laptop, the page's top on a phone); the pick holds.
+  // TRAK-305, TRAK-324: one squad switcher (the sidebar on a laptop; TRAK-376, the side menu on a phone, opened by the
+  // page's avatar); the pick holds.
   test(`Age groups at ${width} px: picked once in the switcher, kept after a reload`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/training', width, height)
-    const trigger = page.getByRole('button', { name: /^Squad: / })
-    await expect(trigger).toHaveAccessibleName(/^Squad: All squads\./)
+    const phone = width < 1024
+    const menu = async () => {
+      if (!phone) return
+      await page.getByRole('button', { name: 'Open menu' }).click()
+      await expect(page.getByRole('dialog', { name: 'Menu' })).toBeVisible()
+    }
+    const closeMenu = async () => {
+      if (!phone) return
+      await page.getByRole('button', { name: 'Close menu' }).click()
+      await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0)
+    }
     const coming = page.getByRole('region', { name: 'Upcoming trainings' }).first()
     await expect(coming.getByRole('link')).toHaveCount(3)
+    if (phone) await expect(page.getByRole('button', { name: /^Squad: / })).toHaveCount(0)
+    await menu()
+    const trigger = page.getByRole('button', { name: /^Squad: / })
+    await expect(trigger).toHaveAccessibleName(/^Squad: All squads\./)
     await trigger.click()
     const options = page.getByRole('listbox').getByRole('option')
     await expect(options).toHaveCount(3)
@@ -195,10 +209,13 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.screenshot({ path: testInfo.outputPath(`squad-switcher-${width}.png`) })
     await page.getByRole('option', { name: /^U14/ }).click()
     await expect(trigger).toHaveAccessibleName(/^Squad: U14\./)
+    await closeMenu()
     await expect(coming.getByRole('link')).toHaveCount(1)
     await expect(coming.getByRole('link')).toContainText('U14 finishing')
     await page.reload()
+    await menu()
     await expect(page.getByRole('button', { name: /^Squad: / })).toHaveAccessibleName(/^Squad: U14\./)
+    await closeMenu()
     await expect(page.getByRole('region', { name: 'Upcoming trainings' }).first().getByRole('link')).toHaveCount(1)
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])

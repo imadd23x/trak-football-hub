@@ -395,15 +395,31 @@ const DRAFT = (): Plans => new Map([
   ['line-up:m-next:sq-1', { event_id: 'm-next', squad_player_id: 'sq-1', role: 'starter', slot: 4, job: 'Stay tight to their winger.',
     note: 'Second game at right-back. Proud of you.', context: ['out_of_position'], expectation: 'stretch' }],
 ])
-// TRAK-317: a starter expected to stretch is yellow on the pitch (TRAK-270's attention yellow), with a key under it.
+// TRAK-317: a starter expected to stretch stands out on the pitch, with a key under it. TRAK-370 (Imad, 5 Nov): stretch
+// and context are Trak's orange, lead Trak's blue, on Arc's current badge (soft corners, no border).
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
-  test(`a stretch starter at ${width} px: a yellow circle on the pitch, and the key`, async ({ page, context }, testInfo) => {
-    const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', width, height, DRAFT())
+  test(`a stretch starter at ${width} px: an orange circle on the pitch, the key, and orange, blue and soft-cornered badges`, async ({ page, context }, testInfo) => {
+    const plans = DRAFT()
+    plans.set('line-up:m-next:sq-2', { event_id: 'm-next', squad_player_id: 'sq-2', role: 'starter', slot: 2, job: 'Organise the back four.',
+      note: '', context: [], expectation: 'lead' })
+    const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', width, height, plans)
     await page.getByRole('button', { name: 'Next: Line-up and jobs' }).click()
     const stretch = page.getByRole('button', { name: /, slot 4, stretch$/ })
     await expect(stretch).toBeVisible()
-    expect(await stretch.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(234, 179, 8)')
-    await expect(page.getByText('Yellow: stretch')).toBeVisible()
+    const trak = (token: string) => page.evaluate(name => `rgb(${getComputedStyle(document.documentElement).getPropertyValue(name).trim().split(/\s+/).join(', ')})`, token)
+    const orange = await trak('--t-orange')
+    expect(orange).toBe('rgb(156, 69, 22)')
+    expect(await stretch.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(orange)
+    await expect(page.getByText('Orange: stretch')).toBeVisible()
+    // Each badge's tone, as its stylesheet resolves it, and its shape.
+    const badge = (text: string) => page.getByText(text, { exact: true }).locator('xpath=ancestor::span[contains(@class, "badge")][1]')
+    const tone = (text: string) => badge(text).evaluate(el => getComputedStyle(el).getPropertyValue('--badge-tone').replace(/\s+/g, ' ').trim())
+    const rgbOf = (value: string) => value.replace(/^rgb\((\d+) (\d+) (\d+)\)$/, 'rgb($1, $2, $3)')
+    expect(rgbOf(await tone('Expect: Stretch'))).toBe(orange)
+    expect(rgbOf(await tone('Out of position'))).toBe(orange)
+    expect(rgbOf(await tone('Expect: Lead'))).toBe(await trak('--t-info'))
+    const shape = await badge('Expect: Stretch').evaluate(el => ({ radius: getComputedStyle(el).borderTopLeftRadius, edge: getComputedStyle(el).borderTopColor }))
+    expect(shape).toEqual({ radius: '5px', edge: 'rgba(0, 0, 0, 0)' })
     await page.waitForTimeout(400)
     await page.getByRole('region', { name: '4-4-2' }).screenshot({ path: testInfo.outputPath(`stretch-pitch-${width}.png`) })
     expect(await sideways(page)).toBeLessThanOrEqual(0)

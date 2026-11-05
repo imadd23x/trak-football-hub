@@ -22,6 +22,9 @@ export const EXPECTATIONS: { value: Expectation; label: string; description: str
   { value: 'usual', label: 'Usual', description: 'Your normal game.' },
   { value: 'lead', label: 'Lead', description: 'We needed you to take charge.' },
 ]
+/** TRAK-370 (Imad, 5 Nov): an expectation's badge colour, as context's is orange: stretch orange, lead blue
+ *  (arc-theme.css maps Arc's amber and sky to Trak's). Usual stays a plain badge. */
+export const EXPECTATION_COLOR = { stretch: 'amber', usual: undefined, lead: 'sky' } as const satisfies Record<Expectation, 'amber' | 'sky' | undefined>
 /** Database limits (20261028140000_game_plan_players.sql). */
 export const PLAYER_LIMITS = { job: 300, note: 500 }
 

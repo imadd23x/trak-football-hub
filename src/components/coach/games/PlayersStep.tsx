@@ -1,5 +1,5 @@
 import { AGAINST, DID_JOB, EVALUATION_LIMITS, answerOf, summary, type Against, type Answer, type DidJob, type EvaluationForm } from '@/lib/games/evaluation'
-import { CONTEXT, EXPECTATIONS, playerPlan, type PlayerPlans } from '@/lib/games/lineup'
+import { CONTEXT, EXPECTATIONS, EXPECTATION_COLOR, playerPlan, type PlayerPlans } from '@/lib/games/lineup'
 import { Badge } from '@/components/arc/badge/badge'
 import { ExpandableCard } from '@/components/arc/expandable-card/expandable-card'
 import { Input } from '@/components/arc/input/input'
@@ -30,8 +30,8 @@ export function PlayersStep({ eventId, form, onFormChange, played, plans }: {
           const name = first(player.name)
           return <li key={player.id}>
             <ExpandableCard title={player.name} description={summary(answer)} badges={<>
-              {plan.context.map(value => <Badge key={value} size="sm">{CONTEXT.find(c => c.value === value)?.label ?? value}</Badge>)}
-              <Badge size="sm" tone={plan.expectation === 'usual' ? 'neutral' : 'info'}>
+              {plan.context.map(value => <Badge key={value} size="sm" color="amber">{CONTEXT.find(c => c.value === value)?.label ?? value}</Badge>)}
+              <Badge size="sm" color={EXPECTATION_COLOR[plan.expectation]}>
                 {`Expected: ${EXPECTATIONS.find(e => e.value === plan.expectation)!.label}`}</Badge>
             </>}>
               <div className="grid gap-4 p-4 tablet:grid-cols-2">

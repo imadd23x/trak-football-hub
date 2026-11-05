@@ -30,12 +30,12 @@
 .filters + .body { border-top: 1px solid var(--border); }
 
 /* Body */
-.body { display: grid; grid-template-columns: minmax(240px, 34%) minmax(0, 1fr); min-height: 480px; }
-.listPane { min-width: 0; padding: 8px; border-right: 1px solid var(--border); }
+.body { display: grid; grid-template-columns: minmax(0, 1fr); }
+/* Trak (TRAK-351): the list alone; a player opens as their own page. */
+.listPane { min-width: 0; padding: 8px; }
 .peopleList { position: relative; display: grid; gap: 2px; }
 .personRow { position: relative; isolation: isolate; display: flex; width: 100%; min-height: 56px; align-items: center; gap: 12px; border: 0; border-radius: 10px; padding: 8px 10px; background: transparent; color: var(--foreground); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color var(--duration-fast) var(--ease-standard); }
-@media (hover: hover) and (pointer: fine) { .personRow:hover:not([aria-pressed="true"]) { background: color-mix(in oklab, var(--surface-muted) 60%, transparent); } }
-.rowHighlight { position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--surface-muted); }
+@media (hover: hover) and (pointer: fine) { .personRow:hover { background: color-mix(in oklab, var(--surface-muted) 60%, transparent); } }
 .personText { display: grid; min-width: 0; flex: 1; gap: 1px; }
 .personName, .personRole { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .personName { font-size: 14px; font-weight: 500; }
@@ -49,29 +49,10 @@
 .empty p { color: var(--text-secondary); }
 .empty button { border: 0; padding: 0; background: transparent; color: var(--foreground); font: inherit; font-weight: 500; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; cursor: pointer; }
 
-/* Profile */
-.detailPane { position: relative; min-width: 0; }
-.back { display: none; }
-.profile { display: flex; flex-direction: column; gap: 20px; padding: 24px; }
-.noProfile { display: grid; align-content: center; justify-items: start; gap: 4px; height: 100%; min-height: 240px; padding: 24px; }
-.noProfile p { font-weight: 500; }
-.noProfile span { color: var(--text-secondary); }
-
 @container directory (max-width: 680px) {
   .header { padding: 14px 16px 10px; }
   .filters { padding-inline: 12px; }
   .summary { padding-inline: 16px; }
-  .body { grid-template-columns: 1fr; min-height: 0; }
-  /* The rule travels with the profile, so it never jumps while the list closes its gap. */
-  .listPane { border-right: 0; }
-  .detailPane { border-top: 1px solid var(--border); }
-  /* Trak: stacked, an empty profile pane under the list is only noise; it appears once a player is picked. */
-  .detailPane:not(:has(.profile)) { display: none; }
-  .profile { padding: 20px 16px; }
-  /* Trak (Imad, 23 Oct): a picked player takes the whole block, with "All players" above the profile. */
-  .directory[data-focused] :is(.header, .filters, .summary, .listPane) { display: none; }
-  .directory[data-focused] .detailPane { border-top: 0; scroll-margin-top: 8px; }
-  .back { display: inline-flex; min-height: 44px; align-items: center; gap: 4px; margin: 8px 8px 0; border: 0; border-radius: 10px; padding: 0 8px; background: transparent; color: var(--foreground); font: inherit; font-weight: 500; cursor: pointer; }
 }
 @container directory (max-width: 400px) {
   .header { flex-direction: column; align-items: stretch; gap: 10px; }

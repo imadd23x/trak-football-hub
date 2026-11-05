@@ -350,11 +350,12 @@ test.describe('TRAK-220 Arc panels opened over the page', () => {
 })
 
 // Imad's 23 Oct phone review: picking a player in a long list lagged, and the profile under the list needed scrolling to.
-// On a phone the profile now takes the list's place, and "All players" returns to the same spot.
+// On a phone the profile now takes the list's place, and "All players" returns to the same spot. TRAK-351: on every
+// screen a player opens as their own page, and its Back button returns to the same spot.
 test.describe('Squad Players on a phone', () => {
   test.use({ timezoneId: 'Asia/Dubai', viewport: { width: 390, height: 500 } })
 
-  test("a picked player's profile replaces the list, and All players returns to it", async ({ page, context }) => {
+  test("a picked player's page replaces the list, and Back returns to it", async ({ page, context }) => {
     const unexpected: string[] = []
     await coachBackend(context, unexpected)
     await page.goto('/coach/squad')
@@ -366,7 +367,7 @@ test.describe('Squad Players on a phone', () => {
     const profile = page.locator('article[aria-label^="Thiago Silva"]')
     await expect(profile).toBeInViewport()
     await expect(list).toBeHidden()
-    await page.getByRole('button', { name: 'All players' }).click()
+    await page.getByRole('button', { name: 'Back' }).click()
     await expect(list).toBeVisible()
     await expect.poll(() => page.evaluate(() => scrollY)).toBe(before)
     expect(unexpected).toEqual([])

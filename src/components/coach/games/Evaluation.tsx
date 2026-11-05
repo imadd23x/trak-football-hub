@@ -137,7 +137,7 @@ export function Evaluation({ game, opensAt, plans, planGoals, form, onFormChange
       <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Evaluation" jumpAhead />
       {step === 0 ? <ResultStep eventId={game.id} form={form} onFormChange={change} starters={named(starters)} bench={named(bench)} goals={planGoals} />
         : step === 1 ? <PlayersStep eventId={game.id} form={form} onFormChange={change} played={named(played)} plans={plans} />
-        : <PublishStep eventId={game.id} form={form} listed={listed} plans={plans} goals={planGoals.length} coachName={coachName}
+        : <PublishStep eventId={game.id} form={form} listed={listed} goals={planGoals.length} onStep={onStep}
             askCompetition={!game.competition} askHomeAway={game.home_away !== 'home' && game.home_away !== 'away'}
             onPublish={choices => { setPublishProblem(null); publish.mutate({ args: formToSave(game.id, form, listed), choices }) }}
             publishing={publish.isPending} problem={publishProblem} />}

@@ -1,26 +1,32 @@
-import { Lock } from 'lucide-react'
-import { EVALUATION_LIMITS, hasPlayed, setPlayed, withScore, type EvaluationForm, type ScoredGoal } from '@/lib/games/evaluation'
-import { Badge } from '@/components/arc/badge/badge'
+import { EVALUATION_LIMITS, PLAN_WORKED, hasPlayed, setPlayed, withScore, type EvaluationForm, type PlanWorked, type ScoredGoal } from '@/lib/games/evaluation'
 import { Checkbox } from '@/components/arc/checkbox/checkbox'
 import { NumberField } from '@/components/arc/number-field/number-field'
+import { RadioGroup } from '@/components/arc/radio-group/radio-group'
 import { Select } from '@/components/arc/select/select'
 import { Textarea } from '@/components/arc/textarea/textarea'
+import { OnlyYou } from './OnlyYou'
 
 /* TRAK-288 (Games 6/8): the evaluation's Result step (TRAK-282). The score; for each of our goals, who scored and who
    assisted, from the players who played; how they scored, only the coach's; and who played: the starters ticked until
-   the coach unticks them, the bench ticked when they came on. No minutes (Imad, 29 Oct). */
+   the coach unticks them, the bench ticked when they came on. No minutes (Imad, 29 Oct). TRAK-374 (Imad, 5 Nov): "Did
+   the plan work?" for each instruction as it locked (the Team step's, gone); How they scored only once they scored,
+   with the Scouting lock. */
 
 const NONE = 'none'
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
 type Listed = { id: string; name: string }
 
-export function ResultStep({ form, onFormChange, starters, bench }: {
-  form: EvaluationForm; onFormChange: (form: EvaluationForm) => void; starters: Listed[]; bench: Listed[]
+export function ResultStep({ eventId, form, onFormChange, starters, bench, goals }: {
+  eventId: string; form: EvaluationForm; onFormChange: (form: EvaluationForm) => void; starters: Listed[]; bench: Listed[]
+  /** The plan's instructions in order, as they locked at kick-off. */
+  goals: string[]
 }) {
   const played = [...starters.filter(p => hasPlayed(form, p.id, true)), ...bench.filter(p => hasPlayed(form, p.id, false))]
   const setGoal = (index: number, next: Partial<ScoredGoal>) =>
     onFormChange({ ...form, goals: form.goals.map((goal, i) => i === index ? { ...goal, ...next } : goal) })
   const pick = (value: string) => value === NONE ? null : value
+  const answer = (index: number, value: PlanWorked) =>
+    onFormChange({ ...form, planWorked: goals.map((_, i) => i === index ? value : form.planWorked[i] ?? null) })
   const tick = (player: Listed, starter: boolean) => <Checkbox key={player.id} label={player.name}
     checked={hasPlayed(form, player.id, starter)} onCheckedChange={next => onFormChange(setPlayed(form, player.id, next === true))} />
 
@@ -49,14 +55,20 @@ export function ResultStep({ form, onFormChange, starters, bench }: {
           </ol>}
         </section>
 
-        <section aria-labelledby="evaluation-how" className={card}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        {form.theirScore > 0 && <section aria-labelledby="evaluation-how" className={card}>
+          <div className="flex items-start justify-between gap-3">
             <h2 id="evaluation-how" className="text-lg font-medium text-ink">How they scored</h2>
-            <Badge size="sm" icon={<Lock size={12} />}>Only you</Badge>
+            <OnlyYou what="how they scored" />
           </div>
           <Textarea label="How their goals came" rows={3} value={form.howTheyScored} maxLength={EVALUATION_LIMITS.howTheyScored}
             onChange={event => onFormChange({ ...form, howTheyScored: event.target.value })} />
-        </section>
+        </section>}
+
+        {goals.length > 0 && <section aria-labelledby="evaluation-team" className={card}>
+          <h2 id="evaluation-team" className="text-lg font-medium text-ink">Did the plan work?</h2>
+          {goals.map((goal, index) => <RadioGroup key={index} label={goal} name={`plan-worked-${eventId}-${index}`} options={PLAN_WORKED}
+            value={form.planWorked[index] ?? ''} onValueChange={value => answer(index, value as PlanWorked)} />)}
+        </section>}
       </div>
 
       <section aria-labelledby="evaluation-played" className={card}>

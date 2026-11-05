@@ -79,6 +79,8 @@ beforeEach(() => {
     http.post(`${SUPABASE_URL}/rest/v1/season_objectives`, () => new HttpResponse(null, { status: 201 })),
     table('training_notes', []),
     table('squad_player_profiles', []),
+    // TRAK-353: the player's Can also play and roles; none.
+    table('squad_player_also_plays', []), table('squad_player_roles', []),
     // TRAK-354: step 3 and the player's page read the players' objectives; none.
     table('player_objectives', []),
     rpc('coach_player_birth_dates', () => []),

@@ -61,6 +61,8 @@ beforeEach(() => {
       return new HttpResponse(null, { status: 204 })
     }),
     table('training_notes', []),
+    // TRAK-353: the player's page also lists Can also play and roles; none.
+    table('squad_player_also_plays', []), table('squad_player_roles', []),
     table('squad_player_profiles', []),
     rpc('coach_player_birth_dates', () => []),
     rpc('coach_squad_season', () => []),

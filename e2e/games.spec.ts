@@ -574,9 +574,47 @@ test("the player's event page at 390 px: the shared game plan", async ({ page, c
   expect(errors).toEqual([])
 })
 
-// TRAK-287: a match that has kicked off shows its plan locked: read only, with no Save or Share, and the lock's note.
+// TRAK-373 (Imad, 5 Nov): while the match is on, Review & share's top right is the minute over a green bar, "HT" at
+// half-time (15 minutes in the middle of the 90-minute slot), then "Locked" with the lock. The page's clock is set to
+// 14 minutes after Lakeside's kick-off, then moved on.
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
-  test(`a locked plan at ${width} px: read only, with the lock's note`, async ({ page, context }, testInfo) => {
+  test(`the match clock at ${width} px: the minute (as on TV) over a green bar, HT, then Locked`, async ({ page, context }, testInfo) => {
+    const lakeside = MATCHES.find(m => m.id === 'm-past')!
+    await page.clock.install({ time: new Date(Date.parse(lakeside.starts_at) + 14 * MINUTE + 10_000) })
+    const plans: Plans = new Map([['m-past', { event_id: 'm-past', strength: 'similar', their_formation: null, key_players: [], scouting: '',
+      format: 11, formation: '4-4-2', goals: [], created_at: '2026-10-20T17:00:00Z', updated_at: '2026-10-20T17:40:00Z' }]])
+    const { unexpected, errors } = await open(page, context, '/coach/matches/m-past?tab=plan&step=share', width, height, plans)
+    const card = page.getByRole('region', { name: 'Game plan review' })
+    const clock = card.getByRole('progressbar', { name: 'Match clock' })
+    // Counted as on TV: 14 minutes played is 15'.
+    await expect(clock).toHaveAttribute('aria-valuetext', 'Minute 15')
+    await expect(card.getByText('15\'', { exact: true })).toBeVisible()
+    await expect(card.getByRole('timer')).toHaveCount(0)
+    // Trak's green, a fifth of the way along (14 of 75 minutes of play).
+    const fill = clock.locator('span')
+    expect(await fill.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(await page.evaluate(() =>
+      `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--t-brand').trim().split(/\s+/).join(', ')})`))
+    await page.waitForTimeout(600)
+    const share = await fill.evaluate(el => el.getBoundingClientRect().width / el.parentElement!.getBoundingClientRect().width)
+    expect(share).toBeCloseTo(14 / 75, 1)
+    await card.screenshot({ path: testInfo.outputPath(`match-clock-${width}.png`) })
+    await page.clock.fastForward('24:00')
+    await expect(card.getByText('HT', { exact: true })).toBeVisible()
+    await expect(clock).toHaveAttribute('aria-valuetext', 'Half-time')
+    await page.clock.fastForward('01:00:00')
+    await expect(card.getByText('Locked', { exact: true })).toBeVisible()
+    await expect(clock).toHaveCount(0)
+    await card.screenshot({ path: testInfo.outputPath(`match-locked-${width}.png`) })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}
+
+// TRAK-287: a match that has kicked off shows its plan locked, with no Save or Share. TRAK-372 (Imad, 5 Nov): no lock
+// alert, and what was written reads as written, with no boxes.
+for (const [width, height] of [[390, 844], [1440, 900]] as const) {
+  test(`a locked plan at ${width} px: written, not boxes, with no lock alert`, async ({ page, context }, testInfo) => {
     const plans: Plans = new Map([
       ['m-past', { event_id: 'm-past', strength: 'similar', their_formation: '4-3-3', key_players: [], scouting: 'Their 9 is quick.', format: 11,
         formation: '4-4-2', goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }],
@@ -585,15 +623,16 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
         note: '', context: [], expectation: 'usual' }],
     ])
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-past?tab=plan', width, height, plans)
-    await expect(page.getByText(/^Locked at kick-off, \d\d:\d\d$/)).toBeVisible()
-    await expect(page.getByText(/It wasn’t shared, so only you saw it\./)).toBeVisible()
+    await expect(page.getByText('Win it back in their half', { exact: true })).toBeVisible()
+    await expect(page.getByText('Press when their keeper plays short.', { exact: true })).toBeVisible()
+    await expect(page.getByText('Their 9 is quick.', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^Locked at kick-off, \d\d:\d\d$/)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Save draft' })).toHaveCount(0)
-    await expect(page.getByRole('textbox', { name: 'Instruction' })).toHaveAttribute('readonly', '')
+    await expect(page.locator('[role="tabpanel"]:not([hidden])').getByRole('textbox')).toHaveCount(0)
     await expect(page.getByRole('button', { name: /Add instruction/ })).toHaveCount(0)
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`locked-plan-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
-    // Read-only fields still take focus, so the plan can be read with the keyboard.
     const keyboard = await everyControlByKeyboard(page, '[role="tabpanel"]:not([hidden])', true)
     expect(keyboard.count).toBeGreaterThan(3)
     expect(keyboard.missed).toEqual([])

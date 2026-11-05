@@ -9,8 +9,6 @@ import { useWhoCanCome } from './useGames'
 import { TacticsAndAnalysis } from './TacticsAndAnalysis'
 import { LineUpAndJobs } from './LineUpAndJobs'
 import { ShareStep } from './ShareStep'
-import { Lock } from 'lucide-react'
-import { Alert } from '@/components/arc/alert/alert'
 import { Button } from '@/components/arc/button/button'
 import { Stepper } from '@/components/arc/stepper/stepper'
 
@@ -18,7 +16,7 @@ import { Stepper } from '@/components/arc/stepper/stepper'
    then Share. One draft, only the coach sees it: Save draft keeps both steps, and a failed save keeps everything typed
    and says so, as Schedule's does. Sharing saves what's typed first, so what goes out is what's on screen. The game page holds what's
    typed and the step, above its tabs, so a look at Logistics never loses them. TRAK-287: at kick-off the plan locks; the
-   saved plan shows read only, Save and Share go, and the alert says what wasn't shared. TRAK-290: Share at… schedules
+   saved plan shows read only, and Save and Share go (TRAK-372, Imad 5 Nov: with no alert). TRAK-290: Share at… schedules
    it; until then Save draft also rewrites what's waiting, so it goes out as saved (Imad, 29 Oct). TRAK-332 (Imad, 2 Nov):
    the last step is Review & share, and the face-to-face tick and Share plan (Share at… on its chevron) sit in its card;
    the bottom bar keeps Back and Save draft (it was TRAK-318's place for Share). */
@@ -28,16 +26,15 @@ const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again
 const SHARE_FAILED = "Couldn't share the plan. Check your connection and try again; everything you typed is still here."
 const SCHEDULE_FAILED = "Couldn't schedule the plan. Check your connection and try again; everything you typed is still here."
 
-export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, changes, lockedAt = null, onEditLogistics }: {
+export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, changes, locked = false, onEditLogistics }: {
   game: EventRow; form: PlanForm; onFormChange: (form: PlanForm) => void; step: number; onStep: (step: number) => void
   /** TRAK-286: when the plan was first shared, or null; and whose copies a share would change now. */
   sharedAt: string | null; changes: string[]
-  /** TRAK-287: kick-off as the header shows it ("11:00") once it has passed; null before. */
-  lockedAt?: string | null
+  /** TRAK-287: kick-off has passed, so the plan only shows. */
+  locked?: boolean
   /** TRAK-332: Review & share's Logistics part pulls up the event's edit sheet (TRAK-331). */
   onEditLogistics: () => void
 }) {
-  const locked = lockedAt !== null
   const { user } = useAuth()
   const client = useQueryClient()
   const who = useWhoCanCome(game)
@@ -133,11 +130,6 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
 
   return (
     <div className="grid gap-5 pt-4">
-      {locked && <div className="arc"><Alert tone="info" icon={Lock} title={lockedAt ? `Locked at kick-off, ${lockedAt}` : 'Locked at kick-off'}>
-        {`Jobs and expectations are fixed, so the evaluation reads against what you expected before the game.${sharedAt == null
-          ? ' It wasn’t shared, so only you saw it.'
-          : changes.length ? ` ${changes.length} ${changes.length === 1 ? 'player' : 'players'} didn’t get your last changes.` : ''}`}
-      </Alert></div>}
       {/* TRAK-346 (Imad, 3 Nov): any step opens from here, ahead as well as back, so an Edit never means walking back. */}
       <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Game plan" jumpAhead />
       {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} form={form} onFormChange={change} locked={locked} />

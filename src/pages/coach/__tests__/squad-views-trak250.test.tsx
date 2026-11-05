@@ -55,6 +55,8 @@ function coachReads(players: Record<string, unknown>[] = PLAYERS) {
     rpc('coach_squad_season', () => []),
     // TRAK-263: the Players view's profile facts (TRAK-260).
     table('squad_player_profiles', []),
+    // TRAK-353: the player's Can also play and roles; none.
+    table('squad_player_also_plays', []), table('squad_player_roles', []),
     // TRAK-354: the player's objectives; none.
     table('player_objectives', []),
     rpcRows('coach_player_birth_dates', []),

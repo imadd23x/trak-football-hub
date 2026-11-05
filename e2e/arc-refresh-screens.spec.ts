@@ -67,6 +67,8 @@ async function coachBackend(context: BrowserContext, unexpected: string[], withM
     if (path === '/rest/v1/rpc/my_session_is_live' || path === '/rest/v1/rpc/feature_on') return json(true)
     // TRAK-350: the season plan's switch is on here, so Home asks for the squad's plan; there is none.
     if (path === '/rest/v1/season_plans') return json([])
+    // TRAK-353: so a player's page lists their Can also play and roles; there are none.
+    if (path === '/rest/v1/squad_player_also_plays' || path === '/rest/v1/squad_player_roles') return json([])
     // TRAK-354: so a player's page lists their objectives; there are none.
     if (path === '/rest/v1/player_objectives') return json([])
     if (path.startsWith('/rest/v1/rpc/')) return json([])

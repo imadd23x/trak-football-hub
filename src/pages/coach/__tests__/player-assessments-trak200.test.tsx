@@ -55,6 +55,8 @@ function serve(given: Record<string, unknown>[] = [DRAFT, PUBLISHED]) {
     rpc('coach_squad_player_consent_required', () => false),
     rpc('coach_squad_season', () => []),
     table('squad_player_profiles', []),
+    // TRAK-353: the player's Can also play and roles; none.
+    table('squad_player_also_plays', []), table('squad_player_roles', []),
     // TRAK-354: the player's objectives; none.
     table('player_objectives', []),
     table('season_plans', []),

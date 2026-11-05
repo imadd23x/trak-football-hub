@@ -4,6 +4,7 @@ import type { Scorer } from '@/lib/games/scorers'
 import { Link, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
+import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { COMPETITIONS } from '@/lib/coach-events'
 import { actionLink, type GameAction, type GameState, type PlanProgress, gameState, gameStatus, orderGames } from '@/lib/games/loop'
@@ -34,7 +35,7 @@ const details = (game: Game, time: string | null) => [
 ].filter(Boolean).join(' · ')
 
 export default function CoachGames() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const coachSquad = useCoachSquad(user?.id)
   const navigate = useNavigate()
   const games = useGames()
@@ -72,6 +73,8 @@ export default function CoachGames() {
     <div className="min-h-screen bg-ground pb-24">
       <div className={WIDE_COLUMN}>
         <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-5 pb-3">
+          {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
+          <CoachMenuButton name={profile?.full_name || 'Coach'} />
           <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Matches</h1>
         </header>
 

@@ -9,6 +9,8 @@ import { PlayersTab } from '@/components/coach/squad/PlayersTab'
 import { AttributesTab } from '@/components/coach/squad/AttributesTab'
 import { AvailabilityTab } from '@/components/coach/squad/AvailabilityTab'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { useAuth } from '@/contexts/AuthContext'
+import { CoachMenuButton } from '@/components/coach/CoachFrame'
 
 /* TRAK-250: Squad is a full-width coach workspace with views of the same
    roster. The view lives in the URL (?tab=), so a view can be linked and a
@@ -28,6 +30,7 @@ type TabId = typeof TABS[number]['id']
 export default function CoachSquadPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { profile } = useAuth()
   const [params, setParams] = useSearchParams()
   const active: TabId = TABS.find(t => t.id === params.get('tab'))?.id ?? 'players'
   // TRAK-305: All or one squad, as picked at the top of the frame.
@@ -54,6 +57,8 @@ export default function CoachSquadPage() {
       <div className={WIDE_COLUMN}>
         {/* TRAK-351: a player's page has the screen to itself. Not `hidden`: the header's flex would show it anyway. */}
         {openId == null && <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 pb-4">
+          {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
+          <CoachMenuButton name={profile?.full_name || 'Coach'} />
           <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Squad</h1>
           {/* On a phone the views take the full width, under the title; on a coach's tablet or laptop they sit in the header. */}
           <div className="arc order-last w-full tablet:order-none tablet:w-[440px]">

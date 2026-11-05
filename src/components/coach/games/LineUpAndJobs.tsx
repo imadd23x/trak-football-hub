@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { DEFAULT_FORMATION, FORMATIONS, FORMATS, lineName } from '@/lib/games/formations'
-import { CONTEXT, EXPECTATIONS, fitFormat, playerPlan, type PlayerPlans } from '@/lib/games/lineup'
+import { CONTEXT, EXPECTATIONS, EXPECTATION_COLOR, fitFormat, playerPlan, type PlayerPlans } from '@/lib/games/lineup'
 import type { PlanForm } from '@/lib/games/plan'
 import { useIsMobile } from '@/hooks/use-mobile'
 import type { Candidate, useWhoCanCome } from './useGames'
@@ -75,8 +75,8 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
         {(player.absent || plan(player).expectation !== 'usual' || plan(player).context.length > 0) && <span className="arc flex flex-wrap gap-1.5">
           {/* TRAK-286: a starter whose family said they can't make it, after the plan was made. Never the reason. */}
           {player.absent && <Badge size="sm" tone="warning">Can’t make it</Badge>}
-          {plan(player).context.map(tag => <Badge key={tag} size="sm" tone="warning">{contextLabel.get(tag)}</Badge>)}
-          {plan(player).expectation !== 'usual' && <Badge size="sm" tone="info">Expect: {expectationLabel.get(plan(player).expectation)}</Badge>}
+          {plan(player).context.map(tag => <Badge key={tag} size="sm" color="amber">{contextLabel.get(tag)}</Badge>)}
+          {plan(player).expectation !== 'usual' && <Badge size="sm" color={EXPECTATION_COLOR[plan(player).expectation]}>Expect: {expectationLabel.get(plan(player).expectation)}</Badge>}
         </span>}
       </div>
     </li>
@@ -99,7 +99,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
             onSelect={slot => setTarget(starters.has(slot) ? { kind: 'player', id: starters.get(slot)!.id } : { kind: 'slot', slot })} />
           <p className="text-sm text-ink-3">{locked ? 'Tap a player to see their job.' : 'Tap a slot to pick who plays there, or a player to give them a job.'}</p>
           {[...onPitch.values()].some(player => player.stretch) && <p className="flex items-center gap-2 text-sm text-ink-3">
-            <span aria-hidden="true" className="size-3 rounded-full border border-ink/60 bg-[rgb(var(--t-attention))]" />Yellow: stretch</p>}
+            <span aria-hidden="true" className="size-3 rounded-full border border-ink/60 bg-[rgb(var(--t-orange))]" />Orange: stretch</p>}
         </section>
         {phone
           ? <BottomSheet className="arc" open={!!target} onOpenChange={open => { if (!open) setTarget(null) }} title={title} detents={[0.6, 0.92]}>{panel}</BottomSheet>

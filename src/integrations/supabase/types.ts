@@ -1251,6 +1251,7 @@ export type Database = {
           created_at: string
           ends_on: string | null
           id: string
+          positions_known: string | null
           shared_at: string | null
           squad: string
           starts_on: string | null
@@ -1261,6 +1262,7 @@ export type Database = {
           created_at?: string
           ends_on?: string | null
           id?: string
+          positions_known?: string | null
           shared_at?: string | null
           squad: string
           starts_on?: string | null
@@ -1271,6 +1273,7 @@ export type Database = {
           created_at?: string
           ends_on?: string | null
           id?: string
+          positions_known?: string | null
           shared_at?: string | null
           squad?: string
           starts_on?: string | null
@@ -1386,6 +1389,41 @@ export type Database = {
             foreignKeyName: "squad_player_profiles_squad_player_id_fkey"
             columns: ["squad_player_id"]
             isOneToOne: true
+            referencedRelation: "squad_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squad_position_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          from_position: string | null
+          id: string
+          squad_player_id: string
+          to_position: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          from_position?: string | null
+          id?: string
+          squad_player_id: string
+          to_position: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          from_position?: string | null
+          id?: string
+          squad_player_id?: string
+          to_position?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_position_history_squad_player_id_fkey"
+            columns: ["squad_player_id"]
+            isOneToOne: false
             referencedRelation: "squad_players"
             referencedColumns: ["id"]
           },
@@ -1789,6 +1827,10 @@ export type Database = {
       save_training_plan: {
         Args: { p_event_id: string; p_practices: Json; p_note?: string }
         Returns: undefined
+      }
+      set_player_position: {
+        Args: { p_squad_player_id: string; p_position: string }
+        Returns: string
       }
       take_event_register: {
         Args: { p_event_id: string; p_present: string[] }

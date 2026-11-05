@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
@@ -18,14 +18,17 @@ import { DatePicker } from '@/components/arc/date-picker/date-picker'
 import { Input } from '@/components/arc/input/input'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Textarea } from '@/components/arc/textarea/textarea'
+import { PositionsStep } from '@/components/coach/season-plan/PositionsStep'
 
 /* TRAK-350 (Season plan 2/18, spec TRAK-348): the season plan's set-up, step 1. The season's dates and up to three
    season objectives (the mockup's six, or the coach's own), each editable and deletable. It saves as a draft only the
    coach sees, with or without objectives; a failed save keeps everything typed and says so, as Game plan's does. No
-   Focus and no Fill in for me (Tarek, 3 Nov). The stepper shows only steps that exist: Positions, Player objectives
-   and Share arrive with TRAK-352, TRAK-354 and TRAK-356. */
+   Focus and no Fill in for me (Tarek, 3 Nov). The stepper shows only steps that exist: TRAK-352 adds Positions;
+   Player objectives and Share arrive with TRAK-354 and TRAK-356. Step 1 stays mounted while another step shows, so
+   moving between steps never loses what was typed. */
 
-const STEPS = [{ id: 'season', label: 'Season and objectives' }]
+const STEPS = [{ id: 'season', label: 'Season and objectives' }, { id: 'positions', label: 'Positions' }]
+const STEP_PATHS = ['/coach/season-plan', '/coach/season-plan/positions']
 const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again; everything you typed is still here."
 const NO_TITLE = 'Give each objective a title, or delete it.'
 const END_BEFORE_START = 'The season has to end after it starts.'
@@ -57,6 +60,8 @@ export default function CoachSeasonPlan() {
     enabled: !!season.plan,
   })
   const loaded = !!squad && !season.isPending && !season.error && (!season.plan || objectives.isSuccess)
+  const step = useMatch('/coach/season-plan/positions') ? 1 : 0
+  const goTo = (index: number) => navigate(STEP_PATHS[index])
 
   return (
     <div className="min-h-screen bg-ground pb-24">
@@ -73,15 +78,21 @@ export default function CoachSeasonPlan() {
               <Button variant="secondary" onClick={() => { season.retry(); void objectives.refetch() }}>Try again</Button>
             </div>)
           : !loaded ? <LoadingSkeleton label="Loading your season plan…" lines={3} className="pt-2" />
-          // Keyed by squad, not plan: the first save creates the plan, and "Saved" must survive it.
-          : <SetUp key={squad} squad={squad} plan={season.plan} saved={objectives.data ?? []} />}
+          : <div className="arc grid gap-5">
+            <Stepper steps={STEPS} current={step} label="Season plan steps" onStepSelect={goTo} jumpAhead />
+            {/* Keyed by squad, not plan: the first save creates the plan, and "Saved" must survive it. */}
+            <div className={step === 0 ? undefined : 'hidden'}>
+              <SetUp key={squad} squad={squad} plan={season.plan} saved={objectives.data ?? []} onNext={() => goTo(1)} />
+            </div>
+            {step === 1 && user && <PositionsStep coachId={user.id} squad={squad} plan={season.plan} onBack={() => goTo(0)} onDone={() => navigate('/coach/home')} />}
+          </div>}
       </div>
       <NavBar role="coach" activeTab={location.pathname} onNavigate={navigate} />
     </div>
   )
 }
 
-function SetUp({ squad, plan, saved }: { squad: string; plan: SeasonPlan | null; saved: SeasonObjective[] }) {
+function SetUp({ squad, plan, saved, onNext }: { squad: string; plan: SeasonPlan | null; saved: SeasonObjective[]; onNext: () => void }) {
   const { user } = useAuth()
   const client = useQueryClient()
   const [form, setForm] = useState<Form>(() => toForm(plan, saved))
@@ -161,15 +172,16 @@ function SetUp({ squad, plan, saved }: { squad: string; plan: SeasonPlan | null;
     },
     onError: () => setProblem(SAVE_FAILED),
   })
-  const submit = () => {
+  const submit = (then?: () => void) => {
     if (datesProblem) return setProblem(datesProblem)
     if (form.objectives.some(o => !o.title.trim())) return setProblem(NO_TITLE)
-    save.mutate({ form, version: version.current })
+    save.mutate({ form, version: version.current }, { onSuccess: () => then?.() })
   }
+  // Next saves first when anything is unsaved, so leaving from a later step never drops this one's typing.
+  const next = () => (version.current === 0 || savedNow ? onNext() : submit(onNext))
 
   return (
     <div className="arc grid gap-5">
-      <Stepper steps={STEPS} current={0} label="Season plan steps" />
       <p className="text-sm text-ink-2">Your dates and up to three season objectives. You can save with none and add them later.</p>
       <div className="grid items-start gap-5 laptop:grid-cols-2">
         <section aria-labelledby="season-dates" className="grid gap-4 rounded-2xl border border-line bg-surface p-5">
@@ -223,8 +235,9 @@ function SetUp({ squad, plan, saved }: { squad: string; plan: SeasonPlan | null;
       </div>
 
       {problem && <Alert tone={problem === SAVE_FAILED ? 'danger' : 'warning'} title={problem} />}
-      <div className="flex justify-end">
-        <Button variant="secondary" loading={save.isPending} onClick={submit}>{savedNow ? 'Saved' : 'Save draft'}</Button>
+      <div className="flex flex-wrap justify-end gap-3">
+        <Button variant="secondary" loading={save.isPending} onClick={() => submit()}>{savedNow ? 'Saved' : 'Save draft'}</Button>
+        <Button disabled={save.isPending} onClick={next}>Next: Positions</Button>
       </div>
     </div>
   )

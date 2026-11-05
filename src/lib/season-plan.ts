@@ -7,7 +7,9 @@ import type { Tables } from '@/integrations/supabase/types'
    and up to three season objectives, a draft only the squad's coach sees. A squad is the coach's roster rows with one
    age group (TRAK-176). The academy's season_plan switch gates every write; with it off nothing here is read. */
 
-export type SeasonPlan = Pick<Tables<'season_plans'>, 'id' | 'squad' | 'starts_on' | 'ends_on' | 'shared_at'>
+export type SeasonPlan = Pick<Tables<'season_plans'>, 'id' | 'squad' | 'starts_on' | 'ends_on' | 'shared_at' | 'positions_known'>
+/** TRAK-352: the answer to "Do you know where they play yet?" */
+export type PositionsKnown = 'yes' | 'some' | 'not_yet'
 export type SeasonObjective = Pick<Tables<'season_objectives'>, 'id' | 'place' | 'title' | 'looks_like'>
 
 export const MAX_SEASON_OBJECTIVES = 3
@@ -28,7 +30,7 @@ export const seasonPlanKey = (coachId: string | undefined, squad: string | null)
 export const seasonObjectivesKey = (coachId: string | undefined, planId: string | undefined) => ['coach', coachId, 'season-objectives', planId] as const
 
 export async function loadSeasonPlan(coachId: string, squad: string): Promise<SeasonPlan | null> {
-  const { data, error } = await supabase.from('season_plans').select('id, squad, starts_on, ends_on, shared_at')
+  const { data, error } = await supabase.from('season_plans').select('id, squad, starts_on, ends_on, shared_at, positions_known')
     .eq('coach_user_id', coachId).eq('squad', squad).maybeSingle()
   if (error) throw error
   return data

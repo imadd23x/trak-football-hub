@@ -11,6 +11,7 @@ import { bandMoves } from '@/lib/squad/snapshot'
 import { seasonAverages } from '@/lib/squad/season-profile'
 import { seasonWindow } from '@/lib/squad/season'
 import { seasonStartLabel, useSeasonPlan } from '@/lib/season-plan'
+import { isPosition } from '@/lib/positions'
 import { localParts, localTodayISO } from '@/lib/event-time'
 import { PlayerProfile } from './PlayerProfile'
 import { usePlayerFacts } from './usePlayerFacts'
@@ -61,10 +62,13 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
     return kinds
   }, [roster.players, roster.consentPending, roster.assessments])
 
+  // TRAK-352: where the season plan is on, a consented player the coach hasn't placed says so. Elsewhere Squad is as it was.
+  const positionOf = (p: (typeof roster.players)[number]) =>
+    isPosition(p.position) || !seasonPlan.on || roster.consentPending.has(p.id) ? p.position ?? '' : 'No position yet'
   const players: SquadPlayer[] = roster.players.map(p => {
     const move = moves.get(p.id)
     return {
-      id: p.id, name: p.player_name, position: p.position ?? '', group: GROUP[p.position ?? ''] ?? null, shirt: p.shirt_number,
+      id: p.id, name: p.player_name, position: positionOf(p), group: GROUP[p.position ?? ''] ?? null, shirt: p.shirt_number,
       band: move ? BANDS.find(b => b.word.toLowerCase() === move.band)?.word ?? null : null, move: move?.move ?? 0,
       waiting: roster.consentPending.has(p.id),
       trend: trends.get(p.id),

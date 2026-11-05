@@ -82,11 +82,17 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
     {openId != null && <div className="grid gap-4 pt-4">
       <span className="arc"><Button variant="ghost" size="sm" onClick={onBack}><ChevronLeft size={16} aria-hidden="true" />Back</Button></span>
       {open && <CoachTrail current={open.name} />}
+      {/* TRAK-368: the page's title, as the older player page had it; the card's name is the visible one. */}
+      {open && <h1 className="sr-only">{open.name}</h1>}
       {open && user ? <article aria-label={`${open.name}, ${open.position || 'no position yet'}`} className="rounded-2xl border border-line bg-surface p-6">
         <PlayerProfile player={open} squad={squadOf.get(open.id) ?? squadLabel} coachId={user.id}
           facts={facts.data?.get(open.id)} factsFailed={facts.isError} onRetryFacts={() => { void facts.refetch() }}
-          season={season.players.get(open.id)} squadSeason={season.squad} since={seasonStartLabel(seasonFrom)} />
-      </article> : !open && <p className="text-sm text-ink-2">This player isn't in the squad you're looking at. Pick All at the top to see every squad.</p>}
+          season={season.players.get(open.id)} squadSeason={season.squad} since={seasonStartLabel(seasonFrom)}
+          seasonFailed={roster.assessmentsFailed} onRetrySeason={roster.retry} />
+      </article> : !open && <p className="text-sm text-ink-2">{roster.squad == null || roster.squads.length <= 1
+        // Every squad is in view, so the player isn't the coach's at all (TRAK-368: the older page's answer).
+        ? "We couldn't find that player. They may have been removed from your squad."
+        : "This player isn't in the squad you're looking at. Pick All at the top to see every squad."}</p>}
     </div>}
   </>
 }

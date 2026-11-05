@@ -3,7 +3,7 @@ import { cleanup, screen, waitFor } from '@testing-library/react'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
-import { table, tableError } from '../../../../tests/msw/supabase'
+import { rpc, rpcRows, table, tableError } from '../../../../tests/msw/supabase'
 
 /**
  * A failed load on a coach screen must not read as "you have nothing".
@@ -176,37 +176,59 @@ describe('a failed coach load is not an empty squad', () => {
      *
      * The same spinner also covers a player that genuinely does not exist, so
      * loading, failed and not-found are one indistinguishable state. */
-    const PLAYER = {
-      id: 'sp-1', coach_user_id: COACH.id, player_name: 'Ade Okafor',
-      position: 'Attacker', age: 15, status: 'active',
+    // TRAK-368: the player's page is their own page in Squad now (/coach/squad/player/:id). Each test signs in as
+    // a coach of its own, because the app's query cache outlives a test.
+    let k = 0
+    let OWN = { id: 'coach-lf' }
+    const PLAYER = () => ({
+      id: 'sp-1', coach_user_id: OWN.id, player_name: 'Ade Okafor',
+      position: 'Attacker', age: 15, status: 'active', age_group: 'U16',
+    })
+    function onPlayerPage() {
+      OWN = { id: `coach-lf-${++k}` }
+      signInAs(OWN)
+      server.use(
+        table('profiles', [{ id: 'p-own', user_id: OWN.id, role: 'coach', full_name: 'Coach Vasilis', invite_code: 'ABCD' }]),
+        table('coach_details', []),
+        table('notification_settings', []),
+        table('coach_sessions', []),
+        table('coach_assessment_notes', []),
+        table('coach_shared_feedback', []),
+        table('squad_player_profiles', []),
+        rpc('coach_squad_player_consent_required', () => false),
+        rpc('feature_on', () => false),
+        rpc('coach_squad_season', () => []),
+        rpcRows('coach_player_birth_dates', []),
+      )
     }
 
     it('does not spin forever when the player load fails', async () => {
-      signedInCoach()
+      onPlayerPage()
       server.use(tableError('squad_players', 500, { message: 'upstream unavailable' }))
 
-      await requestSettled('/squad_players', () => renderApp('/coach/player/sp-1'))
+      await requestSettled('/squad_players', () => renderApp('/coach/squad/player/sp-1'))
 
       expect(await screen.findByRole('alert')).toBeInTheDocument()
     })
 
     it('says so when the player genuinely does not exist, rather than spinning', async () => {
-      // A real 200 with no rows — a deleted player, or another coach's. The
+      // A real 200 without them — a deleted player, or another coach's. The
       // coach deserves an answer, and it is a different answer from "failed".
-      signedInCoach()
-      server.use(table('squad_players', []), table('coach_assessments', []))
+      // TRAK-368: the squad has someone else, so this is a missing player, not an empty squad.
+      onPlayerPage()
+      server.use(table('squad_players', [{ ...PLAYER(), id: 'sp-other', player_name: 'Bea Synthetic' }]), table('coach_assessments', []))
 
-      await requestSettled('/squad_players', () => renderApp('/coach/player/sp-1'))
+      await requestSettled('/squad_players', () => renderApp('/coach/squad/player/sp-1'))
 
       expect(await screen.findByText(/couldn't find that player/i)).toBeInTheDocument()
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
 
     it('renders the player when the read succeeds', async () => {
-      signedInCoach()
-      server.use(table('squad_players', [PLAYER]), table('coach_assessments', []))
+      onPlayerPage()
+      server.use(table('squad_players', [PLAYER()]), table('coach_assessments', []))
 
-      await requestSettled('/squad_players', () => renderApp('/coach/player/sp-1'))
+      await requestSettled('/squad_players', () => renderApp('/coach/squad/player/sp-1'))
 
       expect(await screen.findByRole('heading', { level: 1, name: 'Ade Okafor' })).toBeInTheDocument()
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -216,13 +238,13 @@ describe('a failed coach load is not an empty squad', () => {
       // Partial truth. The coach can still see who they opened; losing the
       // whole page because one of two reads failed would be the same
       // over-correction the banner-above-stats choice avoids on Home.
-      signedInCoach()
+      onPlayerPage()
       server.use(
-        table('squad_players', [PLAYER]),
+        table('squad_players', [PLAYER()]),
         tableError('coach_assessments', 500, { message: 'upstream unavailable' }),
       )
 
-      await requestSettled('/coach_assessments', () => renderApp('/coach/player/sp-1'))
+      await requestSettled('/coach_assessments', () => renderApp('/coach/squad/player/sp-1'))
 
       /* Wait for the failure to render, THEN check the player survived it.
          The first draft asserted the name first and passed against a page that
@@ -231,9 +253,11 @@ describe('a failed coach load is not an empty squad', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Ade Okafor' })).toBeInTheDocument()
       // The banner must be the assessments one. A page-level failure banner
       // here would mean an assessments error was escalated to a page error.
-      expect(screen.getByText(/this player's assessments/i)).toBeInTheDocument()
-      // And the count chip must not assert zero assessments it never read.
+      // TRAK-368: the player's page names them: "Ade's assessments". Its own read retries once first (App's retry: 1).
+      expect(await screen.findByText(/Ade's assessments/i, {}, { timeout: 5000 })).toBeInTheDocument()
+      // And nothing may assert zero assessments it never read.
       expect(screen.queryByText(/^0 assessments$/)).not.toBeInTheDocument()
+      expect(screen.queryByText('No assessment this season yet.')).not.toBeInTheDocument()
     })
   })
 })

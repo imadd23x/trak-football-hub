@@ -92,10 +92,23 @@ describe('TRAK-351 a player\'s full page', () => {
     expect(await within(panel).findByRole('list', { name: 'Players' })).toBeInTheDocument()
   })
 
-  it('says so when the address names nobody in the squad in view', async () => {
+  // TRAK-368: with every squad in view, a missing player isn't the coach's at all, as the older page said.
+  it('says so when the address names nobody in the squad', async () => {
     renderApp('/coach/squad/player/sq-gone')
     const panel = await view()
-    expect(await within(panel).findByText(/isn't in the squad you're looking at/)).toBeInTheDocument()
+    expect(await within(panel).findByText("We couldn't find that player. They may have been removed from your squad.")).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+  })
+
+  it('with one squad picked, a player from another squad points to All', async () => {
+    server.use(table('squad_players', [
+      player('sq-ada', 'Ada Synthetic', 'Defender', 4), { ...player('sq-una', 'Una Synthetic', 'Midfielder', 6), age_group: 'U14' },
+    ]))
+    localStorage.setItem(`trak:coach-squad-all:${COACH.id}`, '0')
+    localStorage.setItem(`trak:coach-squad:${COACH.id}`, 'U14')
+    renderApp('/coach/squad/player/sq-ada')
+    const panel = await view()
+    expect(await within(panel).findByText(/isn't in the squad you're looking at\. Pick All at the top/)).toBeInTheDocument()
   })
 })

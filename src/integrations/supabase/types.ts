@@ -1323,6 +1323,64 @@ export type Database = {
           },
         ]
       }
+      squad_player_also_plays: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          position: string
+          squad_player_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          position: string
+          squad_player_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          position?: string
+          squad_player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_player_also_plays_squad_player_id_fkey"
+            columns: ["squad_player_id"]
+            isOneToOne: false
+            referencedRelation: "squad_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squad_player_roles: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          role: string
+          squad_player_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          role: string
+          squad_player_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          role?: string
+          squad_player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_player_roles_squad_player_id_fkey"
+            columns: ["squad_player_id"]
+            isOneToOne: false
+            referencedRelation: "squad_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       squad_players: {
         Row: {
           age: number | null
@@ -1821,6 +1879,15 @@ export type Database = {
           p_team_score: number
           p_user_id: string
           p_venue: string
+        }
+        Returns: undefined
+      }
+      save_player_position_and_roles: {
+        Args: {
+          p_also_plays: string[]
+          p_position: string
+          p_roles: string[]
+          p_squad_player_id: string
         }
         Returns: undefined
       }

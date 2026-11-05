@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
@@ -15,6 +15,9 @@ import type { Scores } from '@/lib/squad/season-profile'
 import { PlayerFactsEditor } from './PlayerFactsEditor'
 import type { PlayerFacts } from './usePlayerFacts'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { isPosition } from '@/lib/positions'
+import { PositionAndRolesSheet } from './PositionAndRolesSheet'
+import { usePlayerRoles } from './usePlayerRoles'
 
 const FOOT = { left: 'Left', right: 'Right', both: 'Both' } as const
 /** The assessments shown at first, newest first. TRAK-368: "All N" shows the rest here too. */
@@ -34,7 +37,7 @@ const notSet = <span className="text-ink-3">Not set</span>
  * coach's assessment card exactly as it is elsewhere. Imad, 23 Oct: one row of cards, the latest first, swiping to
  * earlier ones, with no date line above them (the card's quick look has the date and session).
  */
-export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRetryFacts, season, squadSeason, since = '1 July', seasonFailed = false, onRetrySeason }: {
+export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRetryFacts, season, squadSeason, since = '1 July', seasonFailed = false, onRetrySeason, placement }: {
   player: SquadPlayer
   squad: string | null
   coachId: string
@@ -48,6 +51,8 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
   /** TRAK-368: the squad's assessments didn't load, so the season can't be told; never "No assessment this season yet". */
   seasonFailed?: boolean
   onRetrySeason?: () => void
+  /** TRAK-353: where the season plan is on, the roster's position, and the player's position and roles show here. */
+  placement?: { position: string | null }
 }) {
   const navigate = useNavigate()
   const client = useQueryClient()
@@ -86,23 +91,26 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
 
     {/* A laptop's pane has room for two columns: facts beside the radar, the latest card beside the earlier ones. */}
     <div className="grid gap-5 laptop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] laptop:items-start">
-      <section aria-label={`About ${first}`} className="grid gap-2">
-        {factsFailed ? <LoadError what={`${first}'s profile`} onRetry={onRetryFacts} />
-          : !facts ? <LoadingSkeleton label={`Loading ${first}'s profile…`} />
-          : <>
-            <dl className="m-0 border-t border-line">
-              <Fact label="Preferred foot">{facts.foot ? FOOT[facts.foot] : notSet}</Fact>
-              <Fact label="Nationality">{facts.nationality ?? notSet}</Fact>
-              <Fact label="Born">{facts.born ? bornLine(facts.born, new Date()) : notSet}</Fact>
-              <Fact label="Traits">{facts.traits.length
-                ? <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label={`${first}'s traits`}>
-                    {facts.traits.map(trait => <li key={trait} className="rounded-full border border-line bg-raised px-2.5 py-0.5 text-sm text-ink">{trait}</li>)}
-                  </ul>
-                : <span className="text-ink-3">None picked yet</span>}</Fact>
-            </dl>
-            <span className="justify-self-start"><PlayerFactsEditor playerId={player.id} name={player.name} coachId={coachId} facts={facts} /></span>
-          </>}
-      </section>
+      <div className="grid gap-5">
+        {placement && <PositionAndRoles coachId={coachId} id={player.id} name={player.name} position={placement.position} />}
+        <section aria-label={`About ${first}`} className="grid gap-2">
+          {factsFailed ? <LoadError what={`${first}'s profile`} onRetry={onRetryFacts} />
+            : !facts ? <LoadingSkeleton label={`Loading ${first}'s profile…`} />
+            : <>
+              <dl className="m-0 border-t border-line">
+                <Fact label="Preferred foot">{facts.foot ? FOOT[facts.foot] : notSet}</Fact>
+                <Fact label="Nationality">{facts.nationality ?? notSet}</Fact>
+                <Fact label="Born">{facts.born ? bornLine(facts.born, new Date()) : notSet}</Fact>
+                <Fact label="Traits">{facts.traits.length
+                  ? <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label={`${first}'s traits`}>
+                      {facts.traits.map(trait => <li key={trait} className="rounded-full border border-line bg-raised px-2.5 py-0.5 text-sm text-ink">{trait}</li>)}
+                    </ul>
+                  : <span className="text-ink-3">None picked yet</span>}</Fact>
+              </dl>
+              <span className="justify-self-start"><PlayerFactsEditor playerId={player.id} name={player.name} coachId={coachId} facts={facts} /></span>
+            </>}
+        </section>
+      </div>
 
       <section aria-labelledby={`season-${player.id}`}>
         <div className="grid gap-0.5">
@@ -149,4 +157,28 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
       Assess {first} <ArrowRight size={16} aria-hidden />
     </button>
   </>
+}
+
+/** TRAK-353: the player's main position, roles and Can also play, with one Edit for all three (the mockup's profile). */
+function PositionAndRoles({ coachId, id, name, position }: { coachId: string; id: string; name: string; position: string | null }) {
+  const [editing, setEditing] = useState(false)
+  const roles = usePlayerRoles(coachId)
+  const first = name.split(' ')[0]
+  const { also, roles: held } = roles.of(id)
+  return <section aria-labelledby={`position-${id}`} className="grid gap-2">
+    <div className="flex items-baseline justify-between gap-3">
+      <h4 id={`position-${id}`} className="text-base font-medium text-ink">Position and roles</h4>
+      <button type="button" onClick={() => setEditing(true)} aria-label={`Edit ${first}'s position and roles`} aria-haspopup="dialog"
+        className="min-h-11 rounded-md text-[15px] font-medium text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Edit</button>
+    </div>
+    {roles.isError ? <LoadError what={`${first}'s roles`} onRetry={() => { void roles.refetch() }} />
+      : !roles.data ? <LoadingSkeleton label={`Loading ${first}'s roles…`} lines={2} />
+      : <dl className="m-0 border-t border-line">
+        <Fact label="Main position">{isPosition(position) ? position : <span className="text-ink-3">No position yet</span>}</Fact>
+        <Fact label="Roles">{held.length ? held.join(', ') : <span className="text-ink-3">No role yet</span>}</Fact>
+        <Fact label="Can also play">{also.length ? also.join(', ') : <span className="text-ink-3">None yet</span>}</Fact>
+      </dl>}
+    <PositionAndRolesSheet coachId={coachId} player={{ id, name, position }} open={editing} onOpenChange={setEditing} saveNeedsChange
+      onSaved={() => setEditing(false)} />
+  </section>
 }

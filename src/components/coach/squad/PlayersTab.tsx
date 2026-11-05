@@ -92,7 +92,8 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
         <PlayerProfile player={open} squad={squadOf.get(open.id) ?? squadLabel} coachId={user.id}
           facts={facts.data?.get(open.id)} factsFailed={facts.isError} onRetryFacts={() => { void facts.refetch() }}
           season={season.players.get(open.id)} squadSeason={season.squad} since={seasonStartLabel(seasonFrom)}
-          seasonFailed={roster.assessmentsFailed} onRetrySeason={roster.retry} />
+          seasonFailed={roster.assessmentsFailed} onRetrySeason={roster.retry}
+          placement={seasonPlan.on ? { position: roster.players.find(p => p.id === open.id)?.position ?? null } : undefined} />
       </article> : !open && <p className="text-sm text-ink-2">{roster.squad == null || roster.squads.length <= 1
         // Every squad is in view, so the player isn't the coach's at all (TRAK-368: the older page's answer).
         ? "We couldn't find that player. They may have been removed from your squad."

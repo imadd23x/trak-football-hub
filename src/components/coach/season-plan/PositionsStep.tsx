@@ -10,14 +10,17 @@ import { LoadError } from '@/components/trak/LoadError'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { PlayerFace } from '@/components/trak/PlayerFace'
 import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
-import { POSITIONS, positionsBoard, type Position } from '@/lib/positions'
+import { PositionAndRolesSheet } from '@/components/coach/squad/PositionAndRolesSheet'
+import { playerRolesKey, usePlayerRoles } from '@/components/coach/squad/usePlayerRoles'
+import { POSITIONS, isPosition, positionsBoard, type Position } from '@/lib/positions'
 import { loadSeasonPlan, seasonPlanKey, type PositionsKnown, type SeasonPlan } from '@/lib/season-plan'
 import type { Tables } from '@/integrations/supabase/types'
 
 /* TRAK-352 (Season plan 4/18, spec TRAK-348): step 2, Positions. One question first, then every consented player
    with four big buttons. A tap saves at once through set_player_position(), so nothing waits to be saved. Players
    still waiting for consent aren't listed, only counted. Placed players group by line. The coach can skip it, and
-   Not yet saves with nobody placed (TRAK-355 brings the reminder). Can also play and roles come with TRAK-353. */
+   Not yet saves with nobody placed (TRAK-355 brings the reminder). TRAK-353: a name opens the player's position,
+   roles and Can also play, and Save · next goes on to the next player without a role. */
 
 type Player = Tables<'squad_players'>
 
@@ -43,6 +46,8 @@ export function PositionsStep({ coachId, squad, plan, onBack, onDone }: {
   const [asking, setAsking] = useState(false)
   const [choice, setChoice] = useState<PositionsKnown | null>(answer)
   const [problem, setProblem] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const roles = usePlayerRoles(coachId)
 
   const saveAnswer = useMutation({
     mutationFn: async (next: PositionsKnown) => {
@@ -70,6 +75,8 @@ export function PositionsStep({ coachId, squad, plan, onBack, onDone }: {
     },
     onMutate: ({ player, position }) => { setProblem(null); setPosition(player.id, position); return { before: player.position } },
     onError: (_error, { player }, context) => { setPosition(player.id, context?.before ?? null); setProblem(PLACE_FAILED(player.player_name)) },
+    // A tap onto a position the player could also play takes it off Can also play (TRAK-353).
+    onSuccess: () => { void client.invalidateQueries({ queryKey: playerRolesKey(coachId) }) },
   })
 
   const footer = (
@@ -126,14 +133,23 @@ export function PositionsStep({ coachId, squad, plan, onBack, onDone }: {
     )
   }
 
+  // As the mockup's rows: their roles, or No role yet, and who they can also play as.
+  const detail = (player: Player) => {
+    const { also, roles: held } = roles.of(player.id)
+    return [player.shirt_number != null && `#${player.shirt_number}`, isPosition(player.position) && (held.length ? held.join(', ') : 'No role yet'),
+      also.length > 0 && `also ${also.map(p => POSITIONS.find(x => x.value === p)!.short).join(', ')}`].filter(Boolean).join(' · ')
+  }
   const row = (player: Player) => (
     <li key={player.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2">
-      <PlayerFace name={player.player_name} size="sm" />
       {/* A floor for the name, so on a phone the buttons drop to their own line rather than hide who it is. */}
-      <span className="grid min-w-[9rem] flex-1">
-        <span className="truncate text-sm font-medium text-ink">{player.player_name}</span>
-        {player.shirt_number != null && <span className="text-xs text-ink-3">#{player.shirt_number}</span>}
-      </span>
+      <button type="button" onClick={() => setOpenId(player.id)} aria-haspopup="dialog"
+        className="flex flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <PlayerFace name={player.player_name} size="sm" />
+        <span className="grid min-w-[9rem] flex-1">
+          <span className="truncate text-sm font-medium text-ink">{player.player_name}</span>
+          <span className="truncate text-xs text-ink-3">{detail(player)}</span>
+        </span>
+      </button>
       <span role="group" aria-label={`${player.player_name}'s position`} className="flex gap-2">
         {POSITIONS.map(position => (
           <Button key={position.value} size="sm" variant={player.position === position.value ? 'primary' : 'secondary'}
@@ -146,8 +162,17 @@ export function PositionsStep({ coachId, squad, plan, onBack, onDone }: {
     </li>
   )
 
+  // Save · next: the next player in the list with no role yet, or no position, after this one.
+  const listed = [...board.unplaced, ...board.lines.flatMap(line => line.players)]
+  const opened = listed.find(p => p.id === openId)
+  const after = opened ? [...listed.slice(listed.indexOf(opened) + 1), ...listed.slice(0, listed.indexOf(opened))] : []
+  const next = after.find(p => !isPosition(p.position) || roles.of(p.id).roles.length === 0)
+
   return (
     <div className="arc grid gap-5">
+      {opened && <PositionAndRolesSheet coachId={coachId} player={{ id: opened.id, name: opened.player_name, position: opened.position }}
+        open onOpenChange={open => { if (!open) setOpenId(null) }} quiet
+        saveLabel={next ? `Save · next: ${next.player_name}` : 'Save · back to Positions'} onSaved={() => setOpenId(next?.id ?? null)} />}
       <section aria-labelledby="positions-progress" className="grid gap-3 rounded-2xl border border-line bg-surface p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="positions-progress" className="text-lg font-medium text-ink">{board.placed} of {board.total} placed</h2>

@@ -732,7 +732,12 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const coach = await open(page, context, '/coach/matches/m-past?tab=evaluation', width, height, plans)
     await page.getByRole('button', { name: 'Next: Player evaluation' }).click()
     await page.getByRole('button', { name: 'Next: Publish' }).click()
-    await expect(page.getByText('2 players · 1 changed from “Met” · 1 note')).toBeVisible()
+    // TRAK-375 (Imad, 5 Nov): one Evaluation review card, with no preview or "Who sees what".
+    const review = page.getByRole('region', { name: 'Evaluation review' })
+    await expect(review.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(4)
+    await expect(review.getByText('Won 2–1 · 1 goal without a scorer', { exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Preview' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Who sees what' })).toHaveCount(0)
     // This match was made before New event asked the competition (Imad, 29 Oct): the Publish step asks it.
     await expect(page.getByText('Pick the competition first.')).toBeVisible()
     await page.getByRole('group', { name: 'Competition' }).getByText('League').click()

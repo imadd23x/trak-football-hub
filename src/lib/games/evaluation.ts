@@ -21,10 +21,12 @@ export type EvaluationForm = {
   answers: Record<string, Answer>
 }
 
+/** TRAK-374 (Imad, 5 Nov): "Did the job?" reads No, Partly, Yes. The saved values stay; players still read "Not this
+ *  time" for No (reviews.ts). */
 export const DID_JOB: { value: DidJob; label: string; summary: string }[] = [
-  { value: 'yes', label: 'Yes', summary: 'Did the job' },
+  { value: 'not_yet', label: 'No', summary: 'Didn’t do the job' },
   { value: 'partly', label: 'Partly', summary: 'Did part of the job' },
-  { value: 'not_yet', label: 'Not yet', summary: 'Not yet' },
+  { value: 'yes', label: 'Yes', summary: 'Did the job' },
 ]
 export const AGAINST: { value: Against; label: string }[] = [
   { value: 'below', label: 'Below' }, { value: 'met', label: 'Met' }, { value: 'above', label: 'Above' },
@@ -80,14 +82,15 @@ export function setPlayed(form: EvaluationForm, id: string, played: boolean): Ev
   return { ...form, played: { ...form.played, [id]: played }, goals }
 }
 
-/** What save_game_evaluation takes: every player listed; answers and a note only for those who played. */
+/** What save_game_evaluation takes: every player listed; answers and a note only for those who played; how they scored
+ *  only if they did (TRAK-374: the box hides at 0). */
 export function formToSave(eventId: string, form: EvaluationForm, listed: { id: string; starter: boolean }[]) {
   const played = new Set(listed.filter(p => hasPlayed(form, p.id, p.starter)).map(p => p.id))
   const who = (id: string | null) => (id && played.has(id) ? id : null)
   return {
     p_event_id: eventId, p_our_score: form.ourScore, p_their_score: form.theirScore,
     p_goals: form.goals.map(goal => ({ scorer: who(goal.scorer), assist: who(goal.assist) })),
-    p_how_they_scored: form.howTheyScored.trim(), p_plan_worked: form.planWorked,
+    p_how_they_scored: form.theirScore > 0 ? form.howTheyScored.trim() : '', p_plan_worked: form.planWorked,
     p_players: listed.map(({ id }) => {
       if (!played.has(id)) return { id, played: false }
       const answer = answerOf(form, id)

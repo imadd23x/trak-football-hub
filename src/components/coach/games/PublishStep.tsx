@@ -1,18 +1,19 @@
 import { useState } from 'react'
-import { Lock } from 'lucide-react'
 import { COMPETITIONS, type Competition } from '@/lib/coach-events'
 import type { PlayerPlans } from '@/lib/games/lineup'
 import { hasPlayed, planAnswered, previewReview, publishSummary, type EvaluationForm } from '@/lib/games/evaluation'
 import { GameReviewSection } from '@/components/player/GameReviewSection'
+import { PlanReview, type ReviewRow } from '@/components/arc/blocks/plan-review/plan-review'
 import { Button } from '@/components/arc/button/button'
 import { RadioGroup } from '@/components/arc/radio-group/radio-group'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { Select } from '@/components/arc/select/select'
 
-/* TRAK-289 (Games 7/8): the evaluation's Publish step (TRAK-282). The summary, who sees what, and a preview drawn by
-   the player's and the parent's own After the match section, as Share previews the plan. "Publish to N players and
-   families" waits for every "Did the plan work?" answer, and for the competition and home or away when the match has
-   none (Imad, 29 Oct). In the app only: no email, no push. */
+/* TRAK-289 (Games 7/8): the evaluation's Publish step (TRAK-282). "Publish to N players and families" waits for every
+   "Did the plan work?" answer, and for the competition and home or away when the match has none (Imad, 29 Oct). In the
+   app only: no email, no push. TRAK-375 (Imad, 5 Nov): one Evaluation review card, Game plan review's kind: the gauge,
+   each part with its Edit, and Publish in the card. No preview or "Who sees what" here; the published page keeps the
+   preview (ReviewPreview). */
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
 const first = (name: string) => name.split(/\s+/)[0] || name
@@ -20,55 +21,54 @@ const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : 
 type Listed = { id: string; name: string; starter: boolean }
 export type PublishChoices = { competition: Competition | ''; homeAway: 'home' | 'away' | '' }
 
-export function PublishStep({ eventId, form, listed, plans, goals, coachName, askCompetition, askHomeAway, onPublish, publishing, problem }: {
-  eventId: string; form: EvaluationForm; listed: Listed[]; plans: PlayerPlans
+export function PublishStep({ eventId, form, listed, goals, askCompetition, askHomeAway, onPublish, publishing, problem, onStep }: {
+  eventId: string; form: EvaluationForm; listed: Listed[]
   /** How many goals the plan had: each needs a "Did the plan work?" answer. */
   goals: number
-  coachName: string | null
   /** The match has no competition, or no home or away, yet: ask it here. */
   askCompetition: boolean; askHomeAway: boolean
   onPublish: (choices: PublishChoices) => void
   publishing: boolean
   problem: string | null
+  /** Opens a step, for a part's Edit. */
+  onStep: (step: number) => void
 }) {
   const [choices, setChoices] = useState<PublishChoices>({ competition: '', homeAway: '' })
   const summary = publishSummary(form, listed)
+  const answered = form.planWorked.slice(0, goals).filter(answer => answer != null).length
+  const unscored = form.goals.filter(goal => !goal.scorer).length
+  const outcome = form.ourScore > form.theirScore ? 'Won' : form.ourScore === form.theirScore ? 'Drew' : 'Lost'
+  const rows: ReviewRow[] = [
+    { id: 'result', label: 'Result', status: unscored ? 'watch' : 'good', onEdit: () => onStep(0),
+      detail: `${outcome} ${form.ourScore}–${form.theirScore}${unscored ? ` · ${count(unscored, 'goal', 'goals')} without a scorer` : ''}` },
+    { id: 'played', label: 'Who played', status: summary.players ? 'good' : 'risk', onEdit: () => onStep(0), detail: `${summary.players} played` },
+    { id: 'plan', label: 'Did the plan work?', status: planAnswered(form, goals) ? 'good' : 'risk', onEdit: () => onStep(0),
+      detail: goals ? `${answered} of ${goals} answered` : 'No instructions in the plan' },
+    { id: 'players', label: 'Player evaluation', status: 'good', onEdit: () => onStep(1),
+      detail: `${summary.changed} changed from Did the job · Met · ${count(summary.notes, 'note', 'notes')}` },
+  ]
+  const incomplete = rows.filter(row => row.status !== 'good').length
+  const band = incomplete === 0 ? { status: 'good' as const, label: 'Ready to publish' }
+    : { status: rows.some(row => row.status === 'risk') ? 'risk' as const : 'watch' as const, label: `${incomplete} incomplete` }
   const blocked = !planAnswered(form, goals) ? 'Answer “Did the plan work?” for every instruction first.'
     : askCompetition && !choices.competition ? 'Pick the competition first.'
     : askHomeAway && !choices.homeAway ? 'Say whether it was home or away first.'
     : summary.players === 0 ? 'Tick who played in Result first.' : null
   return (
-    <div className="grid gap-4 tablet:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] tablet:items-start">
-      <div className="grid min-w-0 gap-4">
-        <section aria-labelledby="evaluation-publish" className={card}>
-          <div>
-            <h2 id="evaluation-publish" className="text-lg font-medium text-ink">Publish</h2>
-            <p className="mt-1 text-sm text-ink-2">
-              {count(summary.players, 'player', 'players')} · {summary.changed} changed from “Met” · {count(summary.notes, 'note', 'notes')}</p>
-          </div>
-          {askCompetition && <RadioGroup label="Competition" name={`publish-competition-${eventId}`} options={COMPETITIONS}
-            value={choices.competition} onValueChange={value => setChoices({ ...choices, competition: value as Competition })} />}
-          {askHomeAway && <RadioGroup label="Home or away" name={`publish-home-away-${eventId}`}
-            options={[{ value: 'home', label: 'Home' }, { value: 'away', label: 'Away' }]}
-            value={choices.homeAway} onValueChange={value => setChoices({ ...choices, homeAway: value as 'home' | 'away' })} />}
-          <span><Button disabled={!!blocked} loading={publishing} onClick={() => onPublish(choices)}>
+    <div className="arc">
+      <PlanReview title="Evaluation review" rows={rows} band={band}>
+        {askCompetition && <RadioGroup label="Competition" name={`publish-competition-${eventId}`} options={COMPETITIONS}
+          value={choices.competition} onValueChange={value => setChoices({ ...choices, competition: value as Competition })} />}
+        {askHomeAway && <RadioGroup label="Home or away" name={`publish-home-away-${eventId}`}
+          options={[{ value: 'home', label: 'Home' }, { value: 'away', label: 'Away' }]}
+          value={choices.homeAway} onValueChange={value => setChoices({ ...choices, homeAway: value as 'home' | 'away' })} />}
+        <div className="flex flex-wrap items-center gap-3">
+          {blocked && <span className="text-sm text-ink-3">{blocked}</span>}
+          <span className="ml-auto"><Button disabled={!!blocked} loading={publishing} onClick={() => onPublish(choices)}>
             Publish to {count(summary.players, 'player', 'players')} and families</Button></span>
-          {blocked && <p className="text-sm text-ink-3">{blocked}</p>}
-          {problem && <p role="alert" className="text-sm text-danger">{problem}</p>}
-        </section>
-        <section aria-labelledby="evaluation-who" className={card}>
-          <h2 id="evaluation-who" className="text-lg font-medium text-ink">Who sees what</h2>
-          <ul className="divide-y divide-line">
-            <li className="grid gap-0.5 py-3"><span className="text-sm font-medium text-ink">Each player</span>
-              <span className="text-sm text-ink-3">Their job, how it went, what you expected and how they did against it, and your note.</span></li>
-            <li className="grid gap-0.5 py-3"><span className="text-sm font-medium text-ink">Families</span>
-              <span className="text-sm text-ink-3">The score, what you expected and how they did against it. Never the job, whether they did it, or your note.</span></li>
-            <li className="grid gap-0.5 py-3"><span className="flex items-center gap-1.5 text-sm font-medium text-ink">Only you<Lock size={14} aria-hidden="true" /></span>
-              <span className="text-sm text-ink-3">How strong they were, scouting and how they scored, always.</span></li>
-          </ul>
-        </section>
-      </div>
-      <ReviewPreview eventId={eventId} form={form} listed={listed} plans={plans} coachName={coachName} />
+        </div>
+        {problem && <p role="alert" className="text-sm text-danger">{problem}</p>}
+      </PlanReview>
     </div>
   )
 }

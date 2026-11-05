@@ -23,6 +23,7 @@
 .name { overflow: hidden; font-size: var(--text-base); font-weight: 500; line-height: 1.375; text-overflow: ellipsis; white-space: nowrap; }
 
 .overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.overview[data-single] { grid-template-columns: minmax(0, 1fr); }
 .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding-inline: 16px; }
 .cell + .cell { border-left: 1px solid var(--border-subtle); }
 

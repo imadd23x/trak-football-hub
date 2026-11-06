@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useFeatureState } from '@/components/trak/parked'
 import type { Tables } from '@/integrations/supabase/types'
+import { localTodayISO } from '@/lib/event-time'
 
 /* TRAK-350 (Season plan 2/18, spec TRAK-348): a squad's season plan, set up once. This slice holds the season's dates
    and up to three season objectives, a draft only the squad's coach sees. A squad is the coach's roster rows with one
@@ -146,6 +147,26 @@ export const dateToIso = (date: Date | undefined) => (date
 /** "6 Nov", for "Shared …" and a removed objective's dates. */
 export function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+const DAY = 86_400_000
+const dayNumber = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) / DAY
+
+/** TRAK-361: "34 weeks left", or when the season starts or that it's over, by the device's day. */
+export function seasonLeft(plan: Pick<SeasonPlan, 'starts_on' | 'ends_on'>, today = localTodayISO()): string | null {
+  if (!plan.starts_on || !plan.ends_on) return null
+  if (today < plan.starts_on) return `starts ${shortDate(`${plan.starts_on}T00:00:00`)}`
+  if (today > plan.ends_on) return 'season over'
+  const weeks = Math.max(1, Math.ceil((dayNumber(plan.ends_on) - dayNumber(today)) / 7))
+  return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} left`
+}
+
+/** TRAK-361: Home's folded line, where the plan stands and what comes next. */
+export function planState(plan: SeasonPlan, today = localTodayISO()): string {
+  if (!plan.shared_at) return 'Not shared yet'
+  if (plan.unshared_parts.length || plan.unshared_players.length) return 'Changes not shared'
+  const shared = lastShared(plan)
+  return [`Shared ${shared ? shortDate(shared) : ''}`, seasonLeft(plan, today)].filter(Boolean).join(' · ')
 }
 
 /** "1 September", for "since …" lines. */

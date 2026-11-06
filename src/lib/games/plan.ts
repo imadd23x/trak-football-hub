@@ -9,7 +9,8 @@ import type { Expectation, PlayerPlans, Role } from './lineup'
    what an earlier plan saved there stays as it was. */
 
 export type Strength = 'weaker' | 'similar' | 'stronger'
-export type Goal = { title: string; looksLike: string }
+/** TRAK-363: an instruction picked from the season plan carries its season objective, whatever the words become. */
+export type Goal = { title: string; looksLike: string; seasonObjectiveId?: string | null }
 export type PlanForm = {
   strength: Strength | null; scouting: string; goals: Goal[]
   format: Format; formation: string | null; players: PlayerPlans
@@ -32,11 +33,11 @@ export const emptyGoal = (): Goal => ({ title: '', looksLike: '' })
 /** A saved plan as the form shows it. No plan yet is an empty form, with no instruction until the coach adds one
  *  (TRAK-328), 11 a side. */
 export function planToForm(row: SavedPlan | null, saved: SavedPlayer[] = []): PlanForm {
-  const goals = (Array.isArray(row?.goals) ? row.goals : []) as { title: string; looks_like: string }[]
+  const goals = (Array.isArray(row?.goals) ? row.goals : []) as { title: string; looks_like: string; season_objective_id?: string | null }[]
   return {
     strength: (row?.strength ?? null) as Strength | null,
     scouting: row?.scouting ?? '',
-    goals: goals.map(g => ({ title: g.title, looksLike: g.looks_like })),
+    goals: goals.map(g => ({ title: g.title, looksLike: g.looks_like, ...(g.season_objective_id ? { seasonObjectiveId: g.season_objective_id } : {}) })),
     format: (row?.format ?? 11) as Format,
     formation: row?.formation ?? null,
     players: Object.fromEntries(saved.map(p => [p.squad_player_id, {
@@ -51,7 +52,8 @@ export function formToPlan(form: PlanForm) {
   return {
     strength: form.strength,
     scouting: form.scouting.trim(),
-    goals: form.goals.map(g => ({ title: g.title.trim(), looks_like: g.looksLike.trim() })).filter(g => g.title || g.looks_like),
+    goals: form.goals.map(g => ({ title: g.title.trim(), looks_like: g.looksLike.trim(), ...(g.seasonObjectiveId ? { season_objective_id: g.seasonObjectiveId } : {}) }))
+      .filter(g => g.title || g.looks_like),
     format: form.format,
     formation: form.formation,
   }

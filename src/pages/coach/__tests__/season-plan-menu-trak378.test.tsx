@@ -4,7 +4,7 @@
  * On a laptop the sidebar holds the picker and the page has no avatar. Synthetic people.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
@@ -50,6 +50,9 @@ describe('TRAK-378 Season plan on a phone', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     expect(await screen.findByRole('dialog', { name: 'Menu' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Close menu' }))
+    // The menu slides away first, its switcher still on screen. A pick made in it then can lose the menu mid-check
+    // (#527's gate, twice), so the helper starts once it has gone.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).toBeNull(), { timeout: 5000 })
     // The shared helper opens the menu from the avatar, picks, and closes it again.
     await pickSquad('U16')
     expect(await screen.findByText('U16 · Not started')).toBeInTheDocument()

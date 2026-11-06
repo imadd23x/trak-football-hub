@@ -92,7 +92,7 @@ export default function CoachSeasonPlan() {
               <SetUp key={squad} squad={squad} plan={season.plan} saved={objectives.data ?? []} onNext={() => goTo(1)} />
             </div>
             {step === 1 && user && <PositionsStep coachId={user.id} squad={squad} plan={season.plan} onBack={() => goTo(0)} onNext={() => goTo(2)} />}
-            {step === 2 && user && <ObjectivesStep coachId={user.id} seasonObjectives={objectives.data ?? []}
+            {step === 2 && user && <ObjectivesStep coachId={user.id} squad={squad} plan={season.plan} seasonObjectives={objectives.data ?? []}
               onBack={() => goTo(1)} onPositions={() => goTo(1)} onDone={() => navigate('/coach/home')} />}
           </div>}
       </div>

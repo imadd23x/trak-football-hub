@@ -57,7 +57,7 @@ export function PositionsStep({ coachId, squad, plan, onBack, onNext }: {
   const [problem, setProblem] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const roles = usePlayerRoles(coachId)
-  const watching = useWatchList(coachId)
+  const watching = useWatchList(coachId, roster)
   const watchOf = new Map(watching.list.map(w => [w.playerId, w]))
   const watch = useWatchPlayers(coachId)
   // Home's card for a due player opens their sheet here, once.

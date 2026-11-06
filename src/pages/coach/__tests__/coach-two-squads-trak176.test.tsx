@@ -35,6 +35,8 @@ let sessionsInserted: Record<string, unknown>[]
 
 function coachReads(players: typeof TWO) {
   server.use(
+    // TRAK-355: who the coach is watching; no one.
+    table('player_watches', []),
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Angelos Basinas', invite_code: 'ABCD' }]),
     table('coach_details', [{ user_id: COACH.id, team: 'U16s', coach_role: 'Head Coach' }]),
     table('coach_assessments', []),

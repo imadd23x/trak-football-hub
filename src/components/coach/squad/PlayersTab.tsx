@@ -53,7 +53,7 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
   const squadLabel = roster.squad ?? (roster.squads.length === 1 ? roster.squads[0] : null)
   const seasonPlan = useSeasonPlan(user?.id, squadLabel)
   // TRAK-355: a watched player shows Watching, or Ready once their reminder is due, where the season plan is on.
-  const watching = useWatchList(user?.id, seasonPlan.on)
+  const watching = useWatchList(user?.id, roster, seasonPlan.on)
   const watchOf = new Map(watching.list.map(w => [w.playerId, w]))
   const seasonFrom = seasonPlan.plan?.starts_on ?? seasonWindow(localTodayISO()).from
   const season = useMemo(() => seasonAverages(roster.assessments, seasonFrom, dateOf), [roster.assessments, seasonFrom])

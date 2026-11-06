@@ -37,6 +37,8 @@ function fixtures({ evaluated = false } = {}) {
   posts = []
   patches = []
   server.use(
+    // TRAK-355: who the coach is watching; no one.
+    table('player_watches', []),
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Otto Rehhagel', invite_code: 'ABCD' }]),
     table('coach_details', [{ user_id: COACH.id, coach_role: 'Head Coach', team: 'U16', organization_id: 'org-1' }]),
     table('organizations', [{ id: 'org-1', name: 'Rehearsal FC', logo_url: null }]),

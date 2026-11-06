@@ -142,7 +142,7 @@ export default function CoachHomePage() {
     action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad && squad) coachSquad.setSquad(squad); navigate('/coach/season-plan/positions') }}>Place them</Button></span>,
   }))
   // TRAK-355: a watched player whose reminder is due comes back, one card each, opening the step where they were left.
-  const watching = useWatchList(user?.id, seasonPlanOn)
+  const watching = useWatchList(user?.id, roster, seasonPlanOn)
   const watchEvents: OwedEvent[] = !seasonPlanOn ? [] : watching.list.filter(w => w.ready).map(w => ({
     id: `watch:${w.playerId}`,
     title: `${w.why === '4 weeks, the latest' ? 'Watched 4 weeks' : w.why} · Set ${w.name.split(' ')[0]} up`,

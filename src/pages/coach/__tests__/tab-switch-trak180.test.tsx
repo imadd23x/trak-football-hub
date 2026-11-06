@@ -28,6 +28,8 @@ const HOME_LOAD = { timeout: 5000 }
 /** The coach's reads; squad_players waits for `gate` when one is given. */
 function coachReads(players: typeof PLAYERS | [], gate?: Promise<void>) {
   server.use(
+    // TRAK-355: who the coach is watching; no one.
+    table('player_watches', []),
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach Vasilis', invite_code: 'ABCD' }]),
     table('coach_details', [{ user_id: COACH.id, team: 'U15s', coach_role: 'Head Coach' }]),
     table('coach_assessments', []),

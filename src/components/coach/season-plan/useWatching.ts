@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
-import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
+import type { SquadRoster } from '@/components/coach/squad/useSquadRoster'
 import { usePlayerObjectives } from './usePlayerObjectives'
 import { DEFAULT_WATCH_RULE, effectiveRule, isWatchRule, watchedPlayers, type RegisterSession, type WatchRule } from '@/lib/watch-first'
 import { seasonPlanKey } from '@/lib/season-plan'
@@ -133,18 +133,21 @@ export function useSetWatchRule(coachId: string, squad: string) {
   })
 }
 
-/** Every watched player of the coach's (in view), each with whether they're due and where to set them up. */
-export function useWatchList(coachId: string | undefined, enabled = true) {
-  const roster = useSquadRoster()
+/** Every watched player of the coach's in the roster given (the one the screen already holds), each with whether
+ *  they're due and where to set them up. */
+export function useWatchList(coachId: string | undefined, roster: Pick<SquadRoster, 'players' | 'consentPending' | 'isPending'>, enabled = true) {
   const watches = usePlayerWatches(coachId, enabled)
-  const objectives = usePlayerObjectives(coachId, enabled)
-  const rules = useWatchRules(coachId, enabled)
-  const register = useWatchRegister(coachId, enabled)
-  const zone = useAcademyTimeZone(coachId, enabled)
-  const training = useTrainingSquads(coachId, enabled)
-  const ready = !!watches.data && !!objectives.data && !!rules.data && !!register.data && !!training.data && !zone.isPending && !roster.isPending
+  // The rest is read only once someone is watched: most squads watch no one.
+  const some = enabled && (watches.data?.length ?? 0) > 0
+  const objectives = usePlayerObjectives(coachId, some)
+  const rules = useWatchRules(coachId, some)
+  const register = useWatchRegister(coachId, some)
+  const zone = useAcademyTimeZone(coachId, some)
+  const training = useTrainingSquads(coachId, some)
+  const ready = !!watches.data && !roster.isPending
+    && (!some || (!!objectives.data && !!rules.data && !!register.data && !!training.data && !zone.isPending))
   const list = useMemo(() => {
-    if (!ready) return []
+    if (!ready || !some) return []
     const players = roster.players.filter(p => !roster.consentPending.has(p.id))
     const bySquad = new Map<string, typeof players>()
     for (const p of players) bySquad.set(p.age_group?.trim() ?? '', [...(bySquad.get(p.age_group?.trim() ?? '') ?? []), p])
@@ -154,7 +157,7 @@ export function useWatchList(coachId: string | undefined, enabled = true) {
       return watchedPlayers({ players: squadPlayers, watches: watches.data!, objectives: held, sessions: register.data!, rule, timeZone: zone.zone, now: new Date() })
         .map(w => ({ ...w, squad: squad || null, rule }))
     })
-  }, [ready, roster.players, roster.consentPending, objectives.data, watches.data, register.data, rules.data, training.data, zone.zone])
+  }, [ready, some, roster.players, roster.consentPending, objectives.data, watches.data, register.data, rules.data, training.data, zone.zone])
   const failed = watches.isError || objectives.isError || rules.isError || register.isError || training.isError
   return { list, ready, failed, retry: () => { void watches.refetch(); void objectives.refetch(); void rules.refetch(); void register.refetch(); void training.refetch() } }
 }

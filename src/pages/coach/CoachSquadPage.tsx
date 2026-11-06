@@ -8,6 +8,8 @@ import { SquadLoadError } from '@/components/coach/squad/SquadLoadError'
 import { PlayersTab } from '@/components/coach/squad/PlayersTab'
 import { AttributesTab } from '@/components/coach/squad/AttributesTab'
 import { AvailabilityTab } from '@/components/coach/squad/AvailabilityTab'
+import { FormationsTab } from '@/components/coach/squad/formations/FormationsTab'
+import { useFeatureState } from '@/components/trak/parked'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { CoachMenuButton } from '@/components/coach/CoachFrame'
@@ -19,20 +21,29 @@ import { CoachMenuButton } from '@/components/coach/CoachFrame'
    sit on Arc's glass segmented control. TRAK-283 (Imad, 27 Oct): Games left
    Squad for everyone; matches have their own Games tab, with no statistics.
    TRAK-351 (Tarek, 3 Nov): a player opens as their own full page at /coach/squad/player/:id, with no list beside it
-   and a Back button. The page stays mounted behind it, so Back (or the browser's) finds the list as it was left. */
-const TABS = [
+   and a Back button. The page stays mounted behind it, so Back (or the browser's) finds the list as it was left.
+   TRAK-357 (spec TRAK-348): where the season plan is on, Formations takes Attributes' place. Availability goes with
+   TRAK-359. Elsewhere Squad stays as it is. */
+type TabId = 'players' | 'formations' | 'attributes' | 'availability'
+const TABS: { id: TabId; label: string }[] = [
   { id: 'players', label: 'Players' },
   { id: 'attributes', label: 'Attributes' },
   { id: 'availability', label: 'Availability' },
-] as const
-type TabId = typeof TABS[number]['id']
+]
+const SEASON_PLAN_TABS: { id: TabId; label: string }[] = [
+  { id: 'players', label: 'Players' },
+  { id: 'formations', label: 'Formations' },
+  { id: 'availability', label: 'Availability' },
+]
 
 export default function CoachSquadPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile } = useAuth()
   const [params, setParams] = useSearchParams()
-  const active: TabId = TABS.find(t => t.id === params.get('tab'))?.id ?? 'players'
+  const seasonPlan = useFeatureState('season_plan')
+  const tabs = seasonPlan.on ? SEASON_PLAN_TABS : TABS
+  const active: TabId = tabs.find(t => t.id === params.get('tab'))?.id ?? 'players'
   // TRAK-305: All or one squad, as picked at the top of the frame.
   const roster = useSquadRoster()
   const choose = (id: string) => setParams({ tab: id }, { replace: true })
@@ -63,16 +74,17 @@ export default function CoachSquadPage() {
           {/* On a phone the views take the full width, under the title; on a coach's tablet or laptop they sit in the header. */}
           <div className="arc order-last w-full tablet:order-none tablet:w-[440px]">
             <GlassSegmented label="Squad view" value={active} onValueChange={choose} fullWidth
-              options={TABS.map(t => ({ value: t.id, label: t.label }))} />
+              options={tabs.map(t => ({ value: t.id, label: t.label }))} />
           </div>
         </header>}
 
-        <section aria-label={TABS.find(t => t.id === active)!.label} className="pb-8">
+        <section aria-label={tabs.find(t => t.id === active)!.label} className="pb-8">
           {/* TRAK-368: a player's page stays up when only the assessments failed, and says so there. */}
           {(openId != null && active === 'players' ? roster.rosterError : roster.error) ? <SquadLoadError onRetry={roster.retry} />
             : roster.isPending ? <LoadingSkeleton label="Loading your squad…" lines={2} avatar rows={4} className="pt-6" />
             : roster.players.length === 0 ? <PreparingSquad />
             : active === 'players' ? <PlayersTab roster={roster} openId={openId} onOpen={openPlayer} onBack={back} />
+            : active === 'formations' ? <FormationsTab roster={roster} />
             : active === 'attributes' ? <AttributesTab roster={roster} />
             : <AvailabilityTab roster={roster} />}
         </section>

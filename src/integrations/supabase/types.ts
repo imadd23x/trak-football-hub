@@ -622,6 +622,72 @@ export type Database = {
         }
         Relationships: []
       }
+      formation_players: {
+        Row: {
+          formation_id: string
+          slot: number
+          squad_player_id: string
+        }
+        Insert: {
+          formation_id: string
+          slot: number
+          squad_player_id: string
+        }
+        Update: {
+          formation_id?: string
+          slot?: number
+          squad_player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formation_players_formation_id_fkey"
+            columns: ["formation_id"]
+            isOneToOne: false
+            referencedRelation: "formations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formation_players_squad_player_id_fkey"
+            columns: ["squad_player_id"]
+            isOneToOne: false
+            referencedRelation: "squad_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formations: {
+        Row: {
+          coach_user_id: string
+          created_at: string
+          format: number
+          id: string
+          name: string
+          shape: string
+          squad: string
+          updated_at: string
+        }
+        Insert: {
+          coach_user_id: string
+          created_at?: string
+          format: number
+          id?: string
+          name: string
+          shape: string
+          squad: string
+          updated_at?: string
+        }
+        Update: {
+          coach_user_id?: string
+          created_at?: string
+          format?: number
+          id?: string
+          name?: string
+          shape?: string
+          squad?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       game_evaluation_notes: {
         Row: {
           event_id: string
@@ -1948,6 +2014,22 @@ export type Database = {
           p_squad_player_id: string
         }
         Returns: undefined
+      }
+      delete_formation: { Args: { p_id: string }; Returns: undefined }
+      save_formation: {
+        Args: {
+          p_format: number
+          p_id: string | null
+          p_name: string
+          p_shape: string
+          p_squad: string
+          p_starters: Json
+        }
+        Returns: string
+      }
+      start_formations: {
+        Args: { p_formations: Json; p_squad: string }
+        Returns: boolean
       }
       save_training_plan: {
         Args: { p_event_id: string; p_practices: Json; p_note?: string }

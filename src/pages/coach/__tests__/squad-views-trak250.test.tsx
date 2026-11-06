@@ -51,7 +51,8 @@ function coachReads(players: Record<string, unknown>[] = PLAYERS) {
     table('coach_assessments', []),
     table('coach_sessions', []),
     rpc('coach_squad_player_consent_required', () => false),
-    rpc('feature_on', () => true),
+    // TRAK-357: Squad as it is without the season plan; where it's on, Formations takes Attributes' place (formations-trak357).
+    rpc('feature_on', args => args.p_feature !== 'season_plan'),
     rpc('coach_squad_season', () => []),
     // TRAK-263: the Players view's profile facts (TRAK-260).
     table('squad_player_profiles', []),

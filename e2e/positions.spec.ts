@@ -2,7 +2,7 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 
 // TRAK-352 (Season plan 4/18): Positions in a real browser, on a laptop and a phone. Home's Needs you asks for the
 // players with no position; the coach answers the first question and places all 22 with taps only; two children
-// waiting for consent are counted, never listed; Done goes Home and the card has gone. Production build, synthetic
+// waiting for consent are counted, never listed; then Home's card has gone. Production build, synthetic
 // intercepted backend.
 const coachId = '97352000-0000-4000-8000-000000000001'
 type Row = Record<string, unknown>
@@ -92,9 +92,11 @@ for (const [width, height] of [[1280, 800], [390, 844]] as const) {
     // Every tap has saved by now, so the screenshot can't lose anything (see e2e/season-plan.spec.ts, 4 Nov).
     await page.screenshot({ path: testInfo.outputPath(`positions-${width}.png`), fullPage: true })
 
-    // TRAK-354: Positions goes on to Player objectives, whose Done goes Home.
+    // TRAK-354: Positions goes on to Player objectives; TRAK-356: then on to Share. Home no longer asks.
     await page.getByRole('button', { name: 'Next: Player objectives' }).click()
-    await page.getByRole('button', { name: 'Done' }).click()
+    await page.getByRole('button', { name: 'Next: Share' }).click()
+    await expect(page.getByRole('heading', { name: 'What goes out' })).toBeVisible()
+    await page.goto('/coach/home')
     await expect(page.getByRole('heading', { name: /^Needs you/ })).toBeVisible()
     await expect(page.getByText(/players? needs? a position$/)).toHaveCount(0)
     expect(unexpected).toEqual([])

@@ -10,6 +10,7 @@ import { COMPETITIONS } from '@/lib/coach-events'
 import { actionLink, type GameAction, type GameState, type PlanProgress, gameState, gameStatus, orderGames } from '@/lib/games/loop'
 import { gameTitle, gameWhen, useGameEvaluations, useGamePlanChanges, useGamePlans, useGameShares, useGames, useScorers, type Game } from '@/components/coach/games/useGames'
 import { seasonStart } from '@/lib/games/scorers'
+import { matchResult } from '@/lib/games/results'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { PitchIcon } from '@/components/icons/PitchIcon'
 import { Badge } from '@/components/arc/badge/badge'
@@ -188,8 +189,8 @@ function PreviousMatches({ games, results, squads }: {
           <ul className="flex gap-3 px-1 pb-1">
             {games.map(game => {
               const { ourScore: our, theirScore: their } = results.get(game.id)!
-              const [said, tone] = our == null || their == null ? ['Published', 'neutral'] as const
-                : our > their ? ['Won', 'success'] as const : our === their ? ['Drew', 'neutral'] as const : ['Lost', 'danger'] as const
+              // TRAK-362: said the same way as on Home's Season plan card.
+              const result = matchResult(our, their)
               const competition = COMPETITIONS.find(c => c.value === game.competition)?.label
               return <li key={game.id} className="w-[200px] flex-none" style={{ scrollSnapAlign: 'start' }}>
                 <Link to={`/coach/matches/${game.id}?tab=evaluation`}
@@ -198,7 +199,7 @@ function PreviousMatches({ games, results, squads }: {
                     <span className="truncate text-base font-medium text-ink">{gameTitle(game)}</span>
                     <span className="truncate text-sm text-ink-3">{[gameWhen(game).day, competition, squads ? game.squad : null].filter(Boolean).join(' · ')}</span>
                   </span>
-                  <span className="arc mt-auto"><Badge tone={tone} size="sm">{our == null || their == null ? said : `${said} ${our}–${their}`}</Badge></span>
+                  <span className="arc mt-auto"><Badge tone={result.tone} size="sm">{result.label}</Badge></span>
                 </Link>
               </li>
             })}

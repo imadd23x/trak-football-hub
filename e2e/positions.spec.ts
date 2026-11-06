@@ -92,6 +92,8 @@ for (const [width, height] of [[1280, 800], [390, 844]] as const) {
     // Every tap has saved by now, so the screenshot can't lose anything (see e2e/season-plan.spec.ts, 4 Nov).
     await page.screenshot({ path: testInfo.outputPath(`positions-${width}.png`), fullPage: true })
 
+    // TRAK-354: Positions goes on to Player objectives, whose Done goes Home.
+    await page.getByRole('button', { name: 'Next: Player objectives' }).click()
     await page.getByRole('button', { name: 'Done' }).click()
     await expect(page.getByRole('heading', { name: /^Needs you/ })).toBeVisible()
     await expect(page.getByText(/players? needs? a position$/)).toHaveCount(0)

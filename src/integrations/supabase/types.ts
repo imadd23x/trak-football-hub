@@ -1175,6 +1175,60 @@ export type Database = {
         }
         Relationships: []
       }
+      player_objectives: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          retired_at: string | null
+          season_objective_id: string | null
+          slot: number
+          source: string
+          squad_player_id: string
+          status: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          retired_at?: string | null
+          season_objective_id?: string | null
+          slot: number
+          source: string
+          squad_player_id: string
+          status?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          retired_at?: string | null
+          season_objective_id?: string | null
+          slot?: number
+          source?: string
+          squad_player_id?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_objectives_season_objective_id_fkey"
+            columns: ["season_objective_id"]
+            isOneToOne: false
+            referencedRelation: "season_objectives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_objectives_squad_player_id_fkey"
+            columns: ["squad_player_id"]
+            isOneToOne: false
+            referencedRelation: "squad_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_parent_links: {
         Row: {
           created_at: string | null
@@ -1946,6 +2000,10 @@ export type Database = {
           p_user_id: string
           p_venue: string
         }
+        Returns: undefined
+      }
+      save_player_objectives: {
+        Args: { p_objectives: Json; p_squad_player_id: string }
         Returns: undefined
       }
       save_player_position_and_roles: {

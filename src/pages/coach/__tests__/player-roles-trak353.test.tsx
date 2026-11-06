@@ -68,6 +68,8 @@ beforeEach(() => {
     http.get(`${SUPABASE_URL}/rest/v1/season_plans`, () => HttpResponse.json([{ id: 'plan-1', squad: 'U16', starts_on: null, ends_on: null, shared_at: null, positions_known: 'yes' }])),
     table('season_objectives', []),
     table('training_notes', []),
+    // TRAK-354: the player's page also lists their objectives; none.
+    table('player_objectives', []),
     table('squad_player_profiles', []),
     rpc('coach_player_birth_dates', () => []),
     rpc('coach_squad_season', () => []),

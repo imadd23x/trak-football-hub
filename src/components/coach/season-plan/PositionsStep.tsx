@@ -33,12 +33,13 @@ const PLACE_FAILED = (name: string) => `Couldn't save ${name}'s position. Check 
 const ANSWER_FAILED = "Couldn't save your answer. Check your connection and try again."
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
-export function PositionsStep({ coachId, squad, plan, onBack, onDone }: {
+export function PositionsStep({ coachId, squad, plan, onBack, onNext }: {
   coachId: string
   squad: string
   plan: SeasonPlan | null
   onBack: () => void
-  onDone: () => void
+  /** TRAK-354: on to step 3, Player objectives. */
+  onNext: () => void
 }) {
   const client = useQueryClient()
   const roster = useSquadRoster()
@@ -82,7 +83,7 @@ export function PositionsStep({ coachId, squad, plan, onBack, onDone }: {
   const footer = (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <Button variant="ghost" onClick={onBack}><ChevronLeft size={16} aria-hidden="true" />Season and objectives</Button>
-      <Button variant={answer ? 'primary' : 'secondary'} onClick={onDone}>{answer ? 'Done' : 'Skip for now'}</Button>
+      <Button variant={answer ? 'primary' : 'secondary'} onClick={onNext}>{answer ? 'Next: Player objectives' : 'Skip for now'}</Button>
     </div>
   )
 

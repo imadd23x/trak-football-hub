@@ -17,7 +17,7 @@ import { forgetScreens } from '@/lib/screen-memory'
 
 type Plan = {
   id: string; squad: string; starts_on: string | null; ends_on: string | null; shared_at: string | null; positions_known: string | null
-  last_shared_at: string | null; unshared_parts: string[]; unshared_players: string[]
+  watch_rule: string; last_shared_at: string | null; unshared_parts: string[]; unshared_players: string[]
 }
 type SeasonObjective = { id: string; plan_id: string; place: number; title: string; looks_like: string; status: string; created_at: string; retired_at: string | null }
 type PlayerObjective = {
@@ -33,6 +33,7 @@ let objectives: SeasonObjective[] = []
 let held: PlayerObjective[] = []
 let writes: { method: string; table: string; body: unknown }[] = []
 let shares: { p_plan_id: string; p_talked: boolean }[] = []
+let watches: { squad_player_id: string; since: string }[] = []
 
 const child = (id: string, name: string, position: string | null) => ({
   id, coach_user_id: COACH.id, player_name: name, age_group: 'U16', status: 'active', shirt_number: 4, position,
@@ -52,11 +53,12 @@ beforeEach(() => {
   localStorage.clear()
   COACH = { id: `coach-356-${++n}` }
   plan = { id: 'plan-1', squad: 'U16', starts_on: '2026-09-01', ends_on: '2027-06-30', shared_at: null, positions_known: 'yes',
-    last_shared_at: null, unshared_parts: [], unshared_players: [] }
+    watch_rule: 't2', last_shared_at: null, unshared_parts: [], unshared_players: [] }
   objectives = []
   held = []
   writes = []
   shares = []
+  watches = []
   signInAs(COACH)
   server.use(
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Synthetic Coach', invite_code: 'ABCD' }]),
@@ -93,6 +95,8 @@ beforeEach(() => {
       return new HttpResponse(null, { status: 204 })
     }),
     http.get(`${SUPABASE_URL}/rest/v1/player_objectives`, () => HttpResponse.json(held)),
+    // TRAK-355: who is watched first.
+    http.get(`${SUPABASE_URL}/rest/v1/player_watches`, () => HttpResponse.json(watches)),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/share_season_plan`, async ({ request }) => {
       shares.push(await request.json() as (typeof shares)[number])
       plan = { ...plan, shared_at: plan.shared_at ?? NOW, last_shared_at: NOW, unshared_parts: [], unshared_players: [] }
@@ -258,4 +262,50 @@ describe('TRAK-356 once shared', () => {
     expect(within(section).getByText('No objective yet.')).toBeInTheDocument()
     expect(section).toHaveTextContent('Wins their headers · given 1 Nov, removed 5 Nov')
   }, 30_000)
+
+  it('names who is watched first on the Share step, with the reminder', async () => {
+    watches = [{ squad_player_id: 'quinn', since: new Date(Date.now() - 2 * 86400_000).toISOString() }]
+    renderApp('/coach/season-plan/share')
+    const watching = await screen.findByRole('region', { name: /^Watching first/ })
+    expect(watching).toHaveTextContent('Quinn Synthetic')
+    expect(within(watching).getByRole('group', { name: 'Remind me' })).toBeInTheDocument()
+  }, 30_000)
+
+  it('once shared: Watching lists who is watched, and the reminder is one screen that never waits to be shared', async () => {
+    sharedPlan()
+    watches = [{ squad_player_id: 'quinn', since: new Date(Date.now() - 2 * 86400_000).toISOString() }]
+    renderApp('/coach/season-plan')
+    const watching = await screen.findByRole('region', { name: /^Watching/ })
+    // No trainings on the schedule or in the register: the squad's reminder counts weeks (TRAK-355).
+    expect(watching).toHaveTextContent('Reminder after 2 weeks, 4 weeks at the latest.')
+    expect(watching).toHaveTextContent('Quinn Synthetic')
+    expect(watching).toHaveTextContent('0 of 2 weeks so far')
+
+    await user().click(within(watching).getByRole('button', { name: 'Edit the watching reminder' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Watching reminder' })).toBeInTheDocument()
+    expect(screen.getByText('Only you see this.')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: '4 weeks' }))
+    await user().click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByText('Shared 1 Nov.')).toBeInTheDocument()
+    expect(writes).toEqual([])
+
+    await user().click(screen.getByRole('button', { name: 'Edit the watching reminder' }))
+    await user().click(await screen.findByRole('button', { name: '4 weeks' }))
+    await user().click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Shared 1 Nov.')).toBeInTheDocument()
+    expect(writes).toEqual([{ method: 'PATCH', table: 'season_plans', body: { watch_rule: 'w4' } }])
+    expect(screen.queryByText(/^Not shared yet/)).toBeNull()
+  }, 30_000)
+
+  it('once shared, Home’s Set up for a due watched player opens their sheet on the plan', async () => {
+    sharedPlan()
+    watches = [{ squad_player_id: 'pat', since: new Date(Date.now() - 30 * 86400_000).toISOString() }]
+    renderApp('/coach/home')
+    expect(await screen.findByText('Watched 2 weeks · Set Pat up')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Set up' }))
+    const sheet = await screen.findByRole('dialog', { name: "Pat's objectives" })
+    expect(window.location.pathname).toBe('/coach/season-plan')
+    expect(within(sheet).getByRole('button', { name: 'Keep watching' })).toBeInTheDocument()
+  }, 30_000)
 })
+

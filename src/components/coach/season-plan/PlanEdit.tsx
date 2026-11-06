@@ -11,13 +11,16 @@ import {
   dateToIso, isoToDate, removedSeasonObjectivesKey, seasonObjectivesKey, seasonPlanKey, writeSeasonObjectives,
   type SeasonObjective, type SeasonPlan,
 } from '@/lib/season-plan'
+import { DEFAULT_WATCH_RULE, effectiveRule, isWatchRule, rulesFor, type WatchRule } from '@/lib/watch-first'
 import { SeasonObjectivesEditor, type EditableObjective } from './SeasonObjectivesEditor'
+import { trainsIn, useSetWatchRule, useTrainingSquads } from './useWatching'
 
 /* TRAK-356 (Season plan 8/18, spec TRAK-348): one part of a shared plan, edited on one screen (Tarek, 1 Nov). Cancel
    leaves it as it was; Save keeps the change, which waits under "Not shared yet" until the coach shares the changes.
-   Removing a season objective here retires it: it stays in the plan's history, with its dates. */
+   Removing a season objective here retires it: it stays in the plan's history, with its dates. The watching reminder
+   (TRAK-355) is the coach's alone, so it never waits to be shared. */
 
-const PLAN_PARTS = { dates: 'Season dates', objectives: 'Season objectives' } as const
+const PLAN_PARTS = { dates: 'Season dates', objectives: 'Season objectives', reminder: 'Watching reminder' } as const
 type Part = keyof typeof PLAN_PARTS
 const isPart = (part: string): part is Part => part in PLAN_PARTS
 
@@ -34,8 +37,8 @@ export function PlanEdit({ part, coachId, squad, plan, seasonObjectives }: {
   seasonObjectives: SeasonObjective[]
 }) {
   if (!isPart(part)) return <Navigate to={PLAN} replace />
-  return part === 'dates'
-    ? <DatesEdit coachId={coachId} squad={squad} plan={plan} />
+  return part === 'dates' ? <DatesEdit coachId={coachId} squad={squad} plan={plan} />
+    : part === 'reminder' ? <ReminderEdit coachId={coachId} squad={squad} plan={plan} />
     : <ObjectivesEdit coachId={coachId} squad={squad} plan={plan} saved={seasonObjectives} />
 }
 
@@ -53,7 +56,7 @@ function EditScreen({ part, problem, saving, canSave, onSave, children }: {
       <header className="grid gap-1">
         <p className="text-sm text-ink-3">Edit</p>
         <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">{PLAN_PARTS[part]}</h1>
-        <p className="text-sm text-ink-3">{WAITS}</p>
+        <p className="text-sm text-ink-3">{part === 'reminder' ? 'Only you see this.' : WAITS}</p>
       </header>
       {children}
       {problem && <Alert tone={problem === SAVE_FAILED ? 'danger' : 'warning'} title={problem} />}
@@ -136,6 +139,40 @@ function ObjectivesEdit({ coachId, squad, plan, saved }: { coachId: string; squa
     <EditScreen part="objectives" problem={problem} saving={save.isPending} canSave={changed} onSave={submit}>
       <SeasonObjectivesEditor objectives={list} focusKey={focusKey} removeWord="Remove" onChange={change} onAdd={add} />
       <p className="text-sm text-ink-3">A removed objective stays in the plan’s history, with its dates.</p>
+    </EditScreen>
+  )
+}
+
+const chip = (on: boolean) =>
+  `min-h-10 rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? 'border-brand bg-brand text-on-brand' : 'border-line bg-surface text-ink'}`
+
+function ReminderEdit({ coachId, squad, plan }: { coachId: string; squad: string; plan: SeasonPlan }) {
+  const navigate = useNavigate()
+  const training = useTrainingSquads(coachId)
+  const set = useSetWatchRule(coachId, squad)
+  const hasTrainings = trainsIn(training.data, squad)
+  // What the squad follows now: a trainings rule counts as weeks where the squad has no trainings (TRAK-355).
+  const saved = effectiveRule(isWatchRule(plan.watch_rule) ? plan.watch_rule : DEFAULT_WATCH_RULE, hasTrainings)
+  const [rule, setRule] = useState<WatchRule | null>(null)
+  const [problem, setProblem] = useState<string | null>(null)
+  const current = rule ?? saved
+  const save = () => set.mutate({ planId: plan.id, rule: current }, {
+    onSuccess: () => { toast.success('Saved.'); navigate(PLAN) },
+    onError: () => setProblem(SAVE_FAILED),
+  })
+
+  return (
+    <EditScreen part="reminder" problem={problem} saving={set.isPending} canSave={!training.isPending && current !== saved} onSave={save}>
+      <section aria-label="Watching reminder" className="grid gap-3 rounded-2xl border border-line bg-surface p-5">
+        <div role="group" aria-labelledby="reminder-edit" className="grid gap-2">
+          <span id="reminder-edit" className="text-sm font-medium text-ink">Remind me about players I’m watching after</span>
+          <div className="flex flex-wrap gap-2">
+            {rulesFor(hasTrainings).map(option => <button key={option.value} type="button" aria-pressed={current === option.value} className={chip(current === option.value)}
+              onClick={() => { setRule(option.value); setProblem(null) }}>{option.label}</button>)}
+          </div>
+        </div>
+        <p className="text-sm text-ink-3">{hasTrainings ? 'Trainings count each player’s own, from your register. ' : ''}4 weeks at the latest.</p>
+      </section>
     </EditScreen>
   )
 }

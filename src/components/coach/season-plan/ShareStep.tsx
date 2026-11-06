@@ -10,11 +10,14 @@ import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
 import { positionsBoard } from '@/lib/positions'
 import { seasonPlanKey, shareSeasonPlan, type SeasonObjective, type SeasonPlan } from '@/lib/season-plan'
 import { usePlayerObjectives } from './usePlayerObjectives'
+import { useWatchList } from './useWatching'
+import { WatchRulePicker } from './WatchRulePicker'
 
 /* TRAK-356 (Season plan 8/18, spec TRAK-348): step 4, Share. What goes out: the season's dates, the season objectives,
    positions and player objectives; it shares with none. The face-to-face tick shows only when there's something to
    tell (Tarek, 3 Nov), and only here, at the first share (Tarek, 6 Nov). Share needs both dates (Tarek, 6 Nov). Until
-   TRAK-366 ships their screens, players and families see nothing of the plan in the app, and the step says so. */
+   TRAK-366 ships their screens, players and families see nothing of the plan in the app, and the step says so. The
+   players watched first (TRAK-355) are named with the squad's reminder; nothing goes out about them. */
 
 const SHARE_FAILED = "Couldn't share the plan. Check your connection and try again."
 const NO_DATES = 'Add the season’s dates first'
@@ -34,6 +37,7 @@ export function ShareStep({ coachId, squad, plan, seasonObjectives, onBack, onSe
   const client = useQueryClient()
   const roster = useSquadRoster()
   const objectives = usePlayerObjectives(coachId)
+  const watching = useWatchList(coachId, roster)
   const [talked, setTalked] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const share = useMutation({
@@ -54,6 +58,7 @@ export function ShareStep({ coachId, squad, plan, seasonObjectives, onBack, onSe
   const withSome = placed.filter(p => objectives.of(p.id).length > 0).length
   const dated = !!plan?.starts_on && !!plan.ends_on
   const toTell = seasonObjectives.length > 0 || roster.players.some(p => objectives.of(p.id).length > 0)
+  const watched = roster.players.filter(p => watching.list.some(w => w.playerId === p.id))
   const holdBack = !dated ? NO_DATES : toTell && !talked ? 'Tick that you’ve talked it through first' : null
 
   return (
@@ -87,6 +92,13 @@ export function ShareStep({ coachId, squad, plan, seasonObjectives, onBack, onSe
           </div>
         </dl>
       </section>
+
+      {watched.length > 0 && <section aria-labelledby="share-watching" className="grid gap-3 rounded-2xl border border-line bg-surface p-5">
+        <h2 id="share-watching" className="text-lg font-medium text-ink">Watching first <span className="font-normal text-ink-3">· {watched.length}</span></h2>
+        <p className="text-sm text-ink-2">{watched.map(p => p.player_name).join(', ')}</p>
+        <p className="text-sm text-ink-3">They get objectives once you set them up. Nothing goes out about them until then.</p>
+        <WatchRulePicker coachId={coachId} squad={squad} plan={plan} />
+      </section>}
 
       {toTell && <section aria-label="Before you share" className="rounded-2xl border border-line bg-surface p-5">
         <Checkbox label="I’ve talked objectives through with the players, face to face" description="Before this goes out. Players should hear it from you first."

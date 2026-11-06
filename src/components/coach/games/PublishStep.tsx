@@ -56,7 +56,7 @@ export function PublishStep({ eventId, form, listed, goals, askCompetition, askH
     : summary.players === 0 ? 'Tick who played in Result first.' : null
   return (
     <div className="arc">
-      <PlanReview title="Evaluation review" rows={rows} band={band}>
+      <PlanReview title="Evaluation review" footerId="evaluation-publish" rows={rows} band={band}>
         {askCompetition && <RadioGroup label="Competition" name={`publish-competition-${eventId}`} options={COMPETITIONS}
           value={choices.competition} onValueChange={value => setChoices({ ...choices, competition: value as Competition })} />}
         {askHomeAway && <RadioGroup label="Home or away" name={`publish-home-away-${eventId}`}

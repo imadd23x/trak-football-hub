@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { EventRow } from '@/lib/coach-events'
 import { formToPlan, type PlanForm } from '@/lib/games/plan'
 import { rowsToSave } from '@/lib/games/lineup'
-import { useWhoCanCome } from './useGames'
+import type { useWhoCanCome } from './useGames'
 import { TacticsAndAnalysis } from './TacticsAndAnalysis'
 import { LineUpAndJobs } from './LineUpAndJobs'
 import { ShareStep } from './ShareStep'
@@ -19,25 +19,26 @@ import { Stepper } from '@/components/arc/stepper/stepper'
    saved plan shows read only, and Save and Share go (TRAK-372, Imad 5 Nov: with no alert). TRAK-290: Share at… schedules
    it; until then Save draft also rewrites what's waiting, so it goes out as saved (Imad, 29 Oct). TRAK-332 (Imad, 2 Nov):
    the last step is Review & share, and the face-to-face tick and Share plan (Share at… on its chevron) sit in its card;
-   the bottom bar keeps Back and Save draft (it was TRAK-318's place for Share). */
+   the bottom bar keeps Back and Save draft (it was TRAK-318's place for Share). Match header (Imad, 6 Nov): Save draft
+   moves to the match's header, so the page holds the draft's saving and sharing (useGamePlanDraft); the bottom bar
+   keeps Back, the draft line and Next. */
 
 const STEPS = [{ id: 'opponent', label: 'Tactics & analysis' }, { id: 'line-up', label: 'Line-up and jobs' }, { id: 'share', label: 'Review & share' }]
 const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again; everything you typed is still here."
 const SHARE_FAILED = "Couldn't share the plan. Check your connection and try again; everything you typed is still here."
 const SCHEDULE_FAILED = "Couldn't schedule the plan. Check your connection and try again; everything you typed is still here."
 
-export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, changes, locked = false, onEditLogistics }: {
-  game: EventRow; form: PlanForm; onFormChange: (form: PlanForm) => void; step: number; onStep: (step: number) => void
-  /** TRAK-286: when the plan was first shared, or null; and whose copies a share would change now. */
-  sharedAt: string | null; changes: string[]
-  /** TRAK-287: kick-off has passed, so the plan only shows. */
-  locked?: boolean
-  /** TRAK-332: Review & share's Logistics part pulls up the event's edit sheet (TRAK-331). */
-  onEditLogistics: () => void
+/** The plan as a draft: what Save draft, Share and Schedule write, and what they said. `change` is the form's onChange. */
+export function useGamePlanDraft({ game, form, onFormChange, sharedAt, who, onSaved }: {
+  game: EventRow; form: PlanForm; onFormChange: (form: PlanForm) => void
+  /** After Save draft has saved. */
+  onSaved?: () => void
+  /** TRAK-286: when the plan was first shared, or null. */
+  sharedAt: string | null
+  who: ReturnType<typeof useWhoCanCome>
 }) {
   const { user } = useAuth()
   const client = useQueryClient()
-  const who = useWhoCanCome(game)
   const [savedNow, setSavedNow] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const [shareProblem, setShareProblem] = useState<string | null>(null)
@@ -83,6 +84,7 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
     },
     onSuccess: (_, sent) => {
       if (sent.version === version.current) setSavedNow(true)
+      onSaved?.()
       void refresh(false)
     },
     onError: () => setProblem(SAVE_FAILED),
@@ -126,8 +128,22 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
     schedule.mutate({ sent: draft(), talked, at })
   }
 
-  const sharing = share.isPending || schedule.isPending
+  return { change, submit, saving: save.isPending, savedNow, problem, shareNow, scheduleAt, sharing: share.isPending || schedule.isPending, shareProblem }
+}
 
+export function GamePlan({ game, form, draft, who, step, onStep, sharedAt, changes, locked = false, onEditLogistics, picking, onPicking }: {
+  game: EventRow; form: PlanForm; draft: ReturnType<typeof useGamePlanDraft>; who: ReturnType<typeof useWhoCanCome>
+  step: number; onStep: (step: number) => void
+  /** TRAK-286: when the plan was first shared, or null; and whose copies a share would change now. */
+  sharedAt: string | null; changes: string[]
+  /** TRAK-287: kick-off has passed, so the plan only shows. */
+  locked?: boolean
+  /** TRAK-332: Review & share's Logistics part pulls up the event's edit sheet (TRAK-331). */
+  onEditLogistics: () => void
+  /** Whether Review & share's Schedule pickers are open. */
+  picking: boolean; onPicking: (open: boolean) => void
+}) {
+  const { change, shareNow, scheduleAt, sharing, shareProblem } = draft
   return (
     <div className="grid gap-5 pt-4">
       {/* TRAK-346 (Imad, 3 Nov): any step opens from here, ahead as well as back, so an Edit never means walking back. */}
@@ -135,16 +151,12 @@ export function GamePlan({ game, form, onFormChange, step, onStep, sharedAt, cha
       {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} form={form} onFormChange={change} locked={locked} />
         : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} />
         : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} onShare={shareNow} onSchedule={scheduleAt}
-            sharing={sharing} problem={shareProblem} locked={locked} onStep={onStep} onEditLogistics={onEditLogistics} />}
+            sharing={sharing} problem={shareProblem} locked={locked} onStep={onStep} onEditLogistics={onEditLogistics} picking={picking} onPicking={onPicking} />}
       <div className="flex flex-wrap items-center gap-3">
         {step > 0 && <Button variant="ghost" onClick={() => onStep(step - 1)}>Back</Button>}
-        {!locked && <>
-          <span className="ml-auto text-sm text-ink-3">Draft · only you see it</span>
-          <Button variant="secondary" loading={save.isPending} onClick={submit}>{savedNow ? 'Saved' : 'Save draft'}</Button>
-        </>}
+        {!locked && <span className="ml-auto text-sm text-ink-3">Draft · only you see it</span>}
         {step < 2 && <Button className={locked ? 'ml-auto' : undefined} onClick={() => onStep(step + 1)}>{step === 0 ? 'Next: Line-up and jobs' : 'Next: Review & share'}</Button>}
       </div>
-      {problem && <p role="alert" className="text-right text-[15px] text-danger">{problem}</p>}
     </div>
   )
 }

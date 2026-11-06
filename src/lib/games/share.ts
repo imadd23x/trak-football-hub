@@ -1,6 +1,6 @@
 import type { Json } from '@/integrations/supabase/types'
 import { localParts } from '@/lib/event-time'
-import { formToPlan, type Goal, type PlanForm } from './plan'
+import { STRENGTHS, formToPlan, type Goal, type PlanForm } from './plan'
 import { playerPlan, type Role } from './lineup'
 
 /* TRAK-286 (Games 4/8): what players and families read once the plan is shared. The database writes two copies per
@@ -35,6 +35,17 @@ export function lineUpCounts(form: PlanForm, players: { id: string }[]) {
   const starters = players.map(player => playerPlan(form.players, player.id))
     .filter(plan => plan.role === 'starter' && plan.slot != null && plan.slot <= form.format)
   return { placed: starters.length, withJob: starters.filter(plan => plan.job.trim()).length }
+}
+
+/** TRAK-332's Game plan review, part by part: which parts are ready, and the counts its lines say. The match header's
+ *  "N to do" counts the same parts. TRAK-371: Jobs is ready once any starter has a job. */
+export function planParts(form: PlanForm, players: { id: string; absent: boolean }[], published: boolean) {
+  const { placed, withJob } = lineUpCounts(form, players)
+  const bench = players.filter(player => !player.absent && playerPlan(form.players, player.id).role !== 'not_selected'
+    && playerPlan(form.players, player.id).role !== 'starter').length
+  const instructions = form.goals.filter(goal => goal.title.trim() || goal.looksLike.trim()).length
+  const ready = { logistics: published, tactics: STRENGTHS.some(option => option.value === form.strength), instructions: instructions > 0, lineUp: placed === form.format, jobs: withJob > 0 }
+  return { placed, withJob, bench, instructions, ready, incomplete: Object.values(ready).filter(part => !part).length }
 }
 
 type FamilyRow = { role: string; changed_at: string | null }

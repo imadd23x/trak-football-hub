@@ -175,6 +175,19 @@ async function open(page: Page, context: BrowserContext, path: string, width: nu
   await page.goto(path)
   return { unexpected, errors }
 }
+/** Match header (Imad, 6 Nov): the match's state beside its title. Once the page scrolls, the compact row repeats it. */
+const matchStatus = (page: Page) => page.getByRole('heading', { level: 1 }).locator('..')
+/** Save draft is in the match header. On a phone it folds into the header's "…" menu, and a toast says it's saved. */
+async function saveDraft(page: Page) {
+  if (page.viewportSize()!.width > 560) {
+    await page.getByRole('button', { name: 'Save draft' }).click()
+    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
+    return
+  }
+  await page.getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Save draft' }).click()
+  await expect(page.getByText('Draft saved', { exact: true })).toBeVisible()
+}
 const sideways = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
 
 /** Tab from the top of the page; every control in `scope` must take focus at least once. A tab list is one stop
@@ -292,9 +305,8 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.getByRole('tab', { name: 'Game plan' }).click()
     await expect(goal.getByLabel('Instruction', { exact: true })).toHaveValue('Win it back in their half')
 
-    await page.getByRole('button', { name: 'Save draft' }).click()
-    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
-    await expect(page.getByText('Draft', { exact: true })).toBeVisible()
+    await saveDraft(page)
+    await expect(matchStatus(page).getByText('Draft', { exact: true })).toBeVisible()
     expect(plans.get('m-next')).toMatchObject({ strength: 'stronger',
       goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }] })
     await page.waitForTimeout(500)
@@ -374,6 +386,12 @@ test("a game's line-up at 1440 px: the pitch stays in view while the panel besid
   await expect(pitch).toBeInViewport()
   await expect(job).toBeInViewport()
   await expect(page.getByRole('progressbar', { name: '1 of 11 starters have a job' })).toBeVisible()
+  // Match header (Imad, 6 Nov): scrolled, the pitch pins under the header's tabs, never behind them.
+  await page.mouse.wheel(0, 600)
+  await page.waitForTimeout(400)
+  const tabs = (await page.getByRole('tablist', { name: 'This match' }).boundingBox())!
+  expect((await pitch.boundingBox())!.y).toBeGreaterThanOrEqual(tabs.y + tabs.height)
+  await expect(pitch).toBeInViewport()
   await page.getByRole('button', { name: 'Save draft' }).click()
   await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
   expect(plans.get('line-up:m-next:sq-4')).toMatchObject({ role: 'starter', slot: 2, job: 'Stay tight to their number 9. Win the first header.' })
@@ -487,7 +505,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByRole('region', { name: 'Shared' })).toBeVisible()
     expect(plans.get('share:m-next')).toMatchObject({ talked: true })
     expect(plans.get('m-next')).toMatchObject({ goals: [{ title: 'Win it back in their half' }] })
-    await expect(page.getByText('Plan shared').first()).toBeVisible()
+    await expect(matchStatus(page).getByText('Plan shared')).toBeVisible()
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`shared-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
@@ -696,10 +714,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(keyboard.missed).toEqual([])
 
     await expect(page.getByText('Draft', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Save draft' }).click()
-    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
-    await expect(page.getByText(/^Draft saved/)).toHaveCount(0)
-    await expect(page.getByText('Evaluation draft')).toBeVisible()
+    await saveDraft(page)
+    await expect(page.getByText(/^Draft saved /)).toHaveCount(0)
+    await expect(matchStatus(page).getByText('Evaluation draft')).toBeVisible()
     await page.evaluate(() => window.scrollTo(0, 0))
     await page.waitForTimeout(400)
     await page.screenshot({ path: testInfo.outputPath(`evaluation-saved-${width}.png`) })
@@ -751,7 +768,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.getByRole('button', { name: 'Publish to 2 players and families' }).click()
     await expect(page.getByText('Published to 2 players and their families. The loop is closed.')).toBeVisible()
     await expect(page.getByRole('region', { name: 'History' }).getByText('Evaluation published. The loop is closed.')).toBeVisible()
-    await expect(page.locator('header.arc').getByText('Published')).toBeVisible()
+    await expect(matchStatus(page).getByText('Published')).toBeVisible()
     await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`published-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
@@ -771,5 +788,98 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(kid.unexpected).toEqual([])
     expect(kid.errors).toEqual([])
     await player.close()
+  })
+}
+
+// Match header (Imad, 6 Nov, Concept A): Arc's Page header over the three tabs, with each match's own details. Two
+// matches, one before kick-off (Evaluation after the match) and one after full time (Evaluation open). The tabs switch
+// by pointer and keyboard; scrolled, the title and details go under a pinned compact row and the tabs, in the window's
+// one scroll, and the compact title goes back to the top.
+for (const [width, height] of [[390, 844], [1440, 900]] as const) {
+  test(`the match header at ${width} px: two matches, the tabs, scrolling to compact and back`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, '/coach/matches/m-next', width, height)
+    const header = page.getByRole('region', { name: 'vs Parkview Athletic U16' })
+    await expect(header.getByRole('heading', { level: 1, name: 'vs Parkview Athletic U16' })).toBeVisible()
+    await expect(header).toContainText(/Kick-off 11:00/)
+    await expect(header).toContainText('Rehearsal Park · Home')
+    await expect(header.getByText(/^U16 · \d+ players$/)).toBeVisible()
+    const tabs = page.getByRole('tablist', { name: 'This match' })
+    await expect(tabs.getByRole('tab', { name: 'Evaluation After the match' })).toBeVisible()
+    await expect(tabs.getByRole('tab', { name: /^Game plan \d to do$/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Review game plan' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'More actions', exact: true })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`header-logistics-${width}.png`) })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    const keyboard = await everyControlByKeyboard(page, '.trak-wide')
+    expect(keyboard.missed).toEqual([])
+
+    // The keyboard moves along the tabs; Evaluation says when it opens.
+    await tabs.getByRole('tab', { name: /^Logistics/ }).focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(tabs.getByRole('tab', { name: /^Game plan/ })).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByRole('heading', { name: /^Opens at full time, \d\d:\d\d$/ })).toBeVisible()
+
+    // Review game plan opens Review & share; scrolled, the header is compact and the tabs stay usable.
+    await page.getByRole('button', { name: 'Review game plan' }).click()
+    await expect(page.getByRole('region', { name: 'Game plan review' })).toBeVisible()
+    // The header's, before the stepper's step of the same name.
+    await expect(page.getByRole('button', { name: 'Review & share' }).first()).toBeVisible()
+    // The "…" menu: Schedule share, and on a phone Save draft, folded in from the top row.
+    // Folded, the top row's Save draft is inert: out of reach of the pointer, the keyboard and screen readers.
+    expect(await page.getByRole('button', { name: 'Save draft' }).evaluate(el => !!el.closest('[inert]'))).toBe(width < 560)
+    await page.getByRole('button', { name: 'More actions', exact: true }).click()
+    const menu = page.getByRole('menu')
+    await expect(menu.getByRole('menuitem', { name: 'Schedule share' })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: 'Save draft' })).toHaveCount(width < 560 ? 1 : 0)
+    await page.waitForTimeout(300)
+    await page.screenshot({ path: testInfo.outputPath(`header-menu-${width}.png`) })
+    await page.keyboard.press('Escape')
+    await expect(menu).toHaveCount(0)
+    await page.mouse.wheel(0, 700)
+    const compact = page.getByRole('button', { name: 'vs Parkview Athletic U16, back to top' })
+    await expect(compact).toBeVisible()
+    await expect(tabs).toBeInViewport()
+    await expect(header.getByRole('heading', { level: 1 })).not.toBeInViewport()
+    // One scroll, the window's: nothing in the page scrolls on its own.
+    const scrollers = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('body *')].filter(el => {
+      const overflow = getComputedStyle(el).overflowY
+      return (overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight + 1 && el.offsetParent !== null
+    }).map(el => el.className))
+    expect(scrollers).toEqual([])
+    await page.waitForTimeout(500)
+    await page.screenshot({ path: testInfo.outputPath(`header-compact-${width}.png`) })
+
+    // A tab while compact keeps the compact row and shows the top of the new tab.
+    await tabs.getByRole('tab', { name: /^Logistics/ }).click()
+    await expect(compact).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeInViewport()
+    const pinnedTabs = (await tabs.boundingBox())!
+    expect((await page.getByRole('button', { name: 'Edit', exact: true }).boundingBox())!.y).toBeGreaterThan(pinnedTabs.y + pinnedTabs.height)
+    // The compact title goes back to the top.
+    await compact.click()
+    await expect(header.getByRole('heading', { level: 1 })).toBeInViewport()
+    await expect(header.getByRole('heading', { level: 1 })).toBeFocused()
+    await expect(compact).toHaveCount(0)
+
+    // Another match: its own header, and after full time its Evaluation is open.
+    await page.goto('/coach/matches/m-past')
+    const past = page.getByRole('region', { name: 'vs Lakeside FC U16' })
+    await expect(past.getByRole('heading', { level: 1, name: 'vs Lakeside FC U16' })).toBeVisible()
+    await expect(matchStatus(page).getByText('Full time')).toBeVisible()
+    await expect(tabs.getByRole('tab', { name: 'Evaluation', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Review evaluation' }).click()
+    await expect(page.getByRole('region', { name: 'Evaluation review' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Review & publish' })).toBeVisible()
+    await tabs.getByRole('tab', { name: /^Evaluation/ }).focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(tabs.getByRole('tab', { name: /^Game plan/ })).toHaveAttribute('aria-selected', 'true')
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`header-past-${width}.png`) })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
   })
 }

@@ -13,5 +13,5 @@ Keep the notice line at the top of every file.
 - `glass-tabbar/`
 - `radar-chart/`
 - `team-switcher/` (TRAK-324: the coach's squad switcher; adapted: no Create or Join, no sample brands)
-- `blocks/` (adapted from Arc Pro blocks)
+- `blocks/` (adapted from Arc Pro blocks), except `blocks/page-header/`: Arc's free Page header, under the MIT licence
   - `blocks/plan-review/` (TRAK-332: the Game plan's Review & share step, adapted from Account health)

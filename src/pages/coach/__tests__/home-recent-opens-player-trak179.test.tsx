@@ -25,6 +25,8 @@ function serve() {
       table('coach_sessions', []),
       // TRAK-353: the player's Can also play and roles; none.
       table('squad_player_also_plays', []), table('squad_player_roles', []),
+      // TRAK-354: the player's objectives; none.
+      table('player_objectives', []),
       table('session_attendance', []),
       table('coach_calendar_events', []),
       rpc('feature_on', () => true),

@@ -24,6 +24,8 @@ let evaluations: Record<string, unknown>[] = []
 let plans: Record<string, unknown>[] = []
 
 const param = (url: URL, key: string) => url.searchParams.get(key)?.replace(/^eq\./, '') ?? null
+/** `event_id=eq.x` or `event_id=in.(x,y)`: the ids asked for, or null for all. */
+const ids = (url: URL) => { const raw = url.searchParams.get('event_id'); return raw ? raw.replace(/^(eq\.|in\.\()|\)$/g, '').split(',').map(id => id.replace(/"/g, '')) : null }
 const event = (m: Match) => ({
   id: m.id, coach_user_id: COACH.id, event_type: 'match', squad: m.squad === undefined ? 'U16' : m.squad, title: `v ${m.opponent}`,
   published: true, status: m.status ?? 'scheduled', starts_at: `${m.day}T15:00:00Z`, ends_at: `${m.day}T16:30:00Z`, event_date: m.day,
@@ -68,12 +70,12 @@ beforeEach(() => {
     table('player_watches', []),
     http.get(`${SUPABASE_URL}/rest/v1/coach_calendar_events`, () => HttpResponse.json(matches.map(event))),
     http.get(`${SUPABASE_URL}/rest/v1/game_evaluations`, ({ request }) => {
-      const id = param(new URL(request.url), 'event_id')
-      return HttpResponse.json(evaluations.filter(e => !id || e.event_id === id))
+      const asked = ids(new URL(request.url))
+      return HttpResponse.json(evaluations.filter(e => !asked || asked.includes(e.event_id as string)))
     }),
     http.get(`${SUPABASE_URL}/rest/v1/game_plans`, ({ request }) => {
-      const id = param(new URL(request.url), 'event_id')
-      return HttpResponse.json(plans.filter(p => !id || p.event_id === id))
+      const asked = ids(new URL(request.url))
+      return HttpResponse.json(plans.filter(p => !asked || asked.includes(p.event_id as string)))
     }),
     table('game_shares', []),
     rpc('game_plan_changes', () => []),
@@ -118,8 +120,8 @@ describe('TRAK-362 results in the Season plan card', () => {
     await user().keyboard('{Enter}')
     expect(united).toHaveAttribute('aria-expanded', 'true')
     const went = await within(list).findByText('Press as one')
-    expect(went.parentElement).toHaveTextContent('Press as oneWorked')
-    expect(within(list).getByText('Win the second ball').parentElement).toHaveTextContent('Win the second ballDidn’t')
+    expect(went.closest('li')).toHaveTextContent('Press as oneWorked')
+    expect(within(list).getByText('Win the second ball').closest('li')).toHaveTextContent('Win the second ballDidn’t')
 
     await user().pointer({ keys: '[TouchA]', target: rovers })
     expect(rovers).toHaveAttribute('aria-expanded', 'true')
@@ -154,7 +156,7 @@ describe('TRAK-362 how a result is said', () => {
   })
   it('pairs each instruction with its answer, in order, and skips empty ones', () => {
     expect(instructionsWent([{ title: 'Press as one' }, { title: ' ' }, { title: 'Stay compact' }], ['partly', null, 'worked']))
-      .toEqual([{ title: 'Press as one', went: 'Partly' }, { title: 'Stay compact', went: 'Worked' }])
+      .toEqual([{ title: 'Press as one', went: 'Partly', seasonObjectiveId: null }, { title: 'Stay compact', went: 'Worked', seasonObjectiveId: null }])
     expect(instructionsWent(null, null)).toEqual([])
   })
 })

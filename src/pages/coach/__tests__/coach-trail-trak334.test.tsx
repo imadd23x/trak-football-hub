@@ -81,7 +81,7 @@ describe('TRAK-334: a match page\'s trail', { timeout: 30_000 }, () => {
     expect(screen.queryByRole('link', { name: 'Matches' })).toBeNull()
     expect(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByText('vs Parkview Athletic')).toHaveAttribute('aria-current', 'page')
 
-    await user.click(screen.getByRole('tab', { name: 'Logistics' }))
+    await user.click(screen.getByRole('tab', { name: /^Logistics/ }))
     expect(await crumbs('vs Parkview Athletic')).toEqual(['Home', 'vs Parkview Athletic'])
     await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb trail' })).getByRole('link', { name: 'Home' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/home'))

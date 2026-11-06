@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { format } from 'date-fns'
 import { dateAsDay, dayAsDate, type EventRow } from '@/lib/coach-events'
 import { displayEventTime, localTodayISO } from '@/lib/event-time'
-import { STRENGTHS, type PlanForm } from '@/lib/games/plan'
-import { playerPlan } from '@/lib/games/lineup'
-import { lineUpCounts, readers, shareWall } from '@/lib/games/share'
+import type { PlanForm } from '@/lib/games/plan'
+import { planParts, readers, shareWall } from '@/lib/games/share'
 import type { useWhoCanCome } from './useGames'
 import { LoadError } from '@/components/trak'
 import { Alert } from '@/components/arc/alert/alert'
@@ -26,13 +25,14 @@ import { MatchClock } from './MatchClock'
    28 Oct); the other parts never block. Who sees what and the preview are gone. TRAK-344 (Imad, 3 Nov):
    Game plan review says each thing once: no match or time (the header has them), "N incomplete", one countdown, and
    no detail for Logistics or Tactics & analysis. TRAK-371 (Imad, 5 Nov): Jobs is ready once any starter has a job; a
-   coach never has to give everyone one. */
+   coach never has to give everyone one. Match header (Imad, 6 Nov): the header's menu can open Schedule here, so the
+   page holds whether it's open (`picking`). */
 
 const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
 const list = (names: string[]) => names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 const sub = 'text-sm font-medium text-ink'
 
-export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSchedule, sharing, problem, locked = false, onStep, onEditLogistics }: {
+export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSchedule, sharing, problem, locked = false, onStep, onEditLogistics, picking, onPicking }: {
   game: EventRow; form: PlanForm; who: ReturnType<typeof useWhoCanCome>; locked?: boolean
   /** When the plan was first shared, or goes out if that's still to come (TRAK-290); null while it's a draft. */
   sharedAt: string | null
@@ -48,36 +48,32 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
   onStep: (step: number) => void
   /** Pulls up the event's edit sheet (TRAK-331), for the Logistics part. */
   onEditLogistics: () => void
+  /** Whether Schedule's day and time pickers are open. The page closes them at a new share time (scheduled, moved or
+   *  gone out now). */
+  picking: boolean; onPicking: (open: boolean) => void
 }) {
-  // The face-to-face tick, and Schedule's pickers. A new share time (scheduled, moved or gone out now) closes them.
+  // The face-to-face tick.
   const [talked, setTalked] = useState(false)
-  const [picking, setPicking] = useState(false)
-  useEffect(() => setPicking(false), [sharedAt])
 
   if (who.error) return <LoadError what="who can come" onRetry={who.retry} />
   if (who.isPending) return <LoadingSkeleton label="Loading who can come…" rows={2} className="pt-6" />
 
   const reading = readers(form, who.players)
-  const { placed, withJob } = lineUpCounts(form, who.players)
-  const bench = who.players.filter(player => !player.absent && playerPlan(form.players, player.id).role !== 'not_selected'
-    && playerPlan(form.players, player.id).role !== 'starter').length
-  const instructions = form.goals.filter(goal => goal.title.trim() || goal.looksLike.trim()).length
-  const strength = STRENGTHS.find(option => option.value === form.strength)?.label
+  const { placed, withJob, bench, instructions, ready, incomplete } = planParts(form, who.players, game.published)
   const names = new Map(who.players.map(player => [player.id, player.name]))
   const changed = changes.map(id => names.get(id)).filter((name): name is string => !!name)
   const waiting = sharedAt != null && !locked && Date.now() < Date.parse(sharedAt)
 
   const rows: ReviewRow[] = [
-    { id: 'logistics', label: 'Logistics', status: game.published ? 'good' : 'risk', onEdit: onEditLogistics },
-    { id: 'tactics', label: 'Tactics & analysis', status: strength ? 'good' : 'watch', onEdit: () => onStep(0) },
-    { id: 'instructions', label: 'Instructions', status: instructions ? 'good' : 'watch', onEdit: () => onStep(0),
+    { id: 'logistics', label: 'Logistics', status: ready.logistics ? 'good' : 'risk', onEdit: onEditLogistics },
+    { id: 'tactics', label: 'Tactics & analysis', status: ready.tactics ? 'good' : 'watch', onEdit: () => onStep(0) },
+    { id: 'instructions', label: 'Instructions', status: ready.instructions ? 'good' : 'watch', onEdit: () => onStep(0),
       detail: instructions ? `${instructions} ${instructions === 1 ? 'instruction' : 'instructions'}` : 'None yet' },
-    { id: 'line-up', label: 'Line-up', status: placed === form.format ? 'good' : 'watch', onEdit: () => onStep(1),
+    { id: 'line-up', label: 'Line-up', status: ready.lineUp ? 'good' : 'watch', onEdit: () => onStep(1),
       detail: `${placed} of ${form.format} placed · ${bench} on the bench` },
-    { id: 'jobs', label: 'Jobs', status: withJob > 0 ? 'good' : 'watch', onEdit: () => onStep(1),
+    { id: 'jobs', label: 'Jobs', status: ready.jobs ? 'good' : 'watch', onEdit: () => onStep(1),
       detail: placed === 0 ? 'Nobody is on the pitch yet' : `${withJob} of ${placed} starters have one` },
   ]
-  const incomplete = rows.filter(row => row.status !== 'good').length
   const band = incomplete === 0 ? { status: 'good' as const, label: 'Ready to share' }
     : { status: game.published ? 'watch' as const : 'risk' as const, label: `${incomplete} incomplete` }
   const holdsBack = !game.published || !talked
@@ -85,7 +81,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
   return (
     <div className="arc">
       {/* TRAK-373 (Imad, 5 Nov): after kick-off, the match clock, then "Locked", in the countdown's place. */}
-      <PlanReview title="Game plan review" rows={rows} band={band} readOnly={locked} aside={locked ? <MatchClock game={game} /> : undefined}
+      <PlanReview title="Game plan review" footerId="plan-share" rows={rows} band={band} readOnly={locked} aside={locked ? <MatchClock game={game} /> : undefined}
         countdown={{ label: 'Kick-off in', end: game.starts_at, completeLabel: 'Locked' }}>
         {sharedAt == null && locked ? (
           <section aria-labelledby="plan-not-shared" className="grid gap-1">
@@ -99,10 +95,10 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
           <div className="flex flex-wrap items-center gap-3">
             {!game.published && <span className="text-sm text-ink-3">Publish the match in Logistics first</span>}
             <span className="ml-auto"><SplitButton label={sharing ? 'Sharing…' : 'Share plan'} onClick={() => onShare(talked)}
-              disabled={holdsBack || sharing} actions={[{ label: 'Schedule', onSelect: () => setPicking(true), disabled: holdsBack }]} /></span>
+              disabled={holdsBack || sharing} actions={[{ label: 'Schedule', onSelect: () => onPicking(true), disabled: holdsBack }]} /></span>
           </div>
           {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta={when => when ? `Schedule for ${when}` : 'Schedule'}
-            busy={sharing} ready={!holdsBack} onSchedule={at => onSchedule(at, talked)} onCancel={() => setPicking(false)} />}
+            busy={sharing} ready={!holdsBack} onSchedule={at => onSchedule(at, talked)} onCancel={() => onPicking(false)} />}
           {problem && <p role="alert" className="text-sm text-danger">{problem}</p>}
         </> : waiting ? (
           <section aria-labelledby="plan-scheduled" className="grid gap-3">
@@ -113,10 +109,10 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
             <p className="text-sm text-ink-2">{players(reading.length)} and their families read it from {format(new Date(sharedAt), 'EEE d MMM, HH:mm')}, in the app only. What you save before then goes out with it.</p>
             {picking
               ? <ShareAt game={game} initial={shareWall(game, sharedAt)} cta={when => when ? `Move to ${when}` : 'Move'} busy={sharing} ready
-                  onSchedule={at => onSchedule(at, false)} onCancel={() => setPicking(false)} />
+                  onSchedule={at => onSchedule(at, false)} onCancel={() => onPicking(false)} />
               : <div className="flex flex-wrap gap-2">
                   <Button size="sm" loading={sharing} onClick={() => onShare(false)}>Share now</Button>
-                  <Button size="sm" variant="secondary" onClick={() => setPicking(true)}>Change time</Button>
+                  <Button size="sm" variant="secondary" onClick={() => onPicking(true)}>Change time</Button>
                 </div>}
             {problem && <p role="alert" className="text-sm text-danger">{problem}</p>}
           </section>

@@ -83,8 +83,14 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     // TRAK-344: the header has no countdown; Game plan review has the one.
     expect(screen.queryByRole('timer')).toBeNull()
     const tabs = screen.getByRole('tablist', { name: 'This match' })
-    expect(within(tabs).getAllByRole('tab').map(t => t.textContent)).toEqual(['Logistics', 'Game plan', 'Evaluation'])
-    expect(within(tabs).getByRole('tab', { name: 'Logistics' })).toHaveAttribute('aria-selected', 'true')
+    // Match header (Imad, 6 Nov): each tab says where it is. A plan not written has four of Review & share's five parts
+    // to do, counted once the squad is read.
+    expect(await within(tabs).findByRole('tab', { name: 'Game plan 4 to do' }, { timeout: 5000 })).toBeInTheDocument()
+    const [logistics, gamePlan, evaluation] = within(tabs).getAllByRole('tab')
+    expect(logistics).toHaveAccessibleName('Logistics shared')
+    expect(gamePlan).toHaveAccessibleName('Game plan 4 to do')
+    expect(evaluation).toHaveAccessibleName('Evaluation After the match')
+    expect(within(tabs).getByRole('tab', { name: /^Logistics/ })).toHaveAttribute('aria-selected', 'true')
 
     expect(screen.getByText('Shared')).toBeInTheDocument()
     expect(row('Type')).toHaveTextContent('Match')
@@ -103,19 +109,19 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     const user = userEvent.setup()
     events([game(soon())])
     renderApp('/coach/matches/g1')
-    await user.click(await screen.findByRole('tab', { name: 'Game plan' }))
+    await user.click(await screen.findByRole('tab', { name: /^Game plan/ }))
     expect(await screen.findByRole('heading', { name: 'Instructions' })).toBeInTheDocument()
     expect(window.location.search).toBe('?tab=plan')
 
     await user.keyboard('{ArrowRight}')
-    expect(screen.getByRole('tab', { name: 'Evaluation' })).toHaveFocus()
+    expect(screen.getByRole('tab', { name: /^Evaluation/ })).toHaveFocus()
     // TRAK-288: until full time it says when it opens.
     expect(await screen.findByRole('heading', { name: /^Opens at full time, \d\d:\d\d$/ })).toBeInTheDocument()
     expect(window.location.search).toBe('?tab=evaluation')
 
     cleanup()
     renderApp('/coach/matches/g1?tab=plan')
-    expect(await screen.findByRole('tab', { name: 'Game plan' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('tab', { name: /^Game plan/ })).toHaveAttribute('aria-selected', 'true')
   })
 
   it("a draft's Publish publishes it here, as Home's event sheet does, and families are emailed the logistics as today", async () => {

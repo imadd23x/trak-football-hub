@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { Pencil } from 'lucide-react'
+import { CalendarDays, Check, ClipboardCheck, Clock, MapPin, Pencil, Save, Share, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/integrations/supabase/client'
@@ -10,30 +10,40 @@ import { publishEvent } from '@/lib/event-publish'
 import { askToEmailFamilies } from '@/lib/event-emails'
 import { SAVE_FAILED, failed, pastProblem, type EditSheet } from '@/lib/event-edit'
 import { useCoachSquad } from '@/lib/coach-squad'
+import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { blankRepeat, clashMessage, formProblem, formToRow, lockedMessage, rowToForm, savedVenues, startedLocked, type EventRow } from '@/lib/coach-events'
 import { fullTime, gameStatus, type GameTab } from '@/lib/games/loop'
 import { formToPlan, planToForm, type PlanForm } from '@/lib/games/plan'
+import { planParts } from '@/lib/games/share'
 import { evaluationToForm, type EvaluationForm } from '@/lib/games/evaluation'
 import type { Tables } from '@/integrations/supabase/types'
-import { gameTitle, gameWhen, useGame, useGameEvaluation, useGamePlan, useGamePlanChanges, useGamePlayers, useGameShares, useGames } from '@/components/coach/games/useGames'
-import { GamePlan } from '@/components/coach/games/GamePlan'
-import { Evaluation } from '@/components/coach/games/Evaluation'
+import { gameTitle, gameWhen, useGame, useGameEvaluation, useGamePlan, useGamePlanChanges, useGamePlayers, useGameShares, useGames, useWhoCanCome } from '@/components/coach/games/useGames'
+import { GamePlan, useGamePlanDraft } from '@/components/coach/games/GamePlan'
+import { Evaluation, evaluationLineUp, useEvaluationDraft } from '@/components/coach/games/Evaluation'
 import { EventSummary } from '@/components/coach/EventSummary'
 import { EventEditSheet } from '@/components/coach/EventEditSheet'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/arc/tabs/tabs'
+import { PageHeader, PageHeaderPanel, type PageHeaderAction, type PageHeaderTab } from '@/components/arc/blocks/page-header/page-header'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 /* TRAK-283 (Games 1/8): a game's page. Its header says where it is in the loop; Logistics, Game plan and
-   Evaluation are peer panels of the one game (Arc tabs), and the panel lives in the URL (?tab=). TRAK-284 to
-   TRAK-286: the Game plan (GamePlan). TRAK-288: the Evaluation, from full time. */
+   Evaluation are peer panels of the one game, and the panel lives in the URL (?tab=). TRAK-284 to
+   TRAK-286: the Game plan (GamePlan). TRAK-288: the Evaluation, from full time.
+   Match header (Imad, 6 Nov, Concept A): Arc's Page header over the three tabs. The match's name and state, when and
+   where, the squad; Save draft, Review & share and a "…" menu at the top right; the top row and the tabs stay pinned
+   as the page scrolls. Save draft saves the draft on screen: the plan until kick-off, the evaluation from full time
+   until it's published. Review & share opens the plan's last step, Review & publish the evaluation's. */
 
 const TABS: { id: GameTab; label: string }[] = [
   { id: 'logistics', label: 'Logistics' }, { id: 'plan', label: 'Game plan' }, { id: 'evaluation', label: 'Evaluation' },
 ]
+/** The laptop's top bar (Arc's sidebar rail) is pinned above the page; the header pins under it. */
+const TOP_BAR = '60px'
+const icon = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const
+const metaIcon = { size: 14, strokeWidth: 1.75, 'aria-hidden': true } as const
 type Plan = UseQueryResult<Tables<'game_plans'> | null>
 type Players = UseQueryResult<Pick<Tables<'game_plan_players'>, 'squad_player_id' | 'role' | 'slot' | 'job' | 'note' | 'context' | 'expectation'>[]>
 type Evaluated = ReturnType<typeof useGameEvaluation>
@@ -46,18 +56,18 @@ export default function CoachGame() {
   const players = useGamePlayers(eventId)
   const shares = useGameShares()
   const evaluation = useGameEvaluation(eventId)
+  // TRAK-334: where the coach came from (Home, Matches, Schedule). It waits for the match's name, so the last crumb
+  // never swaps; a match that can't be read still offers the way back. The match's own header holds it once it's read.
+  const trail = !game.isPending && <CoachTrail className="mt-5" current={game.data ? gameTitle(game.data) : 'Match'} />
   return (
     <div className="min-h-screen bg-ground pb-24">
       {/* TRAK-323 (Imad, 30 Oct): the plan's steps use the screen: the coach's wide column (TRAK-307), not 960 px. */}
       <div className={WIDE_COLUMN}>
-        {/* TRAK-334: where the coach came from (Home, Matches, Schedule), in place of "‹ Matches". It waits for the
-            match's name, so the last crumb never swaps; a match that can't be read still offers the way back. */}
-        {!game.isPending && <CoachTrail className="mt-5" current={game.data ? gameTitle(game.data) : 'Match'} />}
-        {game.error || shares.error ? <div className="pt-6"><LoadError what="this match" onRetry={() => { void game.refetch(); void shares.refetch() }}
-            retrying={game.isFetching || shares.isFetching} /></div>
+        {game.error || shares.error ? <>{trail}<div className="pt-6"><LoadError what="this match" onRetry={() => { void game.refetch(); void shares.refetch() }}
+            retrying={game.isFetching || shares.isFetching} /></div></>
           : game.isPending || plan.isPending || players.isPending || shares.isPending || evaluation.isPending
-            ? <LoadingSkeleton label="Loading the match…" lines={4} rows={2} className="pt-6" />
-          : !game.data ? <p className="pt-10 text-[15px] text-ink-2">This match isn’t in your matches.</p>
+            ? <>{trail}<LoadingSkeleton label="Loading the match…" lines={4} rows={2} className="pt-6" /></>
+          : !game.data ? <>{trail}<p className="pt-10 text-[15px] text-ink-2">This match isn’t in your matches.</p></>
           // Keyed by match: a route that only changes :eventId must never carry one match's typing into another's.
           : <Game key={game.data.id} row={game.data} plan={plan} players={players} sharedAt={shares.data.get(game.data.id) ?? null} evaluation={evaluation} />}
       </div>
@@ -68,6 +78,8 @@ export default function CoachGame() {
 function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; plan: Plan; players: Players; sharedAt: string | null; evaluation: Evaluated }) {
   const { user } = useAuth()
   const coachSquad = useCoachSquad(user?.id)
+  const wide = useSideMenuScreen()
+  const who = useWhoCanCome(row)
   const [params, setParams] = useSearchParams()
   const tab = TABS.find(t => t.id === params.get('tab'))?.id ?? 'logistics'
   const [now, setNow] = useState(() => Date.now())
@@ -88,11 +100,14 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
   const state = gameStatus({ ...row, ends_at: row.ends_at ?? null }, now,
     { drafted: !!plan.data, shared: !!sharedAt, sharedAt: sharedAt ?? undefined, changes: changes.length,
       evaluated: !!evaluation.data?.evaluation, published: !!evaluation.data?.evaluation?.published_at })
-  // The plan as typed, and its step, live here, above the tabs: Arc unmounts a panel that isn't shown. Until the coach
+  // The plan as typed, and its step, live here, above the tabs: a panel that isn't shown unmounts. Until the coach
   // types, it is the saved plan, so a retried read still fills the form. Needs you's "Share changes" opens Review & share.
   const [typed, setTyped] = useState<PlanForm | null>(null)
   // TRAK-332: a plan that is shared or scheduled opens on Review & share, not on its first step.
   const [planStep, setPlanStep] = useState(() => params.get('step') === 'share' || sharedAt != null ? 2 : 0)
+  // Review & share's Schedule pickers; the header's menu opens them too. A new share time closes them.
+  const [picking, setPicking] = useState(false)
+  useEffect(() => setPicking(false), [sharedAt])
   // TRAK-288: the evaluation as entered, and its step, kept here for the same reason; until the coach enters anything,
   // the saved draft.
   const [entered, setEntered] = useState<EvaluationForm | null>(null)
@@ -103,49 +118,99 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
   // TRAK-287: at kick-off the plan locks, on the event's instant (the academy's clock), never the device's.
   const locked = !cancelled && now >= Date.parse(row.starts_at)
   const squad = coachSquad.squads.length >= 2 && row.squad ? row.squad : undefined
-  const where = [day, time ? `Kick-off ${time}` : '', row.home_away === 'home' ? 'Home' : row.home_away === 'away' ? 'Away' : '', row.venue ?? '', squad ?? '']
   const logistics = useLogisticsEdit(row)
 
-  return <>
-    <header className="arc grid gap-2 pt-4 pb-2">
-      <h1 className="text-[26px] font-medium tracking-[-0.01em] text-ink break-words">{gameTitle(row)}</h1>
-      <p className="text-sm text-ink-2">{where.filter(Boolean).join(' · ')}</p>
-      {academy && <p className="text-sm text-ink-3">{academy}</p>}
-      {/* TRAK-344 (Imad, 3 Nov): no countdown here; Game plan review has the one. */}
-      <div className="flex flex-wrap items-center gap-3 pt-1">
-        {cancelled ? <Badge tone="danger">Cancelled</Badge> : <Badge tone={state.tone}>{state.label}</Badge>}
-      </div>
-    </header>
+  // A plan or evaluation that couldn't be read shows its error, never an empty form to save over it.
+  const planUnread = (plan.isError && plan.data === undefined) || (players.isError && players.data === undefined)
+  const evaluationUnread = (evaluation.isError && evaluation.data === undefined) || planUnread
+  // On a phone Save draft sits in the header's "…" menu, where "Saved" can't be seen, so a saved draft says so there.
+  const [folded, setFolded] = useState(false)
+  const onSaved = () => { if (folded) toast.success('Draft saved') }
+  const planForm = (locked ? null : typed) ?? lockedPlan
+  const planDraft = useGamePlanDraft({ game: row, form: planForm, onFormChange: setTyped, sharedAt, who, onSaved })
+  const evaluationForm = entered ?? evaluationToForm(evaluation.data ?? { evaluation: null, players: [], notes: [] })
+  const evaluationDraft = useEvaluationDraft({ game: row, form: evaluationForm, onFormChange: setEntered,
+    listed: evaluationLineUp(lockedPlan.players, who.players).listed, onSaved })
+  const publishedAt = evaluation.data?.evaluation?.published_at ?? null
+  const evaluating = !cancelled && now >= whistle && !publishedAt
+  const whoKnown = !who.isPending && !who.error
 
-    {cancelled ? <p className="pt-4 text-[15px] text-ink-2">This match was cancelled.</p> : (
-      <div className="arc pt-4">
-        <Tabs value={tab} onValueChange={next => setParams({ tab: next }, { replace: true })}>
-          <TabsList aria-label="This match">
-            {TABS.map(t => <TabsTrigger key={t.id} value={t.id}>{t.label}</TabsTrigger>)}
-          </TabsList>
-          <TabsContent value="logistics"><Logistics row={row} squad={squad} onEdit={logistics.open} publish={logistics.publish} /></TabsContent>
-          <TabsContent value="plan">
-            {(plan.isError && plan.data === undefined) || (players.isError && players.data === undefined)
-              ? <div className="pt-4"><LoadError what="the plan" onRetry={() => { void plan.refetch(); void players.refetch() }}
-                  retrying={plan.isFetching || players.isFetching} /></div>
-              // Locked, it shows the plan as saved at kick-off: what the evaluation reads against.
-              : <GamePlan game={row} form={(locked ? null : typed) ?? planToForm(plan.data ?? null, players.data ?? [])} onFormChange={setTyped}
-                  step={planStep} onStep={setPlanStep} sharedAt={sharedAt} changes={changes} locked={locked}
-                  onEditLogistics={() => logistics.open?.()} />}
-          </TabsContent>
-          <TabsContent value="evaluation">
-            {(evaluation.isError && evaluation.data === undefined) || (plan.isError && plan.data === undefined) || (players.isError && players.data === undefined)
-              ? <div className="pt-4"><LoadError what="the evaluation" onRetry={() => { void evaluation.refetch(); void plan.refetch(); void players.refetch() }}
-                  retrying={evaluation.isFetching || plan.isFetching || players.isFetching} /></div>
-              : <Evaluation game={row} opensAt={now < whistle ? format(new Date(whistle), 'HH:mm') : null}
-                  plans={lockedPlan.players} planGoals={formToPlan(lockedPlan).goals.map((goal, i) => goal.title || goal.looks_like || `Instruction ${i + 1}`)}
-                  form={entered ?? evaluationToForm(evaluation.data ?? { evaluation: null, players: [], notes: [] })} onFormChange={setEntered}
-                  step={evaluationStep} onStep={setEvaluationStep} savedAt={evaluation.data?.evaluation?.saved_at ?? null}
-                  publishedAt={evaluation.data?.evaluation?.published_at ?? null} planCreatedAt={plan.data?.created_at ?? null} />}
-          </TabsContent>
-        </Tabs>
-      </div>
-    )}
+  /** Review & share, or Review & publish: the last step, its footer in view. */
+  const review = (target: 'plan' | 'evaluation') => {
+    const footer = target === 'plan' ? 'plan-share' : 'evaluation-publish'
+    const bring = () => document.getElementById(footer)?.scrollIntoView?.({ block: 'center' })
+    if (tab === target && (target === 'plan' ? planStep : evaluationStep) === 2) return bring()
+    if (target === 'plan') setPlanStep(2); else setEvaluationStep(2)
+    setParams({ tab: target }, { replace: true })
+    window.scrollTo({ top: 0 })
+  }
+  const primary: PageHeaderAction | undefined = cancelled ? undefined
+    : !locked ? { key: 'review', label: tab === 'plan' ? 'Review & share' : 'Review game plan', icon: <Share {...icon} />, onSelect: () => review('plan') }
+    : evaluating ? { key: 'review', label: tab === 'evaluation' ? 'Review & publish' : 'Review evaluation', icon: <ClipboardCheck {...icon} />, onSelect: () => review('evaluation') }
+    : undefined
+  // Save draft saves the draft on screen.
+  const save = tab === 'plan' && !cancelled && !locked && !planUnread ? planDraft
+    : tab === 'evaluation' && evaluating && !evaluationUnread && whoKnown ? evaluationDraft : null
+  const secondary: PageHeaderAction[] = save ? [{ key: 'save', label: save.savedNow ? 'Saved' : 'Save draft', icon: <Save {...icon} />, onSelect: save.submit, loading: save.saving }] : []
+  // TRAK-290: Schedule, or Change time while a scheduled plan waits, open their pickers in Review & share.
+  const waiting = sharedAt != null && now < Date.parse(sharedAt)
+  const menu: PageHeaderAction[] = !cancelled && !locked && !planUnread && (sharedAt == null || waiting) ? [{
+    key: 'schedule', label: sharedAt == null ? 'Schedule share' : 'Change share time', icon: <Clock {...icon} />,
+    onSelect: () => {
+      setPlanStep(2)
+      setPicking(true)
+      setParams({ tab: 'plan' }, { replace: true })
+      requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById('plan-share')?.scrollIntoView?.({ block: 'center' })))
+    },
+  }] : []
+
+  // Logistics: shared. Game plan: what Review & share still counts as incomplete, until kick-off. Evaluation: when.
+  const toDo = !locked && !planUnread && whoKnown ? planParts(planForm, who.players, row.published).incomplete : 0
+  const extras: Record<GameTab, PageHeaderTab['extra']> = {
+    logistics: row.published && <><Check size={14} strokeWidth={2} aria-hidden="true" /><span className="sr-only">shared</span></>,
+    plan: toDo > 0 && <Badge size="sm" tone="warning">{toDo} to do</Badge>,
+    // On a phone the three tabs fit without it, as in the prototype; a screen reader still hears it.
+    evaluation: now < whistle && <span className="sr-only tablet:not-sr-only">After the match</span>,
+  }
+  const homeAway = row.home_away === 'home' ? 'Home' : row.home_away === 'away' ? 'Away' : null
+  const people = whoKnown ? `${who.players.length} ${who.players.length === 1 ? 'player' : 'players'}` : null
+
+  return <>
+    <PageHeader className="[--ph-bleed:1.25rem] tablet:[--ph-bleed:2rem]" top={wide ? TOP_BAR : '0px'}
+      title={gameTitle(row)} crumbs={<CoachTrail current={gameTitle(row)} />}
+      status={cancelled ? <Badge tone="danger" dot>Cancelled</Badge> : <Badge tone={state.tone} dot>{state.label}</Badge>}
+      details={<>
+        <span><CalendarDays {...metaIcon} /><strong>{day}</strong>{time && ` · Kick-off ${time}`}{academy && ` · ${academy}`}</span>
+        {(row.venue || homeAway) && <span><MapPin {...metaIcon} />{row.venue && <strong>{row.venue}</strong>}{row.venue && homeAway && ' · '}{homeAway}</span>}
+        {(row.squad || people) && <span><Users {...metaIcon} />{[row.squad, people].filter(Boolean).join(' · ')}</span>}
+      </>}
+      primary={primary} secondary={secondary} menu={menu} onFold={setFolded}
+      notice={tab === 'plan' ? planDraft.problem : tab === 'evaluation' ? evaluationDraft.problem : null}
+      tabsLabel="This match" value={tab} onValueChange={next => setParams({ tab: next }, { replace: true })}
+      tabs={cancelled ? [] : TABS.map(t => ({ value: t.id, label: t.label, extra: extras[t.id] || undefined }))}>
+      {cancelled ? <p className="pt-4 text-[15px] text-ink-2">This match was cancelled.</p> : <>
+        <PageHeaderPanel value="logistics"><Logistics row={row} squad={squad} onEdit={logistics.open} publish={logistics.publish} /></PageHeaderPanel>
+        <PageHeaderPanel value="plan">
+          {planUnread
+            ? <div className="pt-4"><LoadError what="the plan" onRetry={() => { void plan.refetch(); void players.refetch() }}
+                retrying={plan.isFetching || players.isFetching} /></div>
+            // Locked, it shows the plan as saved at kick-off: what the evaluation reads against.
+            : <GamePlan game={row} form={planForm} draft={planDraft} who={who}
+                step={planStep} onStep={setPlanStep} sharedAt={sharedAt} changes={changes} locked={locked}
+                onEditLogistics={() => logistics.open?.()} picking={picking} onPicking={setPicking} />}
+        </PageHeaderPanel>
+        <PageHeaderPanel value="evaluation">
+          {evaluationUnread
+            ? <div className="pt-4"><LoadError what="the evaluation" onRetry={() => { void evaluation.refetch(); void plan.refetch(); void players.refetch() }}
+                retrying={evaluation.isFetching || plan.isFetching || players.isFetching} /></div>
+            : <Evaluation game={row} opensAt={now < whistle ? format(new Date(whistle), 'HH:mm') : null} who={who}
+                plans={lockedPlan.players} planGoals={formToPlan(lockedPlan).goals.map((goal, i) => goal.title || goal.looks_like || `Instruction ${i + 1}`)}
+                form={evaluationForm} draft={evaluationDraft}
+                step={evaluationStep} onStep={setEvaluationStep} savedAt={evaluation.data?.evaluation?.saved_at ?? null}
+                publishedAt={publishedAt} planCreatedAt={plan.data?.created_at ?? null} />}
+        </PageHeaderPanel>
+      </>}
+    </PageHeader>
     {logistics.sheet}
   </>
 }

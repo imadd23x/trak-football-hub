@@ -123,8 +123,11 @@ for (const [width, height] of [[1280, 800], [390, 844]] as const) {
 
     // Home: View plan, and a set-up step's address shows the plan.
     await page.goto('/coach/home')
-    await expect(page.getByText(`U16 · Shared ${today}`)).toBeVisible()
-    await page.getByRole('button', { name: 'View plan' }).click()
+    // TRAK-361: the card folds; open, it offers View plan.
+    const card = page.getByRole('region', { name: 'U16 season plan' })
+    await expect(card.getByText(new RegExp(`^Shared ${today} · \\d+ weeks? left$`))).toBeVisible()
+    await card.locator('button[aria-expanded]').first().click()
+    await card.getByRole('button', { name: 'View plan' }).click()
     await expect(page.getByText(`Shared ${today}.`)).toBeVisible()
     await page.goto('/coach/season-plan/positions')
     await expect(page).toHaveURL(/\/coach\/season-plan$/)

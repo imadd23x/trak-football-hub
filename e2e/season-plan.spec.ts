@@ -71,8 +71,9 @@ for (const [width, height] of [[1280, 800], [390, 844]] as const) {
     await backend(context, unexpected, seen)
     await page.setViewportSize({ width, height })
     await page.goto('/coach/home')
-    const row = page.getByRole('region', { name: 'Season plan' })
-    await expect(row.getByText('U16 · Not started')).toBeVisible()
+    // TRAK-361: the card, a Start row while there's no plan.
+    const row = page.getByRole('region', { name: 'U16 season plan' })
+    await expect(row.getByText('Not started')).toBeVisible()
     await row.getByRole('button', { name: 'Start' }).click()
 
     await expect(page.getByRole('heading', { name: 'Season plan', level: 1 })).toBeVisible()

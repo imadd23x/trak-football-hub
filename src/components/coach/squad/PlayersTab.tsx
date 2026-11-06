@@ -14,6 +14,8 @@ import { seasonStartLabel, useSeasonPlan } from '@/lib/season-plan'
 import { isPosition } from '@/lib/positions'
 import { localParts, localTodayISO } from '@/lib/event-time'
 import { PlayerProfile } from './PlayerProfile'
+import { WatchBadge } from '@/components/coach/season-plan/WatchFirst'
+import { useWatchList } from '@/components/coach/season-plan/useWatching'
 import { usePlayerFacts } from './usePlayerFacts'
 import type { SquadRoster } from './useSquadRoster'
 
@@ -50,6 +52,9 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
   // TRAK-350: the season starts when the squad's season plan says, where there is one; otherwise on 1 July.
   const squadLabel = roster.squad ?? (roster.squads.length === 1 ? roster.squads[0] : null)
   const seasonPlan = useSeasonPlan(user?.id, squadLabel)
+  // TRAK-355: a watched player shows Watching, or Ready once their reminder is due, where the season plan is on.
+  const watching = useWatchList(user?.id, seasonPlan.on)
+  const watchOf = new Map(watching.list.map(w => [w.playerId, w]))
   const seasonFrom = seasonPlan.plan?.starts_on ?? seasonWindow(localTodayISO()).from
   const season = useMemo(() => seasonAverages(roster.assessments, seasonFrom, dateOf), [roster.assessments, seasonFrom])
   // TRAK-266 (Imad, 22 Oct): the colour key only where the coach is needed: amber for a player to assess or a draft
@@ -72,7 +77,8 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
       band: move ? BANDS.find(b => b.word.toLowerCase() === move.band)?.word ?? null : null, move: move?.move ?? 0,
       waiting: roster.consentPending.has(p.id),
       trend: trends.get(p.id),
-      flag: owed.get(p.id) === 'assess' ? <Badge tone="warning" size="sm">Assess</Badge>
+      flag: watchOf.has(p.id) ? <WatchBadge watch={watchOf.get(p.id)} />
+        : owed.get(p.id) === 'assess' ? <Badge tone="warning" size="sm">Assess</Badge>
         : owed.get(p.id) === 'draft' ? <Badge tone="warning" size="sm">Draft</Badge> : undefined,
     }
   })

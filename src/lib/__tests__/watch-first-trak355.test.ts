@@ -5,7 +5,7 @@
  * training has no register, so it never counts. Synthetic dates.
  */
 import { describe, expect, it } from 'vitest'
-import { WATCH_RULES, watchState, watchedPlayers } from '@/lib/watch-first'
+import { WATCH_RULES, effectiveRule, rulesFor, watchState, watchedPlayers } from '@/lib/watch-first'
 
 // Watching from 10:00 Dubai on Monday 2 November 2026.
 const since = '2026-11-02T06:00:00Z'
@@ -75,5 +75,15 @@ describe('TRAK-355 who is watched, and who is due', () => {
     expect(list('2026-11-16T08:00:00Z').map(w => [w.playerId, w.ready, w.why])).toEqual([['p1', true, 'Watched 2 weeks'], ['p2', true, 'Watched 2 weeks']])
     expect(list('2026-11-05T08:00:00Z', 't2', { p2: [training('2026-11-03'), training('2026-11-04')] }).find(w => w.playerId === 'p2'))
       .toMatchObject({ ready: true, why: 'Watched 2 trainings' })
+  })
+})
+
+describe('TRAK-355 a squad without trainings', () => {
+  it('is offered weeks only, and a trainings rule becomes "after 2 weeks" there', () => {
+    expect(rulesFor(false).map(r => r.value)).toEqual(['w1', 'w2', 'w4'])
+    expect(rulesFor(true).map(r => r.value)).toEqual(['w1', 'w2', 'w4', 't2', 't4'])
+    expect(effectiveRule('t4', false)).toBe('w2')
+    expect(effectiveRule('w4', false)).toBe('w4')
+    expect(effectiveRule('t4', true)).toBe('t4')
   })
 })

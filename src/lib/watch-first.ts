@@ -72,3 +72,9 @@ export function watchedPlayers({ players, watches, objectives, sessions, rule, t
       return { playerId: player.id, name: player.player_name, since: w.since, ...state, step: player.position ? 'objectives' : 'positions' }
     })
 }
+
+/** The rule a squad's watches follow. A squad without trainings in Trak would never see a reminder by trainings, so
+ *  it follows weeks: "after 2 weeks" in place of a trainings rule (Tarek, 6 Nov). */
+export const effectiveRule = (rule: WatchRule, hasTrainings: boolean): WatchRule => (hasTrainings || rule.startsWith('w') ? rule : 'w2')
+/** The rules a squad is offered: all five, or the weeks alone without trainings. */
+export const rulesFor = (hasTrainings: boolean) => WATCH_RULES.filter(r => hasTrainings || r.value.startsWith('w'))

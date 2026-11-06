@@ -27,6 +27,7 @@ import { useCoachSquad } from '@/lib/coach-squad'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { needsYou } from '@/lib/coach-needs-you'
 import { unplacedBySquad } from '@/lib/positions'
+import { useWatchList } from '@/components/coach/season-plan/useWatching'
 import { Button } from '@/components/arc/button/button'
 import { squadShape } from '@/lib/squad/shape'
 import { localParts, localTodayISO } from '@/lib/event-time'
@@ -140,6 +141,16 @@ export default function CoachHomePage() {
     reason: 'A player needs a position before they get objectives.',
     action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad && squad) coachSquad.setSquad(squad); navigate('/coach/season-plan/positions') }}>Place them</Button></span>,
   }))
+  // TRAK-355: a watched player whose reminder is due comes back, one card each, opening the step where they were left.
+  const watching = useWatchList(user?.id, seasonPlanOn)
+  const watchEvents: OwedEvent[] = !seasonPlanOn ? [] : watching.list.filter(w => w.ready).map(w => ({
+    id: `watch:${w.playerId}`,
+    title: `${w.why === '4 weeks, the latest' ? 'Watched 4 weeks' : w.why} · Set ${w.name.split(' ')[0]} up`,
+    when: '',
+    squad: coachSquad.squads.length >= 2 ? w.squad : null,
+    reason: w.step === 'positions' ? 'Give them a position, then objectives, or keep watching.' : 'Give them objectives, or keep watching.',
+    action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad && w.squad) coachSquad.setSquad(w.squad); navigate(`/coach/season-plan/${w.step}?player=${w.playerId}`) }}>Set up</Button></span>,
+  }))
 
 
   return (
@@ -160,7 +171,7 @@ export default function CoachHomePage() {
         </div>
         {/* Shown once the switch is known, so a coach who turned it off never sees it flash in. */}
         {(needsYouSwitch.data === true || needsYouSwitch.isError) && <div className={wide ? 'mt-6' : 'mt-5'}>
-          <NeedsYou items={needsReady ? cards : null} events={[...owedEvents, ...planEvents, ...positionEvents]} failed={!!roster.error || owed.failed || gamesFailed}
+          <NeedsYou items={needsReady ? cards : null} events={[...owedEvents, ...planEvents, ...positionEvents, ...watchEvents]} failed={!!roster.error || owed.failed || gamesFailed}
             onRetry={() => { roster.retry(); owed.retry(); if (gamesOn) { void games.refetch(); void plans.refetch(); void shares.refetch() } }}
             onOpen={item => item.kind === 'draft'
               // TRAK-200: the profile's assessment card says Draft and has Publish.

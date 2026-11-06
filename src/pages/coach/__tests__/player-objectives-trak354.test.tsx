@@ -142,7 +142,7 @@ describe('TRAK-354 player objectives', () => {
     expect(within(reloaded).getByText('Runs in behind')).toBeInTheDocument()
   }, 30_000)
 
-  it('deletes both, and the step saves with none: Done goes Home without writing', async () => {
+  it('deletes both, and the step saves with none: Next goes on to Share without writing', async () => {
     held = [{ ...lib('Wins their headers'), id: 'o1', squad_player_id: 'p1', created_at: '2026-11-04T10:00:00Z' }]
     renderApp('/coach/squad/player/p1')
     const section = await screen.findByRole('region', { name: 'Objective' })
@@ -155,8 +155,9 @@ describe('TRAK-354 player objectives', () => {
 
     cleanup()
     renderApp('/coach/season-plan/objectives')
-    await user().click(await screen.findByRole('button', { name: 'Done' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/home'))
+    // TRAK-356: step 3 goes on to Share.
+    await user().click(await screen.findByRole('button', { name: 'Next: Share' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/season-plan/share'))
     expect(saves).toHaveLength(1)
   }, 30_000)
 

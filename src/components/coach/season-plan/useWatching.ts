@@ -151,7 +151,7 @@ export function useWatchList(coachId: string | undefined, roster: Pick<SquadRost
     const players = roster.players.filter(p => !roster.consentPending.has(p.id))
     const bySquad = new Map<string, typeof players>()
     for (const p of players) bySquad.set(p.age_group?.trim() ?? '', [...(bySquad.get(p.age_group?.trim() ?? '') ?? []), p])
-    const held = new Set([...objectives.data!.entries()].filter(([, list]) => list.length > 0).map(([id]) => id))
+    const held = new Set([...objectives.data!.open.entries()].filter(([, list]) => list.length > 0).map(([id]) => id))
     return [...bySquad].flatMap(([squad, squadPlayers]) => {
       const rule = effectiveRule(rules.data!.get(squad) ?? DEFAULT_WATCH_RULE, trainsIn(training.data, squad || null))
       return watchedPlayers({ players: squadPlayers, watches: watches.data!, objectives: held, sessions: register.data!, rule, timeZone: zone.zone, now: new Date() })

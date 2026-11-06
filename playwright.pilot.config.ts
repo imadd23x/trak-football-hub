@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['parent-invitation.spec.ts', 'parent-family.spec.ts', 'parent-consent.spec.ts', 'child-login.spec.ts', 'pilot-g7.spec.ts', 'text-box-zoom.spec.ts', 'arc-refresh-screens.spec.ts', 'player-home-contrast.spec.ts', 'team-kits.spec.ts', 'coach-wide-layout.spec.ts', 'games.spec.ts', 'training.spec.ts', 'season-plan.spec.ts', 'positions.spec.ts', 'player-roles.spec.ts', 'player-objectives.spec.ts', 'formations.spec.ts', 'watch-first.spec.ts'],
+  testMatch: ['parent-invitation.spec.ts', 'parent-family.spec.ts', 'parent-consent.spec.ts', 'child-login.spec.ts', 'pilot-g7.spec.ts', 'text-box-zoom.spec.ts', 'arc-refresh-screens.spec.ts', 'player-home-contrast.spec.ts', 'team-kits.spec.ts', 'coach-wide-layout.spec.ts', 'games.spec.ts', 'training.spec.ts', 'season-plan.spec.ts', 'positions.spec.ts', 'player-roles.spec.ts', 'player-objectives.spec.ts', 'formations.spec.ts', 'watch-first.spec.ts', 'season-plan-share.spec.ts'],
   timeout: 45_000,
   retries: 0,
   workers: 1,

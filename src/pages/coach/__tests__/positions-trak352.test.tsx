@@ -201,9 +201,12 @@ describe('TRAK-352 positions', () => {
     await user().click(within(await screen.findByRole('group', { name: "Synthetic Player 01's position" })).getByRole('button', { name: 'Goalkeeper' }))
     await user().click(within(groupOf('Synthetic Player 02')).getByRole('button', { name: 'Defender' }))
     expect(await screen.findByRole('heading', { name: '2 of 2 placed' })).toBeInTheDocument()
-    // TRAK-354: Positions goes on to Player objectives, whose Done goes Home.
+    // TRAK-354: Positions goes on to Player objectives; TRAK-356: then on to Share. Home no longer asks.
     await user().click(screen.getByRole('button', { name: 'Next: Player objectives' }))
-    await user().click(await screen.findByRole('button', { name: 'Done' }))
+    await user().click(await screen.findByRole('button', { name: 'Next: Share' }))
+    expect(await screen.findByRole('heading', { name: 'What goes out' })).toBeInTheDocument()
+    cleanup()
+    renderApp('/coach/home')
     expect(await screen.findByRole('heading', { name: /^Needs you/ })).toBeInTheDocument()
     expect(screen.queryByText(/players? needs? a position$/)).not.toBeInTheDocument()
   })

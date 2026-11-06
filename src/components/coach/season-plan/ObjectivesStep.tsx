@@ -27,14 +27,15 @@ import { usePlayerObjectives } from './usePlayerObjectives'
 type Player = Tables<'squad_players'>
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
-export function ObjectivesStep({ coachId, squad, plan, seasonObjectives, onBack, onPositions, onDone }: {
+export function ObjectivesStep({ coachId, squad, plan, seasonObjectives, onBack, onPositions, onNext }: {
   coachId: string
   squad: string
   plan: SeasonPlan | null
   seasonObjectives: { id: string; title: string }[]
   onBack: () => void
   onPositions: () => void
-  onDone: () => void
+  /** TRAK-356: on to Share. */
+  onNext: () => void
 }) {
   const roster = useSquadRoster()
   const objectives = usePlayerObjectives(coachId)
@@ -141,7 +142,7 @@ export function ObjectivesStep({ coachId, squad, plan, seasonObjectives, onBack,
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" onClick={onBack}><ChevronLeft size={16} aria-hidden="true" />Positions</Button>
-        <Button onClick={onDone}>Done</Button>
+        <Button onClick={onNext}>Next: Share</Button>
       </div>
     </div>
   )

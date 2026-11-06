@@ -5,12 +5,17 @@ import type { Tables } from '@/integrations/supabase/types'
 
 /* TRAK-350 (Season plan 2/18, spec TRAK-348): a squad's season plan, set up once. This slice holds the season's dates
    and up to three season objectives, a draft only the squad's coach sees. A squad is the coach's roster rows with one
-   age group (TRAK-176). The academy's season_plan switch gates every write; with it off nothing here is read. */
+   age group (TRAK-176). The academy's season_plan switch gates every write; with it off nothing here is read.
+   TRAK-356: Share. Once shared, the set-up never comes back, a removed season objective is retired with its date, and
+   what changed since the last share waits on the plan until the coach shares the changes. */
 
-export type SeasonPlan = Pick<Tables<'season_plans'>, 'id' | 'squad' | 'starts_on' | 'ends_on' | 'shared_at' | 'positions_known' | 'watch_rule'>
+export type SeasonPlan = Pick<Tables<'season_plans'>, 'id' | 'squad' | 'starts_on' | 'ends_on' | 'shared_at' | 'positions_known' | 'watch_rule'
+  | 'last_shared_at' | 'unshared_parts' | 'unshared_players'>
 /** TRAK-352: the answer to "Do you know where they play yet?" */
 export type PositionsKnown = 'yes' | 'some' | 'not_yet'
 export type SeasonObjective = Pick<Tables<'season_objectives'>, 'id' | 'place' | 'title' | 'looks_like'>
+/** TRAK-356: a season objective removed after the plan was shared, kept with when it was added and removed. */
+export type RemovedSeasonObjective = Pick<Tables<'season_objectives'>, 'id' | 'title' | 'looks_like' | 'created_at'> & { retired_at: string }
 
 export const MAX_SEASON_OBJECTIVES = 3
 export const OBJECTIVE_TITLE_MAX = 80
@@ -28,20 +33,92 @@ export const SEASON_OBJECTIVE_PRESETS = [
 
 export const seasonPlanKey = (coachId: string | undefined, squad: string | null) => ['coach', coachId, 'season-plan', squad] as const
 export const seasonObjectivesKey = (coachId: string | undefined, planId: string | undefined) => ['coach', coachId, 'season-objectives', planId] as const
+export const removedSeasonObjectivesKey = (coachId: string | undefined, planId: string | undefined) => ['coach', coachId, 'season-objectives', planId, 'removed'] as const
 
 export async function loadSeasonPlan(coachId: string, squad: string): Promise<SeasonPlan | null> {
-  const { data, error } = await supabase.from('season_plans').select('id, squad, starts_on, ends_on, shared_at, positions_known, watch_rule')
+  const { data, error } = await supabase.from('season_plans')
+    .select('id, squad, starts_on, ends_on, shared_at, positions_known, watch_rule, last_shared_at, unshared_parts, unshared_players')
     .eq('coach_user_id', coachId).eq('squad', squad).maybeSingle()
   if (error) throw error
-  return data
+  // A plan read before TRAK-356 has no list of changes: nothing waits.
+  return data && { ...data, unshared_parts: data.unshared_parts ?? [], unshared_players: data.unshared_players ?? [] }
 }
 
-export async function loadSeasonObjectives(planId: string): Promise<SeasonObjective[]> {
-  const { data, error } = await supabase.from('season_objectives').select('id, place, title, looks_like')
+/** Every season objective of a plan, open and removed. A row with no status is open. */
+async function loadSeasonObjectiveRows(planId: string) {
+  const { data, error } = await supabase.from('season_objectives').select('id, place, title, looks_like, status, created_at, retired_at')
     .eq('plan_id', planId).order('place')
   if (error) throw error
   return data ?? []
 }
+
+/** The plan's open season objectives, in their places. */
+export async function loadSeasonObjectives(planId: string): Promise<SeasonObjective[]> {
+  return (await loadSeasonObjectiveRows(planId)).filter(o => o.status !== 'retired')
+    .map(({ id, place, title, looks_like }) => ({ id, place, title, looks_like }))
+}
+
+/** TRAK-356: the ones removed after sharing, the latest first. */
+export async function loadRemovedSeasonObjectives(planId: string): Promise<RemovedSeasonObjective[]> {
+  return (await loadSeasonObjectiveRows(planId))
+    .flatMap(({ id, title, looks_like, created_at, status, retired_at }) => (status === 'retired' && retired_at ? [{ id, title, looks_like, created_at, retired_at }] : []))
+    .sort((a, b) => b.retired_at.localeCompare(a.retired_at))
+}
+
+export type ObjectiveDraft = { id?: string; title: string; looksLike: string }
+
+/** Writes a plan's season objectives as the coach left them: what's gone is deleted while the plan is a draft and
+ *  retired once it's shared (TRAK-356), what changed is reworded, and what's new takes a free place. What's gone goes
+ *  first, so its place is free: three places, one open objective each. */
+export async function writeSeasonObjectives(planId: string, saved: SeasonObjective[], next: ObjectiveDraft[], shared: boolean) {
+  const kept = new Set(next.flatMap(o => (o.id ? [o.id] : [])))
+  const gone = saved.filter(o => !kept.has(o.id)).map(o => o.id)
+  if (gone.length) {
+    const { error } = shared
+      ? await supabase.from('season_objectives').update({ status: 'retired' }).in('id', gone)
+      : await supabase.from('season_objectives').delete().in('id', gone)
+    if (error) throw error
+  }
+  for (const o of next) {
+    const before = saved.find(s => s.id === o.id)
+    if (!before || (before.title === o.title.trim() && before.looks_like === o.looksLike.trim())) continue
+    const { error } = await supabase.from('season_objectives').update({ title: o.title.trim(), looks_like: o.looksLike.trim() }).eq('id', before.id)
+    if (error) throw error
+  }
+  const taken = new Set(saved.filter(s => kept.has(s.id)).map(s => s.place))
+  const free = [1, 2, 3].filter(place => !taken.has(place))
+  const fresh = next.filter(o => !o.id).map((o, i) => ({ plan_id: planId, place: free[i], title: o.title.trim(), looks_like: o.looksLike.trim() }))
+  if (fresh.length) {
+    const { error } = await supabase.from('season_objectives').insert(fresh)
+    if (error) throw error
+  }
+}
+
+/** TRAK-356: shares the plan, the first time or its changes. The face-to-face talk counts only the first time. */
+export async function shareSeasonPlan(planId: string, talked: boolean) {
+  const { error } = await supabase.rpc('share_season_plan', { p_plan_id: planId, p_talked: talked })
+  if (error) throw error
+}
+
+/** When the plan was last shared: each share of the changes moves it on. */
+export const lastShared = (plan: SeasonPlan) => plan.last_shared_at ?? plan.shared_at
+
+const PART_NAMES: Record<string, string> = { dates: 'season dates', season_objectives: 'season objectives' }
+
+/** What waits under "Not shared yet": the parts, then each player whose objectives changed, by first name. A player
+ *  no longer in the squad is counted with the rest of them. */
+export function notSharedYet(plan: SeasonPlan, nameOf: (squadPlayerId: string) => string | undefined): string[] {
+  const names = plan.unshared_players.map(nameOf)
+  const others = names.filter(name => !name).length
+  return [
+    ...plan.unshared_parts.map(part => PART_NAMES[part] ?? part),
+    ...names.flatMap(name => (name ? [`${name.split(' ')[0]}’s objectives`] : [])),
+    ...(others ? [others === 1 ? 'another player’s objectives' : `${others} other players’ objectives`] : []),
+  ]
+}
+
+/** The mockup's line: up to three changes by name, more as a count. */
+export const changesText = (changes: string[]) => (changes.length > 3 ? `${changes.length} changes` : changes.join(', '))
 
 /** The squad a season plan is for: the picked one, or the only one. None under All, or before the squads load. */
 export function planSquad({ squads, squad, everySquad }: { squads: string[]; squad: string | null; everySquad: boolean }): string | null {
@@ -59,6 +136,16 @@ export function useSeasonPlan(coachId: string | undefined, squad: string | null)
     enabled: on && !!coachId && !!squad,
   })
   return { on, plan: query.data ?? null, isPending: !known || (on && !!squad && query.isPending), error: query.error, retry: () => void query.refetch() }
+}
+
+/** A date picker's day as the plan's ISO date, and back. */
+export const isoToDate = (iso: string) => (iso ? new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) : undefined)
+export const dateToIso = (date: Date | undefined) => (date
+  ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')
+
+/** "6 Nov", for "Shared …" and a removed objective's dates. */
+export function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
 /** "1 September", for "since …" lines. */

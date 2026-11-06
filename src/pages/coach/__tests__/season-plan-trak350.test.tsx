@@ -115,8 +115,9 @@ describe('TRAK-350 the season plan, step 1', () => {
   it('starts from Home and saves a draft with one of the six and one of the coach\'s own', async () => {
     seasonTables()
     renderApp('/coach/home')
-    const row = await screen.findByRole('region', { name: 'Season plan' })
-    expect(await within(row).findByText('U16 · Not started')).toBeInTheDocument()
+    // TRAK-361: the card, still a Start row for a squad with no plan.
+    const row = await screen.findByRole('region', { name: 'U16 season plan' })
+    expect(await within(row).findByText('Not started')).toBeInTheDocument()
     await user().click(within(row).getByRole('button', { name: 'Start' }))
 
     expect(await screen.findByRole('heading', { name: 'Season plan', level: 1 })).toBeInTheDocument()
@@ -234,7 +235,7 @@ describe('TRAK-350 the season plan, step 1', () => {
     renderApp('/coach/home')
     await waitFor(() => expect(asked).toContain('season_plan'))
     await new Promise(resolve => setTimeout(resolve, 50))
-    expect(screen.queryByRole('region', { name: 'Season plan' })).toBeNull()
+    expect(screen.queryByRole('region', { name: /season plan$/ })).toBeNull()
     expect(writes).toEqual([])
   })
 })

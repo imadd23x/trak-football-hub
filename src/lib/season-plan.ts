@@ -9,7 +9,7 @@ import type { Tables } from '@/integrations/supabase/types'
    TRAK-356: Share. Once shared, the set-up never comes back, a removed season objective is retired with its date, and
    what changed since the last share waits on the plan until the coach shares the changes. */
 
-export type SeasonPlan = Pick<Tables<'season_plans'>, 'id' | 'squad' | 'starts_on' | 'ends_on' | 'shared_at' | 'positions_known'
+export type SeasonPlan = Pick<Tables<'season_plans'>, 'id' | 'squad' | 'starts_on' | 'ends_on' | 'shared_at' | 'positions_known' | 'watch_rule'
   | 'last_shared_at' | 'unshared_parts' | 'unshared_players'>
 /** TRAK-352: the answer to "Do you know where they play yet?" */
 export type PositionsKnown = 'yes' | 'some' | 'not_yet'
@@ -37,7 +37,7 @@ export const removedSeasonObjectivesKey = (coachId: string | undefined, planId: 
 
 export async function loadSeasonPlan(coachId: string, squad: string): Promise<SeasonPlan | null> {
   const { data, error } = await supabase.from('season_plans')
-    .select('id, squad, starts_on, ends_on, shared_at, positions_known, last_shared_at, unshared_parts, unshared_players')
+    .select('id, squad, starts_on, ends_on, shared_at, positions_known, watch_rule, last_shared_at, unshared_parts, unshared_players')
     .eq('coach_user_id', coachId).eq('squad', squad).maybeSingle()
   if (error) throw error
   // A plan read before TRAK-356 has no list of changes: nothing waits.

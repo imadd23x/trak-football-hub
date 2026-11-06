@@ -35,6 +35,8 @@ function fixtures(id: string) {
   COACH = { id } // the app's query cache outlives a test
   signInAs(COACH)
   server.use(
+    // TRAK-355: who the coach is watching; no one.
+    table('player_watches', []),
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Angelos Basinas', invite_code: 'ABCD' }]),
     table('coach_details', []),
     // TRAK-261: no row means the coach's "Can't make it" switch is on.

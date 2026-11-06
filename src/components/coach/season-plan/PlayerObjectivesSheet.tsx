@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { Alert } from '@/components/arc/alert/alert'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { Button } from '@/components/arc/button/button'
+import type { WatchAction } from '@/components/coach/season-plan/WatchFirst'
 import { LoadError } from '@/components/trak/LoadError'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { isPosition, type Position } from '@/lib/positions'
@@ -24,7 +25,7 @@ const card = (on: boolean) =>
 
 export type ObjectivesPlayer = { id: string; name: string; position: string | null }
 
-export function PlayerObjectivesSheet({ coachId, player, seasonObjectives, open, onOpenChange, saveLabel = 'Save', saveNeedsChange = false, quiet = false, onSaved }: {
+export function PlayerObjectivesSheet({ coachId, player, seasonObjectives, open, onOpenChange, saveLabel = 'Save', saveNeedsChange = false, quiet = false, onSaved, watch }: {
   coachId: string
   player: ObjectivesPlayer
   /** The squad's season objectives, so a library objective can say which one it supports. */
@@ -37,6 +38,8 @@ export function PlayerObjectivesSheet({ coachId, player, seasonObjectives, open,
   /** In step 3 the next player opening says it saved; elsewhere a toast does. */
   quiet?: boolean
   onSaved: () => void
+  /** TRAK-355: in a set-up step, Watch first (or Keep watching) instead of setting them up now. */
+  watch?: WatchAction
 }) {
   const objectives = usePlayerObjectives(coachId, open)
   const first = player.name.split(' ')[0]
@@ -46,13 +49,13 @@ export function PlayerObjectivesSheet({ coachId, player, seasonObjectives, open,
       // Keyed by player, so Save · next starts the next one fresh.
       : <Picker key={player.id} coachId={coachId} player={player} first={first} seasonObjectives={seasonObjectives}
         saved={objectives.of(player.id).map(({ title, source, seasonObjectiveId }) => ({ title, source, seasonObjectiveId }))}
-        saveLabel={saveLabel} saveNeedsChange={saveNeedsChange} quiet={quiet} onSaved={onSaved} onCancel={() => onOpenChange(false)} />}
+        saveLabel={saveLabel} saveNeedsChange={saveNeedsChange} quiet={quiet} onSaved={onSaved} watch={watch} onCancel={() => onOpenChange(false)} />}
   </BottomSheet>
 }
 
-function Picker({ coachId, player, first, seasonObjectives, saved, saveLabel, saveNeedsChange, quiet, onSaved, onCancel }: {
+function Picker({ coachId, player, first, seasonObjectives, saved, saveLabel, saveNeedsChange, quiet, onSaved, watch, onCancel }: {
   coachId: string; player: ObjectivesPlayer; first: string; seasonObjectives: { id: string; title: string }[]; saved: ObjectivePick[]
-  saveLabel: string; saveNeedsChange: boolean; quiet: boolean; onSaved: () => void; onCancel: () => void
+  saveLabel: string; saveNeedsChange: boolean; quiet: boolean; onSaved: () => void; watch?: WatchAction; onCancel: () => void
 }) {
   const [picked, setPicked] = useState<ObjectivePick[]>(saved)
   const [refused, setRefused] = useState(false)
@@ -117,6 +120,7 @@ function Picker({ coachId, player, first, seasonObjectives, saved, saveLabel, sa
     {failed && <Alert tone="danger" title="Couldn't save. Check your connection and try again." />}
     <div className="flex flex-wrap items-center justify-end gap-3">
       <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+      {watch && <Button type="button" variant="secondary" loading={watch.pending} onClick={watch.onWatch}>{watch.label}</Button>}
       <Button type="submit" disabled={saveNeedsChange && !changed} loading={save.isPending}>{saveLabel}</Button>
     </div>
   </form>

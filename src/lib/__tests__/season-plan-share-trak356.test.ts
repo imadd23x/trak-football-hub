@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { changesText, lastShared, notSharedYet, type SeasonPlan } from '@/lib/season-plan'
 
 const plan = (parts: string[], players: string[]): SeasonPlan => ({
-  id: 'plan-1', squad: 'U16', starts_on: '2026-09-01', ends_on: '2027-06-30', positions_known: 'yes',
+  id: 'plan-1', squad: 'U16', starts_on: '2026-09-01', ends_on: '2027-06-30', positions_known: 'yes', watch_rule: 't2',
   shared_at: '2026-11-01T10:00:00Z', last_shared_at: '2026-11-04T10:00:00Z', unshared_parts: parts, unshared_players: players,
 })
 const NAMES = new Map([['pat', 'Pat Synthetic'], ['quinn', 'Quinn Synthetic']])

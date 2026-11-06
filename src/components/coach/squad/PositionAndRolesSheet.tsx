@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { Alert } from '@/components/arc/alert/alert'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { Button } from '@/components/arc/button/button'
+import type { WatchAction } from '@/components/coach/season-plan/WatchFirst'
 import { LoadError } from '@/components/trak/LoadError'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { POSITIONS, ROLES, isPosition, ownRoles, pickMain, roleGroups, toggleAlso, type Position } from '@/lib/positions'
@@ -24,7 +25,7 @@ const when = (at: string) => new Date(at).toLocaleDateString('en-GB', { day: 'nu
 
 export type SheetPlayer = { id: string; name: string; position: string | null }
 
-export function PositionAndRolesSheet({ coachId, player, open, onOpenChange, saveLabel = 'Save', saveNeedsChange = false, quiet = false, onSaved }: {
+export function PositionAndRolesSheet({ coachId, player, open, onOpenChange, saveLabel = 'Save', saveNeedsChange = false, quiet = false, onSaved, watch }: {
   coachId: string
   player: SheetPlayer
   open: boolean
@@ -35,6 +36,8 @@ export function PositionAndRolesSheet({ coachId, player, open, onOpenChange, sav
   /** In Positions the next player opening says it saved; elsewhere a toast does. */
   quiet?: boolean
   onSaved: () => void
+  /** TRAK-355: in a set-up step, Watch first (or Keep watching) instead of setting them up now. */
+  watch?: WatchAction
 }) {
   const roles = usePlayerRoles(coachId, open)
   const first = player.name.split(' ')[0]
@@ -43,13 +46,13 @@ export function PositionAndRolesSheet({ coachId, player, open, onOpenChange, sav
       : !roles.data ? <LoadingSkeleton label={`Loading ${first}'s roles…`} lines={3} />
       // Keyed by player, so Save · next starts the next one fresh.
       : <Panel key={player.id} coachId={coachId} player={player} first={first} saved={roles.of(player.id)} own={ownRoles(roles.held)}
-        saveLabel={saveLabel} saveNeedsChange={saveNeedsChange} quiet={quiet} onSaved={onSaved} onCancel={() => onOpenChange(false)} />}
+        saveLabel={saveLabel} saveNeedsChange={saveNeedsChange} quiet={quiet} onSaved={onSaved} watch={watch} onCancel={() => onOpenChange(false)} />}
   </BottomSheet>
 }
 
-function Panel({ coachId, player, first, saved, own, saveLabel, saveNeedsChange, quiet, onSaved, onCancel }: {
+function Panel({ coachId, player, first, saved, own, saveLabel, saveNeedsChange, quiet, onSaved, watch, onCancel }: {
   coachId: string; player: SheetPlayer; first: string; saved: PlayerRoles; own: string[]
-  saveLabel: string; saveNeedsChange: boolean; quiet: boolean; onSaved: () => void; onCancel: () => void
+  saveLabel: string; saveNeedsChange: boolean; quiet: boolean; onSaved: () => void; watch?: WatchAction; onCancel: () => void
 }) {
   const placed = isPosition(player.position) ? player.position : null
   const [main, setMain] = useState<Position | null>(placed)
@@ -148,6 +151,7 @@ function Panel({ coachId, player, first, saved, own, saveLabel, saveNeedsChange,
     {failed && <Alert tone="danger" title="Couldn't save. Check your connection and try again." />}
     <div className="flex flex-wrap items-center justify-end gap-3">
       <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+      {watch && <Button type="button" variant="secondary" loading={watch.pending} onClick={watch.onWatch}>{watch.label}</Button>}
       <Button type="submit" disabled={!main || tooMany || (saveNeedsChange && !changed)} loading={save.isPending}>{saveLabel}</Button>
     </div>
   </form>

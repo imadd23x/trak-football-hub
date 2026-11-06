@@ -17,6 +17,8 @@ afterEach(() => cleanup())
 
 function serve() {
     server.use(
+      // TRAK-355: who the coach is watching; no one.
+      table('player_watches', []),
       table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach', invite_code: 'ABCD' }]),
       table('coach_details', [{ user_id: COACH.id, team: 'U16s', coach_role: 'Head Coach' }]),
       table('squad_players', [{ id: 'sp-1', coach_user_id: COACH.id, player_name: 'Ade Okafor', created_at: '2026-09-01T00:00:00Z' }]),

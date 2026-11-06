@@ -46,6 +46,8 @@ const PLAYERS = [
 
 function coachReads(players: Record<string, unknown>[] = PLAYERS) {
   server.use(
+    // TRAK-355: who the coach is watching; no one.
+    table('player_watches', []),
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach Rehearsal', nationality: 'AE' }]),
     table('squad_players', players),
     table('coach_assessments', []),

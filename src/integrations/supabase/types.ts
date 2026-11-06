@@ -1229,6 +1229,32 @@ export type Database = {
           },
         ]
       }
+      player_watches: {
+        Row: {
+          since: string
+          squad_player_id: string
+          started_by: string | null
+        }
+        Insert: {
+          since?: string
+          squad_player_id: string
+          started_by?: string | null
+        }
+        Update: {
+          since?: string
+          squad_player_id?: string
+          started_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_watches_squad_player_id_fkey"
+            columns: ["squad_player_id"]
+            isOneToOne: true
+            referencedRelation: "squad_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_parent_links: {
         Row: {
           created_at: string | null
@@ -1385,6 +1411,7 @@ export type Database = {
           unshared_parts: string[]
           unshared_players: string[]
           updated_at: string
+          watch_rule: string
         }
         Insert: {
           coach_user_id?: string
@@ -1399,6 +1426,7 @@ export type Database = {
           unshared_parts?: string[]
           unshared_players?: string[]
           updated_at?: string
+          watch_rule?: string
         }
         Update: {
           coach_user_id?: string
@@ -1413,6 +1441,7 @@ export type Database = {
           unshared_parts?: string[]
           unshared_players?: string[]
           updated_at?: string
+          watch_rule?: string
         }
         Relationships: []
       }
@@ -2058,6 +2087,7 @@ export type Database = {
         Args: { p_plan_id: string; p_talked?: boolean }
         Returns: string
       }
+      watch_players: { Args: { p_squad_player_ids: string[] }; Returns: number }
       take_event_register: {
         Args: { p_event_id: string; p_present: string[] }
         Returns: string

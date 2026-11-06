@@ -87,7 +87,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
       {/* TRAK-323 (Imad, 30 Oct): on a laptop the pitch, everyone's list and the selected player's sheet sit side by side,
           the pitch and the sheet staying in view while the list scrolls; on a tablet the list goes under them. */}
       <div className="grid gap-4 tablet:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] tablet:items-start laptop:grid-cols-[minmax(0,5fr)_minmax(0,4fr)_minmax(0,3fr)]">
-        <section aria-labelledby="plan-pitch" className={`${card} tablet:sticky tablet:top-4`}>
+        <section aria-labelledby="plan-pitch" className={`${card} tablet:sticky tablet:top-[calc(var(--ph-pinned,0px)+1rem)]`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="plan-pitch" className={locked ? 'text-lg font-medium text-ink' : 'sr-only'}>{shape}</h2>
             {!locked && <span className="arc"><MorphSelect label="Formation" hideLabel items={SHAPES} value={shape} onValueChange={setShape}
@@ -103,7 +103,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
         </section>
         {phone
           ? <BottomSheet className="arc" open={!!target} onOpenChange={open => { if (!open) setTarget(null) }} title={title} detents={[0.6, 0.92]}>{panel}</BottomSheet>
-          : <aside aria-label={target ? title : 'Selected player'} className={`${card} tablet:sticky tablet:top-4 laptop:order-3`}>
+          : <aside aria-label={target ? title : 'Selected player'} className={`${card} tablet:sticky tablet:top-[calc(var(--ph-pinned,0px)+1rem)] laptop:order-3`}>
               {target ? <><h2 className="text-lg font-medium text-ink">{title}</h2>{panel}</>
                 : <p className="text-sm text-ink-2">Pick a slot or a player to see their job and expectation here.</p>}
             </aside>}

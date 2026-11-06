@@ -42,6 +42,8 @@ export interface PlanReviewProps {
   readOnly?: boolean;
   /** What shares the plan, under the rows. */
   children?: ReactNode;
+  /** Trak (match header, 6 Nov): the footer's id, so the header's Review button can bring it into view. */
+  footerId?: string;
 }
 
 const ease = [...motionTokens.ease.enter] as [number, number, number, number];
@@ -58,7 +60,7 @@ function StatusIcon({ status, spoken = false }: { status: ReviewStatus; spoken?:
     {...(spoken ? { role: "img", "aria-label": label } : { "aria-hidden": true })} />;
 }
 
-export function PlanReview({ title, rows, band, countdown, aside, readOnly = false, children }: PlanReviewProps) {
+export function PlanReview({ title, rows, band, countdown, aside, readOnly = false, children, footerId }: PlanReviewProps) {
   const reduced = useReducedMotion() ?? false;
   const rootRef = useRef<HTMLElement>(null);
   const titleId = useId();
@@ -128,7 +130,7 @@ export function PlanReview({ title, rows, band, countdown, aside, readOnly = fal
         </li>)}
       </ul>
 
-      {children ? <div className={styles.footer}>{children}</div> : null}
+      {children ? <div id={footerId} className={styles.footer}>{children}</div> : null}
     </section>
   );
 }

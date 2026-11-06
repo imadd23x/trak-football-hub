@@ -231,7 +231,7 @@ function SeasonObjectives({ objectives, matches, plans }: {
   return <div className="grid gap-3">
     <h3 className="text-sm font-medium text-ink-2">Season objectives</h3>
     {objectives.length === 0 ? <p className="text-sm text-ink-3">None picked.</p> : <>
-      {measured && <DonutChart label="Times each season objective worked" unit="worked" totalLabel="Worked" legend={false}
+      {measured && <DonutChart label="Times each season objective worked" totalLabel="Times it worked" legend={false}
         data={objectives.map(o => ({ key: o.id, label: o.title, value: measures.get(o.id)?.worked ?? 0 }))}
         activeKey={selected} onActiveChange={setSelected} size={168} thickness={20} emptyLabel="Nothing worked yet" />}
       <ul className="m-0 grid list-none gap-1.5 p-0">{objectives.map(o => {

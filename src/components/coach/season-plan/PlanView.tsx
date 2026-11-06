@@ -151,7 +151,13 @@ export function PlanView({ coachId, squad, plan, seasonObjectives }: {
             {edit('Edit positions in Squad', () => navigate('/coach/squad'))}
           </div>
           <p className="text-sm text-ink-2">{board.placed} of {players(board.total)} placed.</p>
-          {board.unplaced.length > 0 && <p className="text-sm text-ink-3">No position yet: {board.unplaced.map(p => p.player_name).join(', ')}.</p>}
+          {/* Home's "Place them" lands here once the plan is shared: each name opens their position. */}
+          {board.unplaced.length > 0 && <div className="grid gap-1">
+            <h3 className="text-sm font-medium text-ink-2">No position yet <span className="font-normal text-ink-3">· {board.unplaced.length}</span></h3>
+            <ul className="m-0 flex list-none flex-wrap gap-2 p-0">{board.unplaced.map(p => (
+              <li key={p.id}><Button variant="secondary" size="sm" aria-haspopup="dialog" onClick={() => setOpenId(p.id)}>{p.player_name}</Button></li>))}
+            </ul>
+          </div>}
         </section>
 
         <section aria-labelledby="plan-players" className={card}>

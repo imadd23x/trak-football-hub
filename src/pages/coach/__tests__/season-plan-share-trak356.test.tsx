@@ -111,7 +111,7 @@ beforeEach(() => {
     rpc('game_plan_changes', () => []),
     http.get(`${SUPABASE_URL}/rest/v1/game_shares`, () => HttpResponse.json([])),
     table('training_notes', []),
-    table('squad_player_also_plays', []), table('squad_player_roles', []),
+    table('squad_player_also_plays', []), table('squad_player_roles', []), table('squad_position_history', []),
     table('squad_player_profiles', []),
     rpc('coach_player_birth_dates', () => []),
     rpc('coach_squad_season', () => []),
@@ -227,6 +227,19 @@ describe('TRAK-356 once shared', () => {
     // The banner's old line crossfades out (Arc's alert).
     await waitFor(() => expect(screen.queryByText(/^Not shared yet/)).toBeNull())
     expect(screen.queryByRole('button', { name: 'Share the changes' })).toBeNull()
+  }, 30_000)
+
+  it('a player with no position is one tap from it: Home’s Place them lands on the plan, the name opens the sheet', async () => {
+    sharedPlan()
+    server.use(table('squad_players', [child('pat', 'Pat Synthetic', 'Defender'), child('uma', 'Uma Synthetic', null)]))
+    renderApp('/coach/home')
+    await user().click(await screen.findByRole('button', { name: 'Place them' }))
+    expect(await screen.findByText('Shared 1 Nov.')).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/coach/season-plan')
+    const positions = screen.getByRole('region', { name: 'Positions' })
+    expect(positions).toHaveTextContent('1 of 2 players placed.')
+    await user().click(within(positions).getByRole('button', { name: 'Uma Synthetic' }))
+    expect(await screen.findByRole('dialog', { name: "Uma's position and roles" })).toBeInTheDocument()
   }, 30_000)
 
   it('names what waits, each player by first name, and a removed player objective shows in their history', async () => {

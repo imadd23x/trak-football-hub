@@ -96,7 +96,11 @@ for (const [width, height] of [[1280, 800], [390, 844]] as const) {
     await page.getByRole('button', { name: /^Dee Synthetic/ }).click()
     await page.getByRole('dialog', { name: "Dee's objectives" }).getByRole('button', { name: 'Watch first' }).click()
     await expect.poll(() => watched).toEqual([['sq-3']])
-    await page.keyboard.press('Escape')
+    // The sheet moves on once the watch is saved. Escape before then closed Dee's, and the next player's opened over
+    // the page (#527's gate), so wait for the move, then close whatever is open.
+    await expect(page.getByRole('dialog', { name: "Dee's objectives" })).toBeHidden()
+    if (await page.getByRole('dialog').count()) await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('region', { name: /^Watching/ }).getByRole('button', { name: /^Dee Synthetic/ })).toBeVisible()
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
     await page.screenshot({ path: testInfo.outputPath(`watch-step-${width}.png`) })

@@ -1334,6 +1334,8 @@ export type Database = {
           looks_like: string
           place: number
           plan_id: string
+          retired_at: string | null
+          status: string
           title: string
           updated_at: string
         }
@@ -1343,6 +1345,8 @@ export type Database = {
           looks_like?: string
           place: number
           plan_id: string
+          retired_at?: string | null
+          status?: string
           title: string
           updated_at?: string
         }
@@ -1352,6 +1356,8 @@ export type Database = {
           looks_like?: string
           place?: number
           plan_id?: string
+          retired_at?: string | null
+          status?: string
           title?: string
           updated_at?: string
         }
@@ -1371,10 +1377,13 @@ export type Database = {
           created_at: string
           ends_on: string | null
           id: string
+          last_shared_at: string | null
           positions_known: string | null
           shared_at: string | null
           squad: string
           starts_on: string | null
+          unshared_parts: string[]
+          unshared_players: string[]
           updated_at: string
         }
         Insert: {
@@ -1382,10 +1391,13 @@ export type Database = {
           created_at?: string
           ends_on?: string | null
           id?: string
+          last_shared_at?: string | null
           positions_known?: string | null
           shared_at?: string | null
           squad: string
           starts_on?: string | null
+          unshared_parts?: string[]
+          unshared_players?: string[]
           updated_at?: string
         }
         Update: {
@@ -1393,10 +1405,13 @@ export type Database = {
           created_at?: string
           ends_on?: string | null
           id?: string
+          last_shared_at?: string | null
           positions_known?: string | null
           shared_at?: string | null
           squad?: string
           starts_on?: string | null
+          unshared_parts?: string[]
+          unshared_players?: string[]
           updated_at?: string
         }
         Relationships: []
@@ -2037,6 +2052,10 @@ export type Database = {
       }
       set_player_position: {
         Args: { p_squad_player_id: string; p_position: string }
+        Returns: string
+      }
+      share_season_plan: {
+        Args: { p_plan_id: string; p_talked?: boolean }
         Returns: string
       }
       take_event_register: {

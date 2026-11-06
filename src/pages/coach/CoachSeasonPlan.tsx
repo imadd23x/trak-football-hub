@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useMatch, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
 import {
-  MAX_SEASON_OBJECTIVES, OBJECTIVE_LINE_MAX, OBJECTIVE_TITLE_MAX, SEASON_OBJECTIVE_PRESETS, loadSeasonObjectives, loadSeasonPlan,
-  planSquad, seasonObjectivesKey, seasonPlanKey, useSeasonPlan, type SeasonObjective, type SeasonPlan,
+  dateToIso, isoToDate, lastShared, loadSeasonObjectives, loadSeasonPlan, planSquad, seasonObjectivesKey, seasonPlanKey, shortDate,
+  useSeasonPlan, writeSeasonObjectives, type SeasonObjective, type SeasonPlan,
 } from '@/lib/season-plan'
 import { NavBar, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
@@ -16,21 +15,27 @@ import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { Alert } from '@/components/arc/alert/alert'
 import { Button } from '@/components/arc/button/button'
 import { DatePicker } from '@/components/arc/date-picker/date-picker'
-import { Input } from '@/components/arc/input/input'
 import { Stepper } from '@/components/arc/stepper/stepper'
-import { Textarea } from '@/components/arc/textarea/textarea'
 import { PositionsStep } from '@/components/coach/season-plan/PositionsStep'
 import { ObjectivesStep } from '@/components/coach/season-plan/ObjectivesStep'
+import { ShareStep } from '@/components/coach/season-plan/ShareStep'
+import { PlanView } from '@/components/coach/season-plan/PlanView'
+import { PlanEdit } from '@/components/coach/season-plan/PlanEdit'
+import { SeasonObjectivesEditor } from '@/components/coach/season-plan/SeasonObjectivesEditor'
 
 /* TRAK-350 (Season plan 2/18, spec TRAK-348): the season plan's set-up, step 1. The season's dates and up to three
    season objectives (the mockup's six, or the coach's own), each editable and deletable. It saves as a draft only the
    coach sees, with or without objectives; a failed save keeps everything typed and says so, as Game plan's does. No
    Focus and no Fill in for me (Tarek, 3 Nov). The stepper shows only steps that exist: TRAK-352 adds Positions,
-   TRAK-354 Player objectives; Share arrives with TRAK-356. Step 1 stays mounted while another step shows, so
-   moving between steps never loses what was typed. */
+   TRAK-354 Player objectives, TRAK-356 Share. Step 1 stays mounted while another step shows, so moving between steps
+   never loses what was typed. TRAK-356: once the plan is shared, the set-up never comes back. The page is View plan,
+   each part with its Edit on one screen; a set-up step's address shows View plan instead. */
 
-const STEPS = [{ id: 'season', label: 'Season and objectives' }, { id: 'positions', label: 'Positions' }, { id: 'objectives', label: 'Player objectives' }]
-const STEP_PATHS = ['/coach/season-plan', '/coach/season-plan/positions', '/coach/season-plan/objectives']
+const STEPS = [
+  { id: 'season', label: 'Season and objectives' }, { id: 'positions', label: 'Positions' },
+  { id: 'objectives', label: 'Player objectives' }, { id: 'share', label: 'Share' },
+]
+const STEP_PATHS = ['/coach/season-plan', '/coach/season-plan/positions', '/coach/season-plan/objectives', '/coach/season-plan/share']
 const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again; everything you typed is still here."
 const NO_TITLE = 'Give each objective a title, or delete it.'
 const END_BEFORE_START = 'The season has to end after it starts.'
@@ -46,9 +51,6 @@ const toForm = (plan: SeasonPlan | null, saved: SeasonObjective[]): Form => ({
 /** What a form built from the saved plan shows, to tell when the saved plan has moved on. */
 const savedKey = (plan: SeasonPlan | null, saved: SeasonObjective[]) =>
   JSON.stringify([plan?.id, plan?.starts_on, plan?.ends_on, saved.map(o => [o.id, o.title, o.looks_like])])
-const isoToDate = (iso: string) => (iso ? new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) : undefined)
-const dateToIso = (date: Date | undefined) => (date
-  ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')
 
 export default function CoachSeasonPlan() {
   const navigate = useNavigate()
@@ -63,21 +65,26 @@ export default function CoachSeasonPlan() {
   })
   const loaded = !!squad && !season.isPending && !season.error && (!season.plan || objectives.isSuccess)
   const onPositions = !!useMatch('/coach/season-plan/positions'), onObjectives = !!useMatch('/coach/season-plan/objectives')
-  const step = onPositions ? 1 : onObjectives ? 2 : 0
+  const onShare = !!useMatch('/coach/season-plan/share')
+  const editing = useMatch('/coach/season-plan/edit/:part')?.params.part ?? null
+  const step = onPositions ? 1 : onObjectives ? 2 : onShare ? 3 : 0
   const goTo = (index: number) => navigate(STEP_PATHS[index])
+  const shared = season.plan?.shared_at ? season.plan : null
+  const sharedOn = shared ? lastShared(shared) : null
 
   return (
     <div className="min-h-screen bg-ground pb-24">
       <div className={WIDE_COLUMN}>
         <CoachTrail className="mt-5" current="Season plan" />
-        <header className="pt-4 pb-4">
+        {/* An edit screen has its own heading, and Cancel as its way out. */}
+        {!(shared && editing) && <header className="pt-4 pb-4">
           <div className="flex items-center gap-2">
             {/* TRAK-378: on a phone the avatar opens the side menu, where the squad picker is (TRAK-376). */}
             <CoachMenuButton name={profile?.full_name || 'Coach'} />
             <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Season plan</h1>
           </div>
-          {squad && !season.isPending && <p className="mt-1 text-sm text-ink-3">{squad} · {season.plan ? 'Draft, only you see it' : 'Not started'}</p>}
-        </header>
+          {squad && !season.isPending && <p className="mt-1 text-sm text-ink-3">{squad} · {sharedOn ? `Shared ${shortDate(sharedOn)}` : season.plan ? 'Draft, only you see it' : 'Not started'}</p>}
+        </header>}
         {!squad ? <p className="text-sm text-ink-2">Pick one squad in the menu to plan its season.</p>
           : season.error || objectives.error ? (
             <div className="arc grid justify-items-start gap-3">
@@ -85,6 +92,11 @@ export default function CoachSeasonPlan() {
               <Button variant="secondary" onClick={() => { season.retry(); void objectives.refetch() }}>Try again</Button>
             </div>)
           : !loaded ? <LoadingSkeleton label="Loading your season plan…" lines={3} className="pt-2" />
+          : shared && user ? (editing
+            ? <div className="pt-4"><PlanEdit key={editing} part={editing} coachId={user.id} squad={squad} plan={shared} seasonObjectives={objectives.data ?? []} /></div>
+            : step !== 0 ? <Navigate to={{ pathname: '/coach/season-plan', search: location.search }} replace />
+            : <PlanView coachId={user.id} squad={squad} plan={shared} seasonObjectives={objectives.data ?? []} />)
+          : editing ? <Navigate to="/coach/season-plan" replace />
           : <div className="arc grid gap-5">
             <Stepper steps={STEPS} current={step} label="Season plan steps" onStepSelect={goTo} jumpAhead />
             {/* Keyed by squad, not plan: the first save creates the plan, and "Saved" must survive it. */}
@@ -93,7 +105,9 @@ export default function CoachSeasonPlan() {
             </div>
             {step === 1 && user && <PositionsStep coachId={user.id} squad={squad} plan={season.plan} onBack={() => goTo(0)} onNext={() => goTo(2)} />}
             {step === 2 && user && <ObjectivesStep coachId={user.id} seasonObjectives={objectives.data ?? []}
-              onBack={() => goTo(1)} onPositions={() => goTo(1)} onDone={() => navigate('/coach/home')} />}
+              onBack={() => goTo(1)} onPositions={() => goTo(1)} onNext={() => goTo(3)} />}
+            {step === 3 && user && <ShareStep coachId={user.id} squad={squad} plan={season.plan} seasonObjectives={objectives.data ?? []}
+              onBack={() => goTo(2)} onSeason={() => goTo(0)} onShared={() => navigate('/coach/season-plan', { replace: true })} />}
           </div>}
       </div>
       <NavBar role="coach" activeTab={location.pathname} onNavigate={navigate} />
@@ -126,15 +140,11 @@ function SetUp({ squad, plan, saved, onNext }: { squad: string; plan: SeasonPlan
     setSavedNow(false)
     setProblem(null)
   }
-  const setObjective = (key: string, patch: Partial<Objective>) =>
-    change({ ...form, objectives: form.objectives.map(o => (o.key === key ? { ...o, ...patch } : o)) })
   const add = (title: string, looksLike: string) => {
     const key = `new-${(nextKey.current += 1)}`
     change({ ...form, objectives: [...form.objectives, { key, title, looksLike }] })
     if (!title) setFocusKey(key)
   }
-  const full = form.objectives.length >= MAX_SEASON_OBJECTIVES
-  const chosen = new Set(form.objectives.map(o => o.title.trim()))
   const datesProblem = form.startsOn && form.endsOn && form.endsOn <= form.startsOn ? END_BEFORE_START : null
 
   const save = useMutation({
@@ -149,27 +159,7 @@ function SetUp({ squad, plan, saved, onNext }: { squad: string; plan: SeasonPlan
         if (error) throw error
         planId = data.id
       }
-      // Deletes first, so their places are free for what's new: three places, one objective each.
-      const kept = new Set(sent.form.objectives.flatMap(o => (o.id ? [o.id] : [])))
-      const gone = saved.filter(o => !kept.has(o.id)).map(o => o.id)
-      if (gone.length) {
-        const { error } = await supabase.from('season_objectives').delete().in('id', gone)
-        if (error) throw error
-      }
-      for (const o of sent.form.objectives) {
-        const before = saved.find(s => s.id === o.id)
-        if (!before || (before.title === o.title.trim() && before.looks_like === o.looksLike.trim())) continue
-        const { error } = await supabase.from('season_objectives').update({ title: o.title.trim(), looks_like: o.looksLike.trim() }).eq('id', before.id)
-        if (error) throw error
-      }
-      const taken = new Set(saved.filter(s => kept.has(s.id)).map(s => s.place))
-      const free = [1, 2, 3].filter(place => !taken.has(place))
-      const fresh = sent.form.objectives.filter(o => !o.id)
-        .map((o, i) => ({ plan_id: planId!, place: free[i], title: o.title.trim(), looks_like: o.looksLike.trim() }))
-      if (fresh.length) {
-        const { error } = await supabase.from('season_objectives').insert(fresh)
-        if (error) throw error
-      }
+      await writeSeasonObjectives(planId!, saved, sent.form.objectives, !!plan?.shared_at)
       return { plan: await loadSeasonPlan(user!.id, squad), objectives: await loadSeasonObjectives(planId!) }
     },
     onSuccess: (result, sent) => {
@@ -203,44 +193,8 @@ function SetUp({ squad, plan, saved, onNext }: { squad: string; plan: SeasonPlan
           {datesProblem && <p role="alert" className="text-sm text-danger">{datesProblem}</p>}
         </section>
 
-        <section aria-labelledby="season-objectives" className="grid gap-4 rounded-2xl border border-line bg-surface p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 id="season-objectives" className="text-lg font-medium text-ink">Season objectives</h2>
-            <span className="text-sm text-ink-3">{form.objectives.length} of {MAX_SEASON_OBJECTIVES}</span>
-          </div>
-          {form.objectives.length === 0 && <p className="text-sm text-ink-3">None yet. Pick from the list or write your own.</p>}
-          <ol className="grid gap-4">
-            {form.objectives.map((o, index) => (
-              <li key={o.key} className="grid gap-2 rounded-xl border border-line p-3">
-                <Input label={`Objective ${index + 1}`} value={o.title} maxLength={OBJECTIVE_TITLE_MAX} autoFocus={o.key === focusKey}
-                  placeholder="For example: Win the second ball" onChange={event => setObjective(o.key, { title: event.target.value })} />
-                <Textarea label="What it looks like" value={o.looksLike} maxLength={OBJECTIVE_LINE_MAX} rows={2}
-                  onChange={event => setObjective(o.key, { looksLike: event.target.value })} />
-                <span className="justify-self-end">
-                  <Button variant="ghost" size="sm" aria-label={`Delete ${o.title.trim() || `objective ${index + 1}`}`}
-                    onClick={() => change({ ...form, objectives: form.objectives.filter(other => other.key !== o.key) })}>
-                    <Trash2 size={16} aria-hidden="true" />Delete
-                  </Button>
-                </span>
-              </li>
-            ))}
-          </ol>
-          <div className="grid gap-2">
-            <h3 className="text-sm font-medium text-ink-2">Add one</h3>
-            {full && <p className="text-sm text-ink-3">Up to three. Delete one to add another.</p>}
-            <div className="flex flex-wrap gap-2">
-              {SEASON_OBJECTIVE_PRESETS.filter(preset => !chosen.has(preset.title)).map(preset => (
-                <Button key={preset.title} variant="secondary" size="sm" disabled={full} title={preset.looksLike}
-                  onClick={() => add(preset.title, preset.looksLike)}>
-                  <Plus size={16} aria-hidden="true" />{preset.title}
-                </Button>
-              ))}
-              <Button variant="secondary" size="sm" disabled={full} onClick={() => add('', '')}>
-                <Plus size={16} aria-hidden="true" />Write your own
-              </Button>
-            </div>
-          </div>
-        </section>
+        <SeasonObjectivesEditor objectives={form.objectives} focusKey={focusKey} removeWord="Delete"
+          onChange={objectives => change({ ...form, objectives })} onAdd={add} />
       </div>
 
       {problem && <Alert tone={problem === SAVE_FAILED ? 'danger' : 'warning'} title={problem} />}

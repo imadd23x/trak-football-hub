@@ -173,16 +173,17 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
     evaluation: now < whistle && <span className="sr-only tablet:not-sr-only">After the match</span>,
   }
   const homeAway = row.home_away === 'home' ? 'Home' : row.home_away === 'away' ? 'Away' : null
-  const people = whoKnown ? `${who.players.length} ${who.players.length === 1 ? 'player' : 'players'}` : null
 
   return <>
     <PageHeader className="[--ph-bleed:1.25rem] tablet:[--ph-bleed:2rem]" top={wide ? TOP_BAR : '0px'}
       title={gameTitle(row)} crumbs={<CoachTrail current={gameTitle(row)} />}
       status={cancelled ? <Badge tone="danger" dot>Cancelled</Badge> : <Badge tone={state.tone} dot>{state.label}</Badge>}
       details={<>
-        <span><CalendarDays {...metaIcon} /><strong>{day}</strong>{time && ` · Kick-off ${time}`}{academy && ` · ${academy}`}</span>
+        {/* Imad, 6 Nov: the kick-off has its own clock, apart from the day; the squad is its age group, no count. */}
+        <span><CalendarDays {...metaIcon} /><strong>{day}</strong></span>
+        {time && <span><Clock {...metaIcon} />Kick-off {time}{academy && ` · ${academy}`}</span>}
         {(row.venue || homeAway) && <span><MapPin {...metaIcon} />{row.venue && <strong>{row.venue}</strong>}{row.venue && homeAway && ' · '}{homeAway}</span>}
-        {(row.squad || people) && <span><Users {...metaIcon} />{[row.squad, people].filter(Boolean).join(' · ')}</span>}
+        {row.squad && <span><Users {...metaIcon} />{row.squad}</span>}
       </>}
       primary={primary} secondary={secondary} menu={menu} onFold={setFolded}
       notice={tab === 'plan' ? planDraft.problem : tab === 'evaluation' ? evaluationDraft.problem : null}

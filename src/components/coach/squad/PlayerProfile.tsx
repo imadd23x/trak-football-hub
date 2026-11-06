@@ -15,6 +15,7 @@ import type { Scores } from '@/lib/squad/season-profile'
 import { PlayerFactsEditor } from './PlayerFactsEditor'
 import type { PlayerFacts } from './usePlayerFacts'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { PlayerObjectivesSection } from '@/components/coach/season-plan/PlayerObjectivesSection'
 import { isPosition } from '@/lib/positions'
 import { PositionAndRolesSheet } from './PositionAndRolesSheet'
 import { usePlayerRoles } from './usePlayerRoles'
@@ -51,7 +52,7 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
   /** TRAK-368: the squad's assessments didn't load, so the season can't be told; never "No assessment this season yet". */
   seasonFailed?: boolean
   onRetrySeason?: () => void
-  /** TRAK-353: where the season plan is on, the roster's position, and the player's position and roles show here. */
+  /** TRAK-353, TRAK-354: where the season plan is on, the roster's position; the player's position and roles, and their objectives, show here. */
   placement?: { position: string | null }
 }) {
   const navigate = useNavigate()
@@ -125,6 +126,8 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
           formatValue={value => value.toFixed(1)} />}
       </section>
     </div>
+
+    {placement && <PlayerObjectivesSection coachId={coachId} id={player.id} name={player.name} position={placement.position} squad={squad} />}
 
     {assessments.isError ? <LoadError what={`${first}'s assessments`} onRetry={() => { void assessments.refetch() }} />
       : !assessments.data ? <LoadingSkeleton label={`Loading ${first}'s assessments…`} lines={2} rows={2} />

@@ -16,7 +16,7 @@ import styles from "./plan-review.module.css";
    and no AI summary: Trak has no history to draw and no AI writing it. TRAK-344 (Imad, 3 Nov): each part's status is
    its icon, a word only for screen readers. TRAK-369 (Imad, 4 Nov): the top row is two halves, the gauge with what's
    left under it, and Arc's countdown. TRAK-373 (Imad, 5 Nov): after kick-off, `aside` takes the countdown's half (the
-   match clock, then "Locked"). */
+   match clock, then "Locked"). TRAK-375: with neither, the gauge has the row to itself (Evaluation review). */
 
 export type ReviewStatus = "good" | "watch" | "risk";
 export type ReviewRow = {
@@ -93,7 +93,7 @@ export function PlanReview({ title, rows, band, countdown, aside, readOnly = fal
     <section ref={rootRef} className={styles.root} aria-labelledby={titleId}>
       <div className={styles.top}>
         <h3 id={titleId} className={styles.name}>{title}</h3>
-        <div className={styles.overview}>
+        <div className={styles.overview} data-single={aside || countdown ? undefined : ""}>
           <div className={styles.cell}>
             <div className={styles.gauge} role="img" aria-label={`${ready} of ${rows.length} parts ready, ${band.label.toLowerCase()}`}>
               <svg viewBox="0 0 112 60" width="112" height="60" aria-hidden="true">

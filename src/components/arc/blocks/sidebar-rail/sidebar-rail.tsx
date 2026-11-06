@@ -43,7 +43,8 @@ export interface SidebarRailProps {
   trail?: ReactNode[];
   /** Right side of the top bar, such as the bell and Create. */
   actions?: ReactNode;
-  /** Trak (TRAK-324): under the brand in the open sidebar, such as the coach's squad switcher. Folded to a rail, it hides. */
+  /** Trak (TRAK-324): under the brand in the open sidebar, such as the coach's squad switcher. Folded to a rail, it hides.
+   *  TRAK-376 (Imad, 5 Nov): the phone's sheet has it too, under the brand. */
   afterBrand?: ReactNode;
   /** Phone and small tablet: no rail or top bar; the sidebar opens as a sheet. */
   narrow?: boolean;
@@ -267,6 +268,7 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
                 <Identity className={styles.brand} mark={brand.logo} name={brand.name} detail={brand.detail} collapsed={false} reduce={reduce} />
                 <Dialog.Close asChild><button type="button" className={styles.iconButton} aria-label="Close menu"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button></Dialog.Close>
               </div>
+              {afterBrand && <div className={styles.afterBrand}>{afterBrand}</div>}
               <Navigation variant="sheet" collapsed={false} onSelect={id => select(id, true)} onGroup={id => toggleGroup(id, true)} {...navShared} />
               <Identity className={styles.profile} mark={profile.avatar} name={profile.name} detail={profile.detail} collapsed={false} reduce={reduce} />
             </motion.div>

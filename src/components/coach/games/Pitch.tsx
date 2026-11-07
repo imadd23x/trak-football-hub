@@ -1,54 +1,85 @@
-import { TriangleAlert } from 'lucide-react'
-import { slotsOf } from '@/lib/games/formations'
+import type { HTMLAttributes } from 'react'
+import { Check } from 'lucide-react'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { markerWords, markersOf, type PlayerPlan } from '@/lib/games/lineup'
+import { slotPosition } from '@/lib/squad/formation-board'
+import { BoardBenchFace, BoardPitch, BoardPlace, type FaceMarks } from '@/components/coach/squad/formations/FormationBoard'
+import type { usePointerSwap } from '@/components/coach/squad/formations/usePointerSwap'
 
-/* TRAK-285 (Games 3/8): the line-up's pitch, drawn light and attacking to the right, as the mockup draws it. Each slot
-   of the formation is a button: an empty one opens the player picker, a filled one the player's sheet. PitchDiagram.tsx
-   isn't reused: it's a static drill drawing in the old dark palette. TRAK-317 (Imad, 30 Oct): a starter expected to
-   stretch stands out, so the coach sees the big asks at a glance. Coach only, like the expectation itself. TRAK-370
-   (Imad, 5 Nov): in Trak's orange, as the stretch badge is, with on-brand digits (white on a light page). */
+/* TRAK-285 (Games 3/8): the line-up's pitch. Each slot of the formation is a button: an empty one opens the player
+   picker, a filled one the player's sheet. TRAK-358 (Season plan 10/18, spec TRAK-348): it's Formations' pitch,
+   portrait and attacking upwards, and a player drags onto a place, onto another face, or onto Bench or Not selected.
+   Every face, on the pitch and off it, carries its markers: ✓ bottom right for a job (for a Not selected player, a
+   note), i top right for any context, and a ring for the expectation, yellow for Stretch and green for Lead (Tarek,
+   6 Nov: the spec's colours, not TRAK-370's badge colours, which stay on the badges). Coach only, like what they show.
+   Each marker is said in the face's name too, so colour is never the only signal. */
 
-export type PitchPlayer = { name: string; shirt: number | null; absent: boolean; stretch?: boolean }
+export type LineUpSpot = `slot:${number}` | `player:${string}` | 'list:bench' | 'list:not_selected'
+export type LineUpSwap = ReturnType<typeof usePointerSwap<LineUpSpot>>
+export type PitchPlayer = { id: string; name: string; absent: boolean; plan: PlayerPlan }
 
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()
+const RING = { stretch: 'shadow-[0_0_0_3px_rgb(var(--t-attention))]', lead: 'shadow-[0_0_0_3px_rgb(var(--t-success))]' } as const
 
-/** The markings, in a 150 × 100 box: our goal on the left. */
-function Markings() {
-  return <svg viewBox="0 0 150 100" preserveAspectRatio="none" className="absolute inset-0 size-full text-brand" aria-hidden="true">
-    <g fill="none" stroke="currentColor" strokeOpacity={0.22} strokeWidth={0.6} vectorEffect="non-scaling-stroke">
-      <rect x="1" y="1" width="148" height="98" rx="2" />
-      <line x1="75" y1="1" x2="75" y2="99" />
-      <ellipse cx="75" cy="50" rx="10" ry="15" />
-      <rect x="1" y="24" width="20" height="52" />
-      <rect x="129" y="24" width="20" height="52" />
-    </g>
-  </svg>
+function marks(name: string, plan: PlayerPlan, absent: boolean): FaceMarks {
+  const { done, context, ring } = markersOf(plan)
+  return { name, done, context, absent, ring: ring ? RING[ring] : '' }
 }
+const said = (plan: PlayerPlan, absent: boolean) =>
+  [...markerWords(plan), ...(absent ? ["can't make it"] : [])].map(word => `, ${word}`).join('')
+/** A drop target only; it starts no drag. */
+const target = (swap: LineUpSwap | null, spot: LineUpSpot) => (swap ? { 'data-spot': spot } : {})
 
-export function Pitch({ shape, starters, selected, onSelect }: {
+export function Pitch({ shape, format, starters, selected, onSelect, swap, className }: {
   shape: string
+  format: number
   /** The starter in each slot. */
   starters: Map<number, PitchPlayer>
   selected: number | null
   onSelect: (slot: number) => void
+  /** Dragging, until kick-off locks the line-up. */
+  swap: LineUpSwap | null
+  /** A narrower cap on the pitch, such as one that keeps it within the screen's height. */
+  className?: string
 }) {
-  return (
-    <div className="relative aspect-[3/2] w-full overflow-hidden rounded-xl border border-line bg-brand/5">
-      <Markings />
-      {slotsOf(shape).map(({ slot, x, y }) => {
-        const player = starters.get(slot)
-        const on = selected === slot
-        const stretch = !!player?.stretch
-        return <button key={slot} type="button" onClick={() => onSelect(slot)} aria-pressed={on} data-stretch={stretch || undefined}
-          aria-label={player ? `${player.name}, slot ${slot}${stretch ? ', stretch' : ''}${player.absent ? ", can't make it" : ''}` : `Slot ${slot}, empty`}
-          className={`absolute grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-            on ? `border-ink bg-ink text-surface${stretch ? ' shadow-[0_0_0_3px_rgb(var(--t-orange))]' : ''}`
-              : stretch ? 'border-ink/60 bg-[rgb(var(--t-orange))] text-on-brand'
-              : player ? 'border-ink/60 bg-surface text-ink' : 'border-dashed border-ink/40 bg-surface/70 text-ink-3'}`}
-          style={{ left: `${y}%`, top: `${x}%` }}>
-          {player ? player.shirt ?? initials(player.name) : '+'}
-          {player?.absent && <TriangleAlert size={14} className="absolute -right-1.5 -top-1.5 rounded-full bg-surface text-warning" aria-hidden="true" />}
-        </button>
-      })}
-    </div>
-  )
+  const phone = useIsMobile()
+  return <BoardPitch label={`${shape}, starting players. Attacking upwards.`} shape={shape} format={format} className={className} place={(slot, at) => {
+    const player = starters.get(slot)
+    const spot: LineUpSpot = `slot:${slot}`
+    const drag = player && swap ? swap.bind(spot, player.name) : target(swap, spot)
+    return <BoardPlace key={slot} {...drag} at={at} on={selected === slot} over={swap?.drag?.over === spot}
+      face={player ? marks(player.name, player.plan, player.absent) : null} line={slotPosition(shape, slot)} size={phone ? 'sm' : 'md'}
+      aria-label={player ? `${player.name}, slot ${slot}${said(player.plan, player.absent)}` : `Slot ${slot}, empty`}
+      data-ring={(player && markersOf(player.plan).ring) || undefined}
+      onClick={() => { if (!swap?.wasDrag()) onSelect(slot) }} />
+  }} />
+}
+
+const KEY_MARK = 'grid size-4 place-items-center rounded-full text-[10px] font-bold leading-none'
+
+/** What each marker means, under the pitch. */
+export function MarkersKey() {
+  return <ul aria-label="Key" className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0 text-sm text-ink-3">
+    <li className="flex items-center gap-1.5"><span aria-hidden="true" className={`${KEY_MARK} bg-brand text-on-brand`}><Check size={10} strokeWidth={3} /></span>
+      Job, or a note for Not selected</li>
+    <li className="flex items-center gap-1.5"><span aria-hidden="true" className={`${KEY_MARK} bg-ink font-serif italic text-surface`}>i</span>Context</li>
+    <li className="flex items-center gap-2"><span aria-hidden="true" className={`size-3.5 rounded-full ${RING.stretch}`} />Yellow ring: Stretch</li>
+    <li className="flex items-center gap-2"><span aria-hidden="true" className={`size-3.5 rounded-full ${RING.lead}`} />Green ring: Lead</li>
+  </ul>
+}
+
+/** A face off the pitch, on the Bench or Not selected tab: it opens the player's sheet, and drags onto the pitch. */
+export function ListFace({ player, plan, list, detail, on, onOpen, swap }: {
+  player: { id: string; name: string }
+  plan: PlayerPlan
+  list: 'bench' | 'not selected'
+  detail: string
+  on: boolean
+  onOpen: () => void
+  swap: LineUpSwap | null
+}) {
+  const spot: LineUpSpot = `player:${player.id}`
+  const drag: HTMLAttributes<HTMLButtonElement> = swap ? swap.bind(spot, player.name) : {}
+  return <BoardBenchFace {...drag} on={on} over={swap?.drag?.over === spot} face={marks(player.name, plan, false)} detail={detail}
+    aria-label={`${player.name}, ${list}${said(plan, false)}`} data-ring={markersOf(plan).ring ?? undefined}
+    onClick={() => { if (!swap?.wasDrag()) onOpen() }} />
 }

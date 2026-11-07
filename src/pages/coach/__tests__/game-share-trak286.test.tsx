@@ -137,11 +137,9 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
 
     await waitFor(() => expect(calls.map(call => call.fn)).toEqual(['save plan', 'save line-up', 'share']))
     expect(calls[2].body).toEqual({ p_event_id: 'g1', p_talked: true })
-    const shared = await screen.findByRole('region', { name: 'Shared' })
-    expect(within(shared).getByText('Shared Thu 19:30')).toBeInTheDocument()
-    // Who can come or is placed reads it; who can't make it and isn't placed doesn't, nor a child waiting for consent.
-    // TRAK-369: the count shows once it's shared, not before.
-    expect(within(shared).getByText('3 players and their families read it in the app. Edits stay with you until you share them.')).toBeInTheDocument()
+    // Imad, 6 Nov: the heading says when, and nothing repeats it: no badge, no line on who reads it (readers() has its own test).
+    const shared = await screen.findByRole('region', { name: 'Shared at Thu 19:30' })
+    expect(within(shared).queryByText(/^Shared Thu|read it in the app|Edits stay with you/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Share plan' })).toBeNull()
   })
 
@@ -171,7 +169,7 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     const user = userEvent.setup()
     const calls = store({ shared: true, changes: ['charisteas', 'basinas'] })
     shareStep()
-    const shared = await screen.findByRole('region', { name: 'Shared' })
+    const shared = await screen.findByRole('region', { name: /^Shared at / })
     expect(await within(shared).findByText('Changes not shared')).toBeInTheDocument()
     expect(within(shared).getByText(/Angelos Charisteas and Angelos Basinas\. Only they and their families get the update\./)).toBeInTheDocument()
     expect(screen.getAllByText('Changes not shared').length).toBeGreaterThanOrEqual(2) // the header's badge too
@@ -215,7 +213,7 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Next: Review & share' }))
     await user.click(await screen.findByRole('checkbox', { name: /talked selection through/ }))
     await user.click(screen.getByRole('button', { name: 'Share plan' }))
-    expect(within(await screen.findByRole('region', { name: 'Shared' })).getByText(/^4 players and their families read it in the app\./)).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: /^Shared at / })).toBeInTheDocument()
   })
 })
 

@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
+import { supabase } from '@/integrations/supabase/client'
 import { LoadError } from '@/components/trak/LoadError'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { PlayerFace } from '@/components/trak/PlayerFace'
@@ -10,13 +12,18 @@ import { useFeatureState } from '@/components/trak/parked'
 import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
 import { usePlayerObjectives } from '@/components/coach/season-plan/usePlayerObjectives'
 import { useWatchList } from '@/components/coach/season-plan/useWatching'
+import { gameTitle, gameWhen, useGameEvaluations, useGames, type Game } from '@/components/coach/games/useGames'
+import { instructionsWent, matchResult } from '@/lib/games/results'
 import { loadSeasonObjectives, planState, seasonObjectivesKey, useSeasonPlan, type SeasonPlan } from '@/lib/season-plan'
 
 /* TRAK-361 (Season plan 13/18, spec TRAK-348): the season plan's card under Needs you, where the academy's switch is
    on. Folded, one line: the state and what comes next ("Shared 3 Nov · 34 weeks left"). Open: the season objectives,
    each "No match yet" until TRAK-363 measures them; the player objectives in one folded row that lists every player,
    worst first; and View plan. Open or folded is kept on this device, per coach and per squad (Tarek, 3 Nov: the whole
-   card folds). Under All, one folded row per squad, each opening that squad's card. Not started: TRAK-350's Start. */
+   card folds). Under All, one folded row per squad, each opening that squad's card. Not started: TRAK-350's Start.
+   TRAK-362: inside the open card, the squad's published match results this season, newest first, from the reads
+   Matches home's Previous matches makes, so the two never disagree. Each row starts folded and opens to how each
+   instruction went; the latest three show, and Show all lists the rest. */
 
 const card = 'arc grid gap-3 rounded-2xl border border-line bg-surface p-4'
 const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
@@ -130,6 +137,7 @@ function SharedBody({ coachId, squad, plan }: { coachId: string; squad: string; 
           </li>))}
         </ul>}
     </div>
+    <Results coachId={coachId} squad={squad} plan={plan} />
     <div className="grid gap-2 border-t border-line pt-3">
       <button type="button" aria-expanded={playersOpen} aria-controls={`season-plan-players-${squad}`} onClick={() => setPlayersOpen(!playersOpen)}
         className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -156,4 +164,80 @@ function SharedBody({ coachId, squad, plan }: { coachId: string; squad: string; 
       </div>}
     </div>
   </>
+}
+
+const RESULTS_SHOWN = 3
+const dayOf = (game: Game) => game.event_date ?? game.starts_at.slice(0, 10)
+
+/** TRAK-362: the squad's published matches this season, newest first. Drafts and cancelled matches never show. */
+function Results({ coachId, squad, plan }: { coachId: string; squad: string; plan: SeasonPlan }) {
+  const games = useFeatureState('games')
+  const matches = useGames(games.on)
+  const evaluations = useGameEvaluations(games.on)
+  const [all, setAll] = useState(false)
+  const [openId, setOpenId] = useState<string | null>(null)
+  if (!games.on) return null
+  if (matches.error || evaluations.error) {
+    return <LoadError what="the match results" onRetry={() => { void matches.refetch(); void evaluations.refetch() }} />
+  }
+  if (matches.isPending || evaluations.isPending) return <LoadingSkeleton label="Loading the match results…" lines={2} />
+  const published = (matches.data ?? [])
+    .filter(game => game.status !== 'cancelled' && (game.squad == null || game.squad === squad) && !!evaluations.data?.get(game.id)?.publishedAt
+      && (!plan.starts_on || dayOf(game) >= plan.starts_on) && (!plan.ends_on || dayOf(game) <= plan.ends_on))
+    .sort((a, b) => b.starts_at.localeCompare(a.starts_at))
+  const shown = all ? published : published.slice(0, RESULTS_SHOWN)
+
+  return <div className="grid gap-2 border-t border-line pt-3">
+    <h3 className="text-sm font-medium text-ink-2">Results</h3>
+    {published.length === 0 ? <p className="text-sm text-ink-3">No published match yet this season.</p>
+      : <ul className="m-0 list-none divide-y divide-line p-0">{shown.map(game => {
+        const scores = evaluations.data!.get(game.id)!
+        return <ResultRow key={game.id} coachId={coachId} game={game} result={matchResult(scores.ourScore, scores.theirScore)}
+          open={openId === game.id} onToggle={() => setOpenId(openId === game.id ? null : game.id)} />
+      })}</ul>}
+    {published.length > RESULTS_SHOWN && <span className="justify-self-start">
+      <Button variant="ghost" size="sm" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${published.length}`}</Button>
+    </span>}
+  </div>
+}
+
+function ResultRow({ coachId, game, result, open, onToggle }: {
+  coachId: string; game: Game; result: ReturnType<typeof matchResult>; open: boolean; onToggle: () => void
+}) {
+  // Read once the row opens: its instructions, and how each went.
+  const went = useQuery({
+    queryKey: ['coach', coachId, 'match-instructions', game.id],
+    enabled: open,
+    queryFn: async () => {
+      const [planRow, evaluation] = await Promise.all([
+        supabase.from('game_plans').select('goals').eq('event_id', game.id).maybeSingle(),
+        supabase.from('game_evaluations').select('plan_worked').eq('event_id', game.id).maybeSingle(),
+      ])
+      if (planRow.error) throw planRow.error
+      if (evaluation.error) throw evaluation.error
+      return instructionsWent(planRow.data?.goals, evaluation.data?.plan_worked)
+    },
+  })
+  return <li>
+    <button type="button" aria-expanded={open} aria-controls={`result-${game.id}`} onClick={onToggle}
+      className="flex min-h-11 w-full items-center gap-3 rounded-lg py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      <span className="grid min-w-0 flex-1">
+        <span className="truncate text-sm text-ink">{gameTitle(game)}</span>
+        <span className="truncate text-xs text-ink-3">{gameWhen(game).day}</span>
+      </span>
+      <Badge tone={result.tone} size="sm">{result.label}</Badge>
+      {open ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
+    </button>
+    {open && <div id={`result-${game.id}`} className="pb-2 pl-1">
+      {went.error ? <LoadError what="how the plan went" onRetry={() => void went.refetch()} />
+        : went.isPending ? <LoadingSkeleton label="Loading how the plan went…" lines={1} />
+        : went.data.length === 0 ? <p className="text-sm text-ink-3">No instructions</p>
+        : <ul className="m-0 grid list-none gap-1 p-0">{went.data.map((item, i) => (
+          <li key={i} className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="text-ink">{item.title}</span>
+            <span className="shrink-0 text-ink-3">{item.went ?? '—'}</span>
+          </li>))}
+        </ul>}
+    </div>}
+  </li>
 }

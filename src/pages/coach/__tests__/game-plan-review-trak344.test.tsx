@@ -84,11 +84,10 @@ describe('TRAK-344: the match page says each thing once', { timeout: 30_000 }, (
     review()
     const card = await screen.findByRole('region', { name: 'Game plan review' })
     expect(screen.getByRole('heading', { level: 1, name: 'vs Parkview Athletic' })).toBeInTheDocument()
-    // Match header (Imad, 6 Nov): when, then where, each with its icon.
+    // Match header (Imad, 6 Nov): the day, the kick-off, then where, each with its icon.
     const header = screen.getByRole('region', { name: 'vs Parkview Athletic' })
-    expect(header).toHaveTextContent(/\w{3} \d{1,2} \w{3} · Kick-off \d\d:\d\d/)
-    expect(header).toHaveTextContent('Rehearsal Park · Home')
-    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(header).toHaveTextContent(/\w{3} \d{1,2} \w{3}Kick-off \d\d:\d\dRehearsal Park · Home/)
+    expect(within(screen.getByRole('heading', { level: 1 }).parentElement!).getByText('Draft')).toBeInTheDocument()
     expect(screen.queryByText('Plan not shared')).toBeNull()
     const timers = screen.getAllByRole('timer')
     expect(timers).toHaveLength(1)

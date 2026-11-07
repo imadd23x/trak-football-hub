@@ -165,7 +165,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     expect(within(scheduled).queryByRole('button', { name: /^Move to/ })).toBeNull()
 
     await act(async () => { await vi.advanceTimersByTimeAsync(3 * 60 * MINUTE + MINUTE) })
-    expect(await screen.findByRole('region', { name: 'Shared' })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Shared at Mon 13:00' })).toBeInTheDocument()
     expect(screen.getByText('Plan shared')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Scheduled' })).toBeNull()
   })
@@ -178,7 +178,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     await user.click(within(scheduled).getByRole('button', { name: 'Share now' }))
     await waitFor(() => expect(calls.map(call => call.fn)).toEqual(['save plan', 'save line-up', 'share']))
     expect(calls[2].body).toEqual({ p_event_id: 'g1', p_talked: false })
-    expect(await screen.findByRole('region', { name: 'Shared' })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: /^Shared at / })).toBeInTheDocument()
   })
 
   it('a refused time says why and keeps what was picked', async () => {

@@ -26,7 +26,8 @@ import { MatchClock } from './MatchClock'
    Game plan review says each thing once: no match or time (the header has them), "N incomplete", one countdown, and
    no detail for Logistics or Tactics & analysis. TRAK-371 (Imad, 5 Nov): Jobs is ready once any starter has a job; a
    coach never has to give everyone one. Match header (Imad, 6 Nov): the header's menu can open Schedule here, so the
-   page holds whether it's open (`picking`). */
+   page holds whether it's open (`picking`). Imad, 6 Nov: no repeats: "Shared at Fri 19:00" is the heading, with no
+   badge or line under it, and a plan locked unshared says "Not shared" alone. */
 
 const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
 const list = (names: string[]) => names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
@@ -84,9 +85,8 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
       <PlanReview title="Game plan review" footerId="plan-share" rows={rows} band={band} readOnly={locked} aside={locked ? <MatchClock game={game} /> : undefined}
         countdown={{ label: 'Kick-off in', end: game.starts_at, completeLabel: 'Locked' }}>
         {sharedAt == null && locked ? (
-          <section aria-labelledby="plan-not-shared" className="grid gap-1">
+          <section aria-labelledby="plan-not-shared">
             <h4 id="plan-not-shared" className={sub}>Not shared</h4>
-            <p className="text-sm text-ink-2">It wasn’t shared before kick-off, so only you saw it.</p>
           </section>
         ) : sharedAt == null ? <>
           {/* TRAK-345 (Imad, 3 Nov): the tick says this and nothing else; Schedule (it was "Share at…") opens under the button.
@@ -118,11 +118,7 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
           </section>
         ) : (
           <section aria-labelledby="plan-shared" className="grid gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 id="plan-shared" className={sub}>Shared</h4>
-              <Badge tone="success">Shared {format(new Date(sharedAt), 'EEE HH:mm')}</Badge>
-            </div>
-            <p className="text-sm text-ink-2">{players(reading.length)} and their families read it in the app.{locked ? '' : ' Edits stay with you until you share them.'}</p>
+            <h4 id="plan-shared" className={sub}>Shared at {format(new Date(sharedAt), 'EEE HH:mm')}</h4>
             <Alert tone="info" open={!locked && changes.length > 0} title="Changes not shared">
               {changed.length ? `${list(changed)}. ` : ''}Only they and their families get the update.
               <span className="mt-3 block"><Button size="sm" loading={sharing} onClick={() => onShare(false)}>Share changes with {changes.length}</Button></span>

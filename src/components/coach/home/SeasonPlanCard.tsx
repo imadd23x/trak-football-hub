@@ -224,6 +224,7 @@ function SeasonObjectives({ objectives, matches, plans }: {
   })))
   const measured = objectives.some(o => (measures.get(o.id)?.matches ?? 0) > 0)
   const stuck = objectives.filter(o => measures.get(o.id)?.stuck)
+  const noneWorked = objectives.filter(o => measures.get(o.id)?.matches && measures.get(o.id)?.worked === 0)
   const chosen = objectives.find(o => o.id === selected)
   const chosenMatches = chosen ? matches.published.flatMap(game => instructionsWent(plans?.get(game.id)?.goals, plans?.get(game.id)?.planWorked)
     .filter(item => item.seasonObjectiveId === chosen.id).map(item => ({ game, went: item.went }))) : []
@@ -234,6 +235,8 @@ function SeasonObjectives({ objectives, matches, plans }: {
       {measured && <DonutChart label="Times each season objective worked" totalLabel="Times it worked" legend={false}
         data={objectives.map(o => ({ key: o.id, label: o.title, value: measures.get(o.id)?.worked ?? 0 }))}
         activeKey={selected} onActiveChange={setSelected} size={168} thickness={20} emptyLabel="Nothing worked yet" />}
+      {/* TRAK-382: a donut draws no slice for 0, so an objective that has matches but never worked is named here. */}
+      {measured && noneWorked.length > 0 && <p className="text-center text-xs text-ink-3">Worked 0 times: {noneWorked.map(o => o.title).join(', ')}</p>}
       <ul className="m-0 grid list-none gap-1.5 p-0">{objectives.map(o => {
         const m = measures.get(o.id)
         return <li key={o.id}>

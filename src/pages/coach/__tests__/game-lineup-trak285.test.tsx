@@ -42,6 +42,8 @@ function store() {
   const lineUp = new Map<string, Record<string, unknown>>()
   const saves: Record<string, unknown>[][] = []
   server.use(
+    // TRAK-363: the plan's Instructions offer the squad's season objectives.
+    table('season_plans', []),
     http.get(`${SUPABASE_URL}/rest/v1/game_plans`, () => HttpResponse.json([...plans.values()])),
     http.post(`${SUPABASE_URL}/rest/v1/game_plans`, async ({ request }) => {
       const body = await request.json() as Record<string, unknown>

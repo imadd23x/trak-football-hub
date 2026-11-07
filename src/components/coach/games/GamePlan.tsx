@@ -149,7 +149,7 @@ export function GamePlan({ game, form, draft, who, step, onStep, sharedAt, chang
     <div className="grid gap-5 pt-4">
       {/* TRAK-346 (Imad, 3 Nov): any step opens from here, ahead as well as back, so an Edit never means walking back. */}
       <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Game plan" jumpAhead />
-      {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} form={form} onFormChange={change} locked={locked} />
+      {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} squad={game.squad ?? null} form={form} onFormChange={change} locked={locked} />
         : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} />
         : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} onShare={shareNow} onSchedule={scheduleAt}
             sharing={sharing} problem={shareProblem} locked={locked} onStep={onStep} onEditLogistics={onEditLogistics} picking={picking} onPicking={onPicking} />}

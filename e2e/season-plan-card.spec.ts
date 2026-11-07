@@ -40,7 +40,7 @@ async function backend(context: BrowserContext, unexpected: string[], squads: st
       return json(squads.filter(s => !squad || s === squad).map(plan))
     }
     if (path === '/rest/v1/season_objectives' && method === 'GET')
-      return json([{ id: `so-${url.searchParams.get('plan_id')}`, place: 1, title: 'Stay compact', looks_like: '', status: 'open', created_at: '2026-09-01T08:00:00Z', retired_at: null }])
+      return json([{ id: `so-${(url.searchParams.get('plan_id') ?? '').replace(/^eq\./, '')}`, place: 1, title: 'Stay compact', looks_like: '', status: 'open', created_at: '2026-09-01T08:00:00Z', retired_at: null }])
     // TRAK-362: one published match with two instructions, and a draft that never shows.
     if (path === '/rest/v1/coach_calendar_events' && method === 'GET') return json(['m-1', 'm-draft'].map((id, i) => ({
       id, coach_user_id: coachId, event_type: 'match', squad: squads[0], title: i ? 'vs Synthetic Draft' : 'vs Synthetic United', published: true,
@@ -49,9 +49,10 @@ async function backend(context: BrowserContext, unexpected: string[], squads: st
     if (path === '/rest/v1/game_evaluations' && method === 'GET') return json([
       { event_id: 'm-1', saved_at: '2026-10-11T10:00:00Z', published_at: '2026-10-11T10:00:00Z', our_score: 2, their_score: 1, plan_worked: ['worked', 'partly'] },
       { event_id: 'm-draft', saved_at: '2026-10-12T10:00:00Z', published_at: null, our_score: 0, their_score: 0, plan_worked: [] }]
-      .filter(e => !url.searchParams.get('event_id') || url.searchParams.get('event_id') === `eq.${e.event_id}`))
+      .filter(e => { const asked = url.searchParams.get('event_id'); return !asked || asked.replace(/^(eq\.|in\.\()|\)$/g, '').split(',').includes(e.event_id) }))
     if (path === '/rest/v1/game_plans' && method === 'GET')
-      return json([{ event_id: 'm-1', saved_at: '2026-10-09T10:00:00Z', goals: [{ title: 'Press as one', looks_like: '' }, { title: 'Win the second ball', looks_like: '' }] }])
+      // TRAK-363: the first instruction carries the squad's season objective.
+      return json([{ event_id: 'm-1', saved_at: '2026-10-09T10:00:00Z', goals: [{ title: 'Press as one', looks_like: '', season_objective_id: `so-plan-${squads[0]}` }, { title: 'Win the second ball', looks_like: '' }] }])
     if (path === '/rest/v1/player_objectives') return json([{ id: 'po-1', squad_player_id: 'sq-0-1', title: 'Holds the line together', source: 'library', season_objective_id: null, created_at: '2026-11-01T08:00:00Z', status: 'open', retired_at: null }])
     // Every other read is empty: this is about the card, not the rest of Home.
     if (path.startsWith('/rest/v1/') && (method === 'GET' || path.startsWith('/rest/v1/rpc/'))) return json([])
@@ -76,7 +77,8 @@ for (const [width, height] of [[1280, 800], [834, 1112], [390, 844]] as const) {
     await page.screenshot({ path: testInfo.outputPath(`card-folded-${width}.png`) })
 
     await foldOf(page, 'U16').click()
-    await expect(card.getByText('No match yet')).toBeVisible()
+    // TRAK-363: measured from the one published match that carried it.
+    await expect(card.getByText('Worked in 1 of 1 match · 100%')).toBeVisible()
     await card.getByRole('button', { name: /^Player objectives/ }).click()
     await expect(card.getByText('Holds the line together')).toBeVisible()
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
@@ -90,6 +92,10 @@ for (const [width, height] of [[1280, 800], [834, 1112], [390, 844]] as const) {
     await result.click()
     await expect(card.getByText('Press as one')).toBeVisible()
     await expect(card.getByText('Partly')).toBeVisible()
+    // TRAK-363: the instruction names its season objective, which is measured from that match.
+    await expect(card.getByText('Season objective: Stay compact')).toBeVisible()
+    await expect(card.getByRole('button', { name: /^Stay compact/ })).toContainText('Worked in 1 of 1 match · 100%')
+    await expect(card.getByRole('figure', { name: 'Times each season objective worked' })).toBeVisible()
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
     await result.scrollIntoViewIfNeeded()
     await page.screenshot({ path: testInfo.outputPath(`card-results-${width}.png`) })

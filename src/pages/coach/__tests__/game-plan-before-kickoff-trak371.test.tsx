@@ -69,6 +69,9 @@ beforeEach(() => {
     table('game_evaluations', []),
     table('game_evaluation_players', []),
     table('game_evaluation_notes', []),
+    // TRAK-358: Can also play, for Out of position on the line-up; nobody has one.
+    table('squad_player_also_plays', []),
+    table('squad_player_roles', []),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear() })
@@ -117,6 +120,7 @@ describe('TRAK-371: the Game plan before kick-off', { timeout: 30_000 }, () => {
     expect(screen.queryByRole('button', { name: 'Take off the pitch' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Move to bench' }))
     expect(screen.getByRole('button', { name: 'Slot 4, empty' })).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Everyone’s job' })).getByRole('button', { name: /Theodoros Zagorakis/ })).toHaveTextContent('Bench')
+    // TRAK-358: on the Bench tab now, as Everyone's job went.
+    expect(within(screen.getByRole('tabpanel', { name: /^Bench/ })).getByRole('button', { name: 'Theodoros Zagorakis, bench' })).toBeInTheDocument()
   })
 })

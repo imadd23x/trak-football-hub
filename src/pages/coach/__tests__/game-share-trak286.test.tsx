@@ -107,6 +107,9 @@ beforeEach(() => {
     table('game_evaluations', []),
     table('game_evaluation_players', []),
     table('game_evaluation_notes', []),
+    // TRAK-358: Can also play, for Out of position on the line-up; nobody has one.
+    table('squad_player_also_plays', []),
+    table('squad_player_roles', []),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear() })
@@ -200,14 +203,15 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     expect(screen.getByRole('checkbox', { name: /talked selection through/ })).toBeChecked()
   })
 
-  it('a starter whose family says they can\'t make it is flagged in Everyone\'s job, and still reads the plan', async () => {
+  it('a starter whose family says they can\'t make it is flagged on the pitch, and still reads the plan', async () => {
     const user = userEvent.setup()
     store({ lineUp: [...LINE_UP, row('nikopolidis', { role: 'starter', slot: 1, job: 'Command the box on crosses.' })] })
     renderApp('/coach/matches/g1?tab=plan')
     await user.click(await screen.findByRole('button', { name: 'Next: Line-up and jobs' }))
-    const jobs = await screen.findByRole('region', { name: 'Everyone’s job' })
-    const keeper = within(jobs).getByRole('button', { name: /Antonios Nikopolidis/ }).closest('li')!
-    expect(within(keeper).getByText('Can’t make it')).toBeInTheDocument()
+    // TRAK-358: Everyone's job went; the keeper's face says it, as the pitch always has.
+    const keeper = await screen.findByRole('button', { name: /^Antonios Nikopolidis, slot 1/ })
+    expect(keeper).toHaveAccessibleName("Antonios Nikopolidis, slot 1, has a job, can't make it")
+    expect(keeper.querySelector('[data-mark="absent"]')).not.toBeNull()
     await user.click(screen.getByRole('button', { name: 'Next: Review & share' }))
     await user.click(await screen.findByRole('checkbox', { name: /talked selection through/ }))
     await user.click(screen.getByRole('button', { name: 'Share plan' }))

@@ -1,8 +1,10 @@
 /**
  * TRAK-285 (Games 3/8): plan step 2, line-up and jobs. "Can't make it" players can't be placed; a slot holds one player
  * and a player one slot; bench and not selected come back after a reload; the progress counts starters with a job. A
- * child waiting for consent is nowhere. TRAK-329: the formation is one dropdown on the pitch, grouped by format. Test
- * people are named after footballers.
+ * child waiting for consent is nowhere. TRAK-329: the formation is one dropdown on the pitch, grouped by format.
+ * TRAK-358: Formations' pitch, with Bench and Not selected as tabs; Everyone's job and its count went, and Review &
+ * share counts the starters with a job. Every child here is a midfielder, so one placed in goal or at the back gets
+ * Out of position ticked. Test people are named after footballers.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
@@ -86,6 +88,9 @@ beforeEach(() => {
     table('game_evaluation_notes', []),
     table('game_shares', []),
     rpc('game_plan_changes', () => []),
+    // TRAK-358: Can also play, for Out of position; nobody has one.
+    table('squad_player_also_plays', []),
+    table('squad_player_roles', []),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear() })
@@ -101,7 +106,7 @@ async function pick(user: ReturnType<typeof userEvent.setup>, slotNumber: number
   await user.click(screen.getByRole('combobox', { name: 'Who plays here?' }))
   await user.click(await screen.findByRole('option', { name }))
 }
-const jobs = () => screen.getByRole('region', { name: 'Everyone’s job' })
+const bench = () => screen.getByRole('tabpanel', { name: /^Bench/ })
 
 describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
   it('lists who can come, Confirmed first; "Can\'t make it" can\'t be placed, and a child waiting for consent is nowhere', async () => {
@@ -127,7 +132,7 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     store()
     await openLineUp(user)
     await pick(user, 1, /^Theodoros Zagorakis/)
-    expect(slot(1)).toHaveAccessibleName('Theodoros Zagorakis, slot 1')
+    expect(slot(1)).toHaveAccessibleName('Theodoros Zagorakis, slot 1, context: out of position')
 
     // A filled slot opens its player's sheet: nobody can be dropped on top of them.
     await user.click(slot(1))
@@ -137,22 +142,23 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     // Picking a player already on the pitch for another slot moves them.
     await pick(user, 2, /^Theodoros Zagorakis · on the pitch/)
     expect(slot(1)).toHaveAccessibleName('Slot 1, empty')
-    expect(slot(2)).toHaveAccessibleName('Theodoros Zagorakis, slot 2')
+    expect(slot(2)).toHaveAccessibleName('Theodoros Zagorakis, slot 2, context: out of position')
 
     await user.click(screen.getByRole('button', { name: 'Move to bench' }))
     expect(slot(2)).toHaveAccessibleName('Slot 2, empty')
-    expect(within(jobs()).getByRole('button', { name: /Theodoros Zagorakis/ })).toHaveTextContent('Bench')
+    // TRAK-358: off the pitch, Trak's Out of position goes.
+    expect(within(bench()).getByRole('button', { name: 'Theodoros Zagorakis, bench' })).toBeInTheDocument()
   })
 
   it('bench and not selected come back after a reload; a player left out keeps only a note', async () => {
     const user = userEvent.setup()
     const { saves } = store()
     await openLineUp(user)
-    await user.click(within(jobs()).getByRole('button', { name: /Angelos Charisteas/ }))
+    await user.click(within(bench()).getByRole('button', { name: /^Angelos Charisteas, bench/ }))
     await user.click(screen.getByRole('radio', { name: 'Not selected' }))
     expect(screen.queryByLabelText(/^Job/)).toBeNull()
     await user.type(screen.getByLabelText('Note to Angelos · only Angelos sees it'), 'Not this week. Your chance comes Tuesday.')
-    await user.click(within(jobs()).getByRole('button', { name: /Angelos Basinas/ }))
+    await user.click(within(bench()).getByRole('button', { name: /^Angelos Basinas, bench/ }))
     await user.type(screen.getByLabelText('Job · only Angelos sees it'), 'Be ready to come on at half-time.')
     await user.click(screen.getByRole('button', { name: 'Save draft' }))
     expect(await screen.findByRole('button', { name: 'Saved' })).toBeInTheDocument()
@@ -163,36 +169,41 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
 
     cleanup()
     await openLineUp(user)
-    const leftOut = screen.getByRole('region', { name: 'Not selected' })
-    await user.click(within(leftOut).getByRole('button', { name: /Angelos Charisteas/ }))
+    await user.click(screen.getByRole('tab', { name: 'Not selected · 1' }))
+    const leftOut = screen.getByRole('tabpanel', { name: 'Not selected · 1' })
+    await user.click(within(leftOut).getByRole('button', { name: 'Angelos Charisteas, not selected, has a note' }))
     expect(screen.getByRole('radio', { name: 'Not selected' })).toBeChecked()
     expect(screen.getByLabelText('Note to Angelos · only Angelos sees it')).toHaveValue('Not this week. Your chance comes Tuesday.')
-    expect(within(jobs()).getByRole('button', { name: /Angelos Basinas/ }).closest('li')).toHaveTextContent('Be ready to come on at half-time.')
+    await user.click(screen.getByRole('tab', { name: /^Bench/ }))
+    await user.click(within(bench()).getByRole('button', { name: 'Angelos Basinas, bench, has a job' }))
+    expect(screen.getByLabelText('Job · only Angelos sees it')).toHaveValue('Be ready to come on at half-time.')
   })
 
-  it('counts the starters with a job', async () => {
+  it('TRAK-358: Everyone\'s job and its count are gone; Review & share counts the starters with a job', async () => {
     const user = userEvent.setup()
     store()
     await openLineUp(user)
     await pick(user, 1, /^Theodoros Zagorakis/)
     await user.type(screen.getByLabelText('Job · only Theodoros sees it'), 'Command the box on crosses.')
     await pick(user, 2, /^Angelos Basinas/)
-    const progress = screen.getByRole('progressbar', { name: '1 of 11 starters have a job' })
-    expect(progress).toHaveAttribute('aria-valuenow', '1')
-    expect(progress).toHaveAttribute('aria-valuemax', '11')
+    expect(screen.queryByRole('region', { name: 'Everyone’s job' })).toBeNull()
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Next: Review & share' }))
+    expect(await screen.findByText('1 of 2 starters have one')).toBeInTheDocument()
   })
 
-  it('TRAK-317, TRAK-370: a starter expected to stretch shows orange on the pitch, with a key and "stretch" in the slot\'s name', async () => {
+  it('TRAK-317, TRAK-358: a starter expected to stretch has a yellow ring on the pitch, with a key and "stretch" in the slot\'s name', async () => {
     const user = userEvent.setup()
     store()
     await openLineUp(user)
-    await pick(user, 3, /Zagorakis/)
-    expect(slot(3)).toHaveAccessibleName('Theodoros Zagorakis, slot 3')
-    expect(screen.queryByText('Orange: stretch')).toBeNull()
+    // Slot 6 is midfield, where he plays.
+    await pick(user, 6, /Zagorakis/)
+    expect(slot(6)).toHaveAccessibleName('Theodoros Zagorakis, slot 6')
+    expect(slot(6)).not.toHaveAttribute('data-ring')
     await user.click(screen.getByRole('radio', { name: /^Stretch/ }))
-    expect(slot(3)).toHaveAccessibleName('Theodoros Zagorakis, slot 3, stretch')
-    expect(slot(3)).toHaveAttribute('data-stretch')
-    expect(screen.getByText('Orange: stretch')).toBeVisible()
+    expect(slot(6)).toHaveAccessibleName('Theodoros Zagorakis, slot 6, stretch')
+    expect(slot(6)).toHaveAttribute('data-ring', 'stretch')
+    expect(within(screen.getByRole('list', { name: 'Key' })).getByText('Yellow ring: Stretch')).toBeVisible()
   })
 
   it('TRAK-329: one formation dropdown on the pitch, a header per format; a shape in a smaller format benches the starters it has no slot for', async () => {
@@ -215,8 +226,8 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     expect(screen.getByRole('combobox', { name: 'Formation' })).toHaveTextContent('3-3-2')
     // Nine a side has no slots 10 and 11, so those two starters are on the bench.
     expect(screen.queryByRole('button', { name: /slot 10(,|$)/i })).toBeNull()
-    expect(within(jobs()).getByRole('button', { name: /Theodoros Zagorakis/ })).toHaveTextContent('Bench')
-    expect(within(jobs()).getByRole('button', { name: /Angelos Basinas/ })).toHaveTextContent('Bench')
+    expect(within(bench()).getByRole('button', { name: 'Theodoros Zagorakis, bench' })).toBeInTheDocument()
+    expect(within(bench()).getByRole('button', { name: 'Angelos Basinas, bench' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save draft' }))
     expect(await screen.findByRole('button', { name: 'Saved' })).toBeInTheDocument()
     expect(plans.get('g1')).toMatchObject({ format: 9, formation: '3-3-2' })

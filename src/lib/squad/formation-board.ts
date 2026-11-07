@@ -1,5 +1,5 @@
 import { lineName, slotsOf, type Format } from '@/lib/games/formations'
-import { isPosition, type Position } from '@/lib/positions'
+import { POSITIONS, isPosition, type Position } from '@/lib/positions'
 
 /* TRAK-357 (Season plan 9/18, spec TRAK-348): the rules behind Formations' pitch and bench, shared with the match
    line-up (TRAK-358). A formation's starters are kept as place → player; everyone else is on the bench. Places number
@@ -23,6 +23,13 @@ export function slotPosition(shape: string, slot: number): Position {
   const line = lineName(shape, slot)
   return line === 'Forward' ? 'Attacker' : isPosition(line) ? line : 'Midfielder'
 }
+
+/** A position's short name on the board: GK, DEF, MID or ATT. */
+export const shortPosition = (position: Position) => POSITIONS.find(p => p.value === position)!.short
+
+/** A player's positions, main first, as the bench shows them ("MID / DEF"); "No position" when none is recorded. */
+export const positionsShort = (position: string | null, also: readonly string[] = []) =>
+  [position, ...also].filter(isPosition).map(shortPosition).join(' / ') || 'No position'
 
 /** In their position, one they can also play, out of position, or none recorded (never called out of position). */
 export function fitOf(player: Placeable, position: Position): Fit {

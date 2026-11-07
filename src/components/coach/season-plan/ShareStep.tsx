@@ -12,6 +12,8 @@ import { seasonPlanKey, shareSeasonPlan, type SeasonObjective, type SeasonPlan }
 import { usePlayerObjectives } from './usePlayerObjectives'
 import { useWatchList } from './useWatching'
 import { WatchRulePicker } from './WatchRulePicker'
+import { evalDay, evaluationDates, rhythmOf, rhythmText } from '@/lib/evaluation'
+import { localTodayISO } from '@/lib/event-time'
 
 /* TRAK-356 (Season plan 8/18, spec TRAK-348): step 4, Share. What goes out: the season's dates, the season objectives,
    positions and player objectives; it shares with none. The face-to-face tick shows only when there's something to
@@ -71,6 +73,15 @@ export function ShareStep({ coachId, squad, plan, seasonObjectives, onBack, onSe
           <div className="grid gap-0.5 tablet:grid-cols-[12rem_1fr]">
             <dt className="text-sm text-ink-3">Season</dt>
             <dd className="m-0 text-sm text-ink">{dated ? `${day(plan!.starts_on!)} – ${day(plan!.ends_on!)}` : <span className="text-warning">No dates yet</span>}</dd>
+          </div>
+          {/* TRAK-364: the rhythm, and the first date from today: the plan counts from the day it's shared. */}
+          <div className="grid gap-0.5 tablet:grid-cols-[12rem_1fr]">
+            <dt className="text-sm text-ink-3">Evaluation</dt>
+            <dd className="m-0 text-sm text-ink">{(() => {
+              const { every, day: weekday } = rhythmOf(plan ?? {})
+              const first = dated ? evaluationDates({ startsOn: plan!.starts_on, endsOn: plan!.ends_on, every, day: weekday }).find(d => d >= localTodayISO()) : undefined
+              return `${rhythmText(every, weekday).replace(/^e/, 'E')}${first ? ` · first ${evalDay(first, true)}` : ''}`
+            })()}</dd>
           </div>
           <div className="grid gap-0.5 tablet:grid-cols-[12rem_1fr]">
             <dt className="text-sm text-ink-3">Season objectives</dt>

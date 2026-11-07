@@ -14,13 +14,17 @@ import {
 import { DEFAULT_WATCH_RULE, effectiveRule, isWatchRule, rulesFor, type WatchRule } from '@/lib/watch-first'
 import { SeasonObjectivesEditor, type EditableObjective } from './SeasonObjectivesEditor'
 import { trainsIn, useSetWatchRule, useTrainingSquads } from './useWatching'
+import { EvaluationRhythm } from './EvaluationRhythm'
+import { useSquadEvaluations } from './useEvaluation'
+import { evaluationDates, evaluationDue, nextDateLine, rhythmOf, type EvalEvery } from '@/lib/evaluation'
 
 /* TRAK-356 (Season plan 8/18, spec TRAK-348): one part of a shared plan, edited on one screen (Tarek, 1 Nov). Cancel
    leaves it as it was; Save keeps the change, which waits under "Not shared yet" until the coach shares the changes.
    Removing a season objective here retires it: it stays in the plan's history, with its dates. The watching reminder
-   (TRAK-355) is the coach's alone, so it never waits to be shared. */
+   (TRAK-355) is the coach's alone, so it never waits to be shared. TRAK-364: the evaluation's rhythm, which waits
+   under "Not shared yet" as the evaluation dates, as the season's dates do. */
 
-const PLAN_PARTS = { dates: 'Season dates', objectives: 'Season objectives', reminder: 'Watching reminder' } as const
+const PLAN_PARTS = { dates: 'Season dates', evaluation: 'Evaluation', objectives: 'Season objectives', reminder: 'Watching reminder' } as const
 type Part = keyof typeof PLAN_PARTS
 const isPart = (part: string): part is Part => part in PLAN_PARTS
 
@@ -38,6 +42,7 @@ export function PlanEdit({ part, coachId, squad, plan, seasonObjectives }: {
 }) {
   if (!isPart(part)) return <Navigate to={PLAN} replace />
   return part === 'dates' ? <DatesEdit coachId={coachId} squad={squad} plan={plan} />
+    : part === 'evaluation' ? <EvaluationEdit coachId={coachId} squad={squad} plan={plan} />
     : part === 'reminder' ? <ReminderEdit coachId={coachId} squad={squad} plan={plan} />
     : <ObjectivesEdit coachId={coachId} squad={squad} plan={plan} saved={seasonObjectives} />
 }
@@ -99,6 +104,42 @@ function DatesEdit({ coachId, squad, plan }: { coachId: string; squad: string; p
           <DatePicker label="Ends" value={isoToDate(endsOn)} onChange={edit(setEndsOn)} minDate={isoToDate(startsOn)} />
         </div>
         {changed && bad && <p role="alert" className="text-sm text-danger">{bad}</p>}
+      </section>
+    </EditScreen>
+  )
+}
+
+function EvaluationEdit({ coachId, squad, plan }: { coachId: string; squad: string; plan: SeasonPlan }) {
+  const navigate = useNavigate()
+  const client = useQueryClient()
+  const saved = rhythmOf(plan)
+  const [rhythm, setRhythm] = useState<{ every: EvalEvery; day: number }>(saved)
+  const [problem, setProblem] = useState<string | null>(null)
+  const evaluation = useSquadEvaluations(coachId, [squad])
+  const mine = evaluation.list.find(e => e.squad === squad)
+  const changed = rhythm.every !== saved.every || rhythm.day !== saved.day
+  // As Home will work it out once saved: from the day the plan was shared, after the last evaluation, the academy's day.
+  const line = mine ? nextDateLine(evaluationDue({
+    dates: evaluationDates({ startsOn: plan.starts_on, endsOn: plan.ends_on, every: rhythm.every, day: rhythm.day }),
+    sharedOn: mine.sharedOn, lastDueOn: mine.lastDueOn, today: evaluation.today,
+  }), evaluation.today) : evaluation.failed ? 'Couldn’t work out the next date.' : 'Working out the next date…'
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('season_plans').update({ eval_every: rhythm.every, eval_day: rhythm.day }).eq('id', plan.id)
+      if (error) throw error
+    },
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: seasonPlanKey(coachId, squad) })
+      toast.success(SAVED)
+      navigate(PLAN)
+    },
+    onError: () => setProblem(SAVE_FAILED),
+  })
+
+  return (
+    <EditScreen part="evaluation" problem={problem} saving={save.isPending} canSave={changed} onSave={() => save.mutate()}>
+      <section aria-label="Evaluation" className="grid gap-4 rounded-2xl border border-line bg-surface p-5">
+        <EvaluationRhythm every={rhythm.every} day={rhythm.day} line={line} onChange={next => { setRhythm(next); setProblem(null) }} />
       </section>
     </EditScreen>
   )

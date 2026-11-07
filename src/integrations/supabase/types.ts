@@ -209,6 +209,7 @@ export type Database = {
           coachability: number
           consistency: number
           created_at: string | null
+          evaluation_id: string | null
           flag: string | null
           id: string
           impact: number
@@ -234,6 +235,7 @@ export type Database = {
           coachability?: number
           consistency?: number
           created_at?: string | null
+          evaluation_id?: string | null
           flag?: string | null
           id?: string
           impact?: number
@@ -259,6 +261,7 @@ export type Database = {
           coachability?: number
           consistency?: number
           created_at?: string | null
+          evaluation_id?: string | null
           flag?: string | null
           id?: string
           impact?: number
@@ -276,6 +279,13 @@ export type Database = {
           workrate?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "coach_assessments_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "season_evaluations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "coach_assessments_session_id_fkey"
             columns: ["session_id"]
@@ -1353,6 +1363,38 @@ export type Database = {
           },
         ]
       }
+      season_evaluations: {
+        Row: {
+          due_on: string
+          id: string
+          plan_id: string
+          published_at: string
+          published_by: string | null
+        }
+        Insert: {
+          due_on: string
+          id?: string
+          plan_id: string
+          published_at?: string
+          published_by?: string | null
+        }
+        Update: {
+          due_on?: string
+          id?: string
+          plan_id?: string
+          published_at?: string
+          published_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "season_evaluations_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "season_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       season_objectives: {
         Row: {
           created_at: string
@@ -1402,6 +1444,8 @@ export type Database = {
           coach_user_id: string
           created_at: string
           ends_on: string | null
+          eval_day: number
+          eval_every: string
           id: string
           last_shared_at: string | null
           positions_known: string | null
@@ -1417,6 +1461,8 @@ export type Database = {
           coach_user_id?: string
           created_at?: string
           ends_on?: string | null
+          eval_day?: number
+          eval_every?: string
           id?: string
           last_shared_at?: string | null
           positions_known?: string | null
@@ -1432,6 +1478,8 @@ export type Database = {
           coach_user_id?: string
           created_at?: string
           ends_on?: string | null
+          eval_day?: number
+          eval_every?: string
           id?: string
           last_shared_at?: string | null
           positions_known?: string | null
@@ -2086,6 +2134,10 @@ export type Database = {
       share_season_plan: {
         Args: { p_plan_id: string; p_talked?: boolean }
         Returns: string
+      }
+      publish_evaluation: {
+        Args: { p_due_on: string; p_plan_id: string; p_players: Json }
+        Returns: Json
       }
       watch_players: { Args: { p_squad_player_ids: string[] }; Returns: number }
       take_event_register: {

@@ -13,12 +13,15 @@ export function matchResult(our: number | null, their: number | null): { label: 
 const WENT: Record<string, string> = { worked: 'Worked', partly: 'Partly', didnt: 'Didn’t' }
 
 /** Each instruction of the match's plan with how it went, in their order. An answer that's missing says nothing. */
-export function instructionsWent(goals: unknown, planWorked: (string | null)[] | null | undefined): { title: string; went: string | null }[] {
-  const list = (Array.isArray(goals) ? goals : []) as { title?: unknown }[]
+/** Each instruction of the match's plan with how it went, in their order, and (TRAK-363) the season objective it
+ *  carries. An answer that's missing says nothing. */
+export function instructionsWent(goals: unknown, planWorked: (string | null)[] | null | undefined): { title: string; went: string | null; seasonObjectiveId: string | null }[] {
+  const list = (Array.isArray(goals) ? goals : []) as { title?: unknown; season_objective_id?: unknown }[]
   return list.flatMap((goal, i) => {
     const title = typeof goal?.title === 'string' ? goal.title.trim() : ''
     if (!title) return []
     const answer = planWorked?.[i]
-    return [{ title, went: answer ? WENT[answer] ?? null : null }]
+    const objective = typeof goal?.season_objective_id === 'string' ? goal.season_objective_id : null
+    return [{ title, went: answer ? WENT[answer] ?? null : null, seasonObjectiveId: objective }]
   })
 }

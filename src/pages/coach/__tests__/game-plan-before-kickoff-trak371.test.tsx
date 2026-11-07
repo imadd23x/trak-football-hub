@@ -39,6 +39,8 @@ const starter = (id: string, slot: number, job: string) =>
 
 function setup(lineUp: ReturnType<typeof starter>[], goals: { title: string; looks_like: string }[] = []) {
   server.use(
+    // TRAK-363: the plan's Instructions offer the squad's season objectives.
+    table('season_plans', []),
     table('coach_calendar_events', [game()]),
     table('game_plans', [{
       event_id: 'g1', strength: 'stronger', their_formation: null, key_players: [], scouting: '', format: 11, formation: '4-4-2',

@@ -42,6 +42,8 @@ function plans({ failSaves = false } = {}) {
   const saves: Record<string, unknown>[] = []
   const state = { failSaves }
   server.use(
+    // TRAK-363: the plan's Instructions offer the squad's season objectives.
+    table('season_plans', []),
     http.get(`${SUPABASE_URL}/rest/v1/game_plans`, ({ request }) => {
       const id = new URL(request.url).searchParams.get('event_id')?.replace('eq.', '')
       return HttpResponse.json([...store.values()].filter(row => !id || row.event_id === id))

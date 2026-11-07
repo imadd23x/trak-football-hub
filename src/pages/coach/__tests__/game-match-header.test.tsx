@@ -62,6 +62,8 @@ beforeEach(() => {
     game('g2', Date.now() - 3 * 60 * MINUTE, { squad: 'U17', opponent: 'Mirdif Rangers', home_away: 'away', venue: 'Mirdif Stadium' }),
   ]
   server.use(
+    // TRAK-363: the plan's Instructions offer the squad's season objectives.
+    table('season_plans', []),
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Otto Rehhagel', invite_code: 'ABCD' }]),
     table('coach_details', [{ user_id: COACH.id, coach_role: 'Head Coach', team: 'U16', organization_id: 'org-1' }]),
     table('organizations', [{ id: 'org-1', name: 'Rehearsal FC', logo_url: null }]),

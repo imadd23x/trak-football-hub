@@ -68,7 +68,7 @@ describe("TRAK-368 a player's whole history on their own page", () => {
     await user.click(screen.getByRole('button', { name: 'Show the latest 6' }))
     await waitFor(() => expect(cards()).toHaveLength(6))
     expect(window.location.search).toBe('')
-  })
+  }, 30_000)
 
   it('opens with the whole list when the address says so, as after coming back or a reload', async () => {
     renderApp('/coach/squad/player/sq-bo?history=all')

@@ -123,6 +123,8 @@ describe('TRAK-363 season objectives measured on Home', () => {
     expect(within(block).getByRole('button', { name: /^Stay compact/ })).toHaveTextContent('Worked in 0 of 2 matches · 0%At risk')
     expect(within(block).getByRole('button', { name: /^Own the set pieces/ })).toHaveTextContent('No match yet')
     expect(within(block).getByRole('figure', { name: 'Times each season objective worked' })).toBeInTheDocument()
+    // TRAK-382: the donut draws no slice for 0, so the objective with matches that never worked is named under it.
+    expect(within(block).getByText(/^Worked 0 times:/)).toHaveTextContent('Worked 0 times: Stay compact')
   }, 30_000)
 
   it('lists an objective’s matches when it’s selected, and flags two Didn’ts in a row', async () => {

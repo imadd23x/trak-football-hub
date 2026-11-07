@@ -1,6 +1,6 @@
 import { lineName } from '@/lib/games/formations'
 import {
-  CONTEXT, EXPECTATIONS, PLAYER_LIMITS, place, playerPlan, setRole, takeOff,
+  CONTEXT, EXPECTATIONS, PLAYER_LIMITS, place, playerPlan, setContext, setRole, takeOff,
   type Expectation, type PlayerPlan, type PlayerPlans,
 } from '@/lib/games/lineup'
 import type { Candidate } from './useGames'
@@ -78,7 +78,9 @@ export function PlayerPanel({ target, players, onPlayers, candidates, shape, onT
       </> : <>
         <div className="grid gap-2">
           <p className="text-sm font-medium text-ink">Context · only you</p>
-          <ChipGroup label="Context" options={CONTEXT} value={plan.context} onValueChange={context => set({ context })} />
+          {/* TRAK-358: Out of position ticked or unticked here is the coach's, so moving the player leaves it be. */}
+          <ChipGroup label="Context" options={CONTEXT} value={plan.context}
+            onValueChange={context => onPlayers({ ...players, [player.id]: setContext(plan, context) })} />
         </div>
         <RadioGroup label="Expectation · only you" name={`expectation-${player.id}`} options={EXPECTATIONS} value={plan.expectation}
           onValueChange={value => set({ expectation: value as Expectation })} />

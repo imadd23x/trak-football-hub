@@ -29,7 +29,7 @@ const said = (plan: PlayerPlan, absent: boolean) =>
 /** A drop target only; it starts no drag. */
 const target = (swap: LineUpSwap | null, spot: LineUpSpot) => (swap ? { 'data-spot': spot } : {})
 
-export function Pitch({ shape, format, starters, selected, onSelect, swap }: {
+export function Pitch({ shape, format, starters, selected, onSelect, swap, className }: {
   shape: string
   format: number
   /** The starter in each slot. */
@@ -38,9 +38,11 @@ export function Pitch({ shape, format, starters, selected, onSelect, swap }: {
   onSelect: (slot: number) => void
   /** Dragging, until kick-off locks the line-up. */
   swap: LineUpSwap | null
+  /** A narrower cap on the pitch, such as one that keeps it within the screen's height. */
+  className?: string
 }) {
   const phone = useIsMobile()
-  return <BoardPitch label={`${shape}, starting players. Attacking upwards.`} shape={shape} format={format} place={(slot, at) => {
+  return <BoardPitch label={`${shape}, starting players. Attacking upwards.`} shape={shape} format={format} className={className} place={(slot, at) => {
     const player = starters.get(slot)
     const spot: LineUpSpot = `slot:${slot}`
     const drag = player && swap ? swap.bind(spot, player.name) : target(swap, spot)

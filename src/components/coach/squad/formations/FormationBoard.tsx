@@ -53,11 +53,11 @@ function Markings() {
 }
 
 /** The pitch, portrait and attacking upwards, with a place for each of the shape's first `format` slots. `place`
- *  draws one, at the spot it's given. */
-export function BoardPitch({ label, shape, format, place }: {
-  label: string; shape: string; format: number; place: (slot: number, at: CSSProperties) => ReactNode
+ *  draws one, at the spot it's given. `className` can cap it further (the match line-up keeps it within the screen). */
+export function BoardPitch({ label, shape, format, place, className = '' }: {
+  label: string; shape: string; format: number; place: (slot: number, at: CSSProperties) => ReactNode; className?: string
 }) {
-  return <div className="relative mx-auto aspect-[4/5] w-full max-w-[460px] overflow-hidden rounded-xl border border-line bg-brand/5"
+  return <div className={`relative mx-auto aspect-[4/5] w-full max-w-[460px] overflow-hidden rounded-xl border border-line bg-brand/5 ${className}`}
     role="group" aria-label={label}>
     <Markings />
     {slotsOf(shape).slice(0, format).map(({ slot, x, y }) => place(slot, { left: `${x}%`, top: `${topOf(y)}%` }))}

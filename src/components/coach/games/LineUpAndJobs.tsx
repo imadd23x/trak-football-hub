@@ -108,48 +108,59 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
   return (
     <div className="grid gap-4">
       {/* TRAK-323 (Imad, 30 Oct): on a laptop the pitch, the tabs and the selected player's sheet sit side by side, the
-          pitch and the sheet staying in view; on a tablet the tabs go under them. */}
+          pitch and the sheet staying in view; on a tablet the tabs go under them. TRAK-358: only a laptop pins them, as
+          on a tablet the tabs below would scroll under the pinned pitch (and a drop there would land on the tabs). The
+          pitch card holds only the picker and the pitch, capped to the screen's height, so pinned under the match
+          header's tabs (Imad, 6 Nov) it still fits above the bottom bar; the hint and the key sit over the tabs. The
+          16rem is the gap under the header, the card's padding and picker row, and the Back and Next bar below. */}
       <div className="grid gap-4 tablet:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] tablet:items-start laptop:grid-cols-[minmax(0,5fr)_minmax(0,4fr)_minmax(0,3fr)]">
-        <section aria-labelledby="plan-pitch" className={`${card} tablet:sticky tablet:top-[calc(var(--ph-pinned,0px)+1rem)]`}>
+        <section aria-labelledby="plan-pitch" className={`${card} laptop:sticky laptop:top-[calc(var(--ph-pinned,0px)+1rem)]`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="plan-pitch" className={locked ? 'text-lg font-medium text-ink' : 'sr-only'}>{shape}</h2>
             {!locked && <span className="arc"><MorphSelect label="Formation" hideLabel items={SHAPES} value={shape} onValueChange={setShape}
               searchable={false} panelWidth={200} /></span>}
             <span className="text-sm text-ink-3">Attacking ↑</span>
           </div>
-          <Pitch shape={shape} format={form.format} starters={starters} swap={drag}
+          <Pitch shape={shape} format={form.format} starters={starters} swap={drag} className="laptop:max-w-[min(460px,calc((100dvh_-_var(--ph-pinned,0px)_-_16rem)*0.8))]"
             selected={target?.kind === 'slot' ? target.slot : target ? playerPlan(form.players, target.id).slot : null}
             onSelect={slot => setTarget(starters.has(slot) ? { kind: 'player', id: starters.get(slot)!.id } : { kind: 'slot', slot })} />
           <DragGhost drag={drag?.drag ?? null} />
-          <p className="text-sm text-ink-3">{locked ? 'Tap a player to see their job.'
-            : 'Drag a player onto a place, or tap a place to pick who plays there. Tap a player to give them a job.'}</p>
-          <MarkersKey />
         </section>
         {phone
           ? <BottomSheet className="arc" open={!!target} onOpenChange={next => { if (!next) setTarget(null) }} title={title} detents={[0.6, 0.92]}>{panel}</BottomSheet>
-          : <aside aria-label={target ? title : 'Selected player'} className={`${card} tablet:sticky tablet:top-[calc(var(--ph-pinned,0px)+1rem)] laptop:order-3`}>
+          : <aside aria-label={target ? title : 'Selected player'} className={`${card} laptop:sticky laptop:top-[calc(var(--ph-pinned,0px)+1rem)] laptop:order-3`}>
               {target ? <><h2 className="text-lg font-medium text-ink">{title}</h2>{panel}</>
                 : <p className="text-sm text-ink-2">Pick a slot or a player to see their job and expectation here.</p>}
             </aside>}
         <div className="grid min-w-0 gap-4 tablet:col-span-2 laptop:order-2 laptop:col-span-1">
           <section aria-label="Off the pitch" className={`arc ${card}`}>
+            <div className="grid gap-3">
+              <p className="text-sm text-ink-3">{locked ? 'Tap a player to see their job.'
+                : 'Drag a player onto a place, or tap a place to pick who plays there. Tap a player to give them a job.'}</p>
+              <MarkersKey />
+            </div>
             <Tabs value={list} onValueChange={value => setList(value as List)}>
               <TabsList aria-label="Off the pitch">
                 <TabsTrigger value="bench" {...dropOn('list:bench')} className={lit('list:bench')}>Bench · {bench.length}</TabsTrigger>
                 <TabsTrigger value="not_selected" {...dropOn('list:not_selected')} className={lit('list:not_selected')}>Not selected · {leftOut.length}</TabsTrigger>
               </TabsList>
-              {/* Both panels stay mounted, so a tab is never mid-animation when a drag lands; the other is hidden. */}
-              <TabsContent value="bench" forceMount hidden={list !== 'bench'} {...dropOn('list:bench')} className={`grid gap-3 rounded-xl ${lit('list:bench')}`}>
+              {/* Both panels stay mounted, so a tab is never mid-animation when a drag lands; the other is hidden. The grid
+                  is inside each panel: a display class on the panel itself would override `hidden` and show both. */}
+              <TabsContent value="bench" forceMount hidden={list !== 'bench'} {...dropOn('list:bench')} className={`rounded-xl ${lit('list:bench')}`}>
+                <div className="grid gap-3">
                 {!locked && <p className="text-sm text-ink-3">Drag a player onto a place on the pitch, or onto Not selected to leave them out.</p>}
                 {bench.length === 0
                   ? <p className="text-sm text-ink-2">{starters.size + leftOut.length === 0 ? 'Nobody can come yet. Confirm players in Squad › Availability.' : 'Nobody on the bench.'}</p>
                   : faces(bench, 'bench')}
+                </div>
               </TabsContent>
-              <TabsContent value="not_selected" forceMount hidden={list !== 'not_selected'} {...dropOn('list:not_selected')} className={`grid gap-3 rounded-xl ${lit('list:not_selected')}`}>
+              <TabsContent value="not_selected" forceMount hidden={list !== 'not_selected'} {...dropOn('list:not_selected')} className={`rounded-xl ${lit('list:not_selected')}`}>
+                <div className="grid gap-3">
                 <p className="text-sm text-ink-3">Their families see “Not in the squad this week”. Each player reads your note.</p>
                 {leftOut.length === 0
                   ? <p className="text-sm text-ink-2">{locked ? 'Nobody was left out.' : 'Nobody is left out. Drag a player onto this tab, or pick Not selected in their sheet.'}</p>
                   : faces(leftOut, 'not selected')}
+                </div>
               </TabsContent>
             </Tabs>
           </section>

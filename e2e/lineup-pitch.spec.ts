@@ -145,6 +145,8 @@ for (const [width, height] of [[1440, 900], [1280, 800], [834, 1112], [390, 844]
     await expect(tab(page, 'Not selected')).toHaveAccessibleName('Not selected · 2')
     await tab(page, 'Not selected').click()
     await expect(page.getByRole('group', { name: 'Not selected' }).getByRole('button', { name: 'Synthetic Defender 03, not selected' })).toBeVisible()
+    // One panel at a time: the Bench's is hidden, not drawn under this one.
+    await expect(page.getByRole('group', { name: 'Bench', exact: true })).toBeHidden()
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     await page.waitForTimeout(400)
     await page.screenshot({ path: testInfo.outputPath(`lineup-dragged-${width}.png`), fullPage: true })

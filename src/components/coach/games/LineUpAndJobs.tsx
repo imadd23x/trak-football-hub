@@ -19,8 +19,7 @@ import { MorphSelect } from '@/components/arc/morph-select/morph-select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/arc/tabs/tabs'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
-/* TRAK-285 (Games 3/8): plan step 2, line-up and jobs (TRAK-282; the mockup's Squad step merged in, Imad 27 Oct). The
-   coach picks a format and a formation, places players who can come, and gives each a job and a note. Off the pitch,
+/* TRAK-285 (Games 3/8): plan step 2, line-up and jobs (TRAK-282; the mockup's Squad step merged in, Imad 27 Oct).    coach picks a format and a formation, places players who can come, and gives each a job and a note. Off the pitch,
    a player is on the bench unless the coach leaves them out (Imad, 28 Oct). The sheet is a bottom sheet on a phone,
    and a panel beside the pitch on a tablet or laptop, where the pitch stays in view. TRAK-287: locked at kick-off, the
    pitch and the sheet only show what was planned. TRAK-329 (Imad, 2 Nov): format and formation are one Arc morph
@@ -112,7 +111,9 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
           on a tablet the tabs below would scroll under the pinned pitch (and a drop there would land on the tabs). The
           pitch card holds only the picker and the pitch, capped to the screen's height, so pinned under the match
           header's tabs (Imad, 6 Nov) it still fits above the bottom bar; the hint and the key sit over the tabs. The
-          16rem is the gap under the header, the card's padding and picker row, and the Back and Next bar below. */}
+          20rem is the gap under the header, the card's padding and picker row, the Back and Next bar below, and slack:
+          a sticky card rides up with the bottom of its row, so a shorter card stays pinned for longer (CI's fonts run
+          a few pixels shorter than a Mac's). */}
       <div className="grid gap-4 tablet:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] tablet:items-start laptop:grid-cols-[minmax(0,5fr)_minmax(0,4fr)_minmax(0,3fr)]">
         <section aria-labelledby="plan-pitch" className={`${card} laptop:sticky laptop:top-[calc(var(--ph-pinned,0px)+1rem)]`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -121,7 +122,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
               searchable={false} panelWidth={200} /></span>}
             <span className="text-sm text-ink-3">Attacking ↑</span>
           </div>
-          <Pitch shape={shape} format={form.format} starters={starters} swap={drag} className="laptop:max-w-[min(460px,calc((100dvh_-_var(--ph-pinned,0px)_-_16rem)*0.8))]"
+          <Pitch shape={shape} format={form.format} starters={starters} swap={drag} className="laptop:max-w-[min(460px,calc((100dvh_-_var(--ph-pinned,0px)_-_20rem)*0.8))]"
             selected={target?.kind === 'slot' ? target.slot : target ? playerPlan(form.players, target.id).slot : null}
             onSelect={slot => setTarget(starters.has(slot) ? { kind: 'player', id: starters.get(slot)!.id } : { kind: 'slot', slot })} />
           <DragGhost drag={drag?.drag ?? null} />

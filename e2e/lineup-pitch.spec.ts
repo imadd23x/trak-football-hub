@@ -133,7 +133,7 @@ for (const [width, height] of [[1440, 900], [1280, 800], [834, 1112], [390, 844]
     // Beside the pitch on a laptop; under it on a tablet and a phone.
     if (width >= 1024) expect(tabsBox.x).toBeGreaterThanOrEqual(pitchBox.x + pitchBox.width)
     else expect(tabsBox.y).toBeGreaterThanOrEqual(pitchBox.y + pitchBox.height)
-    await page.screenshot({ path: testInfo.outputPath(`lineup-${width}.png`), fullPage: true })
+    await page.screenshot({ path: testInfo.outputPath(`lineup-${width}.png`) })
 
     // A real drag: the second keeper from the bench onto the keeper's place; the keeper goes to the bench.
     await drag(page, page.getByRole('group', { name: 'Bench' }).getByRole('button', { name: /^Synthetic Goalkeeper 02, bench/ }), place(page, 1))
@@ -149,7 +149,7 @@ for (const [width, height] of [[1440, 900], [1280, 800], [834, 1112], [390, 844]
     await expect(page.getByRole('group', { name: 'Bench', exact: true })).toBeHidden()
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     await page.waitForTimeout(400)
-    await page.screenshot({ path: testInfo.outputPath(`lineup-dragged-${width}.png`), fullPage: true })
+    await page.screenshot({ path: testInfo.outputPath(`lineup-dragged-${width}.png`) })
 
     // Saved as the pitch shows it.
     if (width > 560) await page.getByRole('button', { name: 'Save draft' }).click()

@@ -34,7 +34,7 @@ export function UseForMatchesSheet({ formation, squad, using, problem, onClose, 
   const submit = () => (replacing.length > 0 && !confirming ? setConfirming(true) : onUse(matches.filter(game => picked.has(game.id)).map(game => game.id)))
   const failed = games.isError || saved.isError
 
-  return <BottomSheet className="arc" open onOpenChange={open => { if (!open) onClose() }} title={`Use ${formation.name} for matches`}
+  return <BottomSheet className="arc" detents={[0.92]} open onOpenChange={open => { if (!open) onClose() }} title={`Use ${formation.name} for matches`}
     description="Each match gets its own copy. Editing the formation later never changes a match.">
     <div className="grid gap-4 pb-4">
       {failed ? <Alert tone="danger" title="Couldn't load your matches. Check your connection and try again." />

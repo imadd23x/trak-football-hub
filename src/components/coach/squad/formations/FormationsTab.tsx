@@ -150,7 +150,7 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
 
   const dirty = !!edit && !same(edit.draft, draftOf(saved))
   const copyTo = (eventIds: string[]) => writes.use.mutate({ id: saved.id, eventIds }, {
-    onSuccess: () => { setUsing(false); setUseProblem(null); toast(`${saved.name} copied to ${plural(eventIds.length, 'match')}.`) },
+    onSuccess: () => { setUsing(false); setUseProblem(null); toast(`${saved.name} copied to ${eventIds.length === 1 ? '1 match' : `${eventIds.length} matches`}.`) },
     onError: error => setUseProblem((error as { code?: string }).code === 'P0001' ? 'A match has kicked off, so its plan is locked. Pick the others and try again.'
       : "Couldn't copy the formation. Check your connection and try again."),
   })

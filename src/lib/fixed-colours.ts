@@ -36,3 +36,6 @@ export const PITCH = {
   zone: 'rgb(255 255 255 / 0.16)',
   middle: 'rgb(255 255 255 / 0.14)',
 } as const
+/** TRAK-387: the Drill Library's three tiles (8 Nov mockup), white text on each (5.3:1 or more): Technical slate,
+ *  Skill green, Game related deep green. The same in every theme, as the Library's other tiles are. */
+export const PRACTICE_KIND_COLOURS = { technical: '#516D7C', skill: '#227632', game: '#084D1A' } as const

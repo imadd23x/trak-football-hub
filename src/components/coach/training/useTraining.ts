@@ -202,22 +202,6 @@ export function useDrills() {
   })
 }
 
-/** Adds a drill, or changes one when it has an id. The database stamps the coach and refuses another's drill. */
-export function useSaveDrill() {
-  const { user } = useAuth()
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, draft }: { id?: string; draft: DrillDraft & Pick<MyDrill, 'part_type' | 'players_kind' | 'group_size'> }) => {
-      const drill = cleanDrill(draft)
-      const { error } = id
-        ? await supabase.from('coach_drills').update(drill).eq('id', id).eq('coach_user_id', user!.id).select('id').single()
-        : await supabase.from('coach_drills').insert(drill).select('id').single()
-      if (error) throw error
-    },
-    onSuccess: () => client.invalidateQueries({ queryKey: ['coach', user?.id, 'drills'] }),
-  })
-}
-
 /** TRAK-340: Write your own, saved to My drills under its part, and the drill as saved. */
 export function useAddDrill() {
   const { user } = useAuth()
@@ -228,18 +212,6 @@ export function useAddDrill() {
         players_kind: drill.players_kind, group_size: drill.group_size }).select(DRILL_COLUMNS).single()
       if (error) throw error
       return data
-    },
-    onSuccess: () => client.invalidateQueries({ queryKey: ['coach', user?.id, 'drills'] }),
-  })
-}
-
-export function useDeleteDrill() {
-  const { user } = useAuth()
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('coach_drills').delete().eq('id', id).eq('coach_user_id', user!.id).select('id').single()
-      if (error) throw error
     },
     onSuccess: () => client.invalidateQueries({ queryKey: ['coach', user?.id, 'drills'] }),
   })

@@ -330,23 +330,5 @@ describe('TRAK-340: drafts and a saved plan', { timeout: 30_000 }, () => {
   })
 })
 
-describe('TRAK-296 kept: Add to the next training from Training › Drills', { timeout: 30_000 }, () => {
-  it('adds the drill as a part at the end and opens Review', async () => {
-    const user = userEvent.setup()
-    const { saves } = database([training('next', onTheMinute(Date.now() + 2 * DAY))], {}, {
-      drills: [{ id: 'd-20', name: 'Finishing 3v2', minutes: 20, how: 'Three attack two.', tell: '', area: '', numbers: '', direction: '',
-        targets: '', conditions: '', updated_at: '2026-10-27T10:00:00Z', part_type: 'finishing', players_kind: 'groups', group_size: 5 }],
-    })
-    renderApp('/coach/training/drills')
-    await user.click(await screen.findByRole('button', { name: /^Add Finishing 3v2 to / }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/next/plan'))
-    expect(await screen.findByRole('heading', { name: 'Review' })).toBeInTheDocument()
-    const plan = within(screen.getByRole('list', { name: 'The plan' })).getAllByRole('listitem')
-    expect(plan).toHaveLength(6)
-    expect(plan[5]).toHaveTextContent('Finishing')
-    expect(plan[5]).toHaveTextContent('Finishing 3v2')
-    await user.click(screen.getByRole('button', { name: 'Save the plan' }))
-    await waitFor(() => expect(saves).toHaveLength(1))
-    expect((saves[0].p_practices as Record<string, unknown>[]).at(-1)).toMatchObject({ name: 'Finishing 3v2', source: 'drill', drill_id: 'd-20', part_type: 'finishing' })
-  })
-})
+// TRAK-387: Training › Drills is the Library now, with no coach-made drills; adding a Library drill to a training
+// comes back with TRAK-391.

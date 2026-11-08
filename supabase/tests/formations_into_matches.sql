@@ -79,7 +79,9 @@ INSERT INTO public.squad_players(id,coach_user_id,player_name,linked_player_id,a
 INSERT INTO public.coach_calendar_events(id,coach_user_id,title,event_type,opponent,starts_at,start_time,published,squad)
  SELECT pg_temp.f360id(n), pg_temp.f360id(CASE WHEN n = 506 THEN 11 ELSE 10 END), 'vs Team '||n, 'match', 'Team '||n,
   CASE WHEN n = 504 THEN '2020-11-07 15:00+00' ELSE '2054-11-07 15:00+00' END::timestamptz, '19:00', true, 'U16'
- FROM unnest(ARRAY[500,501,502,503,504,505,506,507,508,510]) n;
+ FROM unnest(ARRAY[500,501,502,503,504,505,506,507,508,510,511,512]) n;
+-- 511 and 512: matches with no squad stored, as a coach with one squad adds them.
+UPDATE public.coach_calendar_events SET squad=NULL WHERE id IN (pg_temp.f360id(511), pg_temp.f360id(512));
 INSERT INTO public.academy_features(organization_id,feature) VALUES
  (pg_temp.f360id(100),'games'),(pg_temp.f360id(100),'season_plan');
 
@@ -215,6 +217,10 @@ SELECT pg_temp.f360check((public.load_default_formation(pg_temp.f360id(503)) ->>
 SELECT pg_temp.f360check((SELECT by_default FROM public.formation_copies WHERE formation_id=pg_temp.f360id(700) AND event_id=pg_temp.f360id(503)),
   '5 and the copy says it was the default');
 SELECT pg_temp.f360check(public.load_default_formation(pg_temp.f360id(503)) IS NULL,'5 it loads once');
+SELECT pg_temp.f360check((public.load_default_formation(pg_temp.f360id(511)) ->> 'formation')='Balanced' AND pg_temp.f360line(511)='40:starter:2 41:starter:3 45:starter:1 48:starter:6',
+  '5 a match with no squad stored belongs to a coach''s one squad, so it loads that squad''s default');
+SELECT pg_temp.f360check((SELECT jsonb_array_length(public.use_formation_for_matches(pg_temp.f360id(701), ARRAY[pg_temp.f360id(512)])))=1 AND pg_temp.f360line(512)='45:starter:1',
+  '5 and takes a copy');
 SELECT pg_temp.f360check((public.load_default_formation(pg_temp.f360id(507)) ->> 'formation')='Small' AND pg_temp.f360line(507)='40:starter:2 45:starter:1',
   '5 a 7-a-side match gets the 7-a-side default');
 SELECT pg_temp.f360check(public.load_default_formation(pg_temp.f360id(508)) IS NULL AND pg_temp.f360line(508)='',
@@ -250,7 +256,7 @@ RESET ROLE;
 DO $$ DECLARE failures text; total integer;
 BEGIN
  SELECT count(*) INTO total FROM pg_temp.f360_results;
- IF total <> 44 THEN RAISE EXCEPTION 'Formations into matches: % checks ran; expected 44', total; END IF;
+ IF total <> 46 THEN RAISE EXCEPTION 'Formations into matches: % checks ran; expected 46', total; END IF;
  SELECT string_agg(label, E'\n') INTO failures FROM pg_temp.f360_results WHERE NOT ok;
  IF failures IS NOT NULL THEN RAISE EXCEPTION 'Formations into matches checks failed:%', E'\n' || failures; END IF;
  RAISE NOTICE 'Formations into matches: % of % passed', total, total;

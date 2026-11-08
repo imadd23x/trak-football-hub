@@ -93,6 +93,23 @@ every write handler stops at `useParked()`.
 
 Code: `src/pages/coach/training/`, `src/components/coach/training/`, `src/lib/training/`.
 
+## Drill Library (TRAK-384, building)
+
+The new Library replaces the Drills tab and feeds Plan session, in 11 steps (TRAK-385 to TRAK-395). Step 1 (TRAK-385)
+is the engine in `src/lib/training/library/`, with no screens, so nothing changes for anyone yet:
+
+- **Drills** (`drills.ts`) live in the app, not the database: a coach can only bookmark a Trak drill, never change
+  it. Each id starts with `lib-`, so an old plan's `trak_drill` (`w1`, `p1`… from `shelf.ts`) never finds a Library
+  drill. The 44 drills now are sample content; the real library replaces them (TRAK-388).
+- **Kinds** (`kinds.ts`): Get ready, then Technical, Skill and Game related, each with its drill types. Each drill
+  fits one of the session's parts (Technical → Passing & movement, Skill → Rondo, a small-sided game → Game, other
+  Game related → Functional drills) and has a players shape so Who's here keeps working until TRAK-393.
+- **Fit** (`fit.ts`): a drill fitted to any number of players at one of 8 levels gives the five details (area,
+  numbers, targets, direction, conditions). Every drill starts at level 4 of 8. Easier / Harder goes to the next
+  level that really changes something and says why; Players today refits at the same level.
+- **Search** (`search.ts`): by name, type, other names coaches use, topics and the fitted numbers, with "4 v 4" =
+  "4v4" and one spelling slip allowed (two in long words).
+
 ## Switching it on
 
 The operator runs one line (see `20261028020000_training_drills.sql`):

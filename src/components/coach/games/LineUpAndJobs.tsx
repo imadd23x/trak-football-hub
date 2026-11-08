@@ -34,6 +34,10 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
 const SHAPES = FORMATS.map(format => ({ label: `${format} a side`, options: FORMATIONS[format].map(shape => ({ value: shape, label: shape })) }))
+/** A tab's name with its count under it, so three tabs fit the card on a phone and beside the pitch. The name is still
+ *  "Bench · 6" to a screen reader. */
+const TabLabel = ({ name, count }: { name: string; count: number }) =>
+  <span className="grid justify-items-center leading-tight"><span>{name} </span><span className="text-xs">· {count}</span></span>
 type List = 'bench' | 'not_selected' | 'not_attending'
 const LISTS = { 'list:bench': 'bench', 'list:not_selected': 'not_selected', 'list:not_attending': 'not_attending' } as const
 
@@ -157,9 +161,9 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false, copy = 
             {/* min-w-0: three tabs are wider than a phone's card, and the tab list scrolls within it rather than the page. */}
             <Tabs className="min-w-0" value={list} onValueChange={value => setList(value as List)}>
               <TabsList aria-label="Off the pitch">
-                <TabsTrigger value="bench" {...dropOn('list:bench')} className={`!min-w-0 !px-2 ${lit('list:bench')}`}>Bench · {bench.length}</TabsTrigger>
-                <TabsTrigger value="not_selected" {...dropOn('list:not_selected')} className={`!min-w-0 !px-2 ${lit('list:not_selected')}`}>Not selected · {leftOut.length}</TabsTrigger>
-                <TabsTrigger value="not_attending" {...dropOn('list:not_attending')} className={`!min-w-0 !px-2 ${lit('list:not_attending')}`}>Not attending · {notComing.length}</TabsTrigger>
+                <TabsTrigger value="bench" {...dropOn('list:bench')} className={`!min-w-0 !px-2 laptop:!px-1 laptop:!text-[13px] ${lit('list:bench')}`}><TabLabel name="Bench" count={bench.length} /></TabsTrigger>
+                <TabsTrigger value="not_selected" {...dropOn('list:not_selected')} className={`!min-w-0 !px-2 laptop:!px-1 laptop:!text-[13px] ${lit('list:not_selected')}`}><TabLabel name="Not selected" count={leftOut.length} /></TabsTrigger>
+                <TabsTrigger value="not_attending" {...dropOn('list:not_attending')} className={`!min-w-0 !px-2 laptop:!px-1 laptop:!text-[13px] ${lit('list:not_attending')}`}><TabLabel name="Not attending" count={notComing.length} /></TabsTrigger>
               </TabsList>
               {/* Both panels stay mounted, so a tab is never mid-animation when a drag lands; the other is hidden. The grid
                   is inside each panel: a display class on the panel itself would override `hidden` and show both. */}

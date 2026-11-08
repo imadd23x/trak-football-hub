@@ -21,7 +21,8 @@ export function UseForMatchesSheet({ formation, squad, using, problem, onClose, 
   const games = useGames()
   // Upcoming: not kicked off, as the database requires. Read once, so the list doesn't shift while it is open.
   const [now] = useState(() => Date.now())
-  const matches = (games.data ?? []).filter(game => game.squad === squad && Date.parse(game.starts_at) > now)
+  // A match with no squad stored (a coach with one squad doesn't pick one) is the coach's, so it's offered here too.
+  const matches = (games.data ?? []).filter(game => (game.squad == null || game.squad === squad) && Date.parse(game.starts_at) > now)
   const saved = useSavedLineUps(matches.map(game => game.id))
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)

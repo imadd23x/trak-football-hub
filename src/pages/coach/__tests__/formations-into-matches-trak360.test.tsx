@@ -124,6 +124,8 @@ beforeEach(() => {
     table('coach_calendar_events', [
       match('m-alpha', 'Alpha', 'U16', 3 * DAY), match('m-beta', 'Beta', 'U16', 5 * DAY),
       match('m-past', 'Past', 'U16', -2 * DAY), match('m-u14', 'Younger', 'U14', 4 * DAY),
+      // A coach with one squad doesn't pick one, so a match can have none stored.
+      { ...match('m-none', 'Nosquad', 'U16', 6 * DAY), squad: null },
     ]),
     http.get(`${SUPABASE_URL}/rest/v1/game_plan_players`, () => HttpResponse.json([{ event_id: 'm-beta' }])),
     ...['use_formation_for_matches', 'set_default_formation'].map(name => http.post(`${SUPABASE_URL}/rest/v1/rpc/${name}`, async ({ request }) => {
@@ -145,7 +147,8 @@ describe('TRAK-360 Squad › Formations into matches', () => {
     await openFormations()
     await u.click(await screen.findByRole('button', { name: 'Use for matches' }))
     const list = await screen.findByRole('group', { name: 'Upcoming matches' })
-    expect(within(list).getAllByRole('checkbox').map(box => box.getAttribute('id') && (box.closest('div')?.textContent ?? ''))).toHaveLength(2)
+    expect(within(list).getAllByRole('checkbox').map(box => box.getAttribute('id') && (box.closest('div')?.textContent ?? ''))).toHaveLength(3)
+    expect(within(list).getByText(/vs Nosquad/)).toBeInTheDocument()
     expect(within(list).getByText(/vs Alpha/)).toBeInTheDocument()
     expect(within(list).queryByText(/vs Past/)).toBeNull()
     expect(within(list).queryByText(/vs Younger/)).toBeNull()

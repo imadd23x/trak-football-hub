@@ -62,6 +62,8 @@ beforeEach(() => {
     game('g2', Date.now() - 3 * 60 * MINUTE, { squad: 'U17', opponent: 'Mirdif Rangers', home_away: 'away', venue: 'Mirdif Stadium' }),
   ]
   server.use(
+    // TRAK-363: the plan's Instructions offer the squad's season objectives.
+    table('season_plans', []),
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Otto Rehhagel', invite_code: 'ABCD' }]),
     table('coach_details', [{ user_id: COACH.id, coach_role: 'Head Coach', team: 'U16', organization_id: 'org-1' }]),
     table('organizations', [{ id: 'org-1', name: 'Rehearsal FC', logo_url: null }]),
@@ -98,6 +100,8 @@ const headerButton = (name: string) => {
   return found[0]
 }
 const noHeaderButton = (name: string | RegExp) => expect(inHeader(screen.queryAllByRole('button', { name }))).toHaveLength(0)
+/** The header's details row, under the title and its status. */
+const details = () => screen.getByRole('heading', { level: 1 }).parentElement!.nextElementSibling as HTMLElement
 const tab = (name: RegExp) => within(screen.getByRole('tablist', { name: 'This match' })).getByRole('tab', { name })
 
 describe('Match header', { timeout: 30_000 }, () => {
@@ -107,12 +111,13 @@ describe('Match header', { timeout: 30_000 }, () => {
     const top = await header('vs Parkview Athletic')
     expect(within(top).getByRole('heading', { level: 1, name: 'vs Parkview Athletic' })).toBeInTheDocument()
     expect(within(top).getByText('Plan not written')).toBeInTheDocument()
-    expect(top).toHaveTextContent(/\w{3} \d{1,2} \w{3} · Kick-off \d\d:\d\d/)
-    expect(top).toHaveTextContent('Rehearsal Park · Home')
-    expect(await within(top).findByText('U16 · 2 players', {}, { timeout: 5000 })).toBeInTheDocument()
+    // Imad, 6 Nov: the kick-off is its own item (a clock), apart from the day; the squad is its age group alone.
+    expect(Array.from(details().children, item => item.textContent)).toEqual([expect.stringMatching(/^\w{3} \d{1,2} \w{3}$/),
+      expect.stringMatching(/^Kick-off \d\d:\d\d$/), 'Rehearsal Park · Home', 'U16'])
     expect(tab(/^Logistics/)).toHaveAccessibleName('Logistics shared')
     expect(tab(/^Evaluation/)).toHaveAccessibleName('Evaluation After the match')
-    expect(await within(top).findByRole('tab', { name: 'Game plan 4 to do' })).toBeInTheDocument()
+    expect(await within(top).findByRole('tab', { name: 'Game plan 4 to do' }, { timeout: 5000 })).toBeInTheDocument()
+    expect(details()).toHaveTextContent(/U16$/)
 
     // Logistics has no draft of its own: no Save draft. Review game plan opens Review & share.
     noHeaderButton('Save draft')
@@ -150,7 +155,7 @@ describe('Match header', { timeout: 30_000 }, () => {
     const top = await header('vs Mirdif Rangers')
     expect(within(top).getByText('Full time')).toBeInTheDocument()
     expect(top).toHaveTextContent('Mirdif Stadium · Away')
-    expect(await within(top).findByText('U17 · 1 player', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(details().lastElementChild).toHaveTextContent(/^U17$/)
     expect(tab(/^Evaluation/)).toHaveAccessibleName('Evaluation')
     // Locked at kick-off: nothing left to do on the plan, and no menu.
     expect(tab(/^Game plan/)).toHaveAccessibleName('Game plan')

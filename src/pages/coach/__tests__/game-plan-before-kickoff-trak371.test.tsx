@@ -39,6 +39,8 @@ const starter = (id: string, slot: number, job: string) =>
 
 function setup(lineUp: ReturnType<typeof starter>[], goals: { title: string; looks_like: string }[] = []) {
   server.use(
+    // TRAK-363: the plan's Instructions offer the squad's season objectives.
+    table('season_plans', []),
     table('coach_calendar_events', [game()]),
     table('game_plans', [{
       event_id: 'g1', strength: 'stronger', their_formation: null, key_players: [], scouting: '', format: 11, formation: '4-4-2',
@@ -69,6 +71,9 @@ beforeEach(() => {
     table('game_evaluations', []),
     table('game_evaluation_players', []),
     table('game_evaluation_notes', []),
+    // TRAK-358: Can also play, for Out of position on the line-up; nobody has one.
+    table('squad_player_also_plays', []),
+    table('squad_player_roles', []),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear() })
@@ -117,6 +122,7 @@ describe('TRAK-371: the Game plan before kick-off', { timeout: 30_000 }, () => {
     expect(screen.queryByRole('button', { name: 'Take off the pitch' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Move to bench' }))
     expect(screen.getByRole('button', { name: 'Slot 4, empty' })).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Everyone’s job' })).getByRole('button', { name: /Theodoros Zagorakis/ })).toHaveTextContent('Bench')
+    // TRAK-358: on the Bench tab now, as Everyone's job went.
+    expect(within(screen.getByRole('tabpanel', { name: /^Bench/ })).getByRole('button', { name: 'Theodoros Zagorakis, bench' })).toBeInTheDocument()
   })
 })

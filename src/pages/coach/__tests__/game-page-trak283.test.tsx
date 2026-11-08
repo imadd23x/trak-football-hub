@@ -39,6 +39,8 @@ const soon = () => Math.ceil((Date.now() + 5 * DAY) / MINUTE) * MINUTE
 function events(rows: Record<string, unknown>[]) {
   const asked: URL[] = []
   server.use(
+    // TRAK-363: the plan's Instructions offer the squad's season objectives.
+    table('season_plans', []),
     http.get(`${SUPABASE_URL}/rest/v1/coach_calendar_events`, ({ request }) => { asked.push(new URL(request.url)) }),
     table('coach_calendar_events', rows),
   )

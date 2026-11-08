@@ -663,16 +663,17 @@ use_cases:
   # one child and one child waiting for consent.
   - id: UC-E11
     actor: coach
-    title: Mark each child Confirmed for an event from the squad's WhatsApp replies
+    title: Mark who isn't coming to a match from the squad's WhatsApp replies, in the match's line-up
     requirement: J8
     status: pending
     tier: [2]
-    spec_version: 1
-    given: A coach with a published, not-cancelled match for their squad, consented children, one child whose guardian reported "Can't make it" and one child waiting for consent
-    when: They open the Squad tab's Availability and tap children to mark who the WhatsApp group said is coming
+    spec_version: 2
+    given: A coach with a published, not-cancelled match for their squad, consented children, one child whose guardian reported "Can't make it" and one child waiting for consent, in an academy where the season plan is on
+    when: They plan the match and open the line-up's Not attending tab, then drag in two more children the WhatsApp group said aren't coming
     then:
-      - Each tap moves the child between Confirmed and Not confirmed, and the counts and the confirmed goalkeepers follow
-      - The guardian's report shows as a "Reported can't make it" tag on the child, in whichever column the child is in
-      - The child waiting for consent is listed as not eligible and cannot be confirmed; the database refuses it too
-      - Families never see the confirmations in Trak, and the coach can still change them until the end of the event's day
-    source: TRAK-250
+      - Everyone counts as coming unless they are in Not attending; there are no Confirmed ticks, and Squad has no Availability tab
+      - The child whose guardian reported "Can't make it" starts in Not attending with that tag, never the reason, and stays there until the family undoes the report; the database refuses moving them out
+      - The coach drags the other two in and back out, and the counts and the Review step follow
+      - After Share, a Not attending child and their guardian read "Not in the squad this week" and never why; the child waiting for consent cannot be placed, and the database refuses it too
+      - Only the match's coach writes Not attending; another coach cannot
+    source: TRAK-359 (replaces TRAK-250's Availability path for academies with the season plan)

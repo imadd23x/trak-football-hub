@@ -385,7 +385,9 @@ test("a game's line-up at 1440 px: the pitch stays in view while the panel besid
   await job.fill('Stay tight to their number 9. Win the first header.')
   await expect(pitch).toBeInViewport()
   await expect(job).toBeInViewport()
-  await expect(page.getByRole('progressbar', { name: '1 of 11 starters have a job' })).toBeVisible()
+  // TRAK-358: Everyone's job and its count went; the face says it (a midfielder at the back is out of position).
+  await expect(page.getByRole('button', { name: 'Traianos Dellas, slot 2, has a job, context: out of position', exact: true })).toBeVisible()
+  await expect(page.getByRole('progressbar')).toHaveCount(0)
   // Match header (Imad, 6 Nov): scrolled, the pitch pins under the header's tabs, never behind them.
   await page.mouse.wheel(0, 600)
   await page.waitForTimeout(400)
@@ -413,33 +415,40 @@ const DRAFT = (): Plans => new Map([
   ['line-up:m-next:sq-1', { event_id: 'm-next', squad_player_id: 'sq-1', role: 'starter', slot: 4, job: 'Stay tight to their winger.',
     note: 'Second game at right-back. Proud of you.', context: ['out_of_position'], expectation: 'stretch' }],
 ])
-// TRAK-317: a starter expected to stretch stands out on the pitch, with a key under it. TRAK-370 (Imad, 5 Nov): stretch
-// and context are Trak's orange, lead Trak's blue, on Arc's current badge (soft corners, no border).
+/** A Trak colour token as the browser resolves it, and an Arc badge's tone and shape (TRAK-370). */
+const trak = (page: Page, token: string) => page.evaluate(name => `rgb(${getComputedStyle(document.documentElement).getPropertyValue(name).trim().split(/\s+/).join(', ')})`, token)
+const badge = (page: Page, text: string) => page.getByText(text, { exact: true }).first().locator('xpath=ancestor::span[contains(@class, "badge")][1]')
+const tone = (page: Page, text: string) => badge(page, text).evaluate(el => getComputedStyle(el).getPropertyValue('--badge-tone').replace(/\s+/g, ' ').trim()
+  .replace(/^rgb\((\d+) (\d+) (\d+)\)$/, 'rgb($1, $2, $3)'))
+
+// TRAK-317: a starter expected to stretch stands out on the pitch, with a key under it. TRAK-358 (Season plan 10/18;
+// Tarek, 6 Nov): on Formations' pitch every face has its markers: a yellow ring for Stretch, a green one for Lead, a ✓
+// for a job and an i for context, each said in the face's name too. TRAK-370's orange and blue stay on the badges,
+// which left the line-up with Everyone's job (the evaluation test checks them).
 for (const [width, height] of [[390, 844], [1440, 900]] as const) {
-  test(`a stretch starter at ${width} px: an orange circle on the pitch, the key, and orange, blue and soft-cornered badges`, async ({ page, context }, testInfo) => {
+  test(`stretch and lead starters at ${width} px: yellow and green rings on the pitch, a ✓ and an i, and the key`, async ({ page, context }, testInfo) => {
     const plans = DRAFT()
     plans.set('line-up:m-next:sq-2', { event_id: 'm-next', squad_player_id: 'sq-2', role: 'starter', slot: 2, job: 'Organise the back four.',
       note: '', context: [], expectation: 'lead' })
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next?tab=plan', width, height, plans)
     await page.getByRole('button', { name: 'Next: Line-up and jobs' }).click()
-    const stretch = page.getByRole('button', { name: /, slot 4, stretch$/ })
+    const stretch = page.getByRole('button', { name: 'Theodoros Zagorakis, slot 4, stretch, has a job, context: out of position', exact: true })
+    const lead = page.getByRole('button', { name: 'Angelos Charisteas, slot 2, lead, has a job', exact: true })
     await expect(stretch).toBeVisible()
-    const trak = (token: string) => page.evaluate(name => `rgb(${getComputedStyle(document.documentElement).getPropertyValue(name).trim().split(/\s+/).join(', ')})`, token)
-    const orange = await trak('--t-orange')
-    expect(orange).toBe('rgb(156, 69, 22)')
-    expect(await stretch.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(orange)
-    await expect(page.getByText('Orange: stretch')).toBeVisible()
-    // Each badge's tone, as its stylesheet resolves it, and its shape.
-    const badge = (text: string) => page.getByText(text, { exact: true }).locator('xpath=ancestor::span[contains(@class, "badge")][1]')
-    const tone = (text: string) => badge(text).evaluate(el => getComputedStyle(el).getPropertyValue('--badge-tone').replace(/\s+/g, ' ').trim())
-    const rgbOf = (value: string) => value.replace(/^rgb\((\d+) (\d+) (\d+)\)$/, 'rgb($1, $2, $3)')
-    expect(rgbOf(await tone('Expect: Stretch'))).toBe(orange)
-    expect(rgbOf(await tone('Out of position'))).toBe(orange)
-    expect(rgbOf(await tone('Expect: Lead'))).toBe(await trak('--t-info'))
-    const shape = await badge('Expect: Stretch').evaluate(el => ({ radius: getComputedStyle(el).borderTopLeftRadius, edge: getComputedStyle(el).borderTopColor }))
-    expect(shape).toEqual({ radius: '5px', edge: 'rgba(0, 0, 0, 0)' })
+    await expect(lead).toBeVisible()
+    const ring = (face: ReturnType<Page['getByRole']>) => face.locator('[class*="shadow-"]').first().evaluate(el => getComputedStyle(el).boxShadow)
+    const yellow = await trak(page, '--t-attention'), green = await trak(page, '--t-success')
+    expect(yellow).toBe('rgb(234, 179, 8)')
+    expect(await ring(stretch)).toContain(yellow)
+    expect(await ring(lead)).toContain(green)
+    await expect(stretch.locator('[data-mark="done"]')).toBeVisible()
+    await expect(stretch.locator('[data-mark="context"]')).toBeVisible()
+    await expect(lead.locator('[data-mark="context"]')).toHaveCount(0)
+    const key = page.getByRole('list', { name: 'Key' })
+    await expect(key.getByText('Yellow ring: Stretch')).toBeVisible()
+    await expect(key.getByText('Green ring: Lead')).toBeVisible()
     await page.waitForTimeout(400)
-    await page.getByRole('region', { name: '4-4-2' }).screenshot({ path: testInfo.outputPath(`stretch-pitch-${width}.png`) })
+    await page.getByRole('region', { name: '4-4-2' }).screenshot({ path: testInfo.outputPath(`rings-pitch-${width}.png`) })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
@@ -502,7 +511,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(keyboard.missed).toEqual([])
     await share.focus()
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('region', { name: 'Shared' })).toBeVisible()
+    await expect(page.getByRole('region', { name: /^Shared at / })).toBeVisible()
     expect(plans.get('share:m-next')).toMatchObject({ talked: true })
     expect(plans.get('m-next')).toMatchObject({ goals: [{ title: 'Win it back in their half' }] })
     await expect(matchStatus(page).getByText('Plan shared')).toBeVisible()
@@ -676,7 +685,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
       ['line-up:m-past:sq-1', { event_id: 'm-past', squad_player_id: 'sq-1', role: 'starter', slot: 4, job: 'Stay tight to their winger.',
         note: '', context: ['out_of_position'], expectation: 'stretch' }],
       ['line-up:m-past:sq-4', { event_id: 'm-past', squad_player_id: 'sq-4', role: 'starter', slot: 2, job: 'Win the first header.',
-        note: '', context: [], expectation: 'usual' }],
+        note: '', context: [], expectation: 'lead' }],
     ])
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-past?tab=evaluation', width, height, plans)
     // Result: 2–1, Zagorakis scored the first, Charisteas came on.
@@ -700,6 +709,15 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const card = page.getByRole('button', { name: /^Theodoros Zagorakis/ })
     await expect(card).toContainText('Did the job · Met')
     await expect(card).toContainText('Expected: Stretch')
+    // TRAK-370 (Imad, 5 Nov), here since TRAK-358 took Everyone's job off the line-up: stretch and context are Trak's
+    // orange, lead Trak's blue, on Arc's current badge (soft corners, no border).
+    const orange = await trak(page, '--t-orange')
+    expect(orange).toBe('rgb(156, 69, 22)')
+    expect(await tone(page, 'Expected: Stretch')).toBe(orange)
+    expect(await tone(page, 'Out of position')).toBe(orange)
+    expect(await tone(page, 'Expected: Lead')).toBe(await trak(page, '--t-info'))
+    const shape = await badge(page, 'Expected: Stretch').evaluate(el => ({ radius: getComputedStyle(el).borderTopLeftRadius, edge: getComputedStyle(el).borderTopColor }))
+    expect(shape).toEqual({ radius: '5px', edge: 'rgba(0, 0, 0, 0)' })
     await card.click()
     const expanded = page.locator('article').filter({ has: card })
     await expect(expanded.getByText('Stay tight to their winger.', { exact: true })).toBeVisible()
@@ -800,9 +818,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next', width, height)
     const header = page.getByRole('region', { name: 'vs Parkview Athletic U16' })
     await expect(header.getByRole('heading', { level: 1, name: 'vs Parkview Athletic U16' })).toBeVisible()
-    await expect(header).toContainText(/Kick-off 11:00/)
-    await expect(header).toContainText('Rehearsal Park · Home')
-    await expect(header.getByText(/^U16 · \d+ players$/)).toBeVisible()
+    // Imad, 6 Nov: the kick-off apart from the day, and the age group with no count.
+    const details = header.getByRole('heading', { level: 1 }).locator('xpath=../following-sibling::div[1]').locator(':scope > *')
+    await expect(details).toHaveText([/^\w{3} \d{1,2} \w{3}$/, /^Kick-off 11:00/, 'Rehearsal Park · Home', 'U16'])
     const tabs = page.getByRole('tablist', { name: 'This match' })
     await expect(tabs.getByRole('tab', { name: 'Evaluation After the match' })).toBeVisible()
     await expect(tabs.getByRole('tab', { name: /^Game plan \d to do$/ })).toBeVisible()

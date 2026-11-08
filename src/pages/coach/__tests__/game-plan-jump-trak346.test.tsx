@@ -40,6 +40,8 @@ beforeEach(() => {
   COACH = { id: `coach-346-${++n}` }
   signInAs(COACH)
   server.use(
+    // TRAK-363: the plan's Instructions offer the squad's season objectives.
+    table('season_plans', []),
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Carlo Ancelotti', invite_code: 'ABCD' }]),
     table('coach_details', [{ user_id: COACH.id, coach_role: 'Head Coach', team: 'U16', organization_id: 'org-1' }]),
     table('organizations', [{ id: 'org-1', name: 'Rehearsal FC', logo_url: null }]),
@@ -64,6 +66,9 @@ beforeEach(() => {
     table('game_evaluations', []),
     table('game_evaluation_players', []),
     table('game_evaluation_notes', []),
+    // TRAK-358: Can also play, for Out of position on the line-up; nobody has one.
+    table('squad_player_also_plays', []),
+    table('squad_player_roles', []),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear() })

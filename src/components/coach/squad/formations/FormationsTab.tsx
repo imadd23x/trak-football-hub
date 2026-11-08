@@ -4,6 +4,7 @@ import { Check, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { Alert } from '@/components/arc/alert/alert'
+import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { Select } from '@/components/arc/select/select'
 import { LoadError } from '@/components/trak/LoadError'
@@ -15,6 +16,8 @@ import { FORMATION_SEEDS, firstXI, reshapeXI, swapXI, type Spot } from '@/lib/sq
 import type { SquadRoster } from '../useSquadRoster'
 import { FormationBoard, type BoardPlayer } from './FormationBoard'
 import { NameSheet, type NameSheetMode } from './NameSheet'
+import { UseForMatchesSheet } from './UseForMatchesSheet'
+import { weekdayDayMonth } from '@/lib/squad/format'
 import { refusal, useFormationWrites, useFormations, type Formation, type FormationDraft } from './useFormations'
 
 /* TRAK-357 (Season plan 9/18, spec TRAK-348; Tarek's My Formations mockup, without its Instructions tab): Squad ›
@@ -22,7 +25,9 @@ import { refusal, useFormationWrites, useFormations, type Formation, type Format
    and a shape (Matches' lists), the pitch beside the bench, Undo, Discard changes and Save. Edits stay a draft until
    Save. New, Rename and Delete (it asks first). It opens once every consented player in the squad has a position;
    until then it says how many to place. A squad starts with the mockup's three, saved for it once (Tarek, 5 Nov). The
-   formation in view is in the address (?formation=). Matches take a copy in TRAK-360. */
+   formation in view is in the address (?formation=).
+   TRAK-360: Use for matches copies the saved formation into upcoming matches; Make default loads it into a fresh match of
+   its format; Set for matchday lists the matches it was copied to. */
 
 const SAVE_FAILED = "Couldn't save the formation. Check your connection and try again; your changes are still here."
 const FORMAT_OPTIONS = FORMATS.map(format => ({ value: String(format), label: `${format} a side` }))
@@ -54,6 +59,8 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
   const [namingProblem, setNamingProblem] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [using, setUsing] = useState(false)
+  const [useProblem, setUseProblem] = useState<string | null>(null)
   const started = useRef(false)
 
   // Everyone consented in the squad, in shirt order, as the board shows them.
@@ -142,6 +149,15 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
   </div>
 
   const dirty = !!edit && !same(edit.draft, draftOf(saved))
+  const copyTo = (eventIds: string[]) => writes.use.mutate({ id: saved.id, eventIds }, {
+    onSuccess: () => { setUsing(false); setUseProblem(null); toast(`${saved.name} copied to ${plural(eventIds.length, 'match')}.`) },
+    onError: error => setUseProblem((error as { code?: string }).code === 'P0001' ? 'A match has kicked off, so its plan is locked. Pick the others and try again.'
+      : "Couldn't copy the formation. Check your connection and try again."),
+  })
+  const makeDefault = (on: boolean) => writes.setDefault.mutate({ id: saved.id, on }, {
+    onSuccess: () => toast(on ? `${saved.name} is the default for ${saved.format} a side.` : `${saved.name} is no longer the default.`),
+    onError: () => setProblem("Couldn't change the default. Check your connection and try again."),
+  })
   const change = (next: (draft: FormationDraft) => FormationDraft) => {
     setProblem(null)
     setEdits(all => {
@@ -206,6 +222,14 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
       </div>
       {problem && <Alert tone="danger" title={problem} />}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="secondary" size="sm" disabled={dirty} onClick={() => { setUseProblem(null); setUsing(true) }}>Use for matches</Button>
+        <Button variant="ghost" size="sm" disabled={dirty} loading={writes.setDefault.isPending} onClick={() => makeDefault(!saved.isDefault)}>
+          {saved.isDefault ? 'Remove default' : `Make default for ${saved.format} a side`}</Button>
+        {saved.isDefault && <Badge size="sm" tone="info">Default for {saved.format} a side</Badge>}
+        {dirty && <span className="text-sm text-ink-3">Save your changes first: a match gets the saved formation.</span>}
+      </div>
+
       <div className="grid grid-cols-2 gap-3 tablet:max-w-sm">
         <Select label="Format" options={FORMAT_OPTIONS} value={String(current.format)} onValueChange={value => {
           const format = Number(value) as Format, shape = DEFAULT_FORMATION[format]
@@ -218,6 +242,16 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
       <FormationBoard title={current.name} shape={current.shape} format={current.format} starters={current.starters} players={boardPlayers} bench={bench}
         onSwap={(a: Spot, b: Spot) => change(d => ({ ...d, starters: swapXI(d.starters, a, b) }))} onUndo={undo} canUndo={!!edit?.history.length} />
 
+      <section aria-label="Set for matchday" className="grid gap-2 border-t border-line pt-4">
+        <h3 className="text-[15px] font-medium text-ink">Set for matchday</h3>
+        {saved.copies.length === 0
+          ? <p className="text-sm text-ink-3">Not copied to a match yet. A copy never changes when this formation does.</p>
+          : <ul className="m-0 grid list-none gap-1 p-0">{saved.copies.map(copy => <li key={copy.eventId} className="text-sm text-ink-2">
+            {copy.label} · copied {weekdayDayMonth(copy.copiedAt.slice(0, 10))}
+            {copy.notComing > 0 && ` · ${plural(copy.notComing, 'player')} not coming`}
+            {copy.skipped > 0 && ` · ${copy.skipped} skipped`}</li>)}</ul>}
+      </section>
+
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
         {confirming
           ? <>
@@ -229,5 +263,6 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
       </div>
     </section>
     {nameSheet}
+    {using && <UseForMatchesSheet formation={saved} squad={squad} using={writes.use.isPending} problem={useProblem} onClose={() => setUsing(false)} onUse={copyTo} />}
   </div>
 }

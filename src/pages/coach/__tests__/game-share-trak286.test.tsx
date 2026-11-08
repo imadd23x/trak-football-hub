@@ -107,6 +107,9 @@ beforeEach(() => {
     table('game_evaluations', []),
     table('game_evaluation_players', []),
     table('game_evaluation_notes', []),
+    // TRAK-358: Can also play, for Out of position on the line-up; nobody has one.
+    table('squad_player_also_plays', []),
+    table('squad_player_roles', []),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear() })
@@ -134,11 +137,9 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
 
     await waitFor(() => expect(calls.map(call => call.fn)).toEqual(['save plan', 'save line-up', 'share']))
     expect(calls[2].body).toEqual({ p_event_id: 'g1', p_talked: true })
-    const shared = await screen.findByRole('region', { name: 'Shared' })
-    expect(within(shared).getByText('Shared Thu 19:30')).toBeInTheDocument()
-    // Who can come or is placed reads it; who can't make it and isn't placed doesn't, nor a child waiting for consent.
-    // TRAK-369: the count shows once it's shared, not before.
-    expect(within(shared).getByText('3 players and their families read it in the app. Edits stay with you until you share them.')).toBeInTheDocument()
+    // Imad, 6 Nov: the heading says when, and nothing repeats it: no badge, no line on who reads it (readers() has its own test).
+    const shared = await screen.findByRole('region', { name: 'Shared at Thu 19:30' })
+    expect(within(shared).queryByText(/^Shared Thu|read it in the app|Edits stay with you/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Share plan' })).toBeNull()
   })
 
@@ -168,7 +169,7 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     const user = userEvent.setup()
     const calls = store({ shared: true, changes: ['charisteas', 'basinas'] })
     shareStep()
-    const shared = await screen.findByRole('region', { name: 'Shared' })
+    const shared = await screen.findByRole('region', { name: /^Shared at / })
     expect(await within(shared).findByText('Changes not shared')).toBeInTheDocument()
     expect(within(shared).getByText(/Angelos Charisteas and Angelos Basinas\. Only they and their families get the update\./)).toBeInTheDocument()
     expect(screen.getAllByText('Changes not shared').length).toBeGreaterThanOrEqual(2) // the header's badge too
@@ -200,18 +201,19 @@ describe('TRAK-286, TRAK-332: Review & share', { timeout: 30_000 }, () => {
     expect(screen.getByRole('checkbox', { name: /talked selection through/ })).toBeChecked()
   })
 
-  it('a starter whose family says they can\'t make it is flagged in Everyone\'s job, and still reads the plan', async () => {
+  it('a starter whose family says they can\'t make it is flagged on the pitch, and still reads the plan', async () => {
     const user = userEvent.setup()
     store({ lineUp: [...LINE_UP, row('nikopolidis', { role: 'starter', slot: 1, job: 'Command the box on crosses.' })] })
     renderApp('/coach/matches/g1?tab=plan')
     await user.click(await screen.findByRole('button', { name: 'Next: Line-up and jobs' }))
-    const jobs = await screen.findByRole('region', { name: 'Everyone’s job' })
-    const keeper = within(jobs).getByRole('button', { name: /Antonios Nikopolidis/ }).closest('li')!
-    expect(within(keeper).getByText('Can’t make it')).toBeInTheDocument()
+    // TRAK-358: Everyone's job went; the keeper's face says it, as the pitch always has.
+    const keeper = await screen.findByRole('button', { name: /^Antonios Nikopolidis, slot 1/ })
+    expect(keeper).toHaveAccessibleName("Antonios Nikopolidis, slot 1, has a job, can't make it")
+    expect(keeper.querySelector('[data-mark="absent"]')).not.toBeNull()
     await user.click(screen.getByRole('button', { name: 'Next: Review & share' }))
     await user.click(await screen.findByRole('checkbox', { name: /talked selection through/ }))
     await user.click(screen.getByRole('button', { name: 'Share plan' }))
-    expect(within(await screen.findByRole('region', { name: 'Shared' })).getByText(/^4 players and their families read it in the app\./)).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: /^Shared at / })).toBeInTheDocument()
   })
 })
 

@@ -22,8 +22,8 @@ import { CoachMenuButton } from '@/components/coach/CoachFrame'
    Squad for everyone; matches have their own Games tab, with no statistics.
    TRAK-351 (Tarek, 3 Nov): a player opens as their own full page at /coach/squad/player/:id, with no list beside it
    and a Back button. The page stays mounted behind it, so Back (or the browser's) finds the list as it was left.
-   TRAK-357 (spec TRAK-348): where the season plan is on, Formations takes Attributes' place. Availability goes with
-   TRAK-359. Elsewhere Squad stays as it is. */
+   TRAK-357 (spec TRAK-348): where the season plan is on, Formations takes Attributes' place. TRAK-359: and Availability
+   goes, as Matches marks who isn't attending. Elsewhere Squad stays as it is. */
 type TabId = 'players' | 'formations' | 'attributes' | 'availability'
 const TABS: { id: TabId; label: string }[] = [
   { id: 'players', label: 'Players' },
@@ -33,7 +33,6 @@ const TABS: { id: TabId; label: string }[] = [
 const SEASON_PLAN_TABS: { id: TabId; label: string }[] = [
   { id: 'players', label: 'Players' },
   { id: 'formations', label: 'Formations' },
-  { id: 'availability', label: 'Availability' },
 ]
 
 export default function CoachSquadPage() {

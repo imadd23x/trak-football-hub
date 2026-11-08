@@ -78,6 +78,9 @@ beforeEach(() => {
     table('game_evaluations', []),
     table('game_evaluation_players', []),
     table('game_evaluation_notes', []),
+    // TRAK-358: Can also play, for Out of position on the line-up; nobody has one.
+    table('squad_player_also_plays', []),
+    table('squad_player_roles', []),
   )
 })
 afterEach(() => { vi.useRealTimers(); cleanup(); localStorage.clear() })
@@ -114,7 +117,8 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
     setup({ kickOffIn: -MINUTE })
     renderApp('/coach/matches/g1?tab=plan&step=share')
     const notShared = await screen.findByRole('region', { name: 'Not shared' })
-    expect(notShared).toHaveTextContent('It wasn’t shared before kick-off, so only you saw it.')
+    // Imad, 6 Nov: the heading says it; no line under it.
+    expect(notShared).toHaveTextContent(/^Not shared$/)
     expect(screen.queryByText(/^Locked at kick-off, \d\d:\d\d$/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Share plan' })).toBeNull()
     // TRAK-332: the review still reads every part, with nothing to edit.
@@ -128,10 +132,10 @@ describe('TRAK-287: locked at kick-off', { timeout: 30_000 }, () => {
   it('shared with changes still unshared: no alert, and there is no Share changes', async () => {
     setup({ kickOffIn: -MINUTE, shared: true, changes: ['zagorakis', 'charisteas'] })
     renderApp('/coach/matches/g1?tab=plan&step=share')
-    const shared = await screen.findByRole('region', { name: 'Shared' })
+    const shared = await screen.findByRole('region', { name: /^Shared at / })
     expect(screen.queryByText(/didn’t get your last changes|^Locked at kick-off, /)).toBeNull()
     expect(within(shared).queryByRole('button', { name: /Share changes/ })).toBeNull()
-    expect(shared).not.toHaveTextContent('Edits stay with you')
+    expect(shared).not.toHaveTextContent(/Edits stay with you|read it in the app/)
   })
 
   it('the player\'s sheet only shows: the job is written, context and expectation are words, nothing moves', async () => {

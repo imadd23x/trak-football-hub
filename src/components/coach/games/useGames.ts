@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { scorers, type ScoredMatch } from '@/lib/games/scorers'
 import { useAuth } from '@/contexts/AuthContext'
+import { useFeatureState } from '@/components/trak/parked'
 import type { Tables } from '@/integrations/supabase/types'
 import type { EventRow } from '@/lib/coach-events'
 import { academyClock, displayEventTime, phoneEventTime } from '@/lib/event-time'
@@ -187,23 +188,26 @@ export function useGameEvaluation(eventId: string | undefined) {
 export type Candidate = AvailPlayer & { confirmed: boolean; absent: boolean }
 
 /** TRAK-285: who can come to a match, as Squad > Availability shows it: the match's squad, consented children only (a
- *  departed child never reads), Confirmed first, and a guardian's "Can't make it" as a flag, never its reason. */
+ *  departed child never reads), Confirmed first, and a guardian's "Can't make it" as a flag, never its reason.
+ *  TRAK-359: where the season plan is on, the coach's confirmations aren't read: everyone is coming unless they're in
+ *  Not attending, so everyone reads as confirmed. */
 export function useWhoCanCome(game: { id: string; squad?: string | null }) {
   const { user } = useAuth()
+  const seasonPlan = useFeatureState('season_plan')
   const roster = useSquadRoster({ everySquad: true })
-  const confirmed = useQuery({ queryKey: confirmedKey(user?.id, game.id), queryFn: () => loadConfirmed(game.id), enabled: !!user })
+  const confirmed = useQuery({ queryKey: confirmedKey(user?.id, game.id), queryFn: () => loadConfirmed(game.id), enabled: !!user && seasonPlan.known && !seasonPlan.on })
   const absent = useQuery({ queryKey: absentKey(user?.id, game.id), queryFn: () => loadReportedAbsent(game.id), enabled: !!user })
   const players = useMemo<Candidate[]>(() => {
     const squad = roster.players.filter(p => game.squad == null || p.age_group?.trim() === game.squad)
       .map(p => ({ id: p.id, name: p.player_name, shirt: p.shirt_number, position: p.position }))
-    const split = splitAvailability(squad, roster.consentPending, new Set(confirmed.data ?? []), new Set(absent.data ?? []))
+    const split = splitAvailability(squad, roster.consentPending, new Set(seasonPlan.on ? squad.map(p => p.id) : confirmed.data ?? []), new Set(absent.data ?? []))
     return [...split.confirmed.map(p => ({ ...p, confirmed: true })), ...split.notConfirmed.map(p => ({ ...p, confirmed: false }))]
-  }, [roster.players, roster.consentPending, confirmed.data, absent.data, game.squad])
+  }, [roster.players, roster.consentPending, confirmed.data, absent.data, game.squad, seasonPlan.on])
   return {
     players,
-    isPending: roster.isPending || confirmed.isPending || absent.isPending,
-    error: roster.error ?? confirmed.error ?? absent.error ?? null,
-    retry: () => { roster.retry(); void confirmed.refetch(); void absent.refetch() },
+    isPending: roster.isPending || !seasonPlan.known || (!seasonPlan.on && confirmed.isPending) || absent.isPending,
+    error: roster.error ?? (seasonPlan.on ? null : confirmed.error) ?? absent.error ?? null,
+    retry: () => { roster.retry(); if (!seasonPlan.on) void confirmed.refetch(); void absent.refetch() },
   }
 }
 

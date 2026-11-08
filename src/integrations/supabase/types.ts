@@ -632,6 +632,48 @@ export type Database = {
         }
         Relationships: []
       }
+      formation_copies: {
+        Row: {
+          by_default: boolean
+          copied_at: string
+          event_id: string
+          formation_id: string
+          not_coming: number
+          skipped: number
+        }
+        Insert: {
+          by_default?: boolean
+          copied_at?: string
+          event_id: string
+          formation_id: string
+          not_coming: number
+          skipped: number
+        }
+        Update: {
+          by_default?: boolean
+          copied_at?: string
+          event_id?: string
+          formation_id?: string
+          not_coming?: number
+          skipped?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formation_copies_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "coach_calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formation_copies_formation_id_fkey"
+            columns: ["formation_id"]
+            isOneToOne: false
+            referencedRelation: "formations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formation_players: {
         Row: {
           formation_id: string
@@ -671,6 +713,7 @@ export type Database = {
           created_at: string
           format: number
           id: string
+          is_default: boolean
           name: string
           shape: string
           squad: string
@@ -681,6 +724,7 @@ export type Database = {
           created_at?: string
           format: number
           id?: string
+          is_default?: boolean
           name: string
           shape: string
           squad: string
@@ -691,6 +735,7 @@ export type Database = {
           created_at?: string
           format?: number
           id?: string
+          is_default?: boolean
           name?: string
           shape?: string
           squad?: string
@@ -2108,6 +2153,9 @@ export type Database = {
         Returns: undefined
       }
       delete_formation: { Args: { p_id: string }; Returns: undefined }
+      load_default_formation: { Args: { p_event_id: string }; Returns: Json }
+      set_default_formation: { Args: { p_default: boolean; p_id: string }; Returns: undefined }
+      use_formation_for_matches: { Args: { p_event_ids: string[]; p_formation_id: string }; Returns: Json }
       save_formation: {
         Args: {
           p_format: number

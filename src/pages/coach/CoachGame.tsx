@@ -15,6 +15,7 @@ import { blankRepeat, clashMessage, formProblem, formToRow, lockedMessage, rowTo
 import { fullTime, gameStatus, type GameTab } from '@/lib/games/loop'
 import { formToPlan, planToForm, type PlanForm } from '@/lib/games/plan'
 import { planParts } from '@/lib/games/share'
+import { withReported } from '@/lib/games/lineup'
 import { evaluationToForm, type EvaluationForm } from '@/lib/games/evaluation'
 import type { Tables } from '@/integrations/supabase/types'
 import { gameTitle, gameWhen, useGame, useGameEvaluation, useGamePlan, useGamePlanChanges, useGamePlayers, useGameShares, useGames, useWhoCanCome } from '@/components/coach/games/useGames'
@@ -126,7 +127,9 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
   // On a phone Save draft sits in the header's "…" menu, where "Saved" can't be seen, so a saved draft says so there.
   const [folded, setFolded] = useState(false)
   const onSaved = () => { if (folded) toast.success('Draft saved') }
-  const planForm = (locked ? null : typed) ?? lockedPlan
+  // TRAK-359: until the coach types, a child whose family said "Can't make it" and who has no row starts in Not attending.
+  const reported = locked || who.isPending || who.error ? lockedPlan : { ...lockedPlan, players: withReported(lockedPlan.players, who.players) }
+  const planForm = (locked ? null : typed) ?? reported
   const planDraft = useGamePlanDraft({ game: row, form: planForm, onFormChange: setTyped, sharedAt, who, onSaved })
   const evaluationForm = entered ?? evaluationToForm(evaluation.data ?? { evaluation: null, players: [], notes: [] })
   const evaluationDraft = useEvaluationDraft({ game: row, form: evaluationForm, onFormChange: setEntered,
@@ -173,16 +176,17 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
     evaluation: now < whistle && <span className="sr-only tablet:not-sr-only">After the match</span>,
   }
   const homeAway = row.home_away === 'home' ? 'Home' : row.home_away === 'away' ? 'Away' : null
-  const people = whoKnown ? `${who.players.length} ${who.players.length === 1 ? 'player' : 'players'}` : null
 
   return <>
     <PageHeader className="[--ph-bleed:1.25rem] tablet:[--ph-bleed:2rem]" top={wide ? TOP_BAR : '0px'}
       title={gameTitle(row)} crumbs={<CoachTrail current={gameTitle(row)} />}
       status={cancelled ? <Badge tone="danger" dot>Cancelled</Badge> : <Badge tone={state.tone} dot>{state.label}</Badge>}
       details={<>
-        <span><CalendarDays {...metaIcon} /><strong>{day}</strong>{time && ` · Kick-off ${time}`}{academy && ` · ${academy}`}</span>
+        {/* Imad, 6 Nov: the kick-off has its own clock, apart from the day; the squad is its age group, no count. */}
+        <span><CalendarDays {...metaIcon} /><strong>{day}</strong></span>
+        {time && <span><Clock {...metaIcon} />Kick-off {time}{academy && ` · ${academy}`}</span>}
         {(row.venue || homeAway) && <span><MapPin {...metaIcon} />{row.venue && <strong>{row.venue}</strong>}{row.venue && homeAway && ' · '}{homeAway}</span>}
-        {(row.squad || people) && <span><Users {...metaIcon} />{[row.squad, people].filter(Boolean).join(' · ')}</span>}
+        {row.squad && <span><Users {...metaIcon} />{row.squad}</span>}
       </>}
       primary={primary} secondary={secondary} menu={menu} onFold={setFolded}
       notice={tab === 'plan' ? planDraft.problem : tab === 'evaluation' ? evaluationDraft.problem : null}

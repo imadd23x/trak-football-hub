@@ -42,6 +42,8 @@ function plans({ failSaves = false } = {}) {
   const saves: Record<string, unknown>[] = []
   const state = { failSaves }
   server.use(
+    // TRAK-363: the plan's Instructions offer the squad's season objectives.
+    table('season_plans', []),
     http.get(`${SUPABASE_URL}/rest/v1/game_plans`, ({ request }) => {
       const id = new URL(request.url).searchParams.get('event_id')?.replace('eq.', '')
       return HttpResponse.json([...store.values()].filter(row => !id || row.event_id === id))
@@ -85,6 +87,8 @@ beforeEach(() => {
 afterEach(() => { cleanup(); localStorage.clear() })
 
 const instruction = (number: number) => screen.getByRole('group', { name: `Instruction ${number}` })
+/** The match header's status, beside its title. */
+const status = () => screen.getByRole('heading', { level: 1 }).parentElement!
 
 describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_000 }, () => {
   it('saves a draft only the coach sees, and it comes back when the page opens again', async () => {
@@ -96,6 +100,9 @@ describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_00
     const steps = screen.getByRole('navigation', { name: 'Game plan' })
     expect(steps).toHaveTextContent(/Tactics & analysis.*Line-up and jobs.*Review & share/)
     expect(steps.querySelector('[aria-current="step"]')).toHaveTextContent('Tactics & analysis')
+    // Imad, 6 Nov: the bar's Draft badge, as Evaluation's, beside Next; no "only you see it".
+    expect(within(screen.getByRole('button', { name: 'Next: Line-up and jobs' }).parentElement!).getByText('Draft')).toBeInTheDocument()
+    expect(screen.queryByText(/only you see it/)).toBeNull()
     // TRAK-328 (Imad, 2 Nov): no empty instruction until the coach adds one, and their line-up is gone.
     expect(screen.queryByRole('group', { name: /^Instruction \d$/ })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Their likely line-up' })).toBeNull()
@@ -115,7 +122,7 @@ describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_00
       goals: [{ title: 'Win it back in their half', looks_like: 'Press when their keeper plays short.' }],
       format: 11, formation: null,
     }])
-    expect(await screen.findByText('Draft')).toBeInTheDocument()
+    expect(await within(status()).findByText('Draft')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('What you know about them'), ' Their 7 drifts inside.')
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeInTheDocument()
@@ -125,7 +132,7 @@ describe('TRAK-284, TRAK-328: plan step 1, Tactics & analysis', { timeout: 30_00
     expect(await screen.findByDisplayValue('Win it back in their half')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /Stronger/ })).toBeChecked()
     expect(screen.getByLabelText('What you know about them')).toHaveValue('Their keeper plays short.')
-    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(within(status()).getByText('Draft')).toBeInTheDocument()
   })
 
   it('takes up to three instructions: a fourth can\'t be added, and any can be removed, the last one too', async () => {

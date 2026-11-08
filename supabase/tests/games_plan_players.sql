@@ -217,10 +217,36 @@ SELECT pg_temp.g285check(pg_temp.g285refused(format('UPDATE public.game_plan_pla
   '7 a player not selected keeps only the note: no job');
 RESET ROLE;
 
+-- ── 8. Not attending (TRAK-359) ────────────────────────────────────────────
+-- Player B (41) is not selected, with a note.
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.g285actor(10);
+SELECT pg_temp.g285check(pg_temp.g285refused(format('UPDATE public.game_plan_players SET role=%L WHERE event_id=%L AND squad_player_id=%L','not_attending',pg_temp.g285id(500),pg_temp.g285id(41)),'23514'),
+  '8 Not attending carries nothing: the note has to go with it');
+SELECT pg_temp.g285check(pg_temp.g285changed(format('UPDATE public.game_plan_players SET role=%L, note=%L WHERE event_id=%L AND squad_player_id=%L','not_attending','',pg_temp.g285id(500),pg_temp.g285id(41)))=1,
+  '8 the match''s coach marks a player Not attending');
+SELECT pg_temp.g285actor(11);
+SELECT pg_temp.g285check(pg_temp.g285changed(format('UPDATE public.game_plan_players SET role=%L WHERE event_id=%L AND squad_player_id=%L','bench',pg_temp.g285id(500),pg_temp.g285id(41)))=0,
+  '8 another coach, even of the same academy, can''t move them');
+RESET ROLE;
+-- Player B's guardian (31) reports Can't make it.
+INSERT INTO public.event_absences(event_id,squad_player_id,reported_by) VALUES(pg_temp.g285id(500),pg_temp.g285id(41),pg_temp.g285id(31));
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.g285actor(10);
+SELECT pg_temp.g285check(pg_temp.g285refused(format('UPDATE public.game_plan_players SET role=%L WHERE event_id=%L AND squad_player_id=%L','bench',pg_temp.g285id(500),pg_temp.g285id(41)),'42501'),
+  '8 the database refuses moving a family-reported child out of Not attending');
+RESET ROLE;
+DELETE FROM public.event_absences WHERE event_id=pg_temp.g285id(500) AND squad_player_id=pg_temp.g285id(41);
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.g285actor(10);
+SELECT pg_temp.g285check(pg_temp.g285changed(format('UPDATE public.game_plan_players SET role=%L WHERE event_id=%L AND squad_player_id=%L','bench',pg_temp.g285id(500),pg_temp.g285id(41)))=1,
+  '8 once the family undoes it, the coach moves them');
+RESET ROLE;
+
 DO $$ DECLARE failures text; total integer;
 BEGIN
  SELECT count(*) INTO total FROM pg_temp.g285_results;
- IF total <> 40 THEN RAISE EXCEPTION 'Game plan players: % checks ran; expected 40', total; END IF;
+ IF total <> 45 THEN RAISE EXCEPTION 'Game plan players: % checks ran; expected 45', total; END IF;
  SELECT string_agg(label, E'\n') INTO failures FROM pg_temp.g285_results WHERE NOT ok;
  IF failures IS NOT NULL THEN RAISE EXCEPTION 'Game plan players checks failed:%', E'\n' || failures; END IF;
  RAISE NOTICE 'Game plan players: % of % passed', total, total;

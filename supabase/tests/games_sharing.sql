@@ -269,6 +269,18 @@ INSERT INTO public.event_absences(event_id,squad_player_id,reported_by) VALUES(p
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.g286actor(10);
 SELECT pg_temp.g286check(pg_temp.g286changes(500)='{}','5 a starter who can''t make it keeps their copy until the coach moves them');
+-- TRAK-359: the coach puts Takis, whose family said they can't make it, in Not attending. Not attending reads as Not selected.
+INSERT INTO public.game_plan_players(event_id,squad_player_id,role) VALUES(pg_temp.g286id(500),pg_temp.g286id(48),'not_attending');
+SELECT pg_temp.g286check(pg_temp.g286changes(500)=ARRAY[48] AND (SELECT public.share_game_plan(pg_temp.g286id(500),false))=1,
+  '5 Not attending brings a child who can''t make it a copy, and shared, it''s 1');
+SELECT pg_temp.g286actor(28);
+SELECT pg_temp.g286check(pg_temp.g286family()=ARRAY[48] AND (SELECT role='not_selected' FROM public.game_for_family)
+  AND pg_temp.g286player()=ARRAY[48] AND (SELECT job='' AND note='' FROM public.game_for_player),
+  '5 and he reads "Not in the squad this week": no job, no note, never why');
+SELECT pg_temp.g286actor(38);
+SELECT pg_temp.g286check(pg_temp.g286family()=ARRAY[48] AND (SELECT role='not_selected' FROM public.game_for_family) AND pg_temp.g286player()='{}',
+  '5 and so does his guardian');
+SELECT pg_temp.g286actor(10);
 
 -- ── 6. Roster, consent, the switch and cancelling ──────────────────────────
 RESET ROLE;
@@ -285,10 +297,10 @@ SELECT pg_temp.g286check(pg_temp.g286family()='{}','6 a child whose consent is p
 SELECT pg_temp.g286actor(10);
 SELECT pg_temp.g286check(pg_temp.g286changes(500)='{}','6 a child who left isn''t a change to share');
 SELECT pg_temp.g286check((SELECT public.share_game_plan(pg_temp.g286id(500),false))=0
-  AND (SELECT count(*)=4 FROM public.game_shares),'6 sharing nothing new logs nothing');
+  AND (SELECT count(*)=5 FROM public.game_shares),'6 sharing nothing new logs nothing');
 RESET ROLE;
-SELECT pg_temp.g286check((SELECT array_agg(right(squad_player_id::text,3)::integer ORDER BY squad_player_id) FROM public.game_for_family)=ARRAY[40,41],
-  '6 but clears the copies nobody may read');
+SELECT pg_temp.g286check((SELECT array_agg(right(squad_player_id::text,3)::integer ORDER BY squad_player_id) FROM public.game_for_family)=ARRAY[40,41,48],
+  '6 but clears the copies nobody may read (Not attending keeps his)');
 DELETE FROM public.academy_features WHERE organization_id=pg_temp.g286id(100) AND feature='games';
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.g286actor(20);
@@ -317,7 +329,7 @@ RESET ROLE;
 DO $$ DECLARE failures text; total integer;
 BEGIN
  SELECT count(*) INTO total FROM pg_temp.g286_results;
- IF total <> 65 THEN RAISE EXCEPTION 'Game sharing: % checks ran; expected 65', total; END IF;
+ IF total <> 68 THEN RAISE EXCEPTION 'Game sharing: % checks ran; expected 68', total; END IF;
  SELECT string_agg(label, E'\n') INTO failures FROM pg_temp.g286_results WHERE NOT ok;
  IF failures IS NOT NULL THEN RAISE EXCEPTION 'Game sharing checks failed:%', E'\n' || failures; END IF;
  RAISE NOTICE 'Game sharing: % of % passed', total, total;

@@ -109,6 +109,11 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
   level that really changes something and says why; Players today refits at the same level.
 - **Search** (`search.ts`): by name, type, other names coaches use, topics and the fitted numbers, with "4 v 4" =
   "4v4" and one spelling slip allowed (two in long words).
+- **Pitch picture** (TRAK-386): `pitch.ts` lays a fitted drill out to scale on a 640 × 420 canvas, with roles, not
+  colours; `components/coach/training/library/DrillPitch.tsx` draws it in the fixed pitch colours
+  (`lib/fixed-colours.ts` `PITCH`). `full` is the whole canvas with the size line and a one-line description for
+  screen readers; `card` zooms onto the drill and is hidden from screen readers, as the card says it in words.
+  `PitchKey` says what each colour means. Drills played in turns draw the players who are on.
 
 ## Switching it on
 

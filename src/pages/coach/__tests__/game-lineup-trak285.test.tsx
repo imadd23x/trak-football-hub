@@ -215,6 +215,33 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     expect(saves.at(-1)).toContainEqual({ event_id: 'g1', squad_player_id: 'nikopolidis', role: 'not_attending', slot: null, job: '', note: '', context: [], expectation: 'usual' })
   })
 
+  it('TRAK-360: opening the line-up of a match with none loads the default once, and the step says who isn\'t coming', async () => {
+    const user = userEvent.setup()
+    store()
+    let loads = 0
+    server.use(
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/load_default_formation`, () => { loads += 1; return HttpResponse.json({ event_id: 'g1', placed: 1, not_coming: 1, skipped: 1, formation: 'Balanced' }) }),
+      http.get(`${SUPABASE_URL}/rest/v1/game_plans`, () => HttpResponse.json(loads ? [{ event_id: 'g1', strength: null, scouting: '', goals: [], format: 11, formation: '4-3-3', created_at: '2026-11-07T09:00:00Z', updated_at: '2026-11-07T09:00:00Z' }] : [])),
+      http.get(`${SUPABASE_URL}/rest/v1/game_plan_players`, () => HttpResponse.json(loads ? [
+        { event_id: 'g1', squad_player_id: 'zagorakis', role: 'starter', slot: 2, job: '', note: '', context: [], expectation: 'usual' },
+        { event_id: 'g1', squad_player_id: 'nikopolidis', role: 'not_attending', slot: null, job: '', note: '', context: [], expectation: 'usual' },
+      ] : [])),
+      table('formation_copies', [{ copied_at: '2026-11-07T09:00:00Z', not_coming: 1, skipped: 1, by_default: true, formations: { name: 'Balanced', format: 11 } }]),
+    )
+    renderApp('/coach/matches/g1?tab=plan')
+    await user.click(await screen.findByRole('button', { name: 'Next: Line-up and jobs' }))
+    expect(await screen.findByRole('heading', { name: '4-3-3' })).toBeInTheDocument()
+    expect(slot(2)).toHaveAccessibleName(/^Theodoros Zagorakis, slot 2/)
+    expect(await screen.findByText('Balanced loaded: your default for 11 a side.')).toBeInTheDocument()
+    expect(screen.getByText(/1 player in this formation isn’t coming, so is in Not attending\. 1 player was skipped/)).toBeInTheDocument()
+    expect(loads).toBe(1)
+    // Back to the first step and in again: it doesn't load a second time.
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await user.click(await screen.findByRole('button', { name: 'Next: Line-up and jobs' }))
+    await screen.findByRole('heading', { name: '4-3-3' })
+    expect(loads).toBe(1)
+  })
+
   it('TRAK-358: Everyone\'s job and its count are gone; Review & share counts the starters with a job', async () => {
     const user = userEvent.setup()
     store()

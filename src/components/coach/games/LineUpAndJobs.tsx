@@ -13,6 +13,7 @@ import type { Candidate, useWhoCanCome } from './useGames'
 import { ListFace, MarkersKey, Pitch, type LineUpSpot, type PitchPlayer } from './Pitch'
 import { PlayerPanel, type Target } from './PlayerPanel'
 import { LoadError } from '@/components/trak'
+import { Alert } from '@/components/arc/alert/alert'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { MorphSelect } from '@/components/arc/morph-select/morph-select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/arc/tabs/tabs'
@@ -36,8 +37,11 @@ const SHAPES = FORMATS.map(format => ({ label: `${format} a side`, options: FORM
 type List = 'bench' | 'not_selected' | 'not_attending'
 const LISTS = { 'list:bench': 'bench', 'list:not_selected': 'not_selected', 'list:not_attending': 'not_attending' } as const
 
-export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
-  form: PlanForm; onFormChange: (form: PlanForm) => void; who: ReturnType<typeof useWhoCanCome>; locked?: boolean
+/** TRAK-360: the formation last copied into this match, and how many of its starters weren't coming or were skipped. */
+export type FormationCopy = { name: string; format: number | null; notComing: number; skipped: number; byDefault: boolean }
+
+export function LineUpAndJobs({ form, onFormChange, who, locked = false, copy = null }: {
+  form: PlanForm; onFormChange: (form: PlanForm) => void; who: ReturnType<typeof useWhoCanCome>; locked?: boolean; copy?: FormationCopy | null
 }) {
   const { user } = useAuth()
   // TRAK-358: Can also play, so a placement outside it ticks Out of position.
@@ -109,8 +113,13 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
   const dropOn = (spot: LineUpSpot) => (drag ? { 'data-spot': spot } : {})
   const lit = (spot: LineUpSpot) => (drag?.drag?.over === spot ? 'ring-2 ring-brand' : '')
 
+  const plural = (n: number) => `${n} player${n === 1 ? '' : 's'}`
   return (
     <div className="grid gap-4">
+      {copy && <div className="arc"><Alert tone="info" title={copy.byDefault ? `${copy.name} loaded: your default for ${copy.format ?? form.format} a side.` : `Copied from ${copy.name}.`}>
+        {[copy.notComing > 0 && `${plural(copy.notComing)} in this formation ${copy.notComing === 1 ? 'isn’t' : 'aren’t'} coming, so ${copy.notComing === 1 ? 'is' : 'are'} in Not attending.`,
+          copy.skipped > 0 && `${plural(copy.skipped)} ${copy.skipped === 1 ? 'was' : 'were'} skipped: they left the roster, or their consent was withdrawn.`,
+          'Change anything here; the formation itself stays as it was.'].filter(Boolean).join(' ')}</Alert></div>}
       {/* TRAK-323 (Imad, 30 Oct): on a laptop the pitch, the tabs and the selected player's sheet sit side by side, the
           pitch and the sheet staying in view; on a tablet the tabs go under them. TRAK-358: only a laptop pins them, as
           on a tablet the tabs below would scroll under the pinned pitch (and a drop there would land on the tabs). The

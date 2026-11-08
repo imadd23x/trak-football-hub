@@ -7,7 +7,8 @@ import { useCase } from '../../support/use-case'
 import { renderApp } from '../../support/render-app'
 import { signInAs } from '../../support/session'
 import { server } from '../../msw/server'
-import { table, insertInto } from '../../msw/supabase'
+import { table, insertInto, rpc, SUPABASE_URL } from '../../msw/supabase'
+import { http, HttpResponse } from 'msw'
 
 const COACH = { id: 'coach-1' }
 const SQUAD = [
@@ -187,4 +188,49 @@ useCase('UC-C04', () => {
     expect(inserted).toHaveLength(0)
     expect(screen.queryByRole('button', { name: /^(Save|Publish)$/ })).toBeNull()
   }, 20_000) // TRAK-182: walking the steps; CI under load needs more than 5 s.
+
+  // v3 (TRAK-364): where the season plan is on and the squad's plan is shared, the due evaluation publishes all six
+  // scores for each consented player, from their latest scores, with no session (the function writes session_id NULL;
+  // supabase/tests/season_evaluations.sql proves the rows).
+  it('publishes the six scores per consented player, from their latest, with no session, in an evaluation', async () => {
+    signedInCoachWithSquad()
+    // Its own coach: the app's query cache outlives a test, and the earlier ones' squad has no age group.
+    const coach = { id: 'coach-uc-c04-evaluation' }
+    signInAs(coach)
+    const DAY = 86_400_000
+    const day = (n: number) => new Date(Date.now() + n * DAY).toISOString().slice(0, 10)
+    const published: Record<string, unknown>[] = []
+    server.use(
+      table('profiles', [{ id: 'p-eval', user_id: coach.id, role: 'coach', full_name: 'Coach Vasilis', invite_code: 'ABCD' }]),
+      table('squad_players', [{ ...SQUAD[0], coach_user_id: coach.id, age_group: 'U16', status: 'active', linked_player_id: 'child-1', created_at: '2026-08-01T08:00:00Z' }]),
+      table('coach_details', [{ user_id: coach.id, organization_id: 'org-1' }]),
+      table('organizations', [{ id: 'org-1', time_zone: 'Asia/Dubai' }]),
+      rpc('feature_on', ({ p_feature }) => p_feature === 'season_plan'),
+      rpc('coach_squad_player_consent_required', () => false),
+      table('season_plans', [{ id: 'plan-1', squad: 'U16', starts_on: day(-120), ends_on: day(200), shared_at: new Date(Date.now() - 90 * DAY).toISOString(),
+        unshared_parts: [], unshared_players: [], eval_every: '2w', eval_day: 0 }]),
+      table('season_evaluations', []),
+      table('coach_assessments', [{ squad_player_id: 'squad-1', created_at: '2026-08-20T10:00:00Z', published_at: '2026-08-20T10:00:00Z',
+        work_rate: 8, tactical: 7, attitude: 6, technical: 5, physical: 4, coachability: 3 }]),
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/publish_evaluation`, async ({ request }) => {
+        const args = await request.json() as Record<string, unknown> & { p_players: { squad_player_id: string }[] }
+        published.push(args)
+        return HttpResponse.json({ evaluation_id: 'ev-1', assessments: args.p_players.map(p => ({ squad_player_id: p.squad_player_id, assessment_id: 'as-1' })) })
+      }),
+    )
+    renderApp('/coach/evaluation')
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /^Nikos Papadopoulos/ }))
+    // The band follows the six scores here too: 8+7+6+5+4+3 is 5.5, Mixed; Coachability up to 9 makes 6.5, Steady.
+    expect(screen.getByText('From last time: Mixed, 5.5. Move only what changed.')).toBeInTheDocument()
+    setSlider(screen.getAllByRole('slider')[5], 9)
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(screen.getByRole('button', { name: 'Next: Publish' }))
+    expect(within(screen.getByRole('region', { name: 'What changed' })).getByText('Mixed → Steady')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Publish to 1 player' }))
+    await waitFor(() => expect(published).toHaveLength(1))
+    expect(published[0]).toMatchObject({ p_plan_id: 'plan-1', p_players: [{ squad_player_id: 'squad-1',
+      work_rate: 8, tactical: 7, attitude: 6, technical: 5, physical: 4, coachability: 9, note: '' }] })
+    expect(published[0]).not.toHaveProperty('p_players.0.session_id')
+  }, 20_000)
 })

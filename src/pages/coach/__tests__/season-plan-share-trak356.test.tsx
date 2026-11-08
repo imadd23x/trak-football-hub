@@ -67,6 +67,8 @@ beforeEach(() => {
     table('squad_players', [child('pat', 'Pat Synthetic', 'Defender'), child('quinn', 'Quinn Synthetic', 'Midfielder')]),
     rpc('coach_squad_player_consent_required', () => false),
     rpc('feature_on', () => true),
+    // TRAK-364: a shared plan's evaluations; none published.
+    table('season_evaluations', []),
     http.get(`${SUPABASE_URL}/rest/v1/season_plans`, () => HttpResponse.json([plan])),
     http.patch(`${SUPABASE_URL}/rest/v1/season_plans`, async ({ request }) => {
       const body = await request.json() as Partial<Plan>

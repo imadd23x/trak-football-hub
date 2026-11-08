@@ -12,6 +12,8 @@ import { localTodayISO } from '@/lib/event-time'
 
 export type SeasonPlan = Pick<Tables<'season_plans'>, 'id' | 'squad' | 'starts_on' | 'ends_on' | 'shared_at' | 'positions_known' | 'watch_rule'
   | 'last_shared_at' | 'unshared_parts' | 'unshared_players'>
+  /** TRAK-364: the evaluation's rhythm. A plan read before it has none: rhythmOf() (src/lib/evaluation.ts) gives the default. */
+  & Partial<Pick<Tables<'season_plans'>, 'eval_every' | 'eval_day'>>
 /** TRAK-352: the answer to "Do you know where they play yet?" */
 export type PositionsKnown = 'yes' | 'some' | 'not_yet'
 export type SeasonObjective = Pick<Tables<'season_objectives'>, 'id' | 'place' | 'title' | 'looks_like'>
@@ -38,8 +40,9 @@ export const removedSeasonObjectivesKey = (coachId: string | undefined, planId: 
 
 export async function loadSeasonPlan(coachId: string, squad: string): Promise<SeasonPlan | null> {
   const { data, error } = await supabase.from('season_plans')
-    .select('id, squad, starts_on, ends_on, shared_at, positions_known, watch_rule, last_shared_at, unshared_parts, unshared_players')
-    .eq('coach_user_id', coachId).eq('squad', squad).maybeSingle()
+    .select('id, squad, starts_on, ends_on, shared_at, positions_known, watch_rule, last_shared_at, unshared_parts, unshared_players, eval_every, eval_day')
+    // TanStack Query owns retries (TRAK-364: Home's Needs you waits for this read, so it must not back off on its own).
+    .eq('coach_user_id', coachId).eq('squad', squad).retry(false).maybeSingle()
   if (error) throw error
   // A plan read before TRAK-356 has no list of changes: nothing waits.
   return data && { ...data, unshared_parts: data.unshared_parts ?? [], unshared_players: data.unshared_players ?? [] }
@@ -104,7 +107,8 @@ export async function shareSeasonPlan(planId: string, talked: boolean) {
 /** When the plan was last shared: each share of the changes moves it on. */
 export const lastShared = (plan: SeasonPlan) => plan.last_shared_at ?? plan.shared_at
 
-const PART_NAMES: Record<string, string> = { dates: 'season dates', season_objectives: 'season objectives' }
+// TRAK-364: a new evaluation rhythm moves every evaluation date.
+const PART_NAMES: Record<string, string> = { dates: 'season dates', season_objectives: 'season objectives', evaluation: 'evaluation dates' }
 
 /** What waits under "Not shared yet": the parts, then each player whose objectives changed, by first name. A player
  *  no longer in the squad is counted with the rest of them. */

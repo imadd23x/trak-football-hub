@@ -16,6 +16,7 @@ import { localParts, localTodayISO } from '@/lib/event-time'
 import { PlayerProfile } from './PlayerProfile'
 import { WatchBadge } from '@/components/coach/season-plan/WatchFirst'
 import { useWatchList } from '@/components/coach/season-plan/useWatching'
+import { useSharedPlans } from '@/components/coach/season-plan/useEvaluation'
 import { usePlayerFacts } from './usePlayerFacts'
 import type { SquadRoster } from './useSquadRoster'
 
@@ -58,14 +59,17 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
   const seasonFrom = seasonPlan.plan?.starts_on ?? seasonWindow(localTodayISO()).from
   const season = useMemo(() => seasonAverages(roster.assessments, seasonFrom, dateOf), [roster.assessments, seasonFrom])
   // TRAK-266 (Imad, 22 Oct): the colour key only where the coach is needed: amber for a player to assess or a draft
-  // families can't see yet, by Home's Needs you rule. Everyone else gets no badge.
+  // families can't see yet, by Home's Needs you rule. Everyone else gets no badge. TRAK-364: as on Home, a squad that's
+  // evaluated (its season plan shared) has no per-player Assess; its evaluation is due on Home instead.
+  const evaluated = useSharedPlans(user?.id, roster.squads).shared
   const owed = useMemo(() => {
     const kinds = new Map<string, 'assess' | 'draft'>()
-    for (const item of needsYou({ players: roster.players, waitingForParent: roster.consentPending, assessments: roster.assessments, now: Date.now() })) {
+    for (const item of needsYou({ players: roster.players, waitingForParent: roster.consentPending, assessments: roster.assessments, now: Date.now(),
+      evaluatedSquads: evaluated })) {
       if (!kinds.has(item.playerId)) kinds.set(item.playerId, item.kind)
     }
     return kinds
-  }, [roster.players, roster.consentPending, roster.assessments])
+  }, [roster.players, roster.consentPending, roster.assessments, evaluated])
 
   // TRAK-352: where the season plan is on, a consented player the coach hasn't placed says so. Elsewhere Squad is as it was.
   const positionOf = (p: (typeof roster.players)[number]) =>

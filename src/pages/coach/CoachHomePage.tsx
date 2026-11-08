@@ -28,6 +28,8 @@ import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { needsYou } from '@/lib/coach-needs-you'
 import { unplacedBySquad } from '@/lib/positions'
 import { useWatchList } from '@/components/coach/season-plan/useWatching'
+import { useSquadEvaluations } from '@/components/coach/season-plan/useEvaluation'
+import { evalDay } from '@/lib/evaluation'
 import { Button } from '@/components/arc/button/button'
 import { squadShape } from '@/lib/squad/shape'
 import { localParts, localTodayISO } from '@/lib/event-time'
@@ -64,9 +66,14 @@ export default function CoachHomePage() {
   const loaded = !roster.isPending && !roster.error
   const shape = useMemo(() => loaded ? squadShape(roster.assessments, localTodayISO(), iso => localParts(iso).date) : null,
     [loaded, roster.assessments])
+  // TRAK-364: where the season plan is on and a squad's plan is shared, the squad's evaluation takes the place of its
+  // per-player Assess cards. Until that's known the cards wait, so none shows and then goes. A failed read only leaves
+  // the evaluation out: the per-player cards show as before (the season plan's card says what failed).
+  const evaluations = useSquadEvaluations(user?.id, coachSquad.squads)
   const cards = useMemo(() => loaded
-    ? needsYou({ players: roster.players, waitingForParent: roster.consentPending, assessments: roster.assessments, now: Date.now() })
-    : null, [loaded, roster.players, roster.consentPending, roster.assessments])
+    ? needsYou({ players: roster.players, waitingForParent: roster.consentPending, assessments: roster.assessments, now: Date.now(),
+      evaluatedSquads: evaluations.failed ? undefined : evaluations.evaluated })
+    : null, [loaded, roster.players, roster.consentPending, roster.assessments, evaluations.evaluated, evaluations.failed])
 
   // Imad, 24 Oct: events the week marks "Needs you" are in Needs you too, with the week's own next step.
   const client = useQueryClient()
@@ -96,6 +103,7 @@ export default function CoachHomePage() {
   // A failed read of the changes only leaves their cards out.
   const needsReady = (!eventsOn || owed.items !== null || owed.failed)
     && (!gamesOn || gamesFailed || (!games.isPending && !plans.isPending && !shares.isPending && (!sharedSoon.length || !changes.isPending)))
+    && evaluations.ready
   const owedChanged = () => {
     setWeekVersion(v => v + 1)
     void client.invalidateQueries({ queryKey: ['coach', user?.id, 'owed-events'] })
@@ -130,6 +138,18 @@ export default function CoachHomePage() {
       action: <MatchAction state={state} eventId={game.id} />,
     }]
   })
+  // TRAK-364: one Evaluation due card per squad whose evaluation is due, in place of its per-player Assess cards. A
+  // missed date stays due (urgent once its day has passed). Under All, the card picks its squad, as the others do.
+  const evaluationEvents: OwedEvent[] = evaluations.list.filter(e => e.due.dueOn && (everySquad || coachSquad.inSquad(e.squad))).map(({ squad, due }) => ({
+    id: `evaluation:${squad}`,
+    title: 'Evaluation due',
+    when: evalDay(due.since!),
+    squad: coachSquad.squads.length >= 2 ? squad : null,
+    reason: due.since! < evaluations.today ? `Due since ${evalDay(due.since!)}. Everyone starts where they were last time.`
+      : 'Everyone starts where they were last time. Change only who moved.',
+    urgent: due.since! < evaluations.today,
+    action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad) coachSquad.pick(squad); navigate('/coach/evaluation') }}>Evaluate</Button></span>,
+  }))
   // TRAK-352: where the season plan is on, one card per squad with consented players still to place. A newly
   // consented child has no position, so they join it.
   // Under All, a card picks its squad as the switcher does (TRAK-361): the season plan is one squad's, so All has to go.
@@ -172,8 +192,9 @@ export default function CoachHomePage() {
         </div>
         {/* Shown once the switch is known, so a coach who turned it off never sees it flash in. */}
         {(needsYouSwitch.data === true || needsYouSwitch.isError) && <div className={wide ? 'mt-6' : 'mt-5'}>
-          <NeedsYou items={needsReady ? cards : null} events={[...owedEvents, ...planEvents, ...positionEvents, ...watchEvents]} failed={!!roster.error || owed.failed || gamesFailed}
-            onRetry={() => { roster.retry(); owed.retry(); if (gamesOn) { void games.refetch(); void plans.refetch(); void shares.refetch() } }}
+          <NeedsYou items={needsReady ? cards : null} events={[...owedEvents, ...planEvents, ...evaluationEvents, ...positionEvents, ...watchEvents]}
+            failed={!!roster.error || owed.failed || gamesFailed}
+            onRetry={() => { roster.retry(); owed.retry(); if (evaluations.failed) evaluations.retry(); if (gamesOn) { void games.refetch(); void plans.refetch(); void shares.refetch() } }}
             onOpen={item => item.kind === 'draft'
               // TRAK-200: the profile's assessment card says Draft and has Publish.
               ? navigate(`/coach/squad/player/${item.playerId}`)

@@ -22,6 +22,9 @@ import { ShareStep } from '@/components/coach/season-plan/ShareStep'
 import { PlanView } from '@/components/coach/season-plan/PlanView'
 import { PlanEdit } from '@/components/coach/season-plan/PlanEdit'
 import { SeasonObjectivesEditor } from '@/components/coach/season-plan/SeasonObjectivesEditor'
+import { EvaluationRhythm } from '@/components/coach/season-plan/EvaluationRhythm'
+import { firstDateLine, rhythmOf, type EvalEvery } from '@/lib/evaluation'
+import { localTodayISO } from '@/lib/event-time'
 
 /* TRAK-350 (Season plan 2/18, spec TRAK-348): the season plan's set-up, step 1. The season's dates and up to three
    season objectives (the mockup's six, or the coach's own), each editable and deletable. It saves as a draft only the
@@ -29,7 +32,8 @@ import { SeasonObjectivesEditor } from '@/components/coach/season-plan/SeasonObj
    Focus and no Fill in for me (Tarek, 3 Nov). The stepper shows only steps that exist: TRAK-352 adds Positions,
    TRAK-354 Player objectives, TRAK-356 Share. Step 1 stays mounted while another step shows, so moving between steps
    never loses what was typed. TRAK-356: once the plan is shared, the set-up never comes back. The page is View plan,
-   each part with its Edit on one screen; a set-up step's address shows View plan instead. */
+   each part with its Edit on one screen; a set-up step's address shows View plan instead. TRAK-364: step 1 also asks
+   how often to evaluate each player, and on which day; the first date shows. */
 
 const STEPS = [
   { id: 'season', label: 'Season and objectives' }, { id: 'positions', label: 'Positions' },
@@ -41,16 +45,18 @@ const NO_TITLE = 'Give each objective a title, or delete it.'
 const END_BEFORE_START = 'The season has to end after it starts.'
 
 type Objective = { key: string; id?: string; title: string; looksLike: string }
-type Form = { startsOn: string; endsOn: string; objectives: Objective[] }
+type Form = { startsOn: string; endsOn: string; evalEvery: EvalEvery; evalDay: number; objectives: Objective[] }
 
 const toForm = (plan: SeasonPlan | null, saved: SeasonObjective[]): Form => ({
   startsOn: plan?.starts_on ?? '',
   endsOn: plan?.ends_on ?? '',
+  evalEvery: rhythmOf(plan ?? {}).every,
+  evalDay: rhythmOf(plan ?? {}).day,
   objectives: saved.map(o => ({ key: o.id, id: o.id, title: o.title, looksLike: o.looks_like })),
 })
 /** What a form built from the saved plan shows, to tell when the saved plan has moved on. */
 const savedKey = (plan: SeasonPlan | null, saved: SeasonObjective[]) =>
-  JSON.stringify([plan?.id, plan?.starts_on, plan?.ends_on, saved.map(o => [o.id, o.title, o.looks_like])])
+  JSON.stringify([plan?.id, plan?.starts_on, plan?.ends_on, plan?.eval_every, plan?.eval_day, saved.map(o => [o.id, o.title, o.looks_like])])
 
 export default function CoachSeasonPlan() {
   const navigate = useNavigate()
@@ -149,7 +155,7 @@ function SetUp({ squad, plan, saved, onNext }: { squad: string; plan: SeasonPlan
 
   const save = useMutation({
     mutationFn: async (sent: { form: Form; version: number }) => {
-      const dates = { starts_on: sent.form.startsOn || null, ends_on: sent.form.endsOn || null }
+      const dates = { starts_on: sent.form.startsOn || null, ends_on: sent.form.endsOn || null, eval_every: sent.form.evalEvery, eval_day: sent.form.evalDay }
       let planId = plan?.id
       if (planId) {
         const { error } = await supabase.from('season_plans').update(dates).eq('id', planId)
@@ -181,7 +187,7 @@ function SetUp({ squad, plan, saved, onNext }: { squad: string; plan: SeasonPlan
 
   return (
     <div className="arc grid gap-5">
-      <p className="text-sm text-ink-2">Your dates and up to three season objectives. You can save with none and add them later.</p>
+      <p className="text-sm text-ink-2">Your dates, how often you evaluate each player, and up to three season objectives. You can save with none and add them later.</p>
       <div className="grid items-start gap-5 laptop:grid-cols-2">
         <section aria-labelledby="season-dates" className="grid gap-4 rounded-2xl border border-line bg-surface p-5">
           <h2 id="season-dates" className="text-lg font-medium text-ink">Your season</h2>
@@ -191,6 +197,9 @@ function SetUp({ squad, plan, saved, onNext }: { squad: string; plan: SeasonPlan
               minDate={isoToDate(form.startsOn)} />
           </div>
           {datesProblem && <p role="alert" className="text-sm text-danger">{datesProblem}</p>}
+          <EvaluationRhythm every={form.evalEvery} day={form.evalDay}
+            onChange={({ every, day }) => change({ ...form, evalEvery: every, evalDay: day })}
+            line={firstDateLine({ startsOn: form.startsOn || null, endsOn: form.endsOn || null, every: form.evalEvery, day: form.evalDay, today: localTodayISO() })} />
         </section>
 
         <SeasonObjectivesEditor objectives={form.objectives} focusKey={focusKey} removeWord="Delete"

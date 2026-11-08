@@ -21,6 +21,8 @@ import { PlayerObjectivesSheet } from './PlayerObjectivesSheet'
 import { usePlayerObjectives } from './usePlayerObjectives'
 import { useWatchList, useWatchPlayers } from './useWatching'
 import { WatchBadge } from './WatchFirst'
+import { useSquadEvaluations } from './useEvaluation'
+import { nextDateLine, rhythmOf, rhythmText } from '@/lib/evaluation'
 
 /* TRAK-356 (Season plan 8/18, spec TRAK-348): View plan. Once shared, the set-up never comes back: the plan reads part
    by part, each with its Edit, one screen each (Tarek, 1 Nov). Edits save straight away and wait under "Not shared
@@ -28,7 +30,8 @@ import { WatchBadge } from './WatchFirst'
    a player's objectives in their sheet. A season objective or player objective removed after sharing stays in its
    history, with its dates. Player objectives fold, so the rest of the plan is a short scroll away (Tarek, 2 Nov).
    Watching (TRAK-355) lists who is watched first, with the squad's reminder and its Edit; Give objectives opens their
-   sheet, or their position first. Home's Set up for a watched player lands here with their sheet open (?player=). */
+   sheet, or their position first. Home's Set up for a watched player lands here with their sheet open (?player=).
+   TRAK-364: the Season card also says how often each player is evaluated, and when next, with its own Edit. */
 
 type Player = Tables<'squad_players'>
 const SHARE_FAILED = "Couldn't share the changes. Check your connection and try again."
@@ -50,6 +53,7 @@ export function PlanView({ coachId, squad, plan, seasonObjectives }: {
   const watching = useWatchList(coachId, roster)
   const watch = useWatchPlayers(coachId)
   const removed = useQuery({ queryKey: removedSeasonObjectivesKey(coachId, plan.id), queryFn: () => loadRemovedSeasonObjectives(plan.id) })
+  const evaluation = useSquadEvaluations(coachId, [squad])
   const [openId, setOpenId] = useState<string | null>(null)
   const [playersOpen, setPlayersOpen] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
@@ -140,6 +144,18 @@ export function PlanView({ coachId, squad, plan, seasonObjectives }: {
               <dd className="m-0 text-sm text-ink">{plan.starts_on && plan.ends_on ? `${day(plan.starts_on)} – ${day(plan.ends_on)}` : 'No dates yet'}</dd>
             </dl>
             {edit('Edit the season’s dates', () => navigate('/coach/season-plan/edit/dates'))}
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dl className="m-0 grid gap-0.5">
+              <dt className="text-sm text-ink-3">Evaluation</dt>
+              <dd className="m-0 text-sm text-ink">{(() => {
+                const { every, day } = rhythmOf(plan)
+                const mine = evaluation.list.find(e => e.squad === squad)
+                const when = mine ? ` · ${nextDateLine(mine.due, evaluation.today)}` : ''
+                return `${rhythmText(every, day).replace(/^e/, 'E')}${when}`
+              })()}</dd>
+            </dl>
+            {edit('Edit how often you evaluate', () => navigate('/coach/season-plan/edit/evaluation'))}
           </div>
         </section>
 

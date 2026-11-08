@@ -186,38 +186,47 @@ use_cases:
 
   # ENFORCED 2026-09-21. Its test passed on every uc:check run since the
   # 2026-09-21 merges; Imad approved promoting it (Tarek's offer, #77 thread).
+  # SPEC v3 2026-11-07 (TRAK-364), DRAFT for Kostas's review: with the season
+  # plan on and the squad's plan shared, the squad's evaluation replaces the
+  # per-player Assess marks. Without the switch, nothing changes.
   - id: UC-C03
     actor: coach
     title: View the squad
     requirement: REQ-002
     status: enforced
     tier: [1]
-    spec_version: 2
+    spec_version: 3
     given: A signed-in coach
     when: They open the squad screen
     then:
       - Every player in their squad is listed
       - A coach with an empty squad sees an explicit empty message
       - A failed load is distinguishable from an empty squad
+      - Where the academy's season plan is on and the squad's plan is shared, no player is marked to assess one by one; without it, a player due an assessment is still marked Assess
     source: https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/d0ed55ff618ee0a0b943399236527f9e3f7ebbb5/docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
   # SPEC v2 2026-09-25 (TRAK-68): Imad decided an assessment belongs to a
   # session that already happened, so the session is required. v1 had it
   # optional, and a same-day re-assessment silently moved the first one to
   # another match (second use-case test).
+  # SPEC v3 2026-11-07 (TRAK-364), DRAFT for Kostas's review: the session
+  # assessment stays as v2 everywhere. Where the season plan is on and the
+  # squad's plan is shared, the squad's evaluation also writes assessments,
+  # each with the six scores and no session (the fourth line).
   - id: UC-C04
     actor: coach
     title: Assess a player on six sliders producing a band
     requirement: REQ-002
     status: enforced
     tier: [1, 2]
-    spec_version: 2
+    spec_version: 3
     given: A signed-in coach with at least one squad player and at least one past session
     when: They select a player and a past session, set the six sliders and submit
     then:
       - A coach_assessments row is persisted with all six category scores and the chosen session
       - A band derived from the six scores is shown before submitting
       - Submitting is refused until a player and a session are selected
+      - Where the academy's season plan is on and the squad's plan is shared, its due evaluation publishes all six scores for each consented player, starting from their latest scores, with no session
     source: https://github.com/kostasanastasioubusiness-lang/trak-football-hub/blob/d0ed55ff618ee0a0b943399236527f9e3f7ebbb5/docs/superpowers/specs/2026-07-27-trak-pilot-mvp-design.md
 
   # PARKED 2026-09-23 (Q-2026-09-23-01, TRAK-19). J1: coach TRK- codes are not an admission path in the pilot (TRAK-36).

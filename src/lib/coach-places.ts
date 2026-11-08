@@ -21,6 +21,8 @@ const PLACES: [prefix: string, screen: CoachScreen | null, title: string][] = [
   ['/coach/manual', 'settings', 'How Trak works'],
   ['/coach/feedback', null, 'Feedback'],
   ['/coach/assess', null, 'Assess'],
+  // TRAK-364: the squad's evaluation opens from Home's Needs you.
+  ['/coach/evaluation', 'home', 'Evaluation'],
   // TRAK-186: the log's pages open from Home, so Home stays marked on them.
   ['/coach/sessions', 'home', 'Log'],
 ]

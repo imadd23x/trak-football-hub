@@ -118,7 +118,25 @@ the player before Publish. A partial failure states what saved and what did not.
 Assessments require a completed session attended by the player, with one
 assessment per player per session. `/coach/assess` is the pilot assessment
 screen; Quick Assess remains hidden. Parents never see the coach's message.
-These decisions are recorded in TRAK-63, TRAK-64, TRAK-68 and TRAK-100.
+These decisions are recorded in TRAK-63, TRAK-64, TRAK-68 and TRAK-100. An
+evaluation's assessments (below) are the one kind with no session.
+
+**With the season plan (TRAK-364; draft awaiting Kostas's review).** Academies
+without the `season_plan` switch keep J5 exactly as written above. Where the
+switch is on and a squad's season plan is shared, the squad is evaluated on the
+plan's rhythm: every 2 weeks, every month or every 6 weeks, on a chosen day
+(for every month, the last such day of the month). Dates count in the academy's
+time zone, from the day the plan was first shared. Home shows one Evaluation
+due card for the squad in place of its per-player Assess reminders. A missed
+date stays due, and one evaluation covers every date that has passed. The
+evaluation rates every consented player of the squad on the same six sliders,
+each starting from their latest ratings however they were given. A player with
+no ratings yet must be rated before Publish. Each player may get a note that
+only that player sees, never their family. Publish writes one published
+assessment per player with no session, all at once or not at all, and a failed
+publish keeps everything entered. Families see the bands as they do now. The
+session assessment stays available. Changing the rhythm after sharing waits
+under Not shared yet as the evaluation dates.
 
 ### J6 — Player and parent see the records
 

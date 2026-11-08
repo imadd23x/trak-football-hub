@@ -18,17 +18,22 @@ export interface NeedsYouItem {
  * weeks, or never after 2 weeks in the squad), most urgent first; then a card per player with a draft assessment
  * families can't see yet. Trainings aren't counted here: the cards are about assessing. A player waiting for a
  * parent is left out, as nothing can be recorded about them.
+ * TRAK-364: in a squad that is evaluated (the season plan is on and the squad's plan is shared), the per-player
+ * Assess cards give way to the squad's one Evaluation due card. Drafts still show: they wait for the coach either way.
  */
-export function needsYou({ players, waitingForParent, assessments, now }: {
-  players: { id: string; player_name: string; created_at: string | null; position?: string | null; shirt_number?: number | null }[]
+export function needsYou({ players, waitingForParent, assessments, now, evaluatedSquads }: {
+  players: { id: string; player_name: string; created_at: string | null; position?: string | null; shirt_number?: number | null; age_group?: string | null }[]
   waitingForParent: Set<string>
   assessments: { squad_player_id: string; created_at: string; published_at?: string | null }[]
   now: number
+  /** Squads whose evaluation replaces the per-player Assess cards. */
+  evaluatedSquads?: Set<string>
 }): NeedsYouItem[] {
   const detail = (p: (typeof players)[number]) => [p.position, p.shirt_number != null ? `#${p.shirt_number}` : null].filter(Boolean).join(' · ')
   const byId = new Map(players.map(p => [p.id, p]))
+  const evaluated = (p: (typeof players)[number]) => !!evaluatedSquads?.has(p.age_group?.trim() ?? '')
   const assess: NeedsYouItem[] = playerAttention({
-    roster: players, waitingForParent, assessments, trainings: [], present: new Map(), absenceReasons: new Map(), now,
+    roster: players.filter(p => !evaluated(p)), waitingForParent, assessments, trainings: [], present: new Map(), absenceReasons: new Map(), now,
   }).filter(row => row.level !== 'on-track').map(row => ({
     playerId: row.playerId, name: row.name, detail: detail(byId.get(row.playerId)!), kind: 'assess', reason: row.reasons[0], urgent: row.level === 'urgent',
   }))

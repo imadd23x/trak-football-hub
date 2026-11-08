@@ -188,7 +188,8 @@ describe('TRAK-352 positions', () => {
 
     await user().click(screen.getByRole('button', { name: 'Next: Positions' }))
     expect(await screen.findByRole('heading', { name: 'Do you know where they play yet?' })).toBeInTheDocument()
-    expect(planWrites).toEqual([{ squad: 'U16', starts_on: null, ends_on: null }])
+    // TRAK-364: step 1 saves the evaluation's rhythm with the dates (the default: every month, on the last Sunday).
+    expect(planWrites).toEqual([{ squad: 'U16', starts_on: null, ends_on: null, eval_every: 'month', eval_day: 0 }])
   })
 
   it("asks on Home for consented players with no position, and the card goes once they're placed", async () => {

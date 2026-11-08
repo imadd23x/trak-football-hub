@@ -34,4 +34,15 @@ describe('needs you', () => {
   it('leaves out a player waiting for a parent', () => {
     expect(run([player('a', 'Thierry Henry')], [], ['a'])).toEqual([])
   })
+
+  // TRAK-364: an evaluated squad (its season plan shared) has no per-player Assess cards: its Evaluation due card takes
+  // their place. Another squad keeps them, and drafts still show everywhere.
+  it('drops the Assess cards of an evaluated squad only, and keeps its drafts', () => {
+    const players = [{ ...player('a', 'Thierry Henry'), age_group: 'U16 ' }, { ...player('b', 'Patrick Vieira'), age_group: 'U14' },
+      { ...player('c', 'Robert Pires'), age_group: 'U16' }]
+    const items = needsYou({ players, waitingForParent: new Set(), assessments: [assessed('c', '2026-10-20T12:00:00Z', null)], now,
+      evaluatedSquads: new Set(['U16']) })
+    expect(items.map(i => [i.playerId, i.kind])).toEqual([['b', 'assess'], ['c', 'draft']])
+    expect(needsYou({ players, waitingForParent: new Set(), assessments: [], now }).map(i => i.playerId).sort()).toEqual(['a', 'b', 'c'])
+  })
 })

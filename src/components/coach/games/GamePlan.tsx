@@ -1,3 +1,4 @@
+import { useDefaultFormation, useFormationCopy } from './useDefaultFormation'
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
@@ -145,12 +146,15 @@ export function GamePlan({ game, form, draft, who, step, onStep, sharedAt, chang
   picking: boolean; onPicking: (open: boolean) => void
 }) {
   const { change, shareNow, scheduleAt, sharing, shareProblem } = draft
+  // TRAK-360: opening the line-up of a match that has none loads the squad's default formation for its format.
+  useDefaultFormation({ eventId: game.id, form, onForm: change, enabled: step === 1 && !locked })
+  const copy = useFormationCopy(game.id).data ?? null
   return (
     <div className="grid gap-5 pt-4">
       {/* TRAK-346 (Imad, 3 Nov): any step opens from here, ahead as well as back, so an Edit never means walking back. */}
       <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Game plan" jumpAhead />
       {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} squad={game.squad ?? null} form={form} onFormChange={change} locked={locked} />
-        : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} />
+        : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} copy={copy} />
         : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} onShare={shareNow} onSchedule={scheduleAt}
             sharing={sharing} problem={shareProblem} locked={locked} onStep={onStep} onEditLogistics={onEditLogistics} picking={picking} onPicking={onPicking} />}
       <div className="flex flex-wrap items-center gap-3">

@@ -3,7 +3,8 @@
  * upcoming matches (not past ones, not another squad's) and asks before it replaces a saved line-up; Make default sets
  * and removes the default for the format; Set for matchday lists the matches a formation was copied to. Synthetic people.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { toast } from 'sonner'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
@@ -12,6 +13,8 @@ import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
 import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
 import { forgetScreens } from '@/lib/screen-memory'
+
+vi.mock('sonner', async importOriginal => ({ ...(await importOriginal<typeof import('sonner')>()), toast: vi.fn() }))
 
 type Row = { id: string; coach_user_id: string; player_name: string; age_group: string; status: string; shirt_number: number; position: string | null; created_at: string; linked_player_id: string | null }
 type Starter = { slot: number; squad_player_id: string }
@@ -162,6 +165,7 @@ describe('TRAK-360 Squad › Formations into matches', () => {
     await u.click(screen.getByRole('button', { name: 'Replace and copy' }))
     await waitFor(() => expect(calls).toHaveLength(1))
     expect(calls[0]).toEqual({ rpc: 'use_formation_for_matches', body: { p_formation_id: 'f1', p_event_ids: ['m-alpha', 'm-beta'] } })
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/ copied to 2 matches\.$/)))
   }, 30_000)
 
   it('copying into a match with no saved line-up asks nothing', async () => {
@@ -172,6 +176,7 @@ describe('TRAK-360 Squad › Formations into matches', () => {
     await u.click(await screen.findByRole('checkbox', { name: /vs Alpha/ }))
     await u.click(screen.getByRole('button', { name: 'Copy to 1 match' }))
     await waitFor(() => expect(calls).toEqual([{ rpc: 'use_formation_for_matches', body: { p_formation_id: 'f1', p_event_ids: ['m-alpha'] } }]))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/ copied to 1 match\.$/)))
   }, 30_000)
 
   it('Make default sets it for the format', async () => {

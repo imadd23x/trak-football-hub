@@ -15,6 +15,7 @@ import { blankRepeat, clashMessage, formProblem, formToRow, lockedMessage, rowTo
 import { fullTime, gameStatus, type GameTab } from '@/lib/games/loop'
 import { formToPlan, planToForm, type PlanForm } from '@/lib/games/plan'
 import { planParts } from '@/lib/games/share'
+import { withReported } from '@/lib/games/lineup'
 import { evaluationToForm, type EvaluationForm } from '@/lib/games/evaluation'
 import type { Tables } from '@/integrations/supabase/types'
 import { gameTitle, gameWhen, useGame, useGameEvaluation, useGamePlan, useGamePlanChanges, useGamePlayers, useGameShares, useGames, useWhoCanCome } from '@/components/coach/games/useGames'
@@ -126,7 +127,9 @@ function Game({ row, plan, players, sharedAt, evaluation }: { row: EventRow; pla
   // On a phone Save draft sits in the header's "…" menu, where "Saved" can't be seen, so a saved draft says so there.
   const [folded, setFolded] = useState(false)
   const onSaved = () => { if (folded) toast.success('Draft saved') }
-  const planForm = (locked ? null : typed) ?? lockedPlan
+  // TRAK-359: until the coach types, a child whose family said "Can't make it" and who has no row starts in Not attending.
+  const reported = locked || who.isPending || who.error ? lockedPlan : { ...lockedPlan, players: withReported(lockedPlan.players, who.players) }
+  const planForm = (locked ? null : typed) ?? reported
   const planDraft = useGamePlanDraft({ game: row, form: planForm, onFormChange: setTyped, sharedAt, who, onSaved })
   const evaluationForm = entered ?? evaluationToForm(evaluation.data ?? { evaluation: null, players: [], notes: [] })
   const evaluationDraft = useEvaluationDraft({ game: row, form: evaluationForm, onFormChange: setEntered,

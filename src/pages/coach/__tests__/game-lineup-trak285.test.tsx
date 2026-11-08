@@ -75,7 +75,8 @@ beforeEach(() => {
       child('karagounis', 'Giorgos Karagounis', 10), child('nikopolidis', 'Antonios Nikopolidis', 1),
       child('basinas', 'Angelos Basinas', 6), child('katsouranis', 'Kostas Katsouranis', 8, 'U14'),
     ]),
-    // Zagorakis is confirmed; Nikopolidis's family said he can't make it; Karagounis waits for consent.
+    // Nikopolidis's family said he can't make it; Karagounis waits for consent. Every switch answers on, so the season
+    // plan is on and the coach's confirmations aren't read (TRAK-359): zagorakis' confirmation changes nothing.
     table('event_confirmations', [{ squad_player_id: 'zagorakis' }]),
     table('event_absences', [{ squad_player_id: 'nikopolidis' }]),
     rpc('coach_squad_player_consent_required', ({ p_squad_player_id }) => p_squad_player_id === 'karagounis'),
@@ -119,14 +120,16 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     await user.click(screen.getByRole('combobox', { name: 'Who plays here?' }))
     const options = await screen.findAllByRole('option')
     expect(options.map(option => option.textContent)).toEqual([
-      'Theodoros Zagorakis', 'Angelos Basinas · not confirmed', 'Angelos Charisteas · not confirmed', "Antonios Nikopolidis · can't make it",
+      'Angelos Basinas', 'Angelos Charisteas', 'Theodoros Zagorakis', "Antonios Nikopolidis · can't make it",
     ])
     expect(options[3]).toHaveAttribute('aria-disabled', 'true')
     await user.click(options[3])
     expect(slot(1)).toHaveAccessibleName('Slot 1, empty')
     expect(screen.queryByText(/Karagounis/)).toBeNull()
     expect(screen.queryByText(/Katsouranis/)).toBeNull()
-    expect(within(screen.getByRole('region', { name: 'Can’t make it' })).getByText('Antonios Nikopolidis')).toBeInTheDocument()
+    // TRAK-359: his family's report puts him in Not attending, flagged.
+    await user.click(screen.getByRole('tab', { name: 'Not attending · 1' }))
+    expect(within(screen.getByRole('tabpanel', { name: 'Not attending · 1' })).getByRole('button', { name: "Antonios Nikopolidis, not attending, can't make it" })).toBeInTheDocument()
   })
 
   it('a slot holds one player and a player one slot', async () => {
@@ -165,6 +168,7 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Save draft' }))
     expect(await screen.findByRole('button', { name: 'Saved' })).toBeInTheDocument()
     expect(saves.at(-1)).toEqual([
+      { event_id: 'g1', squad_player_id: 'nikopolidis', role: 'not_attending', slot: null, job: '', note: '', context: [], expectation: 'usual' },
       { event_id: 'g1', squad_player_id: 'charisteas', role: 'not_selected', slot: null, job: '', note: 'Not this week. Your chance comes Tuesday.', context: [], expectation: 'usual' },
       { event_id: 'g1', squad_player_id: 'basinas', role: 'bench', slot: null, job: 'Be ready to come on at half-time.', note: '', context: [], expectation: 'usual' },
     ])
@@ -179,6 +183,36 @@ describe('TRAK-285: plan step 2, line-up and jobs', { timeout: 30_000 }, () => {
     await user.click(screen.getByRole('tab', { name: /^Bench/ }))
     await user.click(within(bench()).getByRole('button', { name: 'Angelos Basinas, bench, has a job' }))
     expect(screen.getByLabelText('Job · only Angelos sees it')).toHaveValue('Be ready to come on at half-time.')
+  })
+
+  it('TRAK-359: the coach moves a player to Not attending and back; a family-reported child stays; the counts follow', async () => {
+    const user = userEvent.setup()
+    const { saves } = store()
+    await openLineUp(user)
+    // Everyone is coming: three on the bench, and Nikopolidis, whose family said so, is already in Not attending.
+    expect(screen.getByRole('tab', { name: 'Bench · 3' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Not attending · 1' })).toBeInTheDocument()
+    await user.click(within(bench()).getByRole('button', { name: /^Angelos Charisteas, bench/ }))
+    await user.click(screen.getByRole('radio', { name: 'Not attending' }))
+    expect(screen.queryByLabelText(/^Job/)).toBeNull()
+    expect(screen.queryByLabelText(/^Note/)).toBeNull()
+    expect(screen.getByRole('tab', { name: 'Bench · 2' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Not attending · 2' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Not attending · 2' }))
+    const panel = screen.getByRole('tabpanel', { name: 'Not attending · 2' })
+    // The family-reported child can't be moved out: no choice, and why.
+    await user.click(within(panel).getByRole('button', { name: "Antonios Nikopolidis, not attending, can't make it" }))
+    expect(screen.queryByRole('radio', { name: 'Bench' })).toBeNull()
+    expect(screen.getByText(/stays in Not attending until Antonios's family undoes it/)).toBeInTheDocument()
+    // The coach's own mark moves back out.
+    await user.click(within(panel).getByRole('button', { name: 'Angelos Charisteas, not attending' }))
+    await user.click(screen.getByRole('radio', { name: 'Bench' }))
+    expect(screen.getByRole('tab', { name: 'Not attending · 1' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Not attending · 1' }))
+    await user.click(within(screen.getByRole('tabpanel', { name: 'Not attending · 1' })).getByRole('button', { name: "Antonios Nikopolidis, not attending, can't make it" }))
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+    expect(await screen.findByRole('button', { name: 'Saved' })).toBeInTheDocument()
+    expect(saves.at(-1)).toContainEqual({ event_id: 'g1', squad_player_id: 'nikopolidis', role: 'not_attending', slot: null, job: '', note: '', context: [], expectation: 'usual' })
   })
 
   it('TRAK-358: Everyone\'s job and its count are gone; Review & share counts the starters with a job', async () => {

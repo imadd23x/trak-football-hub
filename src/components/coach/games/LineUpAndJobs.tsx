@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useFeatureState } from '@/components/trak/parked'
 import { DEFAULT_FORMATION, FORMATIONS, FORMATS, lineName, slotsOf } from '@/lib/games/formations'
 import { fitFormat, followPosition, moveTo, playerPlan, type LineUpDrop, type PlayerPlan, type PlayerPlans } from '@/lib/games/lineup'
 import type { PlanForm } from '@/lib/games/plan'
@@ -12,8 +13,6 @@ import type { Candidate, useWhoCanCome } from './useGames'
 import { ListFace, MarkersKey, Pitch, type LineUpSpot, type PitchPlayer } from './Pitch'
 import { PlayerPanel, type Target } from './PlayerPanel'
 import { LoadError } from '@/components/trak'
-import { PlayerFace } from '@/components/trak/PlayerFace'
-import { Badge } from '@/components/arc/badge/badge'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { MorphSelect } from '@/components/arc/morph-select/morph-select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/arc/tabs/tabs'
@@ -28,12 +27,14 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    (under it on a tablet and a phone). A player drags onto a place, a face or a tab; tapping a place still picks who
    plays there, and tapping a face opens their sheet. Placed outside their position and Can also play, a player gets
    Out of position ticked; moved back, it goes, unless the coach ticked it. Everyone's job went: the faces carry the
-   markers, and Review & share counts the starters with a job. A family's "Can't make it" shows as before, until
-   Not attending (TRAK-359). */
+   markers, and Review & share counts the starters with a job. TRAK-359 (Tarek, 3 Nov): a third tab, Not attending.
+   Everyone is coming unless they're there. A family's "Can't make it" puts the child there, flagged, and the database
+   keeps them there until the family undoes it; a report that comes after the coach placed them only flags them. */
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
 const SHAPES = FORMATS.map(format => ({ label: `${format} a side`, options: FORMATIONS[format].map(shape => ({ value: shape, label: shape })) }))
-type List = 'bench' | 'not_selected'
+type List = 'bench' | 'not_selected' | 'not_attending'
+const LISTS = { 'list:bench': 'bench', 'list:not_selected': 'not_selected', 'list:not_attending': 'not_attending' } as const
 
 export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
   form: PlanForm; onFormChange: (form: PlanForm) => void; who: ReturnType<typeof useWhoCanCome>; locked?: boolean
@@ -42,10 +43,12 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
   // TRAK-358: Can also play, so a placement outside it ticks Out of position.
   const roles = usePlayerRoles(user?.id)
   const phone = useIsMobile()
+  const seasonPlan = useFeatureState('season_plan')
   const [target, setTarget] = useState<Target | null>(null)
   const [list, setList] = useState<List>('bench')
   const shape = form.formation ?? DEFAULT_FORMATION[form.format]
   const plan = (player: Candidate) => playerPlan(form.players, player.id)
+  const familyReported = (id: string) => playerPlan(form.players, id).role === 'not_attending' && !!who.players.find(player => player.id === id)?.absent
   const inSlot = (slot: number) => who.players.find(player => plan(player).role === 'starter' && plan(player).slot === slot)
 
   /** Whether a plan stands outside the player's position and Can also play, on `on`'s places. */
@@ -63,9 +66,10 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
   // A drag: from a place or a face, onto a place, a face, or a list's tab or panel.
   const swap = usePointerSwap<LineUpSpot>((from, to) => {
     const id = from.startsWith('slot:') ? inSlot(Number(from.slice(5)))?.id : from.startsWith('player:') ? from.slice(7) : undefined
-    if (!id || locked) return
+    // The database keeps a family-reported child in Not attending, so a drag doesn't try.
+    if (!id || locked || familyReported(id)) return
     const where: LineUpDrop = to.startsWith('slot:') ? { kind: 'slot', slot: Number(to.slice(5)) }
-      : to.startsWith('player:') ? { kind: 'player', id: to.slice(7) } : { kind: 'list', role: to === 'list:bench' ? 'bench' : 'not_selected' }
+      : to.startsWith('player:') ? { kind: 'player', id: to.slice(7) } : { kind: 'list', role: LISTS[to as keyof typeof LISTS] ?? 'bench' }
     const next = moveTo(form.players, id, where)
     if (next === form.players) return
     setPlayers(next)
@@ -83,10 +87,11 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
     if (role === 'starter' && slot != null && slot <= form.format) starters.set(slot, { ...player, plan: plan(player) })
   }
   const placed = new Set([...starters.values()].map(player => player.id))
-  // Anyone who can come and isn't on the pitch or left out is on the bench.
-  const bench = who.players.filter(player => !player.absent && plan(player).role !== 'not_selected' && !placed.has(player.id))
-  const leftOut = who.players.filter(player => !player.absent && plan(player).role === 'not_selected')
-  const cantMakeIt = who.players.filter(player => player.absent && plan(player).role !== 'starter')
+  // Everyone is coming unless they're in Not attending, and on the bench unless they're on the pitch or left out. A
+  // family's "Can't make it" is a flag on the face, wherever the child is.
+  const bench = who.players.filter(player => !['not_selected', 'not_attending'].includes(plan(player).role) && !placed.has(player.id))
+  const leftOut = who.players.filter(player => plan(player).role === 'not_selected')
+  const notComing = who.players.filter(player => plan(player).role === 'not_attending')
   const title = target?.kind === 'slot' ? `${lineName(shape, target.slot)}, slot ${target.slot}`
     : who.players.find(player => target && player.id === target.id)?.name ?? 'Player'
   const panel = target && <PlayerPanel target={target} players={form.players} onPlayers={setPlayers} candidates={who.players}
@@ -94,8 +99,8 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
   const open = (player: Candidate) => setTarget({ kind: 'player', id: player.id })
   const opened = (player: Candidate) => target?.kind === 'player' && target.id === player.id
   const detail = (player: Candidate) => `${player.shirt != null ? `#${player.shirt} · ` : ''}${positionsShort(player.position, roles.of(player.id).also)}`
-  const faces = (players: Candidate[], words: 'bench' | 'not selected') =>
-    <ul role="group" aria-label={words === 'bench' ? 'Bench' : 'Not selected'} className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2 p-0">
+  const faces = (players: Candidate[], words: 'bench' | 'not selected' | 'not attending') =>
+    <ul role="group" aria-label={words === 'bench' ? 'Bench' : words === 'not selected' ? 'Not selected' : 'Not attending'} className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2 p-0">
       {players.map(player => <li key={player.id}>
         <ListFace player={player} plan={plan(player)} list={words} detail={detail(player)} on={opened(player)} onOpen={() => open(player)} swap={drag} />
       </li>)}
@@ -140,10 +145,12 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
                 : 'Drag a player onto a place, or tap a place to pick who plays there. Tap a player to give them a job.'}</p>
               <MarkersKey />
             </div>
-            <Tabs value={list} onValueChange={value => setList(value as List)}>
+            {/* min-w-0: three tabs are wider than a phone's card, and the tab list scrolls within it rather than the page. */}
+            <Tabs className="min-w-0" value={list} onValueChange={value => setList(value as List)}>
               <TabsList aria-label="Off the pitch">
-                <TabsTrigger value="bench" {...dropOn('list:bench')} className={lit('list:bench')}>Bench · {bench.length}</TabsTrigger>
-                <TabsTrigger value="not_selected" {...dropOn('list:not_selected')} className={lit('list:not_selected')}>Not selected · {leftOut.length}</TabsTrigger>
+                <TabsTrigger value="bench" {...dropOn('list:bench')} className={`!min-w-0 !px-2 ${lit('list:bench')}`}>Bench · {bench.length}</TabsTrigger>
+                <TabsTrigger value="not_selected" {...dropOn('list:not_selected')} className={`!min-w-0 !px-2 ${lit('list:not_selected')}`}>Not selected · {leftOut.length}</TabsTrigger>
+                <TabsTrigger value="not_attending" {...dropOn('list:not_attending')} className={`!min-w-0 !px-2 ${lit('list:not_attending')}`}>Not attending · {notComing.length}</TabsTrigger>
               </TabsList>
               {/* Both panels stay mounted, so a tab is never mid-animation when a drag lands; the other is hidden. The grid
                   is inside each panel: a display class on the panel itself would override `hidden` and show both. */}
@@ -151,7 +158,8 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
                 <div className="grid gap-3">
                 {!locked && <p className="text-sm text-ink-3">Drag a player onto a place on the pitch, or onto Not selected to leave them out.</p>}
                 {bench.length === 0
-                  ? <p className="text-sm text-ink-2">{starters.size + leftOut.length === 0 ? 'Nobody can come yet. Confirm players in Squad › Availability.' : 'Nobody on the bench.'}</p>
+                  ? <p className="text-sm text-ink-2">{starters.size + leftOut.length + notComing.length > 0 ? 'Nobody on the bench.'
+                    : seasonPlan.on ? 'Nobody in this squad yet.' : 'Nobody can come yet. Confirm players in Squad › Availability.'}</p>
                   : faces(bench, 'bench')}
                 </div>
               </TabsContent>
@@ -163,18 +171,16 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false }: {
                   : faces(leftOut, 'not selected')}
                 </div>
               </TabsContent>
+              <TabsContent value="not_attending" forceMount hidden={list !== 'not_attending'} {...dropOn('list:not_attending')} className={`rounded-xl ${lit('list:not_attending')}`}>
+                <div className="grid gap-3">
+                <p className="text-sm text-ink-3">Their families see “Not in the squad this week”. A child whose family said they can’t make it is here until the family undoes it.</p>
+                {notComing.length === 0
+                  ? <p className="text-sm text-ink-2">{locked ? 'Nobody was marked.' : 'Everyone is coming. Drag a player here when the group says they aren’t.'}</p>
+                  : faces(notComing, 'not attending')}
+                </div>
+              </TabsContent>
             </Tabs>
           </section>
-
-          {cantMakeIt.length > 0 && <section aria-labelledby="plan-cant" className={card}>
-            <h2 id="plan-cant" className="text-lg font-medium text-ink">Can’t make it</h2>
-            <p className="text-sm text-ink-3">Their families said they can’t make it, so they can’t be placed.</p>
-            <ul className="grid gap-2">{cantMakeIt.map(player => <li key={player.id} className="flex items-center gap-3 px-2 py-1">
-              <PlayerFace name={player.name} size="sm" aria-hidden="true" />
-              <span className="flex-1 text-base text-ink-2">{player.name}</span>
-              <span className="arc"><Badge size="sm" tone="warning">Can’t make it</Badge></span>
-            </li>)}</ul>
-          </section>}
         </div>
       </div>
     </div>

@@ -89,7 +89,7 @@ describe('fitting a drill to the squad', () => {
 
   it('keepers get serves, not shots', () => {
     expect(fit(drill('Get set and catch'), 12, START_LEVEL).details).toMatchObject({ area: '12 m from goal', numbers: '12 players, two goals', conditions: 'Served low' })
-    expect(fit(drill('Get set and catch'), 12, START_LEVEL).legend[0]).toEqual(['#fff', 'Servers'])
+    expect(fit(drill('Get set and catch'), 12, START_LEVEL).legend[0]).toEqual(['main', 'Servers'])
   })
 
   it('a level outside 0–7 is held at the ends', () => {

@@ -33,7 +33,11 @@ export type Draw =
   | { type: 'pairs'; pairs: number; odd: boolean; gap: number }
   | { type: 'shoot'; g: number; n: number; dist: number; angle: boolean }
 
-export type Fitted = { details: Details; draw: Draw; legend: [colour: string, label: string][] }
+/** Who a dot on the picture is: the main group (attackers, Team A, players), the other group (defenders, Team B) or
+ *  the extras (keepers, spare players, the target). The pitch picture (TRAK-386) picks each one's colour. */
+export type Role = 'main' | 'other' | 'extra'
+
+export type Fitted = { details: Details; draw: Draw; legend: [role: Role, label: string][] }
 
 /* Each template's numbers, level by level (easiest first). */
 const SQ = [[.2, 24, 0], [.25, 19, 3], [.25, 15, 3], [.25, 15, 2], [.3, 12, 2], [.33, 10, 2], [.36, 9, 1], [.4, 8, 1]] // defenders' share, room per player (m²), touches
@@ -47,7 +51,7 @@ const FN = [[3, 1, 40, 30, 0], [3, 1, 35, 30, 0], [3, 2, 35, 30, 0], [4, 2, 35, 
 const FM = [[3, 40, 30, 0], [4, 35, 30, 0], [4, 35, 30, 0], [5, 35, 30, 0], [5, 35, 25, 3], [6, 30, 25, 2], [6, 30, 25, 2], [7, 30, 25, 1]] // players each side, length, width, touches
 const FR = [22, 22, 20, 20, 18, 18, 16, 15] // box size (m)
 
-const WHITE = '#fff', ORANGE = '#E8894A', YELLOW = '#F5D44F'
+const MAIN: Role = 'main', OTHER: Role = 'other', EXTRA: Role = 'extra'
 
 const touches = (t: number) => t === 0 ? 'Any touches' : t === 1 ? '1 touch' : `${t} touches`
 const round5 = (x: number) => Math.max(15, Math.round(x / 5) * 5)
@@ -68,11 +72,11 @@ export function fit(d: LibraryDrill, n: number, i: number): Fitted {
   switch (d.template) {
     case 'warm':
       return { details: details('20x20 m', `${n} players`, 'None', 'Non-directional', rule),
-        draw: { type: 'scatter', att: n, def: 0, side: 20, noBall: true }, legend: [[WHITE, 'Players']] }
+        draw: { type: 'scatter', att: n, def: 0, side: 20, noBall: true }, legend: [[MAIN, 'Players']] }
     case 'free': {
       const side = FR[i], pairs = Math.floor(n / 2)
       return { details: details(`${side}x${side} m`, n % 2 ? `${pairs - 1} pairs and a group of 3` : `${pairs} pairs`, 'None. Follow your partner', 'Non-directional', rule),
-        draw: { type: 'scatter', att: n, def: 0, side }, legend: [[WHITE, 'Players']] }
+        draw: { type: 'scatter', att: n, def: 0, side }, legend: [[MAIN, 'Players']] }
     }
     case 'groups': {
       const [side, t] = GR[i], g = Math.max(2, Math.round(n / 5)), base = Math.floor(n / g), extra = n % g
@@ -81,23 +85,23 @@ export function fit(d: LibraryDrill, n: number, i: number): Fitted {
         return { att: s - def, def }
       })
       return { details: details(`${side}x${side} m each`, `${n} players, ${g} groups`, 'The next cone', 'Non-directional. Round the square', join(touches(t), rule)),
-        draw: { type: 'square', grids, side }, legend: d.shadow ? [[WHITE, 'Passers'], [ORANGE, 'Movers']] : [[WHITE, 'Players']] }
+        draw: { type: 'square', grids, side }, legend: d.shadow ? [[MAIN, 'Passers'], [OTHER, 'Movers']] : [[MAIN, 'Players']] }
     }
     case 'func': {
       const [a, b, L, W, t] = FN[i]
       return { details: details(`${L}x${W} m`, `${n} players, groups of ${a}v${b} and a keeper`, 'One goal', 'Directional. Attack the goal', join(touches(t), rule)),
-        draw: { type: 'game', s: a, sb: b, j: 0, L, W, oneGoal: true, keeper: '' }, legend: [[WHITE, 'Attackers'], [ORANGE, 'Defenders']] }
+        draw: { type: 'game', s: a, sb: b, j: 0, L, W, oneGoal: true, keeper: '' }, legend: [[MAIN, 'Attackers'], [OTHER, 'Defenders']] }
     }
     case 'funcm': {
       const [a0, L, W, t] = FM[i], a = Math.min(a0, Math.floor((n - 1) / 2)), rest = n - a * 2 - 1
       return { details: details(`${L}x${W} m`, `${n} players, ${a}v${a} and a keeper${rest ? `, ${rest} rotate in` : ''}`, 'One goal', 'Directional. Attack the goal', join(touches(t), rule)),
-        draw: { type: 'game', s: a, sb: a, j: 0, L, W, oneGoal: true, keeper: 'right' }, legend: [[WHITE, 'Attackers'], [ORANGE, 'Defenders'], [YELLOW, 'Keeper']] }
+        draw: { type: 'game', s: a, sb: a, j: 0, L, W, oneGoal: true, keeper: 'right' }, legend: [[MAIN, 'Attackers'], [OTHER, 'Defenders'], [EXTRA, 'Keeper']] }
     }
     case 'square': {
       if (d.ballEach) {
         const [r, a] = BE[i], def = Math.max(1, Math.round(n * r)), side = Math.round(Math.sqrt(a * n))
         return { details: details(`${side}x${side} m`, `${n - def} with a ball, ${def} hunting`, 'Keep your ball', 'Non-directional', rule),
-          draw: { type: 'scatter', att: n - def, def, side }, legend: [[WHITE, 'With a ball'], [ORANGE, 'Defenders']] }
+          draw: { type: 'scatter', att: n - def, def, side }, legend: [[MAIN, 'With a ball'], [OTHER, 'Defenders']] }
       }
       const [r, a, t] = SQ[i], g = d.grids === 2 ? 2 : d.third ? 1 : n >= 14 ? 2 : 1
       const sizes = g === 2 ? [Math.ceil(n / 2), Math.floor(n / 2)] : [n]
@@ -107,15 +111,15 @@ export function fit(d: LibraryDrill, n: number, i: number): Fitted {
         : grids[0].att === grids[1].att && grids[0].def === grids[1].def ? `${grids[0].att}v${grids[0].def} in each grid`
         : `${grids[0].att}v${grids[0].def} and ${grids[1].att}v${grids[1].def}`
       return { details: details(`${side}x${side} m${g === 2 ? ' each' : ''}`, `${n} players, ${ov}`, d.targets || 'Keep the ball', 'Non-directional', join(touches(t), rule)),
-        draw: { type: 'square', grids, side }, legend: [[WHITE, 'Attackers'], [ORANGE, 'Defenders']] }
+        draw: { type: 'square', grids, side }, legend: [[MAIN, 'Attackers'], [OTHER, 'Defenders']] }
     }
     case 'game': {
       const [j0, a, t] = GA[i], N = n - (d.keeper ? 1 : 0)
       const j = d.keeper ? N % 2 : (N - j0) % 2 ? j0 + 1 : j0, s = (N - j) / 2
       const L = round5(Math.sqrt(n * a * 1.5)), W = round5(L / 1.5)
-      const legend: Fitted['legend'] = [[WHITE, 'Team A'], [ORANGE, 'Team B']]
-      if (j) legend.push([YELLOW, 'Spare player'])
-      if (d.keeper) legend.push([YELLOW, 'Keeper'])
+      const legend: Fitted['legend'] = [[MAIN, 'Team A'], [OTHER, 'Team B']]
+      if (j) legend.push([EXTRA, 'Spare player'])
+      if (d.keeper) legend.push([EXTRA, 'Keeper'])
       return {
         details: details(`${L}x${W} m`, `${n} players, ${s}v${s}${j ? ` + ${j} spare` : ''}${d.keeper ? ' and a keeper' : ''}`,
           d.targets || (d.noGoals ? 'Keep the ball' : 'Two goals'), d.noGoals ? 'Non-directional' : 'Directional. Attack one end', join(touches(t), rule)),
@@ -125,12 +129,12 @@ export function fit(d: LibraryDrill, n: number, i: number): Fitted {
     case 'pairs': {
       const [gap, t, foot] = PR[i], pairs = Math.floor(n / 2), odd = n % 2 === 1
       return { details: details(`${gap} m between partners`, odd ? `${pairs - 1} pairs and a group of 3` : `${pairs} pairs`, 'Your partner', 'Non-directional. Back and forth', d.rule ? rule : `${touches(t)}, ${foot}`),
-        draw: { type: 'pairs', pairs, odd, gap }, legend: [[WHITE, 'Players']] }
+        draw: { type: 'pairs', pairs, odd, gap }, legend: [[MAIN, 'Players']] }
     }
     case 'shoot': {
       const [dist, c] = (d.focus === 'goalkeeping' ? KP : SH)[i], g = n > 10 ? 2 : 1
       return { details: details(`${dist} m from goal`, `${n} players, ${g === 2 ? 'two goals' : 'one goal'}`, 'One goal', 'Directional. At goal', c),
-        draw: { type: 'shoot', g, n, dist, angle: !!d.angle }, legend: [[WHITE, d.focus === 'goalkeeping' ? 'Servers' : 'Shooters'], [YELLOW, 'Keeper']] }
+        draw: { type: 'shoot', g, n, dist, angle: !!d.angle }, legend: [[MAIN, d.focus === 'goalkeeping' ? 'Servers' : 'Shooters'], [EXTRA, 'Keeper']] }
     }
   }
 }

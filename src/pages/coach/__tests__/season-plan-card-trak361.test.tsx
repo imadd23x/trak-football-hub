@@ -51,6 +51,8 @@ beforeEach(() => {
     http.get(`${SUPABASE_URL}/rest/v1/squad_players`, () => HttpResponse.json(squadPlayers)),
     rpc('coach_squad_player_consent_required', () => false),
     rpc('feature_on', () => true),
+    // TRAK-364: a shared plan's evaluations; none published.
+    table('season_evaluations', []),
     http.get(`${SUPABASE_URL}/rest/v1/season_plans`, async ({ request }) => {
       if (holdPlans) await holdPlans
       const squad = param(new URL(request.url), 'squad')

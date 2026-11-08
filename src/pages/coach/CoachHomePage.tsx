@@ -67,12 +67,13 @@ export default function CoachHomePage() {
   const shape = useMemo(() => loaded ? squadShape(roster.assessments, localTodayISO(), iso => localParts(iso).date) : null,
     [loaded, roster.assessments])
   // TRAK-364: where the season plan is on and a squad's plan is shared, the squad's evaluation takes the place of its
-  // per-player Assess cards. Until that's known the cards wait, so none shows and then goes.
+  // per-player Assess cards. Until that's known the cards wait, so none shows and then goes. A failed read only leaves
+  // the evaluation out: the per-player cards show as before (the season plan's card says what failed).
   const evaluations = useSquadEvaluations(user?.id, coachSquad.squads)
   const cards = useMemo(() => loaded
     ? needsYou({ players: roster.players, waitingForParent: roster.consentPending, assessments: roster.assessments, now: Date.now(),
-      evaluatedSquads: evaluations.evaluated })
-    : null, [loaded, roster.players, roster.consentPending, roster.assessments, evaluations.evaluated])
+      evaluatedSquads: evaluations.failed ? undefined : evaluations.evaluated })
+    : null, [loaded, roster.players, roster.consentPending, roster.assessments, evaluations.evaluated, evaluations.failed])
 
   // Imad, 24 Oct: events the week marks "Needs you" are in Needs you too, with the week's own next step.
   const client = useQueryClient()
@@ -192,7 +193,7 @@ export default function CoachHomePage() {
         {/* Shown once the switch is known, so a coach who turned it off never sees it flash in. */}
         {(needsYouSwitch.data === true || needsYouSwitch.isError) && <div className={wide ? 'mt-6' : 'mt-5'}>
           <NeedsYou items={needsReady ? cards : null} events={[...owedEvents, ...planEvents, ...evaluationEvents, ...positionEvents, ...watchEvents]}
-            failed={!!roster.error || owed.failed || gamesFailed || evaluations.failed}
+            failed={!!roster.error || owed.failed || gamesFailed}
             onRetry={() => { roster.retry(); owed.retry(); if (evaluations.failed) evaluations.retry(); if (gamesOn) { void games.refetch(); void plans.refetch(); void shares.refetch() } }}
             onOpen={item => item.kind === 'draft'
               // TRAK-200: the profile's assessment card says Draft and has Publish.

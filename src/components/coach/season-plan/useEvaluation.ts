@@ -3,7 +3,7 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useFeatureState } from '@/components/trak/parked'
 import { loadSeasonPlan, seasonPlanKey, type SeasonPlan } from '@/lib/season-plan'
-import { evaluationDates, evaluationDue, rhythmOf, type EvaluationDue } from '@/lib/evaluation'
+import { squadEvaluation, type EvaluationDue } from '@/lib/evaluation'
 import { dayIn } from '@/lib/watch-first'
 import { useAcademyTimeZone } from './useWatching'
 
@@ -16,7 +16,7 @@ export const seasonEvaluationsKey = (coachId: string | undefined) => ['coach', c
 
 /** The coach's published evaluations: which plan, and the date each closed. */
 export async function loadSeasonEvaluations(): Promise<{ plan_id: string; due_on: string }[]> {
-  const { data, error } = await supabase.from('season_evaluations').select('plan_id, due_on')
+  const { data, error } = await supabase.from('season_evaluations').select('plan_id, due_on').retry(false)
   if (error) throw error
   return data ?? []
 }
@@ -33,7 +33,8 @@ export function useSharedPlans(coachId: string | undefined, squads: string[]) {
     })),
   })
   const plans = reads.flatMap((read, i) => (read.data?.shared_at ? [{ squad: squads[i], plan: read.data }] : []))
-  const failed = on && reads.some(read => read.isError)
+  // A read that has failed once counts as failed: Home never waits through its retries (the plan's card says so).
+  const failed = on && reads.some(read => read.isError || read.failureCount > 0)
   const ready = known && (!on || failed || reads.every(read => !read.isPending))
   const key = plans.map(p => `${p.squad}:${p.plan.id}`).join(',')
   // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the shared plans themselves, not the array's identity
@@ -50,17 +51,14 @@ export function useSquadEvaluations(coachId: string | undefined, squads: string[
   const some = shared.plans.length > 0
   const zone = useAcademyTimeZone(coachId, some)
   const evaluations = useQuery({ queryKey: seasonEvaluationsKey(coachId), queryFn: loadSeasonEvaluations, enabled: some && !!coachId })
-  const failed = shared.failed || (some && (zone.isError || evaluations.isError))
+  const failed = shared.failed || (some && (zone.isError || zone.failureCount > 0 || evaluations.isError || evaluations.failureCount > 0))
   const ready = shared.ready && (failed || !some || (!zone.isPending && !evaluations.isPending))
-  const today = dayIn(zone.zone, new Date())
+  const now = new Date()
+  const today = dayIn(zone.zone, now)
   const list: SquadEvaluation[] = !ready || failed ? [] : shared.plans.map(({ squad, plan }) => {
-    const { every, day } = rhythmOf(plan)
     const lastDueOn = (evaluations.data ?? []).filter(e => e.plan_id === plan.id).map(e => e.due_on).sort().at(-1) ?? null
-    const sharedOn = dayIn(zone.zone, new Date(plan.shared_at!))
-    return {
-      squad, plan, sharedOn, lastDueOn,
-      due: evaluationDue({ dates: evaluationDates({ startsOn: plan.starts_on, endsOn: plan.ends_on, every, day }), sharedOn, lastDueOn, today }),
-    }
+    const { due, sharedOn } = squadEvaluation({ plan: { ...plan, shared_at: plan.shared_at! }, lastDueOn, zone: zone.zone, now })
+    return { squad, plan, sharedOn, lastDueOn, due }
   })
   return {
     list, today, zone: zone.zone, ready, failed,

@@ -36,12 +36,12 @@
     "hash": "78945991a674d15646ef704e7cd7b7e07ab0c383f5ad88559eb83fb36b685ea4"
   },
   "UC-C03": {
-    "spec_version": 2,
-    "hash": "9c693a6eb6d317052d8fe969c90ad4368107cad4913eaae21b764791a7a3fc33"
+    "spec_version": 3,
+    "hash": "f7f8731736528e03145597b8b7aee2656824137a06578260132f8afe4234b778"
   },
   "UC-C04": {
-    "spec_version": 2,
-    "hash": "6f3e0e394019a8b3316cf8ebe865c0d27a5d2f0b07e79ac92ed7356972588347"
+    "spec_version": 3,
+    "hash": "542ad1a7c9d97237ab4db719f3127ab3872a553eb0bfe39cdafcbe92ed83d66a"
   },
   "UC-C07": {
     "spec_version": 2,

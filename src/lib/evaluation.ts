@@ -161,3 +161,20 @@ export function nextDateLine(due: EvaluationDue, today: string): string {
   if (due.dueOn) return `Due now${due.since && due.since < today ? `, since ${evalDay(due.since)}` : ''}.`
   return due.next ? `Next evaluation ${evalDay(due.next, true)}.` : 'No evaluation is left this season.'
 }
+
+/** The academy's calendar day for an instant, as YYYY-MM-DD (watch-first's dayIn, kept here so this file stands alone). */
+const dayInZone = (timeZone: string, instant: Date) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(instant)
+
+/** A shared plan's evaluation at `now`, every day counted in the academy's `zone`: from the day it was first shared,
+ *  after its last evaluation (`lastDueOn`). */
+export function squadEvaluation({ plan, lastDueOn, zone, now }: {
+  plan: { starts_on: string | null; ends_on: string | null; shared_at: string; eval_every?: string | null; eval_day?: number | null }
+  lastDueOn: string | null
+  zone: string
+  now: Date
+}): { due: EvaluationDue; sharedOn: string; today: string } {
+  const { every, day } = rhythmOf(plan)
+  const today = dayInZone(zone, now), sharedOn = dayInZone(zone, new Date(plan.shared_at))
+  return { today, sharedOn, due: evaluationDue({ dates: evaluationDates({ startsOn: plan.starts_on, endsOn: plan.ends_on, every, day }), sharedOn, lastDueOn, today }) }
+}

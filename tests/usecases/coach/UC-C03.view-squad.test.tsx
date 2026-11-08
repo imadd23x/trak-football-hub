@@ -115,4 +115,30 @@ useCase('UC-C03', () => {
       server.events.removeListener('response:mocked', onResponseMocked)
     }
   })
+
+  // v3 (TRAK-364): a player due an assessment is marked Assess, except in a squad whose season plan is shared, where
+  // the squad's evaluation is due on Home instead.
+  for (const shared of [false, true]) {
+    it(shared ? 'marks nobody Assess in a squad evaluated by its shared season plan' : 'marks a player due an assessment Assess without it', async () => {
+      signedInCoach()
+      server.use(
+        table('squad_players', [{ id: 's1', coach_user_id: COACH.id, player_name: 'Nikos Papadopoulos', position: 'Midfielder', shirt_number: 8,
+          age_group: 'U16', status: 'active', created_at: '2026-08-01T08:00:00Z' }]),
+        rpc('feature_on', ({ p_feature }) => shared && p_feature === 'season_plan'),
+        table('season_plans', [{ id: 'plan-1', squad: 'U16', starts_on: '2026-09-01', ends_on: '2027-06-30', shared_at: '2026-10-01T08:00:00Z',
+          unshared_parts: [], unshared_players: [] }]),
+        table('player_watches', []), table('squad_player_profiles', []), rpc('coach_player_birth_dates', () => []),
+      )
+      renderApp('/coach/squad')
+      expect(await screen.findByText('Nikos Papadopoulos')).toBeInTheDocument()
+      if (shared) {
+        await waitFor(() => expect(screen.queryByText('Assess')).toBeNull())
+        // Settled: the plan has answered, and still no mark.
+        await new Promise(resolve => setTimeout(resolve, 200))
+        expect(screen.queryByText('Assess')).toBeNull()
+      } else {
+        expect(await screen.findByText('Assess')).toBeInTheDocument()
+      }
+    })
+  }
 })

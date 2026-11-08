@@ -41,7 +41,8 @@ export const removedSeasonObjectivesKey = (coachId: string | undefined, planId: 
 export async function loadSeasonPlan(coachId: string, squad: string): Promise<SeasonPlan | null> {
   const { data, error } = await supabase.from('season_plans')
     .select('id, squad, starts_on, ends_on, shared_at, positions_known, watch_rule, last_shared_at, unshared_parts, unshared_players, eval_every, eval_day')
-    .eq('coach_user_id', coachId).eq('squad', squad).maybeSingle()
+    // TanStack Query owns retries (TRAK-364: Home's Needs you waits for this read, so it must not back off on its own).
+    .eq('coach_user_id', coachId).eq('squad', squad).retry(false).maybeSingle()
   if (error) throw error
   // A plan read before TRAK-356 has no list of changes: nothing waits.
   return data && { ...data, unshared_parts: data.unshared_parts ?? [], unshared_players: data.unshared_players ?? [] }

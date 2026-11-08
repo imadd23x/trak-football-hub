@@ -53,7 +53,7 @@ Nobody else reads these tables.
 | Route | Screen | Slice |
 |---|---|---|
 | `/coach/training` | Training home, Sessions: Coming up (not over yet, soonest first) and Last week (over in the past 7 days, newest first), the squad pills, New session | 294 |
-| `/coach/training/drills` | Training home, Drills: search, My drills, New drill / edit / delete (Arc bottom sheet), the Library's seven tiles | 294 |
+| `/coach/training/drills` | Training home, Drills: the Drill Library (TRAK-387; see Drill Library below). Was My drills and New drill (294). | 294, 387 |
 | `/coach/training/:eventId/plan` | Write my own (and Copy a past session, 297) | 295 |
 | `/coach/training/:eventId` | The plan, with the loop strip | 295, 298 |
 | `/coach/training/:eventId/run` | Run it: the plan at the pitch side | 298 |
@@ -114,6 +114,17 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
   (`lib/fixed-colours.ts` `PITCH`). `full` is the whole canvas with the size line and a one-line description for
   screen readers; `card` zooms onto the drill and is hidden from screen readers, as the card says it in words.
   `PitchKey` says what each colour means. Drills played in turns draw the players who are on.
+- **Drills tab** (TRAK-387): `/coach/training/drills` is the Library home (Find a drill, My drills, All drills, the
+  three kinds, then the old FA Library tiles until TRAK-394); `drills/kind/:kind` a practice page, `drills/all` All
+  drills (`?show=` a kind, Individual or Goalkeeping), `drills/mine` My drills (empty until TRAK-390), `drills/d/:id` a
+  drill's page (the picture, key, five details, why, how, watch for; TRAK-389 adds the rest). Searches and filters
+  sit in the address (`?q=`, `?type=`, `?show=`), so Back returns to them. Every picture is fitted to the squad picked
+  at the top (the whole roster on All), kept to 8–20 players, at level 4 of 8. Code: `src/pages/coach/training/
+  DrillLibrary.tsx`, `src/components/coach/training/library/DrillCard.tsx`, paths in `src/lib/training/library/paths.ts`.
+- **No coach-made drills** (Kostas, 8 Nov): New drill, the list of the coach's drills and Add to the next training
+  left the Drills tab; migration `20261109000000_drill_library_clean_start.sql` deleted the hand-written drills, every
+  plan that used one, and any draft that did. `coach_drills` stays, empty. Plan session's Write your own and From My
+  drills go in TRAK-392.
 
 ## Switching it on
 

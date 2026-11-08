@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 
-// TRAK-294 (Training 1/5): Training home (Sessions and Drills) and the New drill sheet with the academy's training
+// TRAK-294 (Training 1/5): Training home (Sessions and Drills; TRAK-387: Drills is the Library) with the academy's training
 // switch on, at a phone's and a laptop's width: no sideways scroll, and the keyboard reaches every control.
 // TRAK-295 (Training 2/5): planning a training: "How do you want to plan it?", Write my own, and the plan, at the
 // same two widths. TRAK-296 (Training 3/5): the Add/Swap sheet's My drills and Library views, and a Library preview.
@@ -222,11 +222,14 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(errors).toEqual([])
   })
 
-  test(`Drills at ${width} px: My drills, the Library, and the New drill sheet`, async ({ page, context }, testInfo) => {
+  // TRAK-387 (Drill Library 3/11): Drills is the Library: Find a drill, My drills and All drills, the three kinds, a
+  // practice page and a drill's page, each picture fitted to the squad. No coach-made drills.
+  test(`Drills at ${width} px: the Library home, a practice page and a drill`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/training/drills', width, height)
-    await expect(page.getByRole('region', { name: 'My drills' }).getByRole('button', { name: /Edit$/ })).toHaveCount(3)
-    // TRAK-296: each drill can go to the next training not planned yet.
-    await expect(page.getByRole('region', { name: 'My drills' }).getByRole('button', { name: /^Add .+ to / })).toHaveCount(3)
+    await expect(page.getByRole('heading', { name: 'Find a drill' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'New drill' })).toHaveCount(0)
+    const kinds = page.getByRole('region', { name: 'What kind of practice?' })
+    await expect(kinds.getByRole('link')).toHaveCount(5) // the three tiles, Individual work, Goalkeeping
     await expect(page.getByRole('region', { name: 'From the Library' }).getByRole('link')).toHaveCount(7)
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`training-drills-${width}.png`), fullPage: true })
@@ -234,24 +237,25 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const keyboard = await everyControlByKeyboard(page, '.trak-wide')
     expect(keyboard.missed).toEqual([])
 
-    await page.getByRole('button', { name: 'New drill' }).click()
-    const sheet = page.getByRole('dialog', { name: 'New drill' })
-    await expect(sheet.getByLabel(/1\. Name it/)).toBeVisible()
-    await sheet.getByLabel(/1\. Name it/).fill('1v1 in channels')
-    await sheet.getByRole('button', { name: 'In groups' }).click()
-    await page.waitForTimeout(600)
-    await page.screenshot({ path: testInfo.outputPath(`training-new-drill-${width}.png`) })
+    // Typing shows picture cards in place of everything else.
+    await page.getByRole('searchbox', { name: 'Search drills' }).fill('piggy in the middle')
+    await expect(page.getByRole('list', { name: 'Drills found' }).getByRole('link')).toHaveCount(6)
+    await expect(kinds).toHaveCount(0)
+    await page.screenshot({ path: testInfo.outputPath(`training-drills-search-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
-    await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
+    await page.getByRole('searchbox', { name: 'Search drills' }).fill('')
 
-    // TRAK-296: Add to <day> opens the planner with the drill, which survives the page being laid out again.
-    await page.getByRole('region', { name: 'My drills' }).getByRole('button', { name: /^Add Pressing on the trigger to / }).click()
-    await expect(page).toHaveURL(/\/coach\/training\/t-thu\/plan$/)
-    // TRAK-340: it joins the plan as a part at the end, and the planner opens on Review.
-    await expect(page.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(6)
-    await page.setViewportSize({ width: width === 390 ? 1440 : 390, height })
-    await expect(page.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(6)
+    await page.getByRole('region', { name: 'What kind of practice?' }).getByRole('link', { name: /^Skill/ }).click()
+    await expect(page.getByRole('heading', { name: 'Skill practices', level: 1 })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-drills-skill-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+
+    await page.getByRole('link', { name: /^Keep the ball/ }).click()
+    await expect(page.getByRole('img', { name: /^Keep the ball set-up\./ })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-drill-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
   })

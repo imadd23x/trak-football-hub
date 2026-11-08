@@ -54,6 +54,8 @@ async function backend(context: BrowserContext, unexpected: string[], squads: st
       // TRAK-363: the first instruction carries the squad's season objective.
       return json([{ event_id: 'm-1', saved_at: '2026-10-09T10:00:00Z', goals: [{ title: 'Press as one', looks_like: '', season_objective_id: `so-plan-${squads[0]}` }, { title: 'Win the second ball', looks_like: '' }] }])
     if (path === '/rest/v1/player_objectives') return json([{ id: 'po-1', squad_player_id: 'sq-0-1', title: 'Holds the line together', source: 'library', season_objective_id: null, created_at: '2026-11-01T08:00:00Z', status: 'open', retired_at: null }])
+    if (path === '/rest/v1/objective_progress') return json([])
+    if (path === '/rest/v1/rpc/stuck_player_objectives') return json([])
     // Every other read is empty: this is about the card, not the rest of Home.
     if (path.startsWith('/rest/v1/') && (method === 'GET' || path.startsWith('/rest/v1/rpc/'))) return json([])
     unexpected.push(`${method} ${path}`)

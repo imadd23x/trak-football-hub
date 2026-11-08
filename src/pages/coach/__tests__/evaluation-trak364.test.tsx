@@ -80,7 +80,7 @@ beforeEach(() => {
       return new HttpResponse(null, { status: 204 })
     }),
     http.get(`${SUPABASE_URL}/rest/v1/season_evaluations`, () => HttpResponse.json(evaluations)),
-    http.post(`${SUPABASE_URL}/rest/v1/rpc/publish_evaluation`, async ({ request }) => {
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/publish_evaluation_with_objectives`, async ({ request }) => {
       const args = await request.json() as { p_due_on: string; p_players: { squad_player_id: string }[] }
       published.push(args)
       if (failNext > 0) { failNext -= 1; return HttpResponse.json({ message: 'Network down' }, { status: 503 }) }
@@ -90,7 +90,7 @@ beforeEach(() => {
     }),
     table('coach_assessments', [lastTime]),
     table('season_objectives', []),
-    table('player_objectives', []),
+    table('player_objectives', []), rpc('stuck_player_objectives', () => []),
     table('player_watches', []),
     // The rest of Home, answered empty.
     table('coach_sessions', []), table('session_attendance', []), table('coach_calendar_events', []), table('event_absences', []),
@@ -192,7 +192,7 @@ describe('TRAK-364 the evaluation', () => {
     await user().click(screen.getByRole('button', { name: 'Publish to 2 players' }))
     expect(await screen.findByText('Published to 2 players.')).toBeInTheDocument()
     const sent = {
-      p_plan_id: 'plan-1', p_due_on: due.dueOn,
+      p_plan_id: 'plan-1', p_due_on: due.dueOn, p_objectives: [],
       p_players: [
         { squad_player_id: 'pat', work_rate: 9, tactical: 6, attitude: 6, technical: 6, physical: 6, coachability: 6, note: '' },
         { squad_player_id: 'quinn', work_rate: 5, tactical: 5, attitude: 5, technical: 8, physical: 5, coachability: 5, note: 'Great first month.' },
@@ -248,5 +248,81 @@ describe('TRAK-364 the rhythm', () => {
     await user().click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByText('Not shared yet: evaluation dates.')).toBeInTheDocument()
     expect(patches).toEqual([{ eval_every: '6w', eval_day: 0 }])
+  }, 30_000)
+})
+
+/* TRAK-365 (Season plan 17/18): the evaluation also asks how each open objective is going. Every open objective needs a
+   status before Publish; Met closes one and makes room for another; the publish sends it all in one call. */
+describe('TRAK-365 objectives in the evaluation', () => {
+  const objective = (id: string, title: string, slot: number) => ({
+    id, squad_player_id: 'pat', slot, title, source: 'own', season_objective_id: null, status: 'open', retired_at: null, created_at: '2026-09-01T08:00:00Z',
+  })
+  const ratings = { work_rate: 6, tactical: 6, attitude: 6, technical: 6, physical: 6, coachability: 6, created_at: '2026-08-20T10:00:00Z', published_at: '2026-08-20T10:00:00Z' }
+
+  it('asks Progress for each objective, lets Met free a place for another, and sends it all at once', async () => {
+    server.use(
+      table('coach_assessments', [{ ...ratings, squad_player_id: 'pat' }, { ...ratings, squad_player_id: 'quinn' }]),
+      table('player_objectives', [objective('oa', 'Win it back within 5 seconds', 1), objective('ob', 'Scan before receiving', 2)]),
+    )
+    const { due } = expected()
+    renderApp('/coach/evaluation')
+    const list = await screen.findByRole('list', { name: 'Players' })
+    expect(within(list).getByRole('button', { name: /^Pat Synthetic/ })).toHaveTextContent('Objectives to rate')
+    expect(within(list).getByRole('button', { name: /^Quinn Synthetic/ })).not.toHaveTextContent('Objectives to rate')
+
+    await user().click(screen.getByRole('button', { name: 'Next: Publish' }))
+    expect(screen.getByRole('button', { name: 'Publish to 2 players' })).toBeDisabled()
+    expect(screen.getByText('Say how Pat is doing on their objectives first.')).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Players' }))
+
+    await user().click(await screen.findByRole('button', { name: /^Pat Synthetic/ }))
+    const first = screen.getByRole('group', { name: 'Progress on Win it back within 5 seconds' })
+    const second = screen.getByRole('group', { name: 'Progress on Scan before receiving' })
+    // Two are open, so there is no room to add another yet.
+    expect(screen.queryByLabelText('Add another objective')).toBeNull()
+    await user().click(within(first).getByRole('button', { name: 'Not yet' }))
+    await user().click(within(second).getByRole('button', { name: 'Met' }))
+    // Met freed a place: one can be added, then the room is gone again.
+    await user().type(await screen.findByLabelText('Add another objective'), 'Run in behind')
+    await user().click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByText('New: Run in behind')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Add another objective')).toBeNull()
+    await user().click(screen.getByRole('button', { name: 'Done' }))
+
+    await user().click(screen.getByRole('button', { name: 'Next: Publish' }))
+    await user().click(screen.getByRole('button', { name: 'Publish to 2 players' }))
+    await waitFor(() => expect(published).toHaveLength(1))
+    expect(published[0]).toMatchObject({
+      p_plan_id: 'plan-1', p_due_on: due.dueOn,
+      p_objectives: [{ squad_player_id: 'pat', progress: [
+        { player_objective_id: 'oa', status: 'not_yet' }, { player_objective_id: 'ob', status: 'met' },
+      ], add: ['Run in behind'] }],
+    })
+  }, 45_000)
+
+  it('shows a stuck objective on Home with its three choices, and Make it simpler sends the easier version', async () => {
+    const resolved: Record<string, unknown>[] = []
+    server.use(
+      table('player_objectives', [objective('oa', 'Win it back within 5 seconds', 1)]),
+      rpc('stuck_player_objectives', () => [{ player_objective_id: 'oa', squad_player_id: 'pat' }]),
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/resolve_stuck_objective`, async ({ request }) => {
+        resolved.push(await request.json() as Record<string, unknown>)
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderApp('/coach/home')
+    const card = (await screen.findByText('Pat is stuck on an objective')).closest('div')!.parentElement!
+    expect(within(card).getByText('“Win it back within 5 seconds”: Not yet three times in a row.')).toBeInTheDocument()
+    await user().click(within(card).getByRole('button', { name: 'Choose' }))
+    expect(await screen.findByRole('button', { name: 'Keep going' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Swap it' })).toBeInTheDocument()
+    await user().click(screen.getByRole('button', { name: 'Make it simpler' }))
+    // Prefilled with the current wording: the same wording can't be saved as the easier version.
+    expect(screen.getByLabelText('The easier version')).toHaveValue('Win it back within 5 seconds')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await user().clear(screen.getByLabelText('The easier version'))
+    await user().type(screen.getByLabelText('The easier version'), 'Win it back within 8 seconds')
+    await user().click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(resolved).toEqual([{ p_player_objective_id: 'oa', p_choice: 'simpler', p_title: 'Win it back within 8 seconds' }]))
   }, 30_000)
 })

@@ -21,6 +21,8 @@ async function loadPlayerObjectives() {
   const removed = new Map<string, RemovedPlayerObjective[]>()
   // A row with no status is open.
   for (const row of data ?? []) {
+    // TRAK-365: a met objective is closed and kept; it is neither open nor "removed".
+    if (row.status === 'met') continue
     if (row.status === 'retired' && row.retired_at) listOf(removed, row.squad_player_id).push({ id: row.id, title: row.title, since: row.created_at, removed: row.retired_at })
     else listOf(open, row.squad_player_id).push({ id: row.id, title: row.title, source: row.source === 'own' ? 'own' : 'library', seasonObjectiveId: row.season_objective_id, since: row.created_at })
   }

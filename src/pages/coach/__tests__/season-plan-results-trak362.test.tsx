@@ -67,6 +67,7 @@ beforeEach(() => {
       positions_known: 'yes', watch_rule: 't2', last_shared_at: '2026-11-01T10:00:00Z', unshared_parts: [], unshared_players: [] }]),
     table('season_objectives', []),
     table('player_objectives', []),
+    table('objective_progress', []),
     table('player_watches', []),
     http.get(`${SUPABASE_URL}/rest/v1/coach_calendar_events`, () => HttpResponse.json(matches.map(event))),
     http.get(`${SUPABASE_URL}/rest/v1/game_evaluations`, ({ request }) => {

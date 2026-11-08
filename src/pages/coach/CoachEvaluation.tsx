@@ -14,6 +14,7 @@ import { Button } from '@/components/arc/button/button'
 import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
 import { useSquadEvaluations } from '@/components/coach/season-plan/useEvaluation'
 import { EvaluationSteps } from '@/components/coach/season-plan/Evaluation'
+import { usePlayerObjectives } from '@/components/coach/season-plan/usePlayerObjectives'
 
 /* TRAK-364 (Season plan 16/18, spec TRAK-348): the squad's evaluation, behind the season plan's switch (App.tsx). It
    opens on its due date, once the plan is shared, and stays open until it's published (a missed date stays due). Home's
@@ -29,6 +30,8 @@ export default function CoachEvaluation() {
   const squads = useMemo(() => (squad ? [squad] : []), [squad])
   const evaluations = useSquadEvaluations(user?.id, squads)
   const roster = useSquadRoster()
+  // TRAK-365: the evaluation also asks how each open objective is going.
+  const held = usePlayerObjectives(user?.id, !!season.plan?.shared_at)
   // Who it went out to, shown once it's published: the page then says when the next one is.
   const [published, setPublished] = useState<number | null>(null)
   const plan = season.plan
@@ -44,9 +47,9 @@ export default function CoachEvaluation() {
       <p className="text-sm text-ink-2">The evaluation opens once the season plan is shared, on its first date.</p>
       <Button variant="secondary" onClick={() => navigate('/coach/season-plan')}>Season plan</Button>
     </div>
-  } else if (evaluations.failed || roster.error) {
-    body = <LoadError what="your evaluation" onRetry={() => { evaluations.retry(); roster.retry() }} />
-  } else if (!evaluations.ready || !mine || roster.isPending) body = <LoadingSkeleton label="Loading your evaluation…" lines={1} avatar rows={4} className="pt-2" />
+  } else if (evaluations.failed || roster.error || held.isError) {
+    body = <LoadError what="your evaluation" onRetry={() => { evaluations.retry(); roster.retry(); void held.refetch() }} />
+  } else if (!evaluations.ready || !mine || roster.isPending || held.isPending) body = <LoadingSkeleton label="Loading your evaluation…" lines={1} avatar rows={4} className="pt-2" />
   else if (!due?.dueOn) {
     const { every, day } = rhythmOf(plan)
     body = <div className="arc grid gap-4">
@@ -66,7 +69,7 @@ export default function CoachEvaluation() {
       {due.since && due.since < evaluations.today && <Alert tone="warning" title={`Due since ${evalDay(due.since)}.`}>
         It stays here until you publish it. One evaluation covers every date since.</Alert>}
       <EvaluationSteps key={`${plan.id}:${due.dueOn}`} coachId={user!.id} planId={plan.id} squad={squad} dueOn={due.dueOn}
-        players={players} waiting={waiting} latest={latestRatings(roster.assessments)}
+        players={players} waiting={waiting} latest={latestRatings(roster.assessments)} objectivesOf={held.of}
         onPublished={setPublished} onRefused={roster.retry} />
     </div>
   }

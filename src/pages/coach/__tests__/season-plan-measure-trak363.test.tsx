@@ -74,6 +74,7 @@ beforeEach(() => {
       { id: SETS, place: 3, title: 'Own the set pieces', looks_like: '', status: 'open', created_at: '2026-09-01T08:00:00Z', retired_at: null },
     ]),
     table('player_objectives', []),
+    table('objective_progress', []),
     table('player_watches', []),
     http.get(`${SUPABASE_URL}/rest/v1/coach_calendar_events`, () => HttpResponse.json(matches.map(event))),
     http.get(`${SUPABASE_URL}/rest/v1/game_evaluations`, ({ request }) => {

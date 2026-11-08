@@ -61,6 +61,7 @@ beforeEach(() => {
     http.get(`${SUPABASE_URL}/rest/v1/season_objectives`, ({ request }) => HttpResponse.json(param(new URL(request.url), 'plan_id') === 'plan-16'
       ? [{ id: 'so-1', place: 1, title: 'Stay compact', looks_like: '', status: 'open', created_at: '2026-09-01T08:00:00Z', retired_at: null }] : [])),
     http.get(`${SUPABASE_URL}/rest/v1/player_objectives`, () => HttpResponse.json(held)),
+    table('objective_progress', []),
     http.get(`${SUPABASE_URL}/rest/v1/player_watches`, () => HttpResponse.json(watches)),
     table('coach_assessments', []),
     table('coach_sessions', []),

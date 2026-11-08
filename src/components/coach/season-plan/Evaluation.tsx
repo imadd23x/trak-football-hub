@@ -6,6 +6,8 @@ import { Alert } from '@/components/arc/alert/alert'
 import { Button } from '@/components/arc/button/button'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Textarea } from '@/components/arc/textarea/textarea'
+import { Input } from '@/components/arc/input/input'
+import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { PlayerFace } from '@/components/trak/PlayerFace'
 import { SliderInput } from '@/components/trak/SliderInput'
 import { remember, remembered } from '@/lib/screen-memory'
@@ -15,7 +17,14 @@ import {
   NOTE_MAX, RATINGS, bandMove, bandOf, evalDay, ratingsAverage, sameRatings, startEntry, toPublish,
   type EvaluationEntry, type Ratings,
 } from '@/lib/evaluation'
+import {
+  PROGRESS_OPTIONS, allRated, cleanAddition, emptyObjectives, isProgress, openAfter, toObjectivesPayload,
+  type ObjectivesEntry,
+} from '@/lib/objective-progress'
+import { MAX_PLAYER_OBJECTIVES, PLAYER_OBJECTIVE_MAX } from '@/lib/player-objectives'
 import { seasonEvaluationsKey } from './useEvaluation'
+import { objectiveProgressKey, stuckObjectivesKey } from './useObjectiveProgress'
+import { playerObjectivesKey } from './usePlayerObjectives'
 
 /* TRAK-364 (Season plan 16/18, spec TRAK-348; mockup: Evaluation, Players → Publish). Every consented player of the
    squad, each starting from their latest six ratings, however they were given; the band follows the six. A name opens
@@ -45,7 +54,7 @@ function BandChip({ ratings, move = 0 }: { ratings: Ratings; move?: number }) {
 
 /** The evaluation due on `dueOn`, Players then Publish. `players` are the consented players of the squad; `latest` each
  *  one's latest ratings. */
-export function EvaluationSteps({ coachId, planId, squad, dueOn, players, waiting, latest, onPublished, onRefused }: {
+export function EvaluationSteps({ coachId, planId, squad, dueOn, players, waiting, latest, objectivesOf, onPublished, onRefused }: {
   coachId: string
   planId: string
   squad: string
@@ -54,6 +63,8 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, players, waitin
   /** Waiting for a parent: not in the evaluation, as nothing is recorded about them. */
   waiting: string[]
   latest: Map<string, Ratings>
+  /** TRAK-365: a player's open objectives, which the evaluation asks Progress for. */
+  objectivesOf: (playerId: string) => { id: string; title: string }[]
   onPublished: (players: number) => void
   /** The database refused a player (consent withdrawn, a player gone): read the squad again. */
   onRefused: () => void
@@ -61,6 +72,7 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, players, waitin
   const client = useQueryClient()
   const memory = `evaluation:${planId}:${dueOn}`
   const [entries, setEntries] = useState<Record<string, EvaluationEntry>>(() => remembered<Record<string, EvaluationEntry>>(memory, coachId) ?? {})
+  const [objectives, setObjectives] = useState<Record<string, ObjectivesEntry>>(() => remembered<Record<string, ObjectivesEntry>>(`${memory}:objectives`, coachId) ?? {})
   const [step, setStep] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
@@ -72,14 +84,23 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, players, waitin
     remember(memory, coachId, all)
     setProblem(null)
   }
+  const objectivesEntry = (id: string): ObjectivesEntry => objectives[id] ?? emptyObjectives()
+  const changeObjectives = (id: string, next: ObjectivesEntry) => {
+    const all = { ...objectives, [id]: next }
+    setObjectives(all)
+    remember(`${memory}:objectives`, coachId, all)
+    setProblem(null)
+  }
   const moved = (id: string) => { const before = latest.get(id); return !before || !sameRatings(entryOf(id).ratings, before) }
   const changed = players.filter(p => latest.has(p.id) && moved(p.id))
   const unrated = players.filter(p => !entryOf(p.id).rated)
+  const objectivesUnsaid = players.filter(p => !allRated(objectivesOf(p.id), objectivesEntry(p.id)))
 
   const publish = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc('publish_evaluation', {
+      const { data, error } = await supabase.rpc('publish_evaluation_with_objectives', {
         p_plan_id: planId, p_due_on: dueOn, p_players: toPublish(players.map(p => p.id), Object.fromEntries(players.map(p => [p.id, entryOf(p.id)]))),
+        p_objectives: toObjectivesPayload(players.map(p => p.id), objectivesOf, Object.fromEntries(players.map(p => [p.id, objectivesEntry(p.id)]))),
       })
       if (error) throw error
       return data as { assessments?: { squad_player_id: string; assessment_id: string }[] } | null
@@ -94,8 +115,12 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, players, waitin
         })
       }
       remember(memory, coachId, undefined)
+      remember(`${memory}:objectives`, coachId, undefined)
       await Promise.all([
         client.invalidateQueries({ queryKey: seasonEvaluationsKey(coachId) }),
+        client.invalidateQueries({ queryKey: objectiveProgressKey(coachId) }),
+        client.invalidateQueries({ queryKey: stuckObjectivesKey(coachId) }),
+        client.invalidateQueries({ queryKey: playerObjectivesKey(coachId) }),
         client.invalidateQueries({ queryKey: ['coach', coachId, 'squad-roster'] }),
       ])
       onPublished(players.length)
@@ -137,6 +162,7 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, players, waitin
               onChange={value => change(open.id, { ratings: { ...entry.ratings, [key]: value } })} />)}
           </div>
         </section>
+        <ObjectivesSection name={name} open={objectivesOf(open.id)} entry={objectivesEntry(open.id)} onChange={next => changeObjectives(open.id, next)} />
         <Textarea label={`Note to ${name}`} description={`Optional. Only ${name} sees it, never their family.`} rows={3}
           maxLength={NOTE_MAX} value={entry.note} placeholder="e.g. Your first touch has come on. Next: look up before it arrives."
           onChange={event => change(open.id, { note: event.target.value.slice(0, NOTE_MAX) })} />
@@ -164,7 +190,9 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, players, waitin
             : <ul aria-label="Players" className="m-0 grid list-none gap-0 divide-y divide-line rounded-2xl border border-line bg-surface px-4 py-1">
               {players.map(p => {
                 const entry = entryOf(p.id), before = latest.get(p.id) ?? null
+                const saidObjectives = allRated(objectivesOf(p.id), objectivesEntry(p.id))
                 const line = !entry.rated ? 'Not rated yet'
+                  : !saidObjectives ? 'Objectives to rate'
                   : [`${bandOf(entry.ratings).word} · ${average(entry.ratings)}`, before && moved(p.id) ? `was ${bandOf(before).word} · ${average(before)}` : null,
                     entry.note.trim() ? 'Note' : null].filter(Boolean).join(' · ')
                 return <li key={p.id}>
@@ -188,19 +216,61 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, players, waitin
         </section>
       ) : (
         <PublishStep players={players} entries={Object.fromEntries(players.map(p => [p.id, entryOf(p.id)]))} latest={latest} waiting={waiting}
-          unrated={unrated.map(p => p.name)} publishing={publish.isPending} problem={problem}
+          unrated={unrated.map(p => p.name)} objectivesUnsaid={objectivesUnsaid.map(p => p.name)} publishing={publish.isPending} problem={problem}
           onBack={() => setStep(0)} onPublish={() => { setProblem(null); publish.mutate() }} />
       )}
     </div>
   )
 }
 
-function PublishStep({ players, entries, latest, waiting, unrated, publishing, problem, onBack, onPublish }: {
+/** TRAK-365: a player's open objectives, each Not yet, Some progress, On track or Met (which closes it), and room to add
+ *  another while they keep fewer than two open. */
+function ObjectivesSection({ name, open, entry, onChange }: {
+  name: string; open: { id: string; title: string }[]; entry: ObjectivesEntry; onChange: (next: ObjectivesEntry) => void
+}) {
+  const [text, setText] = useState('')
+  const room = openAfter(open, entry) < MAX_PLAYER_OBJECTIVES
+  const addition = cleanAddition(text, [...open.map(o => o.title), ...entry.add], PLAYER_OBJECTIVE_MAX)
+  if (open.length === 0 && !room) return null
+  return (
+    <section aria-labelledby="evaluation-objectives" className="grid gap-4 rounded-2xl border border-line bg-surface p-5">
+      <div className="grid gap-1">
+        <h3 id="evaluation-objectives" className="text-lg font-medium text-ink">Objectives</h3>
+        <p className="text-sm text-ink-3">{open.length ? `How is ${name} doing on each? Met closes it.` : `${name} has no objectives yet. You can add one.`}</p>
+      </div>
+      {open.map(o => (
+        <div key={o.id} className="grid gap-2">
+          <p className="text-sm font-medium text-ink">{o.title}</p>
+          <SegmentedControl label={`Progress on ${o.title}`} options={PROGRESS_OPTIONS} value={entry.progress[o.id] ?? ''}
+            onValueChange={value => { if (isProgress(value)) onChange({ ...entry, progress: { ...entry.progress, [o.id]: value } }) }} />
+        </div>
+      ))}
+      {entry.add.length > 0 && <ul className="m-0 grid list-none gap-2 p-0">{entry.add.map(title => (
+        <li key={title} className="flex items-center justify-between gap-3 text-sm text-ink">
+          <span className="min-w-0 truncate">New: {title}</span>
+          <Button variant="ghost" size="sm" onClick={() => onChange({ ...entry, add: entry.add.filter(t => t !== title) })}>Remove</Button>
+        </li>))}
+      </ul>}
+      {room && (
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <Input label="Add another objective" value={text} maxLength={PLAYER_OBJECTIVE_MAX} placeholder="e.g. Scan before receiving"
+              onChange={event => setText(event.target.value)} />
+          </div>
+          <Button variant="secondary" disabled={!addition} onClick={() => { if (addition) { onChange({ ...entry, add: [...entry.add, addition] }); setText('') } }}>Add</Button>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function PublishStep({ players, entries, latest, waiting, unrated, objectivesUnsaid, publishing, problem, onBack, onPublish }: {
   players: EvaluationPlayer[]
   entries: Record<string, EvaluationEntry>
   latest: Map<string, Ratings>
   waiting: string[]
   unrated: string[]
+  objectivesUnsaid: string[]
   publishing: boolean
   problem: string | null
   onBack: () => void
@@ -214,6 +284,7 @@ function PublishStep({ players, entries, latest, waiting, unrated, publishing, p
   const notes = players.filter(p => entries[p.id].note.trim()).length
   const blocked = !players.length ? 'There’s nobody to evaluate.'
     : unrated.length ? `Rate ${unrated.length > 2 ? `${first(unrated[0])} and ${unrated.length - 1} others` : unrated.map(first).join(' and ')} first: no ratings yet.`
+    : objectivesUnsaid.length ? `Say how ${objectivesUnsaid.length > 2 ? `${first(objectivesUnsaid[0])} and ${objectivesUnsaid.length - 1} others are` : `${objectivesUnsaid.map(first).join(' and ')} ${objectivesUnsaid.length === 1 ? 'is' : 'are'}`} doing on their objectives first.`
     : null
   return (
     <div className="grid gap-5">

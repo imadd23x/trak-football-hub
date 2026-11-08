@@ -47,6 +47,79 @@ export type Database = {
         }
         Relationships: []
       }
+      objective_progress: {
+        Row: { evaluation_id: string; player_objective_id: string; status: string }
+        Insert: { evaluation_id: string; player_objective_id: string; status: string }
+        Update: { evaluation_id?: string; player_objective_id?: string; status?: string }
+        Relationships: [
+          {
+            foreignKeyName: "objective_progress_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "season_evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_progress_player_objective_id_fkey"
+            columns: ["player_objective_id"]
+            isOneToOne: false
+            referencedRelation: "player_objectives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      objective_stuck_choices: {
+        Row: {
+          after_evaluation_id: string
+          choice: string
+          chosen_at: string
+          chosen_by: string | null
+          id: string
+          new_objective_id: string | null
+          player_objective_id: string
+        }
+        Insert: {
+          after_evaluation_id: string
+          choice: string
+          chosen_at?: string
+          chosen_by?: string | null
+          id?: string
+          new_objective_id?: string | null
+          player_objective_id: string
+        }
+        Update: {
+          after_evaluation_id?: string
+          choice?: string
+          chosen_at?: string
+          chosen_by?: string | null
+          id?: string
+          new_objective_id?: string | null
+          player_objective_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objective_stuck_choices_after_evaluation_id_fkey"
+            columns: ["after_evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "season_evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_stuck_choices_new_objective_id_fkey"
+            columns: ["new_objective_id"]
+            isOneToOne: false
+            referencedRelation: "player_objectives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_stuck_choices_player_objective_id_fkey"
+            columns: ["player_objective_id"]
+            isOneToOne: false
+            referencedRelation: "player_objectives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           admin_user_id: string
@@ -2186,6 +2259,18 @@ export type Database = {
       publish_evaluation: {
         Args: { p_due_on: string; p_plan_id: string; p_players: Json }
         Returns: Json
+      }
+      publish_evaluation_with_objectives: {
+        Args: { p_due_on: string; p_objectives: Json; p_plan_id: string; p_players: Json }
+        Returns: Json
+      }
+      resolve_stuck_objective: {
+        Args: { p_choice: string; p_player_objective_id: string; p_title?: string }
+        Returns: undefined
+      }
+      stuck_player_objectives: {
+        Args: never
+        Returns: { player_objective_id: string; squad_player_id: string }[]
       }
       watch_players: { Args: { p_squad_player_ids: string[] }; Returns: number }
       take_event_register: {

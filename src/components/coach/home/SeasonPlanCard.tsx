@@ -11,6 +11,8 @@ import { PlayerFace } from '@/components/trak/PlayerFace'
 import { useFeatureState } from '@/components/trak/parked'
 import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
 import { usePlayerObjectives } from '@/components/coach/season-plan/usePlayerObjectives'
+import { useObjectiveProgress } from '@/components/coach/season-plan/useObjectiveProgress'
+import { STATUS_ORDER, latestProgress, playerProgress, progressLabel } from '@/lib/objective-progress'
 import { useWatchList } from '@/components/coach/season-plan/useWatching'
 import { gameTitle, gameWhen, useGameEvaluations, useGames, type Game } from '@/components/coach/games/useGames'
 import { instructionsWent, matchResult } from '@/lib/games/results'
@@ -114,29 +116,32 @@ function SharedBody({ coachId, squad, plan }: { coachId: string; squad: string; 
   const objectives = useQuery({ queryKey: seasonObjectivesKey(coachId, plan.id), queryFn: () => loadSeasonObjectives(plan.id) })
   const roster = useSquadRoster({ everySquad: true })
   const held = usePlayerObjectives(coachId)
+  const progress = useObjectiveProgress(coachId)
   const watching = useWatchList(coachId, roster)
   const matches = useSquadMatches(squad, plan)
   const matchPlans = useMatchPlans(coachId, matches.published.map(game => game.id))
   // Removed objectives too, so a past match's instruction still says which it carried.
   const removed = useQuery({ queryKey: removedSeasonObjectivesKey(coachId, plan.id), queryFn: () => loadRemovedSeasonObjectives(plan.id) })
-  if (objectives.error || roster.error || held.error || matches.error || matchPlans.error) {
-    return <LoadError what="how the season is going" onRetry={() => { void objectives.refetch(); roster.retry(); void held.refetch(); matches.retry(); void matchPlans.refetch() }} />
+  if (objectives.error || roster.error || held.error || progress.error || matches.error || matchPlans.error) {
+    return <LoadError what="how the season is going" onRetry={() => { void objectives.refetch(); roster.retry(); void held.refetch(); void progress.refetch(); matches.retry(); void matchPlans.refetch() }} />
   }
-  if (objectives.isPending || roster.isPending || held.isPending || matches.isPending || (matches.published.length > 0 && matchPlans.isPending)) {
+  if (objectives.isPending || roster.isPending || held.isPending || progress.isPending || matches.isPending || (matches.published.length > 0 && matchPlans.isPending)) {
     return <LoadingSkeleton label="Loading how the season is going…" lines={3} />
   }
   const names = new Map([...(removed.data ?? []), ...(objectives.data ?? [])].map(o => [o.id, o.title]))
 
   const inSquad = roster.players.filter(p => p.age_group?.trim() === squad && !roster.consentPending.has(p.id))
   const watched = new Map(watching.list.map(w => [w.playerId, w]))
-  // Worst first. The statuses (Not yet, Some progress, On track) arrive with the evaluation (TRAK-365); until then
-  // everyone with objectives is Not rated yet.
+  // Worst first: Not yet, Some progress, On track (TRAK-365), by each player's worst open objective's latest status; a
+  // player with objectives and no evaluation yet is Not rated yet.
+  const latest = latestProgress(progress.data ?? [])
+  const status = new Map(inSquad.filter(p => held.of(p.id).length > 0).map(p => [p.id, playerProgress(held.of(p.id).map(o => o.id), latest)]))
   const groups = [
-    { label: 'Not rated yet', players: inSquad.filter(p => held.of(p.id).length > 0) },
+    ...STATUS_ORDER.map(s => ({ label: progressLabel(s), players: inSquad.filter(p => status.get(p.id)?.status === s) })),
     { label: 'Watching', players: inSquad.filter(p => !held.of(p.id).length && watched.has(p.id)) },
     { label: 'No objective yet', players: inSquad.filter(p => !held.of(p.id).length && !watched.has(p.id)) },
   ].filter(group => group.players.length > 0)
-  const working = groups.find(g => g.label === 'Not rated yet')?.players.length ?? 0
+  const working = status.size
   const watchCount = groups.find(g => g.label === 'Watching')?.players.length ?? 0
 
   return <>
@@ -159,7 +164,7 @@ function SharedBody({ coachId, squad, plan }: { coachId: string; squad: string; 
               <PlayerFace name={p.player_name} size="sm" />
               <span className="grid min-w-0">
                 <span className="truncate text-sm text-ink">{p.player_name}</span>
-                <span className="truncate text-xs text-ink-3">{held.of(p.id).length ? held.of(p.id).map(o => o.title).join(' · ')
+                <span className="truncate text-xs text-ink-3">{held.of(p.id).length ? [TREND[String(status.get(p.id)?.trend)], held.of(p.id).map(o => o.title).join(' · ')].filter(Boolean).join(' · ')
                   : watched.get(p.id)?.ready ? `${watched.get(p.id)!.why}: time to set them up` : watched.has(p.id) ? `Watching: ${watched.get(p.id)!.progress}` : 'Nothing set yet'}</span>
               </span>
             </li>))}
@@ -169,6 +174,9 @@ function SharedBody({ coachId, squad, plan }: { coachId: string; squad: string; 
     </div>
   </>
 }
+
+/** How a player's worst objective moved since the evaluation before. */
+const TREND: Record<string, string> = { '1': 'Better', '-1': 'Slipped', '0': 'Same' }
 
 const RESULTS_SHOWN = 3
 const dayOf = (game: Game) => game.event_date ?? game.starts_at.slice(0, 10)

@@ -53,6 +53,8 @@ async function backend(context: BrowserContext, unexpected: string[]) {
       return json(ids.length)
     }
     if (path === '/rest/v1/player_objectives') return json(held)
+    if (path === '/rest/v1/objective_progress') return json([])
+    if (path === '/rest/v1/rpc/stuck_player_objectives') return json([])
     if (path === '/rest/v1/rpc/save_player_objectives') {
       const body = req.postDataJSON(), id = body.p_squad_player_id
       held = [...held.filter(o => o.squad_player_id !== id), ...body.p_objectives.map((o: Row, i: number) => ({ ...o, id: `${id}-${i}`, squad_player_id: id, created_at: new Date().toISOString() }))]

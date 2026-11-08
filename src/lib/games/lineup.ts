@@ -1,8 +1,9 @@
 /* TRAK-285 (Games 3/8): the line-up as the coach builds it, before it's saved to game_plan_players. A slot holds one
    player and a player one slot. Someone who can come and isn't on the pitch is on the bench until the coach says
-   otherwise (Imad, 28 Oct); a player left out keeps only their note. */
+   otherwise (Imad, 28 Oct); a player left out keeps only their note. TRAK-359 (spec TRAK-348): and one who isn't
+   coming is Not attending, which carries nothing at all; a family's "Can't make it" puts the child there. */
 
-export type Role = 'starter' | 'bench' | 'not_selected'
+export type Role = 'starter' | 'bench' | 'not_selected' | 'not_attending'
 export type Expectation = 'stretch' | 'usual' | 'lead'
 export type PlayerPlan = {
   role: Role; slot: number | null; job: string; note: string; context: string[]; expectation: Expectation
@@ -52,10 +53,19 @@ export function place(plans: PlayerPlans, id: string, slot: number): PlayerPlans
 export const takeOff = (plans: PlayerPlans, id: string): PlayerPlans =>
   ({ ...plans, [id]: { ...playerPlan(plans, id), role: 'bench', slot: null } })
 
-/** Bench or not selected, for a player off the pitch. Left out, they keep only their note. */
+/** Bench, not selected or not attending, for a player off the pitch. Left out, they keep only their note; not attending,
+ *  nothing. */
 export function setRole(plans: PlayerPlans, id: string, role: Exclude<Role, 'starter'>): PlayerPlans {
   const plan = playerPlan(plans, id)
-  return { ...plans, [id]: role === 'bench' ? { ...plan, role, slot: null } : { ...BENCH, role, note: plan.note } }
+  return { ...plans, [id]: role === 'bench' ? { ...plan, role, slot: null }
+    : { ...BENCH, role, note: role === 'not_selected' ? plan.note : '' } }
+}
+
+/** TRAK-359: a child whose family said "Can't make it" starts in Not attending, where the coach hasn't placed them
+ *  (they have no row). A coach's own row for them stays as it is: a report that comes later only flags them. */
+export function withReported(plans: PlayerPlans, players: { id: string; absent: boolean }[]): PlayerPlans {
+  const missing = players.filter(player => player.absent && !plans[player.id])
+  return missing.length === 0 ? plans : { ...plans, ...Object.fromEntries(missing.map(player => [player.id, { ...BENCH, role: 'not_attending' as const }])) }
 }
 
 /** A smaller format has fewer slots: starters beyond it go to the bench. */

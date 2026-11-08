@@ -21,7 +21,7 @@ import { LockedValue } from './LockedValue'
 
 export type Target = { kind: 'slot'; slot: number } | { kind: 'player'; id: string }
 
-const ROLES = [{ value: 'bench', label: 'Bench' }, { value: 'not_selected', label: 'Not selected' }]
+const ROLES = [{ value: 'bench', label: 'Bench' }, { value: 'not_selected', label: 'Not selected' }, { value: 'not_attending', label: 'Not attending' }]
 const rank = (player: Candidate) => player.absent ? 2 : player.confirmed ? 0 : 1
 const firstName = (name: string) => name.split(/\s+/)[0] ?? name
 
@@ -56,13 +56,16 @@ export function PlayerPanel({ target, players, onPlayers, candidates, shape, onT
   const set = (next: Partial<PlayerPlan>) => onPlayers({ ...players, [player.id]: { ...plan, ...next } })
 
   return <div className="grid gap-4">
-    <p className="text-sm text-ink-2">{plan.role === 'starter' && plan.slot != null ? `${lineName(shape, plan.slot)}, slot ${plan.slot}` : plan.role === 'bench' ? 'Bench' : 'Not selected'}</p>
+    <p className="text-sm text-ink-2">{plan.role === 'starter' && plan.slot != null ? `${lineName(shape, plan.slot)}, slot ${plan.slot}` : plan.role === 'bench' ? 'Bench' : plan.role === 'not_attending' ? 'Not attending' : 'Not selected'}</p>
     {player.absent && <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-ink">{first}'s family says {first} can't make it.</p>}
     {locked ? null : plan.role === 'starter'
       ? <span><Button variant="secondary" size="sm" onClick={() => onPlayers(takeOff(players, player.id))}>Move to bench</Button></span>
-      : <RadioGroup label="Bench or not selected" name={`role-${player.id}`} options={ROLES} value={plan.role}
-          onValueChange={role => onPlayers(setRole(players, player.id, role as 'bench' | 'not_selected'))} />}
-    {plan.role === 'not_selected' ? <>
+      : plan.role === 'not_attending' && player.absent
+        ? <p className="text-sm text-ink-3">{first} stays in Not attending until {first}'s family undoes it.</p>
+        : <RadioGroup label="Bench, not selected or not attending" name={`role-${player.id}`} options={ROLES} value={plan.role}
+            onValueChange={role => onPlayers(setRole(players, player.id, role as 'bench' | 'not_selected' | 'not_attending'))} />}
+    {plan.role === 'not_attending' ? <p className="text-sm text-ink-3">{first}'s family sees “Not in the squad this week”.</p>
+    : plan.role === 'not_selected' ? <>
       {locked ? <LockedValue label={`Note to ${first} · only ${first} sees it`} value={plan.note.trim() || 'No note.'} />
         : <Textarea label={`Note to ${first} · only ${first} sees it`} rows={3} value={plan.note} maxLength={PLAYER_LIMITS.note}
             onChange={event => set({ note: event.target.value })} />}

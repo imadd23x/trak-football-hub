@@ -49,7 +49,7 @@ is in [MVP Requirements](../../MVP%20Requirements); progress is in the
 | UC-E08 | system | Rehearse events on two real phones before real-family access | J8 | 2 |
 | UC-E09 | system | Subscribe a family member's phone calendar in one tap from signup | J8 | 2 |
 | UC-E10 | coach | Share an event to the squad's WhatsApp group, pre-written, with no child names | J8 | 2 |
-| UC-E11 | coach | Mark each child Confirmed for an event from the squad's WhatsApp replies | J8 | 2 |
+| UC-E11 | coach | Mark who isn't coming to a match from the squad's WhatsApp replies, in the match's line-up | J8 | 2 |
 
 ## Parked — 9
 

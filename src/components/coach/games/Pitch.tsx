@@ -14,7 +14,7 @@ import type { usePointerSwap } from '@/components/coach/squad/formations/usePoin
    6 Nov: the spec's colours, not TRAK-370's badge colours, which stay on the badges). Coach only, like what they show.
    Each marker is said in the face's name too, so colour is never the only signal. */
 
-export type LineUpSpot = `slot:${number}` | `player:${string}` | 'list:bench' | 'list:not_selected'
+export type LineUpSpot = `slot:${number}` | `player:${string}` | 'list:bench' | 'list:not_selected' | 'list:not_attending'
 export type LineUpSwap = ReturnType<typeof usePointerSwap<LineUpSpot>>
 export type PitchPlayer = { id: string; name: string; absent: boolean; plan: PlayerPlan }
 
@@ -67,11 +67,12 @@ export function MarkersKey() {
   </ul>
 }
 
-/** A face off the pitch, on the Bench or Not selected tab: it opens the player's sheet, and drags onto the pitch. */
+/** A face off the pitch, on the Bench, Not selected or Not attending tab: it opens the player's sheet, and drags onto
+ *  the pitch. A family's "Can't make it" shows on it wherever the child is. */
 export function ListFace({ player, plan, list, detail, on, onOpen, swap }: {
-  player: { id: string; name: string }
+  player: { id: string; name: string; absent?: boolean }
   plan: PlayerPlan
-  list: 'bench' | 'not selected'
+  list: 'bench' | 'not selected' | 'not attending'
   detail: string
   on: boolean
   onOpen: () => void
@@ -79,7 +80,7 @@ export function ListFace({ player, plan, list, detail, on, onOpen, swap }: {
 }) {
   const spot: LineUpSpot = `player:${player.id}`
   const drag: HTMLAttributes<HTMLButtonElement> = swap ? swap.bind(spot, player.name) : {}
-  return <BoardBenchFace {...drag} on={on} over={swap?.drag?.over === spot} face={marks(player.name, plan, false)} detail={detail}
-    aria-label={`${player.name}, ${list}${said(plan, false)}`} data-ring={markersOf(plan).ring ?? undefined}
+  return <BoardBenchFace {...drag} on={on} over={swap?.drag?.over === spot} face={marks(player.name, plan, !!player.absent)} detail={detail}
+    aria-label={`${player.name}, ${list}${said(plan, !!player.absent)}`} data-ring={markersOf(plan).ring ?? undefined}
     onClick={() => { if (!swap?.wasDrag()) onOpen() }} />
 }

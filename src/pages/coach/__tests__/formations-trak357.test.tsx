@@ -223,5 +223,14 @@ describe('TRAK-357 Squad › Formations', () => {
     const views = await screen.findByRole('radiogroup', { name: 'Squad view' }).catch(() => screen.findByRole('group', { name: 'Squad view' }))
     expect(within(views).queryByText('Formations')).toBeNull()
     expect(within(views).getByText('Attributes')).toBeInTheDocument()
+    // TRAK-359: and so does Availability.
+    expect(within(views).getByText('Availability')).toBeInTheDocument()
+  })
+
+  it('TRAK-359: where the season plan is on, Squad has no Availability tab', async () => {
+    renderApp('/coach/squad')
+    const views = await screen.findByRole('radiogroup', { name: 'Squad view' }).catch(() => screen.findByRole('group', { name: 'Squad view' }))
+    expect(within(views).getByText('Formations')).toBeInTheDocument()
+    expect(within(views).queryByText('Availability')).toBeNull()
   })
 })

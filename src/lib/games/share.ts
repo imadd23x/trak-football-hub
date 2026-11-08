@@ -12,19 +12,20 @@ import { playerPlan, type Role } from './lineup'
  *  for a guardian, who never reads the goals, the job or the note. */
 export type SharedPlan = { role: Role; player: { goals: Goal[]; job: string; note: string } | null; updated: boolean }
 
-/** Who reads the plan once it's shared: everyone who can come, and a starter who can't (their slot is flagged until
- *  the coach moves them), as trak_private.game_copies decides. */
+/** Who reads the plan once it's shared: everyone who can come, a starter who can't (their slot is flagged until the
+ *  coach moves them), and anyone in Not attending (TRAK-359), as trak_private.game_copies decides. */
 export function readers<T extends { id: string; absent: boolean }>(form: PlanForm, players: T[]): T[] {
-  return players.filter(player => !player.absent || playerPlan(form.players, player.id).role === 'starter')
+  return players.filter(player => !player.absent || ['starter', 'not_attending'].includes(playerPlan(form.players, player.id).role))
 }
 
 /** What `id`, or their family, would read if the coach shared what's typed now: the Share step's preview. */
 export function previewOf(form: PlanForm, id: string, as: 'player' | 'parent'): SharedPlan {
   const plan = playerPlan(form.players, id)
   // One box per player (TRAK-319): a selected player's job, or a left-out player's note.
-  const left = plan.role === 'not_selected'
+  const left = plan.role === 'not_selected' || plan.role === 'not_attending'
   return {
-    role: plan.role, updated: false,
+    // Not attending reads as Not selected (20261107100000_not_attending.sql).
+    role: plan.role === 'not_attending' ? 'not_selected' : plan.role, updated: false,
     player: as === 'parent' ? null : { goals: formToPlan(form).goals.map(goal => ({ title: goal.title, looksLike: goal.looks_like })),
       job: left ? '' : plan.job.trim(), note: left ? plan.note.trim() : '' },
   }
@@ -41,8 +42,7 @@ export function lineUpCounts(form: PlanForm, players: { id: string }[]) {
  *  "N to do" counts the same parts. TRAK-371: Jobs is ready once any starter has a job. */
 export function planParts(form: PlanForm, players: { id: string; absent: boolean }[], published: boolean) {
   const { placed, withJob } = lineUpCounts(form, players)
-  const bench = players.filter(player => !player.absent && playerPlan(form.players, player.id).role !== 'not_selected'
-    && playerPlan(form.players, player.id).role !== 'starter').length
+  const bench = players.filter(player => !player.absent && playerPlan(form.players, player.id).role === 'bench').length
   const instructions = form.goals.filter(goal => goal.title.trim() || goal.looksLike.trim()).length
   const ready = { logistics: published, tactics: STRENGTHS.some(option => option.value === form.strength), instructions: instructions > 0, lineUp: placed === form.format, jobs: withJob > 0 }
   return { placed, withJob, bench, instructions, ready, incomplete: Object.values(ready).filter(part => !part).length }

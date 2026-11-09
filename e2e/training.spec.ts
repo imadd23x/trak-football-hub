@@ -236,8 +236,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByRole('heading', { name: 'Find a drill' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'New drill' })).toHaveCount(0)
     const kinds = page.getByRole('region', { name: 'What kind of practice?' })
-    await expect(kinds.getByRole('link')).toHaveCount(5) // the three tiles, Individual work, Goalkeeping
-    await expect(page.getByRole('region', { name: 'From the Library' }).getByRole('link')).toHaveCount(7)
+    await expect(kinds.getByRole('link')).toHaveCount(6) // the three tiles, Change any practice, Individual work, Goalkeeping
+    // TRAK-394: the old FA Library's tiles left Drills.
+    await expect(page.getByRole('region', { name: 'From the Library' })).toHaveCount(0)
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`training-drills-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
@@ -288,6 +289,30 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByRole('link', { name: /^Keep the ball/ })).toBeVisible()
     await page.waitForTimeout(400)
     await page.screenshot({ path: testInfo.outputPath(`training-my-drills-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+
+  // TRAK-394 (Drill Library 9/11): Change any practice, from the Drills tab. Steve's five things: a set-up's picture and
+  // what changes, and Conditions' three rules.
+  test(`Change any practice at ${width} px: the five things, an example, Conditions`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, '/coach/training/drills', width, height)
+    await page.getByRole('link', { name: 'Change any practice' }).click()
+    await expect(page.getByRole('heading', { name: 'Change any practice', level: 1 })).toBeVisible()
+    await expect(page.getByRole('img', { name: 'Area shape and size example: 20 wide, 40 long' })).toBeVisible()
+    await page.getByRole('group', { name: 'Five things that shape a practice' }).getByRole('button', { name: 'Direction' }).click()
+    await page.getByRole('group', { name: 'Pick an example' }).getByRole('button', { name: 'End line, 60x15' }).click()
+    await expect(page.getByRole('img', { name: 'Direction example: End line, 60x15' })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-change-practice-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    const keys = await everyControlByKeyboard(page, '.trak-wide')
+    expect(keys.missed).toEqual([])
+    await page.getByRole('group', { name: 'Five things that shape a practice' }).getByRole('button', { name: 'Conditions' }).click()
+    await expect(page.getByRole('list', { name: 'Three rules' }).getByRole('listitem')).toHaveCount(3)
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-change-conditions-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])

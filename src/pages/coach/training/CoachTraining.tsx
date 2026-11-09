@@ -17,7 +17,7 @@ import { NOTE_STEP } from '@/lib/event-edit'
 import { CopyTargetSheet, PastPlanSheet, type PlanToCopy } from '@/components/coach/training/PastPlanSheet'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { PitchViewRoute, PlanEditorRoute, PlanRoute, WhosHereRoute } from './CoachTrainingPlan'
-import { AllDrills, DrillPage, LibraryHome, MyDrills, PracticePage } from './DrillLibrary'
+import { AllDrills, ChangePractice, DrillPage, LibraryHome, MyDrills, PracticePage } from './DrillLibrary'
 import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
@@ -67,6 +67,7 @@ export default function CoachTraining() {
       <Route path="drills" element={<Page view="drills"><LibraryHome /></Page>} />
       <Route path="drills/mine" element={<MyDrills />} />
       <Route path="drills/all" element={<AllDrills />} />
+      <Route path="drills/change" element={<ChangePractice />} />
       <Route path="drills/kind/:kind" element={<PracticePage />} />
       <Route path="drills/d/:drillId" element={<DrillPage />} />
       <Route path="drills/*" element={<Navigate to={`${TRAINING_PATH}/drills`} replace />} />

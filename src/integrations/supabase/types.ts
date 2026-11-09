@@ -504,6 +504,24 @@ export type Database = {
           referencedColumns: ["id"]
         }]
       }
+      coach_drill_bookmarks: {
+        Row: {
+          coach_user_id: string
+          created_at: string
+          drill: string
+        }
+        Insert: {
+          coach_user_id?: string
+          created_at?: string
+          drill: string
+        }
+        Update: {
+          coach_user_id?: string
+          created_at?: string
+          drill?: string
+        }
+        Relationships: []
+      }
       coach_drills: {
         Row: {
           group_size: number | null
@@ -1894,6 +1912,7 @@ export type Database = {
           part_type: string | null
           players_kind: string | null
           trak_drill: string | null
+          trak_level: number | null
           area: string
           conditions: string
           direction: string
@@ -1915,6 +1934,7 @@ export type Database = {
           part_type?: string | null
           players_kind?: string | null
           trak_drill?: string | null
+          trak_level?: number | null
           area?: string
           conditions?: string
           direction?: string
@@ -1936,6 +1956,7 @@ export type Database = {
           part_type?: string | null
           players_kind?: string | null
           trak_drill?: string | null
+          trak_level?: number | null
           area?: string
           conditions?: string
           direction?: string

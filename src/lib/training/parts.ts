@@ -1,6 +1,7 @@
 import type { Json } from '@/integrations/supabase/types'
 import { DRILL_LIMITS, blankDrill, type DrillDraft } from './sessions'
-import { PART_TYPES, STANDARD, partInfo, playersShort, shelfDrill, SHELF, type PartType, type Players, type ShelfDrill } from './shelf'
+import { PART_TYPES, STANDARD, partInfo, playersShort, shelfDrill, type PartType, type Players, type ShelfDrill } from './shelf'
+import { LEVELS, LIBRARY, START_LEVEL, drillOrder, fit, libraryDrill, partFor, playersFor, type LibraryDrill } from './library'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): a plan is a list of parts. Each part has a name (the
    coach can rename it), one drill and its minutes. Kept apart from the screens. The limits are the database's
@@ -21,6 +22,8 @@ export type PlanDrill = DrillDraft & {
   library_session: string | null
   players_kind: PlayersKind | null
   group_size: number | null
+  /** TRAK-391: a Library drill's level (0 easiest), as the coach set it on its page. Drafts from before it have none. */
+  trak_level?: number | null
 }
 
 export type Part = { key: string; type: PartType; name: string; minutes: number; drill: PlanDrill | null }
@@ -35,21 +38,43 @@ export function fromShelf(drill: ShelfDrill): PlanDrill {
   return {
     ...blank(), minutes: 0, name: drill.name, how: drill.how, source: 'trak', trak_drill: drill.id, drill_id: null,
     library_session: null, players_kind: drill.players.kind, group_size: drill.players.kind === 'groups' ? drill.players.g : null,
+    trak_level: null,
   }
 }
 
-export type MyDrill = DrillDraft & { id: string; part_type: string | null; players_kind: string | null; group_size: number | null }
+const clip = (text: string, max: number) => text.trim().slice(0, max)
 
-/** One of the coach's drills, as a plan's drill. */
-export function fromMyDrill(drill: MyDrill): PlanDrill {
-  const { id, part_type: _p, players_kind, group_size, ...draft } = drill
-  return { ...draft, source: 'drill', trak_drill: null, drill_id: id, library_session: null,
-    players_kind: (players_kind as PlayersKind | null) ?? null, group_size }
+/** TRAK-391: a Library drill as a plan's drill, fitted to the players and level the coach set on its page. The five
+ *  details are the fitted ones in words, so View and Home's Today card show the drill as the coach saw it. */
+export function fromLibrary(drill: LibraryDrill, players: number, level: number): PlanDrill {
+  const at = Math.min(LEVELS - 1, Math.max(0, Math.round(level)))
+  const { details } = fit(drill, players, at)
+  const takes = playersFor(drill)
+  const detail = (text: string) => clip(text, DRILL_LIMITS.detail)
+  return {
+    name: clip(drill.name, DRILL_LIMITS.name), minutes: 0, how: clip(drill.how.join('\n'), DRILL_LIMITS.how),
+    tell: clip(drill.watch.join('\n'), DRILL_LIMITS.tell), area: detail(details.area), numbers: detail(details.numbers),
+    direction: detail(details.direction), targets: detail(details.targets), conditions: detail(details.conditions),
+    source: 'trak', trak_drill: drill.id, drill_id: null, library_session: null, players_kind: takes.kind,
+    group_size: takes.kind === 'groups' ? takes.g : null, trak_level: at,
+  }
 }
+
+/** TRAK-391: the part a Library drill joins a plan as: its kind's part, with that part's usual minutes. */
+export function libraryPart(drill: LibraryDrill, players: number, level: number): Part {
+  const type = partFor(drill)
+  return { key: newKey(), type, name: partInfo(type).name, minutes: partInfo(type).mins, drill: fromLibrary(drill, players, level) }
+}
+
+/** TRAK-392: the Library drill a plan's drill is, or undefined (a drill from an older plan: Trak's old shelf, the
+ *  coach's own, the FA Library). */
+export const libraryOf = (d: Pick<PlanDrill, 'source' | 'trak_drill'> | null | undefined): LibraryDrill | undefined =>
+  d?.source === 'trak' ? libraryDrill(d.trak_drill ?? undefined) : undefined
 
 export type SavedPart = DrillDraft & {
   position: number; source: string; drill_id: string | null; library_session: string | null
   part?: string; part_type?: string | null; trak_drill?: string | null; players_kind?: string | null; group_size?: number | null
+  trak_level?: number | null
 }
 
 const knownType = (type: string | null | undefined): PartType =>
@@ -68,7 +93,7 @@ export function partsFromSaved(practices: SavedPart[]): Part[] {
       targets: p.targets, conditions: p.conditions,
       source: (['trak', 'drill', 'own', 'library'].includes(p.source) ? p.source : 'own') as DrillSource,
       trak_drill: p.trak_drill ?? null, drill_id: p.drill_id, library_session: p.library_session,
-      players_kind: (p.players_kind as PlayersKind | null) ?? null, group_size: p.group_size ?? null,
+      players_kind: (p.players_kind as PlayersKind | null) ?? null, group_size: p.group_size ?? null, trak_level: p.trak_level ?? null,
     },
   }))
 }
@@ -88,7 +113,8 @@ export function toSave(parts: Part[]): Json {
     area: part.drill.area, numbers: part.drill.numbers, direction: part.drill.direction, targets: part.drill.targets,
     conditions: part.drill.conditions, source: part.drill.source, drill_id: part.drill.drill_id,
     library_session: part.drill.library_session, trak_drill: part.drill.trak_drill, part: part.name.trim(), part_type: part.type,
-    players_kind: part.drill.players_kind, group_size: part.drill.group_size, save_to_drills: false,
+    players_kind: part.drill.players_kind, group_size: part.drill.group_size, trak_level: part.drill.trak_level ?? null,
+    save_to_drills: false,
   }] : [])
 }
 
@@ -116,25 +142,37 @@ export function usageOf(past: PastPlan[], max = 8): Usage {
   return { plans: recent.length, byDrill }
 }
 
-/** The drills that fit a part: Trak's for its type and the coach's own for it; a part of the coach's own takes any. */
-export function candidates(type: PartType, mine: MyDrill[]): PlanDrill[] {
-  const shelf = type === 'own' ? SHELF : SHELF.filter(d => d.part === type)
-  const own = type === 'own' ? mine : mine.filter(d => d.part_type === type)
-  return [...own.map(fromMyDrill), ...shelf.map(fromShelf)]
+/** TRAK-392: whether a part has Library drills of its own. Trak's five do; a part the coach named, and Set pieces,
+ *  Finishing and Cool-down (no Library drills for them yet), pick from every drill and have no usual. */
+export const hasOwnDrills = (type: PartType) => type !== 'own' && LIBRARY.some(d => partFor(d) === type)
+
+/** TRAK-392: the Library drills a part offers, in the Library's order (by kind, then drill type, team drills before
+ *  individual and keeper ones). */
+export function libraryFor(type: PartType): LibraryDrill[] {
+  const drills = hasOwnDrills(type) ? LIBRARY.filter(d => partFor(d) === type) : [...LIBRARY]
+  return drills.sort((a, b) => drillOrder(a) - drillOrder(b))
 }
+
+/** The drills that fit a part, from the Library (TRAK-392; was Trak's shelf and the coach's own), fitted to the squad
+ *  at the standard level. */
+export function candidates(type: PartType, players: number): PlanDrill[] {
+  return libraryFor(type).map(d => fromLibrary(d, players, START_LEVEL))
+}
+
+const forTeam = (d: PlanDrill) => libraryOf(d)?.focus === 'team'
 
 const used = (usage: Usage, d: PlanDrill) => { const key = drillKey(d); return key ? usage.byDrill.get(key) : undefined }
 
-/** The part's usual drill: the one used most in the last plans (the latest on a tie), else Trak's first. None for a part
- *  of the coach's own. */
+/** The part's usual drill: the one used most in the last plans (the latest on a tie), else the starter drill (the
+ *  part's first team drill). None for a part that picks from every drill. */
 export function usualFor(type: PartType, all: PlanDrill[], usage: Usage): PlanDrill | null {
-  if (type === 'own') return null
+  if (!hasOwnDrills(type)) return null
   let best: PlanDrill | null = null
   for (const d of all) {
     const u = used(usage, d), b = best ? used(usage, best) : undefined
     if (u && (!b || u.count > b.count || (u.count === b.count && u.at < b.at))) best = d
   }
-  return best ?? all.find(d => d.source === 'trak') ?? all[0] ?? null
+  return best ?? all.find(forTeam) ?? all[0] ?? null
 }
 
 /** The same drill: by its key when both have one; otherwise by name, so a drill written in a plan before it was saved
@@ -145,10 +183,11 @@ const same = (a: PlanDrill | null, b: PlanDrill | null) => {
   return ka && kb ? ka === kb : a.name.trim().toLocaleLowerCase() === b.name.trim().toLocaleLowerCase()
 }
 
-/** The three drills a part shows: its usual, then those used lately, then the rest; the picked one is always there. */
+/** The three drills a part shows: its usual, then those used lately, then the rest, team drills only (the mockup);
+ *  the picked one is always there. */
 export function shownFor(type: PartType, picked: PlanDrill | null, all: PlanDrill[], usage: Usage): PlanDrill[] {
   const usual = usualFor(type, all, usage)
-  const rest = all.filter(d => !same(d, usual))
+  const rest = all.filter(d => !same(d, usual) && (forTeam(d) || !!used(usage, d)))
   const lately = rest.filter(d => used(usage, d)).sort((a, b) => used(usage, a)!.at - used(usage, b)!.at)
   const others = rest.filter(d => !used(usage, d))
   const three = [...(usual ? [usual] : []), ...lately, ...others].slice(0, 3)
@@ -156,12 +195,15 @@ export function shownFor(type: PartType, picked: PlanDrill | null, all: PlanDril
   return three.length >= 3 ? [three[0], three[1], picked] : [...three, picked]
 }
 
-/** The tag on a drill: "Your usual · 5 of your last 8", "Last used Mon 26 Oct", "My drill", "Trak drill", "Only in
- *  this plan". */
-export function tagFor(d: PlanDrill, type: PartType, all: PlanDrill[], usage: Usage): string {
+/** The tag on a drill: "Your usual · 5 of your last 8", "Last used Mon 26 Oct", "Starter drill", "In My drills" (a
+ *  bookmark, TRAK-390), or none; a drill from an older plan says what it was: "Trak drill", "My drill", "Library",
+ *  "Only in this plan". */
+export function tagFor(d: PlanDrill, type: PartType, all: PlanDrill[], usage: Usage, bookmarks: readonly string[] = []): string {
   const u = used(usage, d)
   if (u && same(usualFor(type, all, usage), d)) return `Your usual · ${u.count} of your last ${usage.plans}`
   if (u) return `Last used ${u.last}`
+  const lib = libraryOf(d)
+  if (lib) return same(usualFor(type, all, usage), d) ? 'Starter drill' : bookmarks.includes(lib.id) ? 'In My drills' : ''
   if (d.source === 'drill') return 'My drill'
   if (d.source === 'trak') return 'Trak drill'
   if (d.source === 'library') return 'Library'
@@ -183,9 +225,9 @@ export function lastShape(past: PastPlan[]): Shape | null {
 
 export const standardShape = (): Shape => STANDARD.map(type => ({ type, name: partInfo(type).name, minutes: partInfo(type).mins }))
 
-/** A new plan from a shape: each part with its usual drill picked. */
-export function partsFromShape(shape: Shape, mine: MyDrill[], usage: Usage): Part[] {
-  return shape.map(s => ({ key: newKey(), ...s, drill: usualFor(s.type, candidates(s.type, mine), usage) }))
+/** A new plan from a shape: each part with its usual drill picked, fitted to the squad. */
+export function partsFromShape(shape: Shape, players: number, usage: Usage): Part[] {
+  return shape.map(s => ({ key: newKey(), ...s, drill: usualFor(s.type, candidates(s.type, players), usage) }))
 }
 
 export const isStandard = (parts: Pick<Part, 'type' | 'name'>[]) => parts.length === STANDARD.length
@@ -206,20 +248,6 @@ export function minuteOptions(type: PartType, minutes: number): number[] {
   return options.includes(minutes) ? options : [...options, minutes].sort((a, b) => a - b)
 }
 
-/** The list with one item moved from `from` to `to`. */
-/** What every drill says. */
-export type DrillAnswers = { name: string; how: string; kind: PlayersKind | null; size: number }
-
-export const blankAnswers = (): DrillAnswers => ({ name: '', how: '', kind: null, size: 4 })
-
-export function answerProblems({ name, how, kind }: DrillAnswers): Record<string, string> {
-  const found: Record<string, string> = {}
-  if (!name.trim()) found.name = 'Give the drill a name.'
-  if (!how.trim()) found.how = 'Say what the players do.'
-  if (!kind) found.kind = 'Say how many players it takes.'
-  return found
-}
-
 /** What makes two rows the same part, whatever their keys. */
 const sameRow = (p: Part) => JSON.stringify([p.type, p.name, p.minutes, p.drill?.name ?? null])
 
@@ -236,6 +264,7 @@ export function keepKeys(before: Part[], after: Part[]): Part[] {
   })
 }
 
+/** The list with one item moved from `from` to `to`. */
 export function moveTo<T>(list: T[], from: number, to: number): T[] {
   if (from === to || from < 0 || from >= list.length || to < 0 || to >= list.length) return list
   const next = [...list]

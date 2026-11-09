@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import { Reorder, useDragControls, type DragControls } from 'motion/react'
 import { Check, GripVertical, Pencil, Plus, Search, Users, X } from 'lucide-react'
-import { fitLine, partColour, partLine, playersLine, totalMinutes, type Part, type PlanDrill } from '@/lib/training/parts'
+import { fitLine, libraryOf, partColour, partLine, playersLine, totalMinutes, type Part, type PlanDrill } from '@/lib/training/parts'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 
@@ -9,17 +9,23 @@ import { Button } from '@/components/arc/button/button'
    once it's picked, Kostas 2 Nov), the time bar, and Your session: the whole session at a glance, where the coach shapes
    it (drag or arrow keys to move a part, × to remove one, Add a part). */
 
+/** A drill to pick for a part. A Library drill (TRAK-392) says its numbers and area, and why it works once picked; a
+ *  drill from an older plan says how many players it takes, and how it works once picked. */
 export function DrillTile({ drill, picked, tag, onPick }: { drill: PlanDrill; picked: boolean; tag: string; onPick: () => void }) {
-  const players = playersLine(drill)
+  const lib = libraryOf(drill)
+  const line = lib ? [drill.numbers, drill.area].filter(Boolean).join(' · ') : playersLine(drill)
+  const note = lib ? lib.why : drill.how
   // As the mockup (Kostas, 3 Nov): the tick sits in the corner of the picked drill, the name has the width, the rest is small.
   return <button type="button" aria-pressed={picked} onClick={onPick}
     className={`relative flex h-full w-full flex-col items-start gap-1.5 rounded-[14px] border p-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${picked ? 'border-2 border-brand bg-brand/5' : 'border-line bg-surface hover:bg-raised'}`}>
     {picked && <span className="absolute right-3 top-3 inline-flex h-[22px] w-[22px] items-center justify-center rounded-full bg-brand text-on-brand">
       <Check aria-hidden size={13} /></span>}
     <span className="pr-7 text-[15px] font-medium leading-snug text-ink break-words">{drill.name}</span>
-    {picked && drill.how && <span className="text-[13px] leading-snug text-ink-2 break-words">{drill.how}</span>}
-    {players && <span className="mt-auto inline-flex items-center gap-1.5 pt-1 text-[13px] text-ink-2"><Users aria-hidden size={14} />{players}</span>}
-    <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-medium ${tag.startsWith('Your usual') || tag === 'My drill' ? 'bg-brand/10 text-brand' : 'bg-raised text-ink-2'} ${players ? '' : 'mt-auto'}`}>{tag}</span>
+    {/* The drill type shows above the name (the mockup), but is read after it. */}
+    {lib && lib.kind !== 'warmup' && <span className="-order-1 text-[12px] font-medium text-ink-3">{lib.type}</span>}
+    {line && <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-2">{!lib && <Users aria-hidden size={14} />}{line}</span>}
+    {picked && note && <span className="text-[13px] leading-snug text-ink-2 break-words">{note}</span>}
+    {tag && <span className={`mt-auto rounded-full px-2.5 py-0.5 text-[12px] font-medium ${tag.startsWith('Your usual') || tag === 'Starter drill' || tag === 'In My drills' ? 'bg-brand/10 text-brand' : 'bg-raised text-ink-2'}`}>{tag}</span>}
   </button>
 }
 

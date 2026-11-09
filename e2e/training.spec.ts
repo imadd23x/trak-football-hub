@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 
-// TRAK-294 (Training 1/5): Training home (Sessions and Drills) and the New drill sheet with the academy's training
+// TRAK-294 (Training 1/5): Training home (Sessions and Drills; TRAK-387: Drills is the Library) with the academy's training
 // switch on, at a phone's and a laptop's width: no sideways scroll, and the keyboard reaches every control.
 // TRAK-295 (Training 2/5): planning a training: "How do you want to plan it?", Write my own, and the plan, at the
 // same two widths. TRAK-296 (Training 3/5): the Add/Swap sheet's My drills and Library views, and a Library preview.
@@ -69,6 +69,8 @@ async function backend(context: BrowserContext, unexpected: string[], trainings 
     .map(value => Buffer.from(JSON.stringify(value)).toString('base64url')).join('.') + '.synthetic'
   await context.addInitScript(session => localStorage.setItem('sb-xbykbqolvqyqmipikuae-auth-token', JSON.stringify(session)),
     { access_token: token, refresh_token: 'synthetic-training294-refresh', expires_in: 3600, expires_at: exp, token_type: 'bearer', user })
+  // TRAK-390: the coach's bookmarks (My drills), kept for the test.
+  const bookmarks = new Set<string>()
   await context.route('**/*', async route => {
     const req = route.request(), url = new URL(req.url())
     if (url.origin === 'http://127.0.0.1:4189') return route.continue()
@@ -113,6 +115,11 @@ async function backend(context: BrowserContext, unexpected: string[], trainings 
       return route.fulfill({ status: 204, body: '' })
     }
     if (path === '/rest/v1/coach_drills' && req.method() === 'GET') return json(DRILLS)
+    if (path === '/rest/v1/coach_drill_bookmarks') {
+      if (req.method() === 'POST') { bookmarks.add((req.postDataJSON() as { drill: string }).drill); return route.fulfill({ status: 201, body: '' }) }
+      if (req.method() === 'DELETE') { bookmarks.delete(url.searchParams.get('drill')!.slice(3)); return route.fulfill({ status: 204, body: '' }) }
+      return json([...bookmarks].map(drill => ({ drill, created_at: '2026-11-09T00:00:00Z' })))
+    }
     // Every other read is empty.
     if (path.startsWith('/rest/v1/')) return json(req.method() === 'GET' || path.startsWith('/rest/v1/rpc/') ? [] : null)
     unexpected.push(`${req.method()} ${path}`)
@@ -222,11 +229,14 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(errors).toEqual([])
   })
 
-  test(`Drills at ${width} px: My drills, the Library, and the New drill sheet`, async ({ page, context }, testInfo) => {
+  // TRAK-387 (Drill Library 3/11): Drills is the Library: Find a drill, My drills and All drills, the three kinds, a
+  // practice page and a drill's page, each picture fitted to the squad. No coach-made drills.
+  test(`Drills at ${width} px: the Library home, a practice page and a drill (Harder, Players today, Another drill, bookmarks)`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/training/drills', width, height)
-    await expect(page.getByRole('region', { name: 'My drills' }).getByRole('button', { name: /Edit$/ })).toHaveCount(3)
-    // TRAK-296: each drill can go to the next training not planned yet.
-    await expect(page.getByRole('region', { name: 'My drills' }).getByRole('button', { name: /^Add .+ to / })).toHaveCount(3)
+    await expect(page.getByRole('heading', { name: 'Find a drill' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'New drill' })).toHaveCount(0)
+    const kinds = page.getByRole('region', { name: 'What kind of practice?' })
+    await expect(kinds.getByRole('link')).toHaveCount(5) // the three tiles, Individual work, Goalkeeping
     await expect(page.getByRole('region', { name: 'From the Library' }).getByRole('link')).toHaveCount(7)
     await page.waitForTimeout(500)
     await page.screenshot({ path: testInfo.outputPath(`training-drills-${width}.png`), fullPage: true })
@@ -234,24 +244,91 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const keyboard = await everyControlByKeyboard(page, '.trak-wide')
     expect(keyboard.missed).toEqual([])
 
-    await page.getByRole('button', { name: 'New drill' }).click()
-    const sheet = page.getByRole('dialog', { name: 'New drill' })
-    await expect(sheet.getByLabel(/1\. Name it/)).toBeVisible()
-    await sheet.getByLabel(/1\. Name it/).fill('1v1 in channels')
-    await sheet.getByRole('button', { name: 'In groups' }).click()
-    await page.waitForTimeout(600)
-    await page.screenshot({ path: testInfo.outputPath(`training-new-drill-${width}.png`) })
+    // Typing shows picture cards in place of everything else.
+    await page.getByRole('searchbox', { name: 'Search drills' }).fill('piggy in the middle')
+    await expect(page.getByRole('list', { name: 'Drills found' }).getByRole('link')).toHaveCount(6)
+    await expect(kinds).toHaveCount(0)
+    await page.screenshot({ path: testInfo.outputPath(`training-drills-search-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
-    await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
+    await page.getByRole('searchbox', { name: 'Search drills' }).fill('')
 
-    // TRAK-296: Add to <day> opens the planner with the drill, which survives the page being laid out again.
-    await page.getByRole('region', { name: 'My drills' }).getByRole('button', { name: /^Add Pressing on the trigger to / }).click()
-    await expect(page).toHaveURL(/\/coach\/training\/t-thu\/plan$/)
-    // TRAK-340: it joins the plan as a part at the end, and the planner opens on Review.
-    await expect(page.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(6)
+    await page.getByRole('region', { name: 'What kind of practice?' }).getByRole('link', { name: /^Skill/ }).click()
+    await expect(page.getByRole('heading', { name: 'Skill practices', level: 1 })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-drills-skill-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+
+    // TRAK-390: the card's bookmark adds the drill to My drills.
+    await page.getByRole('button', { name: 'Add to My drills: Keep the ball' }).click()
+    await expect(page.getByRole('button', { name: 'In My drills: Keep the ball' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByText('Added to My drills')).toBeVisible()
+    await page.getByRole('link', { name: /^Keep the ball/ }).click()
+    await expect(page.getByRole('button', { name: 'In My drills' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('img', { name: /^Keep the ball set-up\./ })).toBeVisible()
+    // TRAK-389: Harder says what changed and why; Players today refits it.
+    await page.getByRole('button', { name: 'Harder' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Harder. Here’s what Trak changed:' })).toBeVisible()
+    await page.getByRole('group', { name: 'Players today' }).getByRole('button', { name: 'One player more' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'players today. Trak refitted the drill:' })).toBeVisible()
+    // Laid out again (phone ↔ laptop), the drill keeps its level and players.
     await page.setViewportSize({ width: width === 390 ? 1440 : 390, height })
-    await expect(page.getByRole('list', { name: 'The plan' }).getByRole('listitem')).toHaveCount(6)
+    await expect(page.getByRole('status').filter({ hasText: 'players today. Trak refitted the drill:' })).toBeVisible()
+    await page.setViewportSize({ width, height })
+    await expect(page.getByRole('status').filter({ hasText: 'players today. Trak refitted the drill:' })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-drill-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    const drillKeys = await everyControlByKeyboard(page, '.trak-wide')
+    expect(drillKeys.missed).toEqual([])
+    await page.getByRole('button', { name: 'Another drill' }).click()
+    await expect(page.getByRole('heading', { name: 'Four corners', level: 1 })).toBeVisible()
+    // My drills shows it.
+    await page.goto('/coach/training/drills/mine')
+    await expect(page.getByRole('heading', { name: 'Skill practices', level: 2 })).toBeVisible()
+    await expect(page.getByRole('link', { name: /^Keep the ball/ })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-my-drills-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+
+  // TRAK-391 (Drill Library 6/11): Add to training. The drill joins the training's plan at the end, at the level set.
+  test(`Add to training at ${width} px: a drill page, which training, Review, saved, Added to <day>`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, '/coach/training/drills/d/lib-pass-between-defenders', width, height)
+    await expect(page.getByRole('heading', { name: 'Pass between defenders', level: 1 })).toBeVisible()
+    await page.getByRole('button', { name: 'Harder' }).click()
+    await page.getByRole('button', { name: 'Add to training' }).click()
+    const picker = page.getByRole('dialog', { name: 'Add Pass between defenders to which training?' })
+    const coming = picker.getByRole('list', { name: 'Trainings coming up' })
+    await expect(coming.getByRole('listitem').filter({ hasText: 'Before AEK U16 on Saturday' })).toContainText('Not planned')
+    await expect(coming.getByRole('listitem').filter({ hasText: 'Receiving under pressure' })).toContainText('Planned')
+    await expect(coming.getByRole('listitem').filter({ hasText: 'Pressing zones' })).toHaveCount(0)
+    await page.waitForTimeout(500)
+    await page.screenshot({ path: testInfo.outputPath(`training-add-picker-${width}.png`) })
+    await coming.getByRole('button', { name: /^Add to Before AEK U16 on Saturday/ }).click()
+
+    await expect(page).toHaveURL(/\/coach\/training\/t-thu\/plan$/)
+    await expect(page.getByText('Pass between defenders is added at the end. Check the plan, then save. Nothing is saved until you do.')).toBeVisible()
+    const plan = page.getByRole('list', { name: 'The plan' }).getByRole('listitem')
+    await expect(plan).toHaveCount(6)
+    await expect(plan.last()).toContainText('Pass between defenders')
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-add-review-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    await page.getByRole('button', { name: 'Save the plan' }).click()
+    await expect(page).toHaveURL(/\/coach\/training$/)
+
+    // Back on the drill page, the button says where it went and opens the plan.
+    await page.goto('/coach/training/drills/d/lib-pass-between-defenders')
+    const added = page.getByRole('link', { name: /^Added to / })
+    await expect(added).toHaveAttribute('href', '/coach/training/t-thu/plan')
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-add-added-${width}.png`), fullPage: true })
+    const keys = await everyControlByKeyboard(page, '.trak-wide')
+    expect(keys.missed).toEqual([])
+    await added.click()
+    await expect(page.getByRole('list', { name: 'The plan' }).getByRole('listitem').last()).toContainText('Pass between defenders')
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
   })
@@ -262,11 +339,13 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.getByRole('region', { name: 'Before AEK U16 on Saturday' }).getByRole('button', { name: 'Plan session' }).click()
     await expect(page).toHaveURL(/\/coach\/training\/t-thu\/plan$/)
     const warmup = page.getByRole('region', { name: 'Dry warm-up' })
-    await expect(warmup.getByRole('button', { name: /^Dynamic warm-up/, pressed: true })).toBeVisible()
+    // TRAK-392: the Library's starter drill is picked; the three choices are the Library's.
+    await expect(warmup.getByRole('button', { name: /^Moving warm-up/, pressed: true })).toBeVisible()
     await expect(page.getByRole('list', { name: 'Parts of the session' }).getByRole('listitem')).toHaveCount(5)
-    await warmup.getByRole('button', { name: /^Mirror drill/ }).click()
-    await expect(warmup.getByRole('button', { name: /^Mirror drill/, pressed: true })).toBeVisible()
-    await expect(warmup.getByRole('button', { name: /^Dynamic warm-up/, pressed: false })).toBeVisible()
+    await warmup.getByRole('button', { name: /^Tag games/ }).click()
+    await expect(warmup.getByRole('button', { name: /^Tag games/, pressed: true })).toBeVisible()
+    await expect(warmup.getByRole('button', { name: /^Moving warm-up/, pressed: false })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Write your own' })).toHaveCount(0)
     await page.waitForTimeout(400)
     await page.screenshot({ path: testInfo.outputPath(`training-plan-part-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
@@ -293,7 +372,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(errors).toEqual([])
   })
 
-  test(`Planner pop-ups at ${width} px: Add a part, See more drills, Write your own`, async ({ page, context }, testInfo) => {
+  test(`Planner pop-ups at ${width} px: Add a part, See more drills, View drill`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/training/t-thu/plan', width, height)
     await expect(page.getByRole('region', { name: 'Dry warm-up' })).toBeVisible()
     await page.getByRole('button', { name: 'Add a part' }).first().click()
@@ -307,22 +386,30 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('list', { name: 'Parts of the session' }).getByRole('listitem')).toHaveCount(6)
 
-    await page.getByRole('region', { name: 'Dry warm-up' }).getByRole('button', { name: /^See more drills/ }).click()
-    const more = page.getByRole('dialog', { name: 'More drills for Dry warm-up' })
-    await expect(more.getByRole('list', { name: 'Drills' }).getByRole('listitem')).toHaveCount(7)
+    // TRAK-392: View drill shows a Library drill with Easier / Harder; Use this drill picks it.
+    const warmup = page.getByRole('region', { name: 'Dry warm-up' })
+    await warmup.getByRole('button', { name: 'View drill: Tag games' }).click()
+    const view = page.getByRole('dialog', { name: 'Tag games' })
+    await expect(view.getByRole('img', { name: /^Tag games set-up\./ })).toBeVisible()
+    await view.getByRole('button', { name: 'Harder' }).click()
+    await expect(view.getByText('Harder. Here’s what Trak changed:')).toBeVisible()
+    await page.waitForTimeout(600)
+    await page.screenshot({ path: testInfo.outputPath(`training-plan-view-${width}.png`) })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
+    await view.getByRole('button', { name: 'Use this drill' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(warmup.getByRole('button', { name: /^Tag games/, pressed: true })).toBeVisible()
+
+    // See more drills: every Library drill for the part, by drill type.
+    await page.getByRole('button', { name: /^Next: Passing & movement/ }).click()
+    await page.getByRole('region', { name: 'Passing & movement' }).getByRole('button', { name: /^See more drills/ }).click()
+    const more = page.getByRole('dialog', { name: 'More drills for Passing & movement' })
+    await expect(more.getByRole('heading', { level: 3 })).toHaveText(['Passing', 'Pressing movement', 'Follow and copy', 'Repetition', 'Individual', 'Goalkeeping'])
     await page.waitForTimeout(600)
     await page.screenshot({ path: testInfo.outputPath(`training-plan-more-${width}.png`) })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     await more.getByRole('button', { name: 'Close' }).last().click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
-
-    await page.getByRole('region', { name: 'Dry warm-up' }).getByRole('button', { name: 'Write your own' }).click()
-    const own = page.getByRole('dialog', { name: 'Write your own drill' })
-    await own.getByRole('button', { name: 'Save drill' }).click()
-    await expect(own.getByText('Give the drill a name.').first()).toBeVisible()
-    await page.waitForTimeout(600)
-    await page.screenshot({ path: testInfo.outputPath(`training-plan-own-${width}.png`) })
-    expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
   })

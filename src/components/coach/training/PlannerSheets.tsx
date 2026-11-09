@@ -1,23 +1,23 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Check, Plus, Users } from 'lucide-react'
-import { DRILL_LIMITS, blankDrill } from '@/lib/training/sessions'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, Check } from 'lucide-react'
 import { PART_TYPES, type PartType } from '@/lib/training/shelf'
 import {
-  PART_NAME_MAX, answerProblems, blankAnswers, drillKey, fromMyDrill, isSameDrill, playersLine, tagFor, type DrillAnswers, type Part, type PlanDrill, type PlayersKind, type Usage,
+  PART_NAME_MAX, drillKey, fromLibrary, hasOwnDrills, isSameDrill, libraryFor, libraryOf, tagFor, type Part, type PlanDrill, type Usage,
 } from '@/lib/training/parts'
-import { useAddDrill } from './useTraining'
+import { START_LEVEL, alsoCalled, changedBy, fit, kindInfo, nextLevel, searchDrills, step, type Changed, type LibraryDrill } from '@/lib/training/library'
+import { DrillPitch, PitchKey } from './library/DrillPitch'
+import { AboutDrill, CHIP, ChangeNote, DetailList } from './library/DrillInfo'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
-import { Checkbox } from '@/components/arc/checkbox/checkbox'
 import { Input } from '@/components/arc/input/input'
 import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
-import { Textarea } from '@/components/arc/textarea/textarea'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): the planner's pop-ups. Add a part (Trak's eight, or
-   the coach's own name), See more drills (search, and All / You've used / My drills), and Write your own: every drill
-   in Trak has the same three things, a name, what the players do and how many players (Kostas, 30 Oct). */
+   the coach's own name) and Leave. TRAK-392 (Drill Library 7/11): See more drills lists the part's Library drills by
+   drill type, with search; View drill shows one with its picture and Easier / Harder, then Use this drill. Write your
+   own and the My drills filter left with coach-made drills (Kostas, 8 Nov). */
 
 /** Add a part: it goes at the end; the planner then opens it. */
 export function AddPartSheet({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (type: PartType, name: string) => void }) {
@@ -56,123 +56,108 @@ export function AddPartSheet({ open, onClose, onAdd }: { open: boolean; onClose:
   </BottomSheet>
 }
 
-type Filter = 'all' | 'used' | 'mine'
+type Filter = 'all' | 'used'
 
-/** Every drill that fits the part, to search and pick from. */
-export function MoreDrillsSheet({ part, all, usage, onClose, onPick, onWrite }: {
-  part: Part | null; all: PlanDrill[]; usage: Usage; onClose: () => void; onPick: (drill: PlanDrill) => void; onWrite: () => void
+/** Every Library drill for the part, grouped by drill type (team drills first, then Individual and Goalkeeping), to
+ *  search and pick from. */
+export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPick }: {
+  part: Part | null; players: number; usage: Usage; bookmarks: readonly string[]; onClose: () => void; onPick: (drill: PlanDrill) => void
 }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   useEffect(() => { if (part) { setQuery(''); setFilter('all') } }, [part?.key]) // eslint-disable-line react-hooks/exhaustive-deps -- a new part starts afresh
+  const pool = useMemo(() => part ? libraryFor(part.type) : [], [part])
+  const all = useMemo(() => pool.map(d => fromLibrary(d, players, START_LEVEL)), [pool, players])
   if (!part) return null
-  const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean)
-  const shown = all.filter(d => filter === 'all' || (filter === 'used' ? usage.byDrill.has(drillKey(d) ?? '') : d.source === 'drill'))
-    .filter(d => words.every(w => `${d.name} ${d.how}`.toLocaleLowerCase().includes(w)))
+  const byId = new Map(all.map(d => [d.trak_drill, d]))
+  const found = query.trim() ? searchDrills(query, { players, level: START_LEVEL }, () => true, pool) : pool
+  const shown = found.filter(d => filter === 'all' || usage.byDrill.has(drillKey(byId.get(d.id)!) ?? ''))
+  const groupOf = (d: LibraryDrill) => d.focus === 'individual' ? 'Individual' : d.focus === 'goalkeeping' ? 'Goalkeeping'
+    : d.kind === 'warmup' ? kindInfo(d.kind).name : d.type
+  // Searching, the best match first, in one list; otherwise by drill type, in the Library's order.
+  const groups = query.trim() ? [{ name: 'Drills found', drills: shown }]
+    : [...new Set(shown.filter(d => d.focus === 'team').map(groupOf)), 'Individual', 'Goalkeeping']
+      .map(name => ({ name, drills: shown.filter(d => groupOf(d) === name) })).filter(g => g.drills.length)
   return <BottomSheet className="arc" open onOpenChange={next => { if (!next) onClose() }} detents={[0.92]}
-    title={part.type === 'own' ? 'All drills' : `More drills for ${part.name}`}>
+    title={hasOwnDrills(part.type) ? `More drills for ${part.name}` : 'All drills'}>
     <div className="grid gap-4 pb-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px] flex-1"><SearchField label="Search drills" placeholder="For example: pairs, cones, 4 v 2" value={query} onValueChange={setQuery} /></div>
+        <div className="min-w-[220px] flex-1"><SearchField label="Search drills" placeholder="For example: rondo, 4v2, pressing" value={query} onValueChange={setQuery} /></div>
         <SegmentedControl label="Show" value={filter} onValueChange={value => setFilter(value as Filter)}
-          options={[{ value: 'all', label: 'All' }, { value: 'used', label: 'You’ve used' }, { value: 'mine', label: 'My drills' }]} />
+          options={[{ value: 'all', label: 'All' }, { value: 'used', label: 'You’ve used' }]} />
       </div>
-      {shown.length === 0 ? <p className="text-[15px] text-ink-2">{filter === 'mine' && !words.length
-        ? 'You haven’t written any drills for this part yet.' : 'No drills match. Try another word, or write your own.'}</p>
-        : <ul aria-label="Drills" className="divide-y divide-line rounded-2xl border border-line bg-surface px-4">
-          {shown.map(d => {
-            const picked = isSameDrill(d, part.drill)
-            const players = playersLine(d)
-            return <li key={drillKey(d) ?? d.name} className="flex flex-wrap items-start justify-between gap-3 py-3.5">
-              <div className="grid min-w-0 flex-1 gap-1">
-                <p className="text-[15px] font-medium text-ink break-words">{d.name}</p>
-                {d.how && <p className="text-sm text-ink-2 break-words">{d.how}</p>}
-                <p className="flex flex-wrap items-center gap-2 text-[13px] text-ink-3">
-                  {players && <span className="inline-flex items-center gap-1"><Users aria-hidden size={14} />{players}</span>}
-                  <Badge size="sm" tone={d.source === 'drill' ? 'success' : 'neutral'}>{tagFor(d, part.type, all, usage)}</Badge>
-                </p>
-              </div>
-              {picked ? <Badge tone="success"><Check aria-hidden size={14} />Picked</Badge>
-                : <Button size="sm" variant="secondary" aria-label={`Pick ${d.name}`} onClick={() => onPick(d)}>Pick</Button>}
-            </li>
-          })}
-        </ul>}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="ghost" onClick={onWrite}><Plus aria-hidden size={16} />Write your own</Button>
-        <Button variant="secondary" onClick={onClose}>Close</Button>
-      </div>
+      {groups.length === 0 ? <p className="text-[15px] text-ink-2">{filter === 'used' && !query.trim()
+        ? 'You haven’t used any of these drills yet.' : 'No drills match. Try another word.'}</p>
+        : groups.map(group => <section key={group.name} aria-label={group.name} className="grid gap-2">
+          <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-ink-3">{group.name}</h3>
+          <ul aria-label={group.name} className="divide-y divide-line rounded-2xl border border-line bg-surface px-4">
+            {group.drills.map(lib => {
+              const d = byId.get(lib.id)!
+              const picked = isSameDrill(d, part.drill)
+              const tag = tagFor(d, part.type, all, usage, bookmarks)
+              return <li key={lib.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="grid min-w-0 flex-1 gap-0.5">
+                  <p className="text-[15px] font-medium text-ink break-words">{lib.name}</p>
+                  <p className="text-[13px] text-ink-3">{[d.numbers, d.area].filter(Boolean).join(' · ')}</p>
+                  {tag && <p className="text-[13px] text-brand">{tag}</p>}
+                </div>
+                {picked ? <Badge tone="success"><Check aria-hidden size={14} />Picked</Badge>
+                  : <Button size="sm" variant="secondary" aria-label={`Pick ${lib.name}`} onClick={() => onPick(d)}>Pick</Button>}
+              </li>
+            })}
+          </ul>
+        </section>)}
+      <div className="flex justify-end"><Button variant="secondary" onClick={onClose}>Close</Button></div>
     </div>
   </BottomSheet>
 }
 
-const KINDS: { value: PlayersKind; label: string }[] = [
-  { value: 'any', label: 'Any number' }, { value: 'pairs', label: 'In pairs' }, { value: 'groups', label: 'In groups' }, { value: 'teams', label: 'Two teams' },
-]
-
-/** The same three questions wherever a coach writes a drill (TRAK-367): Write your own, New drill, Edit drill. */
-export function DrillQuestions({ answers, onChange, errors }: { answers: DrillAnswers; onChange: (change: Partial<DrillAnswers>) => void; errors: Record<string, string> }) {
-  const { name, how, kind, size } = answers
-  return <>
-    <Input label="1. Name it" description="Short, and says what happens. For example: Rondo 4 v 2 with a target." value={name}
-      maxLength={DRILL_LIMITS.name} autoComplete="off" error={errors.name} onChange={e => onChange({ name: e.target.value })} />
-    <Textarea label="2. What do the players do?" rows={3} maxLength={DRILL_LIMITS.how} value={how} error={errors.how}
-      description="One or two sentences. Set-up first, then the action. For example: 15 × 15 m square. Four keep the ball from two; five passes in a row is a point."
-      onChange={e => onChange({ how: e.target.value })} />
-    <div className="grid justify-items-start gap-2">
-      <p aria-hidden="true" className="text-sm font-medium text-ink">3. How many players?</p>
-      <p className="text-sm text-ink-3">Trak uses this to adjust the drill when fewer players turn up.</p>
-      <SegmentedControl label="3. How many players?" value={kind ?? ''} options={KINDS} onValueChange={value => onChange({ kind: value as PlayersKind })} />
-      {kind === 'groups' && <div className="flex items-center gap-3">
-        <span id="group-size" className="text-sm text-ink-2">Players in each group</span>
-        <Button type="button" size="sm" variant="secondary" aria-label="One fewer" disabled={size <= 2} onClick={() => onChange({ size: size - 1 })}>−</Button>
-        <span aria-labelledby="group-size" className="w-6 text-center text-base font-medium text-ink">{size}</span>
-        <Button type="button" size="sm" variant="secondary" aria-label="One more" disabled={size >= 12} onClick={() => onChange({ size: size + 1 })}>+</Button>
-      </div>}
-      {errors.kind && <p role="alert" className="text-sm text-danger">{errors.kind}</p>}
-    </div>
-  </>
-}
-
-/** Write your own: the same three things as every drill. Ticked (the default), it's saved to My drills under this part
- *  straight away; otherwise it lives only in this plan. */
-export function OwnDrillSheet({ part, onClose, onSaved }: { part: Part | null; onClose: () => void; onSaved: (drill: PlanDrill) => void }) {
-  const add = useAddDrill()
-  const [answers, setAnswers] = useState(blankAnswers)
-  const [keep, setKeep] = useState(true)
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [failed, setFailed] = useState(false)
-  useEffect(() => { if (part) { setAnswers(blankAnswers()); setKeep(true); setErrors({}); setFailed(false) } }, [part?.key]) // eslint-disable-line react-hooks/exhaustive-deps -- each opening starts blank
-  if (!part) return null
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    const found = answerProblems(answers)
-    setErrors(found)
-    if (Object.keys(found).length) return
-    const { name, how, kind, size } = answers
-    const draft = { ...blankDrill(), name: name.trim(), how: how.trim(), minutes: part.minutes }
-    const players = { players_kind: kind, group_size: kind === 'groups' ? size : null }
-    if (!keep) {
-      const { minutes: _m, ...rest } = draft
-      return onSaved({ ...rest, minutes: 0, source: 'own', trak_drill: null, drill_id: null, library_session: null, ...players })
-    }
-    setFailed(false)
-    add.mutate({ ...draft, part_type: part.type, ...players }, {
-      onSuccess: drill => onSaved({ ...fromMyDrill(drill), minutes: 0 }),
-      onError: () => setFailed(true),
-    })
+/** View drill: a Library drill fitted to the squad, with its picture, Easier / Harder (and what changed), the five
+ *  details, why, how and what to watch for. Use this drill picks it at the level set here; the picked drill opens at
+ *  its own level, and Done keeps a change. */
+export function ViewDrillSheet({ drill, part, players, onClose, onUse }: {
+  drill: LibraryDrill | null; part: Part | null; players: number; onClose: () => void; onUse: (drill: PlanDrill) => void
+}) {
+  const picked = !!drill && libraryOf(part?.drill)?.id === drill.id
+  const start = picked ? part?.drill?.trak_level ?? START_LEVEL : START_LEVEL
+  const [level, setLevel] = useState(start)
+  const [changed, setChanged] = useState<Changed | null>(null)
+  useEffect(() => { setLevel(start); setChanged(null) }, [drill?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- each drill opens afresh
+  if (!drill || !part) return null
+  const fitted = fit(drill, players, level)
+  const press = (by: -1 | 1) => {
+    const next = step(drill, players, level, by)
+    if (next) { setLevel(next.level); setChanged(changedBy(by, next.changes)) }
   }
-  return <BottomSheet className="arc" open onOpenChange={next => { if (!next) onClose() }} detents={[0.92]} title="Write your own drill"
-    description="Every drill in Trak has the same three things: a name, what the players do, and how many players. Fill them in and yours will look like all the others.">
-    <form noValidate onSubmit={submit} aria-label="Write your own drill" className="grid gap-5 pb-4">
-      <DrillQuestions answers={answers} onChange={change => setAnswers(a => ({ ...a, ...change }))} errors={errors} />
-      <Checkbox label="Save it to My drills, so I can use it again" checked={keep} onCheckedChange={on => setKeep(on === true)} />
-      {failed && <p role="alert" className="text-[15px] text-danger">Couldn’t save the drill. Check your connection and try again. Nothing you typed is lost.</p>}
-      <p className="text-sm text-ink-3">It goes next to the other drills for {part.name}.</p>
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button type="submit" loading={add.isPending}>Save drill</Button>
+  const also = alsoCalled(drill)
+  const use = () => onUse(fromLibrary(drill, players, level))
+  return <BottomSheet className="arc" open onOpenChange={next => { if (!next) onClose() }} detents={[0.96]} title={drill.name}
+    description={also.length ? `Also called: ${also.join(', ')}` : undefined}>
+    <div className="grid gap-4 pb-4">
+      <p className="flex flex-wrap gap-1.5">
+        <span className={CHIP}>{kindInfo(drill.kind).name}</span>
+        {drill.kind !== 'warmup' && <span className={CHIP}>{drill.type}</span>}
+      </p>
+      <div className="grid items-start gap-4 laptop:grid-cols-[minmax(0,1.4fr)_minmax(260px,1fr)]">
+        <div className="grid gap-3">
+          <DrillPitch drill={drill} players={players} level={level} />
+          <PitchKey legend={fitted.legend} />
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="secondary" disabled={nextLevel(drill, players, level, -1) === null} onClick={() => press(-1)}><ArrowDown aria-hidden size={16} />Easier</Button>
+            <Button variant="secondary" disabled={nextLevel(drill, players, level, 1) === null} onClick={() => press(1)}><ArrowUp aria-hidden size={16} />Harder</Button>
+          </div>
+          <ChangeNote changed={changed} idle={`Set for ${players} players. Press Easier or Harder and Trak shows what it changed and why.`} />
+        </div>
+        <div className="grid gap-4"><AboutDrill drill={drill} /></div>
       </div>
-    </form>
+      <DetailList details={fitted.details} changed={changed} />
+      <div className="flex flex-wrap justify-end gap-2">
+        {picked ? <Button onClick={use}><Check aria-hidden size={16} />Done</Button> : <>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+          <Button onClick={use}>Use this drill</Button>
+        </>}
+      </div>
+    </div>
   </BottomSheet>
 }
 

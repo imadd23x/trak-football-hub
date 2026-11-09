@@ -14,6 +14,10 @@ import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
 import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
 import { partsFromShape, standardShape, usageOf } from '@/lib/training/parts'
+import { LIBRARY, START_LEVEL, step } from '@/lib/training/library'
+
+/** A Library drill by name (TRAK-392: Plan session's drills are the Library's). */
+const lib = (name: string) => LIBRARY.find(d => d.name === name)!
 
 const MINUTE = 60_000
 const DAY = 24 * 60 * MINUTE
@@ -112,20 +116,22 @@ describe('TRAK-340: a new plan', { timeout: 30_000 }, () => {
     const warmup = await part('Dry warm-up')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Plan session: Pressing triggers')
     expect(session()).toEqual([
-      '1Dry warm-upDynamic warm-up10 min', '2Passing & movementPass and follow15 min', '3RondoRondo 4 v 215 min',
-      '4Functional drillsOne-two and finish25 min', '5GameFree play25 min',
-    ].map(s => expect.stringContaining(s.replace(/(\d)([A-Z])/, '$1$2'))))
-    // The usual is picked; its description shows, the others' don't.
-    const picked = within(warmup).getByRole('button', { name: /^Dynamic warm-up/, pressed: true })
-    expect(picked).toHaveTextContent('Jog, high knees')
-    const other = within(warmup).getAllByRole('button', { pressed: false }).find(b => /FIFA 11\+|Mirror/.test(b.textContent ?? ''))!
-    expect(other.textContent).not.toMatch(/Six runs|copies/)
-    expect(within(warmup).getAllByText('Trak drill').length).toBeGreaterThan(0)
+      '1Dry warm-upMoving warm-up10 min', '2Passing & movementPass and follow15 min', '3RondoKeep the ball15 min',
+      '4Functional drillsAttack down the side25 min', '5GamePass then score25 min',
+    ].map(s => expect.stringContaining(s)))
+    // TRAK-392: the starter drill from the Library is picked; why it works shows once picked, the others' don't.
+    const picked = within(warmup).getByRole('button', { name: /^Moving warm-up/, pressed: true })
+    expect(picked).toHaveTextContent(lib('Moving warm-up').why)
+    expect(picked).toHaveTextContent('Starter drill')
+    const other = within(warmup).getByRole('button', { name: /^Tag games/, pressed: false })
+    expect(other.textContent).not.toContain(lib('Tag games').why)
+    // No coach-made drills (Kostas, 8 Nov).
+    expect(screen.queryByRole('button', { name: 'Write your own' })).toBeNull()
     expect(screen.getByText('Fits your 90 minutes.')).toBeInTheDocument()
 
     // Pick another warm-up and give it 15 minutes.
-    await user.click(within(warmup).getByRole('button', { name: /^Mirror drill/ }))
-    expect(within(warmup).getByRole('button', { name: /^Mirror drill/, pressed: true })).toHaveTextContent('In pairs, one leads')
+    await user.click(within(warmup).getByRole('button', { name: /^Tag games/ }))
+    expect(within(warmup).getByRole('button', { name: /^Tag games/, pressed: true })).toHaveTextContent(lib('Tag games').why)
     await user.click(within(warmup).getByRole('button', { name: '15 min' }))
     expect(screen.getByText('5 min over. That’s fine, it’s only a guide.')).toBeInTheDocument()
 
@@ -141,8 +147,10 @@ describe('TRAK-340: a new plan', { timeout: 30_000 }, () => {
     await waitFor(() => expect(saves).toHaveLength(1))
     expect(saves[0].p_event_id).toBe('soon')
     expect(saves[0].p_note).toBe('Remind the back four to talk.')
-    expect((saves[0].p_practices as Record<string, unknown>[]).map(p => `${p.part}/${p.part_type}/${p.trak_drill}/${p.minutes}`)).toEqual([
-      'Dry warm-up/warmup/w3/15', 'Passing & movement/passing/p1/15', 'Rondo/rondo/r1/15', 'Functional drills/functional/f1/25', 'Game/game/g1/25'])
+    expect((saves[0].p_practices as Record<string, unknown>[]).map(p => `${p.part}/${p.part_type}/${p.trak_drill}/${p.trak_level}/${p.minutes}`)).toEqual([
+      `Dry warm-up/warmup/${lib('Tag games').id}/${START_LEVEL}/15`, `Passing & movement/passing/${lib('Pass and follow').id}/${START_LEVEL}/15`,
+      `Rondo/rondo/${lib('Keep the ball').id}/${START_LEVEL}/15`, `Functional drills/functional/${lib('Attack down the side').id}/${START_LEVEL}/25`,
+      `Game/game/${lib('Pass then score').id}/${START_LEVEL}/25`])
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training'))
     expect(await screen.findByText(/^Plan saved for Pressing triggers,/)).toBeInTheDocument()
   })
@@ -151,19 +159,19 @@ describe('TRAK-340: a new plan', { timeout: 30_000 }, () => {
     const user = userEvent.setup()
     const now = Date.now()
     database([training('past', onTheMinute(now - 3 * DAY)), training('soon', onTheMinute(now + DAY))], {
-      past: [trak(1, 'w2', 'FIFA 11+ running part', 'Warm-up', 'warmup', 10), trak(2, 'r3', 'Rondo 6 v 3, two boxes', 'Rondo', 'rondo', 20),
+      past: [trak(1, lib('Copy your partner').id, 'Copy your partner', 'Warm-up', 'warmup', 10), trak(2, lib('Four corners').id, 'Four corners', 'Rondo', 'rondo', 20),
         practice(3, 'Our press', { part: 'Pressing game', part_type: 'own', minutes: 30 })],
     })
     renderApp('/coach/training/soon/plan')
     await part('Warm-up')
     await waitFor(() => expect(session()).toHaveLength(3))
-    expect(session()[0]).toContain('FIFA 11+ running part')
-    expect(session()[1]).toContain('Rondo 6 v 3, two boxes')
+    expect(session()[0]).toContain('Copy your partner')
+    expect(session()[1]).toContain('Four corners')
     expect(session()[2]).toContain('Pressing game')
     expect(session()[2]).toContain('No drill yet')
     expect(screen.getByText('Started from the parts you used last time.')).toBeInTheDocument()
     const warmup = await part('Warm-up')
-    expect(within(warmup).getByRole('button', { name: /^FIFA 11\+ running part/, pressed: true })).toHaveTextContent('Your usual · 1 of your last 1')
+    expect(within(warmup).getByRole('button', { name: /^Copy your partner/, pressed: true })).toHaveTextContent('Your usual · 1 of your last 1')
     await user.click(screen.getByRole('button', { name: 'Start from Trak’s 5 parts' }))
     await waitFor(() => expect(session()).toHaveLength(5))
     expect(screen.queryByRole('button', { name: 'Start from Trak’s 5 parts' })).toBeNull()
@@ -217,43 +225,57 @@ describe('TRAK-340: Your session', { timeout: 30_000 }, () => {
 })
 
 describe('TRAK-340: drills', { timeout: 30_000 }, () => {
-  it('See more drills lists every drill for the part; one picked from there shows in the three', async () => {
+  it('See more drills lists every Library drill for the part by drill type, with search; one picked there shows in the three', async () => {
     const user = userEvent.setup()
     database([training('soon', onTheMinute(Date.now() + DAY))])
     renderApp('/coach/training/soon/plan')
-    const warmup = await part('Dry warm-up')
-    await user.click(within(warmup).getByRole('button', { name: /^See more drills/ }))
-    const sheet = await screen.findByRole('dialog', { name: 'More drills for Dry warm-up' })
-    await user.type(within(sheet).getByRole('searchbox', { name: 'Search drills' }), 'shuttle')
-    await user.click(await within(sheet).findByRole('button', { name: 'Pick 5-10-5 shuttle runs' }))
-    expect(within(await part('Dry warm-up')).getByRole('button', { name: /^5-10-5 shuttle runs/, pressed: true })).toBeInTheDocument()
+    await part('Dry warm-up')
+    await next('Passing & movement')
+    const passing = await part('Passing & movement')
+    await user.click(within(passing).getByRole('button', { name: /^See more drills \(11\)/ }))
+    const sheet = await screen.findByRole('dialog', { name: 'More drills for Passing & movement' })
+    expect(within(sheet).getAllByRole('heading', { level: 3 }).map(h => h.textContent))
+      .toEqual(['Passing', 'Pressing movement', 'Follow and copy', 'Repetition', 'Individual', 'Goalkeeping'])
+    expect(within(sheet).queryByRole('button', { name: 'My drills' })).toBeNull()
+    await user.type(within(sheet).getByRole('searchbox', { name: 'Search drills' }), 'gate')
+    await user.click(await within(sheet).findByRole('button', { name: 'Pick Pass through the gate' }))
+    expect(within(await part('Passing & movement')).getByRole('button', { name: /^Pass through the gate/, pressed: true })).toBeInTheDocument()
   })
+})
 
-  it('Write your own: the same three things as every drill; saved to My drills under its part, and picked', async () => {
+/* TRAK-392 (Drill Library 7/11): View drill. */
+describe('TRAK-392: View drill', { timeout: 30_000 }, () => {
+  it('shows the drill with Easier / Harder; Use this drill picks it, and the level set there is saved with the plan', async () => {
     const user = userEvent.setup()
-    const { drillsSent } = database([training('soon', onTheMinute(Date.now() + DAY))])
+    const { saves } = database([training('soon', onTheMinute(Date.now() + DAY))])
     renderApp('/coach/training/soon/plan')
     await part('Dry warm-up')
     await next('Passing & movement')
     await next('Rondo')
     const rondo = await part('Rondo')
-    await user.click(within(rondo).getByRole('button', { name: 'Write your own' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Write your own drill' })
-    await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
-    expect(within(sheet).getByText('Give the drill a name.')).toBeInTheDocument()
-    expect(within(sheet).getByText('Say what the players do.')).toBeInTheDocument()
-    expect(within(sheet).getByText('Say how many players it takes.')).toBeInTheDocument()
-    await user.type(within(sheet).getByLabelText('1. Name it'), 'Rondo with a target')
-    await user.type(within(sheet).getByLabelText('2. What do the players do?'), '15 × 15 m. Four keep it from two.')
-    await user.click(within(sheet).getByRole('button', { name: 'In groups' }))
-    await user.click(within(sheet).getByRole('button', { name: 'One more' }))
-    await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
-    await waitFor(() => expect(drillsSent).toEqual([expect.objectContaining({
-      name: 'Rondo with a target', how: '15 × 15 m. Four keep it from two.', minutes: 15, part_type: 'rondo', players_kind: 'groups', group_size: 5,
-    })]))
-    const picked = within(await part('Rondo')).getByRole('button', { name: /^Rondo with a target/, pressed: true })
-    expect(picked).toHaveTextContent('My drill')
-    expect(picked).toHaveTextContent('Groups of 5')
+    await user.click(within(rondo).getByRole('button', { name: 'View drill: Four corners' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Four corners' })
+    expect(within(sheet).getByRole('img', { name: /^Four corners set-up\./ })).toBeInTheDocument()
+    expect(within(sheet).getByRole('heading', { name: 'How to play' })).toBeInTheDocument()
+    await user.click(within(sheet).getByRole('button', { name: 'Harder' }))
+    expect(within(sheet).getByText('Harder. Here’s what Trak changed:')).toBeInTheDocument()
+    await user.click(within(sheet).getByRole('button', { name: 'Use this drill' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(within(await part('Rondo')).getByRole('button', { name: /^Four corners/, pressed: true })).toBeInTheDocument()
+
+    // The picked drill opens at its own level; Done keeps it.
+    await user.click(within(await part('Rondo')).getByRole('button', { name: 'View drill: Four corners' }))
+    const again = await screen.findByRole('dialog', { name: 'Four corners' })
+    expect(within(again).queryByRole('button', { name: 'Use this drill' })).toBeNull()
+    await user.click(within(again).getByRole('button', { name: 'Done' }))
+
+    await next('Functional drills')
+    await next('Game')
+    await next('Review')
+    await user.click(await screen.findByRole('button', { name: 'Save the plan' }))
+    await waitFor(() => expect(saves).toHaveLength(1))
+    const sent = (saves[0].p_practices as Record<string, unknown>[])[2]
+    expect(sent).toMatchObject({ trak_drill: lib('Four corners').id, trak_level: step(lib('Four corners'), 8, START_LEVEL, 1)!.level })
   })
 })
 
@@ -274,7 +296,7 @@ describe('TRAK-340: drafts and a saved plan', { timeout: 30_000 }, () => {
 
   it('with a draft, the Next training card says so and Continue plan carries on where the coach stopped', async () => {
     const user = userEvent.setup()
-    const parts = partsFromShape(standardShape(), [], usageOf([]))
+    const parts = partsFromShape(standardShape(), 15, usageOf([]))
     database([training('soon', onTheMinute(Date.now() + DAY), { title: 'Pressing triggers' })], {},
       { drafts: [{ event_id: 'soon', step: 2, body: { parts, note: '' }, updated_at: '2026-11-03T10:00:00Z' }] })
     renderApp('/coach/training')
@@ -330,23 +352,5 @@ describe('TRAK-340: drafts and a saved plan', { timeout: 30_000 }, () => {
   })
 })
 
-describe('TRAK-296 kept: Add to the next training from Training › Drills', { timeout: 30_000 }, () => {
-  it('adds the drill as a part at the end and opens Review', async () => {
-    const user = userEvent.setup()
-    const { saves } = database([training('next', onTheMinute(Date.now() + 2 * DAY))], {}, {
-      drills: [{ id: 'd-20', name: 'Finishing 3v2', minutes: 20, how: 'Three attack two.', tell: '', area: '', numbers: '', direction: '',
-        targets: '', conditions: '', updated_at: '2026-10-27T10:00:00Z', part_type: 'finishing', players_kind: 'groups', group_size: 5 }],
-    })
-    renderApp('/coach/training/drills')
-    await user.click(await screen.findByRole('button', { name: /^Add Finishing 3v2 to / }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/next/plan'))
-    expect(await screen.findByRole('heading', { name: 'Review' })).toBeInTheDocument()
-    const plan = within(screen.getByRole('list', { name: 'The plan' })).getAllByRole('listitem')
-    expect(plan).toHaveLength(6)
-    expect(plan[5]).toHaveTextContent('Finishing')
-    expect(plan[5]).toHaveTextContent('Finishing 3v2')
-    await user.click(screen.getByRole('button', { name: 'Save the plan' }))
-    await waitFor(() => expect(saves).toHaveLength(1))
-    expect((saves[0].p_practices as Record<string, unknown>[]).at(-1)).toMatchObject({ name: 'Finishing 3v2', source: 'drill', drill_id: 'd-20', part_type: 'finishing' })
-  })
-})
+// TRAK-387: Training › Drills is the Library now, with no coach-made drills; adding a Library drill to a training
+// comes back with TRAK-391.

@@ -1,6 +1,6 @@
 import type { Tables } from '@/integrations/supabase/types'
 import { libraryOf, sessionById } from '@/lib/library/library'
-import type { Drill, DrillDraft } from './sessions'
+import type { DrillDraft } from './sessions'
 import type { PartType } from './shelf'
 
 /* TRAK-295 (Training 2/5, spec TRAK-293): a training's plan, kept apart from the screens. A practice carries what a
@@ -13,10 +13,11 @@ export const planPath = (eventId: string) => `/coach/training/${eventId}/plan`
 export const herePath = (eventId: string) => `/coach/training/${eventId}/here`
 /** View: the plan read at the pitch side (TRAK-309). */
 export const viewPath = (eventId: string) => `/coach/training/${eventId}/view`
-/** What the planner can open with: a drill sent from Training › Drills (TRAK-296), or a past session's practices to
- *  copy (TRAK-297). */
+/** What the planner can open with: a Library drill sent from its page (TRAK-391; was a drill from My drills,
+ *  TRAK-296), or a past session's practices to copy (TRAK-297). */
 export type PlannerState = {
-  addDrill?: Drill & { part_type?: string | null; players_kind?: string | null; group_size?: number | null }
+  /** The Library drill's id, and the players and level the coach set on its page. */
+  addLibrary?: { drill: string; players: number; level: number }
   copy?: SavedPractice[]; copiedFrom?: string
   /** TRAK-341: from a saved plan's Review page, change one part (by its place) or add one. */
   editPart?: number
@@ -36,7 +37,7 @@ export type Practice = DrillDraft & {
 
 export type SavedPractice = Pick<Tables<'training_plan_practices'>, 'position' | 'name' | 'minutes' | 'how' | 'tell' | 'area'
   | 'numbers' | 'direction' | 'targets' | 'conditions' | 'source' | 'drill_id' | 'library_session' | 'part' | 'part_type'
-  | 'trak_drill' | 'players_kind' | 'group_size'>
+  | 'trak_drill' | 'players_kind' | 'group_size' | 'trak_level'>
 
 /** The saved practices, in order, ready to change. One already saved is never saved to My drills again. */
 export function fromSaved(rows: SavedPractice[]): Practice[] {

@@ -2,8 +2,8 @@
  * TRAK-294 (Training 1/5, spec TRAK-293): with the academy's training switch on, Training takes Library's place in
  * the coach's nav. Training home lists the coach's own trainings of the squad in view (TRAK-339 redid it: see
  * training-home-trak339);
- * Drills holds My drills (add, change, delete, search) and the Library's tiles. With the switch off, the nav keeps
- * Library and Training is parked. Test people are named after footballers.
+ * Drills is the Drill Library (TRAK-387, training-library-trak387). With the switch off, the nav keeps Library and
+ * Training is parked. Test people are named after footballers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
@@ -31,10 +31,6 @@ function training(id: string, squad: string | null, start: number, over: Record<
     event_date: ymd(start), start_time: `${hm(start)}:00`, venue: 'Pitch 2', ...over,
   }
 }
-const drill = (id: string, name: string, over: Record<string, unknown> = {}) => ({
-  id, name, minutes: 15, how: '', tell: '', area: '', numbers: '', direction: '', targets: '', conditions: '',
-  updated_at: '2026-10-27T10:00:00Z', ...over,
-})
 /** The events read answers with these rows and keeps what each request asked for. */
 function eventsRead(rows: Record<string, unknown>[]) {
   const asked: URL[] = []
@@ -44,39 +40,6 @@ function eventsRead(rows: Record<string, unknown>[]) {
   }))
   return asked
 }
-/** My drills, as the database keeps them: reads, adds, changes and deletes, each kept for the test to read. */
-function drillsTable(start: Record<string, unknown>[]) {
-  let rows = [...start]
-  const sent: { method: string; url: URL; body: Record<string, unknown> | null }[] = []
-  const one = (row: Record<string, unknown>) => HttpResponse.json(row)
-  server.use(
-    http.get(`${SUPABASE_URL}/rest/v1/coach_drills`, () => HttpResponse.json(rows)),
-    http.post(`${SUPABASE_URL}/rest/v1/coach_drills`, async ({ request }) => {
-      const body = await request.json() as Record<string, unknown>
-      sent.push({ method: 'POST', url: new URL(request.url), body })
-      const row = drill(`new-${rows.length + 1}`, String(body.name), { ...body, updated_at: new Date().toISOString() })
-      rows = [row, ...rows]
-      return one({ id: row.id })
-    }),
-    http.patch(`${SUPABASE_URL}/rest/v1/coach_drills`, async ({ request }) => {
-      const url = new URL(request.url)
-      const body = await request.json() as Record<string, unknown>
-      sent.push({ method: 'PATCH', url, body })
-      const id = url.searchParams.get('id')!.slice(3)
-      rows = rows.map(row => row.id === id ? { ...row, ...body } : row)
-      return one({ id })
-    }),
-    http.delete(`${SUPABASE_URL}/rest/v1/coach_drills`, ({ request }) => {
-      const url = new URL(request.url)
-      sent.push({ method: 'DELETE', url, body: null })
-      const id = url.searchParams.get('id')!.slice(3)
-      rows = rows.filter(row => row.id !== id)
-      return one({ id })
-    }),
-  )
-  return sent
-}
-
 beforeEach(() => {
   COACH = { id: `coach-294-${++n}` }
   signInAs(COACH)
@@ -94,19 +57,15 @@ beforeEach(() => {
     table('training_plans', []),
     table('training_notes', []),
     table('training_plan_drafts', []),
+    table('coach_drills', []),
     rpc('feature_on', () => true),
   )
 })
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals() })
 
-// TRAK-296: a card's other button, Add to <training>, isn't the drill.
-const myDrills = () => within(screen.getByRole('region', { name: 'My drills' })).queryAllByRole('button')
-  .map(button => button.getAttribute('aria-label')).filter(label => label?.endsWith('. Edit'))
-
 describe('TRAK-294: Training home', { timeout: 20_000 }, () => {
   it('with the switch on, Training takes Library’s place in the nav, and the Library’s pages mark it', async () => {
     eventsRead([])
-    drillsTable([])
     renderApp('/coach/training')
     expect(await screen.findByRole('heading', { level: 1, name: 'Training' })).toBeInTheDocument()
     const nav = screen.getByRole('tablist', { name: 'Coach' })
@@ -116,7 +75,6 @@ describe('TRAK-294: Training home', { timeout: 20_000 }, () => {
 
   it("with no training coming up, Add a training opens Schedule's New event", async () => {
     eventsRead([])
-    drillsTable([])
     renderApp('/coach/training')
     await userEvent.click(await screen.findByRole('button', { name: 'Add a training' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/schedule'))
@@ -125,7 +83,6 @@ describe('TRAK-294: Training home', { timeout: 20_000 }, () => {
 
   it('a failed read says so with Retry, never "No training coming up"', async () => {
     server.use(tableError('coach_calendar_events', 500, { message: 'unavailable' }))
-    drillsTable([])
     renderApp('/coach/training')
     const failure = await screen.findByRole('alert', {}, { timeout: 5000 })
     expect(within(failure).getByRole('button', { name: /Retry/ })).toBeInTheDocument()
@@ -135,7 +92,6 @@ describe('TRAK-294: Training home', { timeout: 20_000 }, () => {
   it('with the switch off, the nav keeps Library and Training is parked', async () => {
     server.use(rpc('feature_on', ({ p_feature }) => p_feature === 'events'))
     eventsRead([])
-    drillsTable([])
     renderApp('/coach/training')
     expect(await screen.findByRole('note', { name: 'This screen is coming soon' })).toBeInTheDocument()
     const nav = screen.getByRole('tablist', { name: 'Coach' })
@@ -144,111 +100,4 @@ describe('TRAK-294: Training home', { timeout: 20_000 }, () => {
   })
 })
 
-describe('TRAK-294: My drills', { timeout: 20_000 }, () => {
-  // TRAK-367: the same questions as the planner's Write your own, plus the part, which puts it among that part's drills.
-  it('New drill asks what Write your own asks, and the part; it saves trimmed and shows first in My drills', async () => {
-    const user = userEvent.setup()
-    eventsRead([])
-    const sent = drillsTable([drill('d-1', 'Rondos 4v1', { how: 'Four round one' })])
-    renderApp('/coach/training/drills')
-    await waitFor(() => expect(myDrills()).toEqual(['Rondos 4v1, 15 min. Edit']))
-
-    await user.click(screen.getByRole('button', { name: 'New drill' }))
-    const sheet = await screen.findByRole('dialog', { name: 'New drill' })
-    await user.type(within(sheet).getByLabelText(/1\. Name it/), '  1v1 in channels ')
-    await user.type(within(sheet).getByLabelText(/2\. What do the players do/), 'Four channels, 10 m wide.')
-    await user.click(within(sheet).getByRole('button', { name: 'In pairs' }))
-    await user.click(within(sheet).getByRole('button', { name: 'Finishing' }))
-    await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
-
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New drill' })).toBeNull())
-    expect(sent).toHaveLength(1)
-    expect(sent[0].body).toEqual({
-      name: '1v1 in channels', minutes: 15, how: 'Four channels, 10 m wide.', tell: '',
-      area: '', numbers: '', direction: '', targets: '', conditions: '',
-      part_type: 'finishing', players_kind: 'pairs', group_size: null,
-    })
-    await waitFor(() => expect(myDrills()).toEqual(['1v1 in channels, 15 min. Edit', 'Rondos 4v1, 15 min. Edit']))
-  })
-
-  it('a drill needs its three answers; a failed save keeps everything typed and says so', async () => {
-    const user = userEvent.setup()
-    eventsRead([])
-    drillsTable([])
-    server.use(http.post(`${SUPABASE_URL}/rest/v1/coach_drills`, () => HttpResponse.json({ message: 'offline' }, { status: 503 })))
-    renderApp('/coach/training/drills')
-    expect(await screen.findByText(/No drills yet/)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'New drill' }))
-    const sheet = await screen.findByRole('dialog', { name: 'New drill' })
-    await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
-    expect(await within(sheet).findByText('Give the drill a name.')).toBeInTheDocument()
-    expect(within(sheet).getByText('Say what the players do.')).toBeInTheDocument()
-    expect(within(sheet).getByText('Say how many players it takes.')).toBeInTheDocument()
-
-    await user.type(within(sheet).getByLabelText(/1\. Name it/), 'Finishing 3v2')
-    await user.type(within(sheet).getByLabelText(/2\. What do the players do/), 'Three attack two.')
-    await user.click(within(sheet).getByRole('button', { name: 'Any number' }))
-    await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
-    expect(await within(sheet).findByText(/Couldn't save the drill/)).toBeInTheDocument()
-    expect(within(sheet).getByLabelText(/1\. Name it/)).toHaveValue('Finishing 3v2')
-  })
-
-  it("a drill opens to change it, keeping what the form doesn't ask; Delete asks first; each write names the coach's own drill", async () => {
-    const user = userEvent.setup()
-    eventsRead([])
-    const sent = drillsTable([drill('d-1', 'Rondos 4v1', { how: 'Four round one', area: '10 × 10 m', minutes: 20, players_kind: 'groups', group_size: 5, part_type: 'rondo' }),
-      drill('d-2', 'Possession 6v6 + 2')])
-    renderApp('/coach/training/drills')
-    await user.click(await screen.findByRole('button', { name: 'Rondos 4v1, 20 min. Edit' }))
-    let sheet = await screen.findByRole('dialog', { name: 'Edit drill' })
-    expect(within(sheet).getByLabelText(/1\. Name it/)).toHaveValue('Rondos 4v1')
-    expect(within(sheet).getByRole('button', { name: 'Rondo' })).toHaveAttribute('aria-pressed', 'true')
-    await user.click(within(sheet).getByRole('button', { name: 'One more' }))
-    await user.click(within(sheet).getByRole('button', { name: 'Save drill' }))
-    await waitFor(() => expect(sent.map(s => s.method)).toEqual(['PATCH']))
-    expect(sent[0].url.searchParams.get('id')).toBe('eq.d-1')
-    expect(sent[0].url.searchParams.get('coach_user_id')).toBe(`eq.${COACH.id}`)
-    expect(sent[0].body).toMatchObject({ name: 'Rondos 4v1', minutes: 20, area: '10 × 10 m', group_size: 6, part_type: 'rondo' })
-
-    await user.click(await screen.findByRole('button', { name: 'Possession 6v6 + 2, 15 min. Edit' }))
-    sheet = await screen.findByRole('dialog', { name: 'Edit drill' })
-    await user.click(within(sheet).getByRole('button', { name: 'Delete drill' }))
-    expect(sent).toHaveLength(1) // asked first, nothing sent
-    await user.click(within(sheet).getByRole('button', { name: 'Delete' }))
-    await waitFor(() => expect(sent.map(s => s.method)).toEqual(['PATCH', 'DELETE']))
-    expect(sent[1].url.searchParams.get('id')).toBe('eq.d-2')
-    expect(sent[1].url.searchParams.get('coach_user_id')).toBe(`eq.${COACH.id}`)
-    await waitFor(() => expect(myDrills()).toEqual(['Rondos 4v1, 20 min. Edit']))
-  })
-
-  it("search finds drills by any word typed; the Library's tiles open each library", async () => {
-    const user = userEvent.setup()
-    eventsRead([])
-    drillsTable([drill('d-1', 'Rondos 4v1', { how: 'Keep the ball' }), drill('d-2', '1v1 in channels', { how: 'Attack the front foot' })])
-    renderApp('/coach/training/drills')
-    await waitFor(() => expect(myDrills()).toHaveLength(2))
-    await user.type(screen.getByRole('searchbox', { name: 'Search my drills' }), 'front')
-    await waitFor(() => expect(myDrills()).toEqual(['1v1 in channels, 15 min. Edit']))
-    await user.type(screen.getByRole('searchbox', { name: 'Search my drills' }), ' nothing')
-    expect(await screen.findByText(/No drill matches/)).toBeInTheDocument()
-
-    const tiles = within(screen.getByRole('region', { name: 'From the Library' })).getAllByRole('link')
-    expect(tiles).toHaveLength(7)
-    await user.click(within(screen.getByRole('region', { name: 'From the Library' })).getByRole('link', { name: /Defending/ }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/trainings/defending'))
-  })
-
-  it('Sessions and Drills switch the view', async () => {
-    const user = userEvent.setup()
-    eventsRead([])
-    drillsTable([])
-    renderApp('/coach/training')
-    await screen.findByText('No training coming up')
-    await user.click(screen.getByRole('button', { name: 'Drills' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/drills'))
-    expect(await screen.findByRole('region', { name: 'My drills' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Sessions' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training'))
-  })
-})
+// TRAK-387: Drills is the new Library, with no coach-made drills: see training-library-trak387.

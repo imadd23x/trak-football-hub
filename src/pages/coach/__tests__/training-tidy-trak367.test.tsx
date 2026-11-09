@@ -55,6 +55,7 @@ function database(events: Record<string, unknown>[], start: Record<string, Recor
     }),
     http.get(`${SUPABASE_URL}/rest/v1/training_plan_drafts`, () => HttpResponse.json([])),
     http.get(`${SUPABASE_URL}/rest/v1/coach_drills`, () => HttpResponse.json([])),
+    http.get(`${SUPABASE_URL}/rest/v1/coach_drill_bookmarks`, () => HttpResponse.json([])),
     rpc('save_training_plan', args => {
       saves.push(args)
       plans.set(String(args.p_event_id), (args.p_practices as Record<string, unknown>[]).map((p, i) => ({ ...p, position: i + 1 })))
@@ -191,7 +192,8 @@ describe('TRAK-367: the trail', { timeout: 30_000 }, () => {
     database([])
     renderApp('/coach/training')
     await user.click(await screen.findByRole('button', { name: 'Drills' }, { timeout: 5000 }))
-    await user.click(await screen.findByRole('link', { name: /^Technical/ }, { timeout: 5000 }))
+    // TRAK-387: the Library's Technical tile (the old FA Library has a Technical tile too, below it).
+    await user.click(within(await screen.findByRole('region', { name: 'What kind of practice?' }, { timeout: 5000 })).getByRole('link', { name: /^Technical/ }))
     const trail = await screen.findByRole('navigation', { name: 'Breadcrumb trail' }, { timeout: 5000 })
     expect(within(trail).getAllByText('Training')).toHaveLength(1)
     expect(within(trail).getByText('Drills')).toBeInTheDocument()

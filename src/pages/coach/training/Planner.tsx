@@ -3,19 +3,20 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight, Pencil, Plus, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { trainingMinutes } from '@/lib/training/sessions'
+import { libraryDrill, squadPlayers, type LibraryDrill } from '@/lib/training/library'
 import type { PlannerState } from '@/lib/training/plans'
 import { partInfo, type PartType } from '@/lib/training/shelf'
 import {
-  NOTE_MAX, PARTS_MAX, PART_NAME_MAX, candidates, fromMyDrill, isStandard, isSameDrill, lastShape, minuteOptions, moveTo, newKey,
+  NOTE_MAX, PARTS_MAX, PART_NAME_MAX, candidates, fromLibrary, hasOwnDrills, isStandard, libraryOf, libraryPart, isSameDrill, lastShape, minuteOptions, moveTo, newKey,
   partsFromSaved, partsFromShape, planProblem, playersLine, partColour, shownFor, standardShape, tagFor, totalMinutes, usageOf,
   usualFor, type Part, type PastPlan, type PlanDrill, type Usage,
 } from '@/lib/training/parts'
 import { gameWhen } from '@/components/coach/games/useGames'
 import {
-  useDrafts, useDrills, usePastSessions, useSaveDraft, useSavePlan, type Draft, type Plan, type Training,
+  useBookmarks, useDrafts, usePastSessions, useSaveDraft, useSavePlan, useSquadSize, type Draft, type Plan, type Training,
 } from '@/components/coach/training/useTraining'
 import { ActionTile, DrillTile, PlanRows, SessionCard, TimeBar, TotalLine } from '@/components/coach/training/PlannerParts'
-import { AddPartSheet, LeaveSheet, MoreDrillsSheet, OwnDrillSheet } from '@/components/coach/training/PlannerSheets'
+import { AddPartSheet, LeaveSheet, MoreDrillsSheet, ViewDrillSheet } from '@/components/coach/training/PlannerSheets'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { useParked } from '@/components/trak/parked'
 import { LoadError } from '@/components/trak'
@@ -30,24 +31,28 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    last time, or Trak's five (Kostas, 2 Nov: some coaches don't follow the standard five, so the shape is theirs). Each
    part offers three drills, the usual one picked, plus See more and Write your own. Your session, beside it, is the
    whole session at a glance, where parts are moved, removed and added. Save as draft keeps it for later, only the
-   coach's. Replaces Write my own (TRAK-295). */
+   coach's. Replaces Write my own (TRAK-295). TRAK-392 (Drill Library 7/11): the drills are the Library's, fitted to
+   the training's squad; View drill shows one with Easier / Harder, and the level set there is saved with the plan.
+   Write your own left with coach-made drills (Kostas, 8 Nov); plans saved before keep their drills as saved. */
 
 const TRAINING_PATH = '/coach/training'
 const SAVE_FAILED = 'Couldn’t save. Check your connection and try again. Nothing you changed is lost.'
 const REVIEW = 'review'
 
 type Start = { parts: Part[]; note: string; at: string; fromShape: boolean; copiedFrom: string | null; dirty: boolean
+  /** TRAK-391: what happened to the Library drill sent from its page. */
+  added?: { name: string; how: 'added' | 'there' | 'full'; part?: string }
   /** TRAK-341: opened from a saved plan's Review page to change or add one part, then save and go back. */
   only?: 'edit' | 'add' }
 
-/** Where the planner starts: a copied plan; a drill sent from My drills; the draft; the saved plan (at Review); else
- *  the coach's last shape or Trak's five. */
-function startFrom({ state, saved, draft, past, drills, usage }: {
-  state: PlannerState; saved: Plan | null; draft: Draft | undefined; past: PastPlan[]; drills: Parameters<typeof candidates>[1]; usage: Usage
+/** Where the planner starts: a copied plan; a Library drill sent from its page; the draft; the saved plan (at Review);
+ *  else the coach's last shape or Trak's five. */
+function startFrom({ state, saved, draft, past, players, usage }: {
+  state: PlannerState; saved: Plan | null; draft: Draft | undefined; past: PastPlan[]; players: number; usage: Usage
 }): Start {
   const fresh = () => {
     const shape = lastShape(past)
-    return { parts: partsFromShape(shape ?? standardShape(), drills, usage), fromShape: !!shape }
+    return { parts: partsFromShape(shape ?? standardShape(), players, usage), fromShape: !!shape }
   }
   if (saved?.practices.length && state?.editPart != null) {
     const parts = partsFromSaved(saved.practices)
@@ -56,7 +61,7 @@ function startFrom({ state, saved, draft, past, drills, usage }: {
   }
   if (saved?.practices.length && state?.addPart) {
     const { type, name } = state.addPart
-    const part: Part = { key: newKey(), type, name, minutes: partInfo(type).mins, drill: usualFor(type, candidates(type, drills), usage) }
+    const part: Part = { key: newKey(), type, name, minutes: partInfo(type).mins, drill: usualFor(type, candidates(type, players), usage) }
     return { parts: [...partsFromSaved(saved.practices), part].slice(0, PARTS_MAX), note: saved.note, at: part.key, fromShape: false,
       copiedFrom: null, dirty: true, only: 'add' }
   }
@@ -64,13 +69,23 @@ function startFrom({ state, saved, draft, past, drills, usage }: {
     const parts = partsFromSaved(state.copy).slice(0, PARTS_MAX)
     return { parts, note: '', at: parts[0].key, fromShape: false, copiedFrom: state.copiedFrom ?? null, dirty: true }
   }
-  if (state?.addDrill) {
-    const base = draft ? draft.parts : saved ? partsFromSaved(saved.practices) : fresh().parts
-    const drill = state.addDrill as Parameters<typeof fromMyDrill>[0]
-    const type = (drill.part_type ?? 'own') as PartType
-    const part: Part = { key: newKey(), type, name: (type === 'own' ? drill.name : partInfo(type).name).slice(0, PART_NAME_MAX),
-      minutes: drill.minutes, drill: fromMyDrill({ ...drill, part_type: drill.part_type ?? null, players_kind: drill.players_kind ?? null, group_size: drill.group_size ?? null }) }
-    return { parts: [...base, part].slice(0, PARTS_MAX), note: draft?.note ?? saved?.note ?? '', at: REVIEW, fromShape: false, copiedFrom: null, dirty: true }
+  const library = state?.addLibrary ? libraryDrill(state.addLibrary.drill) : undefined
+  if (state?.addLibrary && library) {
+    // TRAK-391 (Kostas, 8 Nov): the drill joins the plan, the draft or the coach's usual shape as a new part at the end,
+    // then Review. Already in it (the usual shape's starter drill since TRAK-392, or Back from Training after Save as
+    // draft): not twice, but that part takes the players and level set on the drill's page. A full plan: said, not cut.
+    const { players: setFor, level } = state.addLibrary
+    const fromShape = !draft && !saved?.practices.length
+    const base = draft ? draft.parts : saved?.practices.length ? partsFromSaved(saved.practices) : fresh().parts
+    const note = draft?.note ?? saved?.note ?? ''
+    const there = base.findIndex(p => libraryOf(p.drill)?.id === library.id)
+    if (there >= 0) {
+      const parts = base.map((p, i) => i === there ? { ...p, drill: fromLibrary(library, setFor, level) } : p)
+      return { parts, note, at: REVIEW, fromShape, copiedFrom: null, dirty: true, added: { name: library.name, how: 'there', part: base[there].name } }
+    }
+    const how = base.length >= PARTS_MAX ? 'full' as const : 'added' as const
+    const parts = how === 'added' ? [...base, libraryPart(library, setFor, level)] : base
+    return { parts, note, at: REVIEW, fromShape, copiedFrom: null, dirty: how === 'added' || fromShape, added: { name: library.name, how } }
   }
   if (draft?.parts.length) {
     const at = draft.step < draft.parts.length ? draft.parts[draft.step].key : REVIEW
@@ -81,34 +96,37 @@ function startFrom({ state, saved, draft, past, drills, usage }: {
   return { parts, note: '', at: parts[0]?.key ?? REVIEW, fromShape, copiedFrom: null, dirty: false }
 }
 
-/** Reads what the planner needs before it starts: drafts, My drills and the coach's past plans. */
+/** Reads what the planner needs before it starts: drafts, the coach's past plans, and how many players the training's
+ *  squad has (TRAK-392: the drills are fitted to it; unknown, they're fitted to 15). */
 export function Planner({ training, saved }: { training: Training; saved: Plan | null }) {
   const drafts = useDrafts()
-  const drills = useDrills()
   const past = usePastSessions()
-  const reads = [drafts, drills, past]
-  if (reads.some(r => r.error)) return <div className="pt-10"><LoadError what="your plans and drills"
+  const size = useSquadSize(training.squad)
+  const reads = [drafts, past]
+  if (reads.some(r => r.error)) return <div className="pt-10"><LoadError what="your plans"
     onRetry={() => reads.forEach(r => void r.refetch())} retrying={reads.some(r => r.isFetching)} /></div>
-  if (reads.some(r => r.isPending)) return <LoadingSkeleton label="Loading your plans and drills…" rows={2} className="pt-6" />
+  if (reads.some(r => r.isPending) || size.isPending) return <LoadingSkeleton label="Loading your plans and drills…" rows={2} className="pt-6" />
   const pastPlans: PastPlan[] = (past.data ?? []).filter(s => s.id !== training.id).map(s => ({ day: gameWhen(s).day, practices: s.practices }))
-  return <PlannerBody training={training} saved={saved} draft={drafts.data!.get(training.id)} past={pastPlans} drills={drills.data ?? []} />
+  return <PlannerBody training={training} saved={saved} draft={drafts.data!.get(training.id)} past={pastPlans} players={squadPlayers(size.data)} />
 }
 
-function PlannerBody({ training, saved, draft, past, drills }: {
-  training: Training; saved: Plan | null; draft: Draft | undefined; past: PastPlan[]; drills: Parameters<typeof candidates>[1]
+function PlannerBody({ training, saved, draft, past, players }: {
+  training: Training; saved: Plan | null; draft: Draft | undefined; past: PastPlan[]; players: number
 }) {
   const { parked, comingSoon } = useParked()
   const navigate = useNavigate()
   const location = useLocation()
   const usage = useMemo(() => usageOf(past), [past])
-  const [start] = useState(() => startFrom({ state: location.state as PlannerState, saved, draft, past, drills, usage }))
+  const [start] = useState(() => startFrom({ state: location.state as PlannerState, saved, draft, past, players, usage }))
   const [parts, setPartsRaw] = useState(start.parts)
   const [note, setNote] = useState(start.note)
   const [at, setAt] = useState(start.at)
   const [dirty, setDirty] = useState(start.dirty)
   // Opened from Review to change one part: Back to Review, not Next.
   const [fromReview, setFromReview] = useState(start.at === REVIEW && !!saved)
-  const [sheet, setSheet] = useState<'add' | 'more' | 'own' | 'leave' | null>(null)
+  const [sheet, setSheet] = useState<'add' | 'more' | 'leave' | null>(null)
+  const [viewing, setViewing] = useState<LibraryDrill | null>(null)
+  const bookmarks = useBookmarks().data ?? []
   const [renaming, setRenaming] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const savePlan = useSavePlan(training.id)
@@ -119,7 +137,7 @@ function PlannerBody({ training, saved, draft, past, drills }: {
   const setParts = (next: Part[]) => { setPartsRaw(next); setDirty(true); setProblem(null) }
   const step = at === REVIEW ? parts.length : Math.max(0, parts.findIndex(p => p.key === at))
   const part = at === REVIEW ? null : parts[step] ?? null
-  const all = part ? candidates(part.type, drills) : []
+  const all = useMemo(() => part ? candidates(part.type, players) : [], [part?.type, players]) // eslint-disable-line react-hooks/exhaustive-deps -- by the part's type
   const update = (key: string, change: Partial<Part>) => setParts(parts.map(p => p.key === key ? { ...p, ...change } : p))
   const go = (index: number) => { setRenaming(null); setAt(index >= parts.length ? REVIEW : parts[index].key); document.scrollingElement?.scrollTo?.(0, 0) }
 
@@ -134,15 +152,15 @@ function PlannerBody({ training, saved, draft, past, drills }: {
   }
   const add = (type: PartType, name: string) => {
     if (parts.length >= PARTS_MAX) { setSheet(null); return setProblem(`A plan holds at most ${PARTS_MAX} parts.`) }
-    const part: Part = { key: newKey(), type, name, minutes: partInfo(type).mins, drill: usualFor(type, candidates(type, drills), usage) }
+    const part: Part = { key: newKey(), type, name, minutes: partInfo(type).mins, drill: usualFor(type, candidates(type, players), usage) }
     setParts([...parts, part])
     setSheet(null)
     // From Review, the new part opens to pick its drill, then comes back.
     if (at === REVIEW) { setFromReview(true); setAt(part.key) }
   }
-  const pick = (drill: PlanDrill) => { if (part) update(part.key, { drill }); setSheet(null) }
+  const pick = (drill: PlanDrill) => { if (part) update(part.key, { drill }); setSheet(null); setViewing(null) }
   const toStandard = () => {
-    const next = partsFromShape(standardShape(), drills, usage)
+    const next = partsFromShape(standardShape(), players, usage)
     setParts(next)
     setAt(next[0].key)
   }
@@ -183,6 +201,10 @@ function PlannerBody({ training, saved, draft, past, drills }: {
       {start.only && <p className="text-sm text-ink-3">{start.only === 'add' ? 'Pick a drill, then add it to the plan.'
         : 'Only this part changes. The rest of the plan stays as it is.'}</p>}
     </header>
+    {start.added && <p role="status" className={`rounded-xl px-4 py-3 text-sm ${start.added.how === 'full' ? 'bg-warning/15 text-ink' : 'bg-raised text-ink-2'}`}>
+      {start.added.how === 'added' ? `${start.added.name} is added at the end. Check the plan, then save. Nothing is saved until you do.`
+        : start.added.how === 'there' ? `${start.added.name} is already in this plan, in ${start.added.part}. It’s now set as you left it on its page. Nothing is saved until you save.`
+        : `${start.added.name} isn’t added: a plan holds at most ${PARTS_MAX} parts. Remove one, then add it from the drill’s page.`}</p>}
     {start.copiedFrom && <p role="status" className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
       Copied from {start.copiedFrom}. Check it, change any part, then save. Nothing is saved until you do.</p>}
     {!start.only && <div className="arc"><Stepper label="Planning steps" steps={steps} current={step} onStepSelect={go} /></div>}
@@ -219,16 +241,22 @@ function PlannerBody({ training, saved, draft, past, drills }: {
         </div>
         <p className="max-w-[640px] text-sm text-ink-2">{partInfo(part.type).guide}</p>
         <div className="grid gap-3">
-          {/* A part of the coach's own already says "Pick any drill, or write your own." in its guide line. */}
-          <p className="text-sm font-medium text-ink">Pick a drill {part.type !== 'own' && <span className="font-normal text-ink-3">{part.drill
-            ? 'We picked your usual. Change it if you like.' : 'Pick one for this part.'}</span>}</p>
+          {/* A part that picks from every drill already says so in its guide line. */}
+          <p className="text-sm font-medium text-ink">Pick a drill {hasOwnDrills(part.type) && <span className="font-normal text-ink-3">{!part.drill ? 'Pick one for this part.'
+            : tagFor(part.drill, part.type, all, usage).startsWith('Your usual') ? 'We picked your usual. Change it if you like.'
+            : 'We picked a drill to start with. Change it if you like.'}</span>}</p>
           <ul aria-label={`Drills for ${part.name}`} className="grid gap-3 tablet:grid-cols-2 laptop:grid-cols-4">
-            {shownFor(part.type, part.drill, all, usage).map(d => <li key={`${d.source}:${d.trak_drill ?? d.drill_id ?? d.name}`}>
-              <DrillTile drill={d} picked={isSameDrill(d, part.drill)} tag={tagFor(d, part.type, all, usage)} onPick={() => pick(d)} /></li>)}
-            {part.type === 'own' && <li><ActionTile icon="search" label="Browse all drills" onClick={() => setSheet('more')} /></li>}
-            <li><ActionTile icon="plus" label="Write your own" onClick={() => setSheet('own')} /></li>
+            {shownFor(part.type, part.drill, all, usage).map(d => {
+              const lib = libraryOf(d)
+              return <li key={`${d.source}:${d.trak_drill ?? d.drill_id ?? d.name}`} className="grid content-start gap-1">
+                <DrillTile drill={d} picked={isSameDrill(d, part.drill)} tag={tagFor(d, part.type, all, usage, bookmarks)} onPick={() => pick(d)} />
+                {lib && <button type="button" aria-label={`View drill: ${lib.name}`} onClick={() => setViewing(lib)}
+                  className="justify-self-start rounded px-1 py-1 text-sm font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">View drill</button>}
+              </li>
+            })}
+            {!hasOwnDrills(part.type) && <li><ActionTile icon="search" label="Browse all drills" onClick={() => setSheet('more')} /></li>}
           </ul>
-          {part.type !== 'own' && all.length > 3 && <div><button type="button" onClick={() => setSheet('more')}
+          {hasOwnDrills(part.type) && all.length > 3 && <div><button type="button" onClick={() => setSheet('more')}
             className="inline-flex min-h-9 items-center gap-1.5 rounded px-1 text-sm font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             <Search aria-hidden size={14} />See more drills ({all.length - 3})</button></div>}
         </div>
@@ -264,9 +292,9 @@ function PlannerBody({ training, saved, draft, past, drills }: {
     </div>
 
     <AddPartSheet open={sheet === 'add'} onClose={() => setSheet(null)} onAdd={add} />
-    <MoreDrillsSheet part={sheet === 'more' ? part : null} all={all} usage={usage} onClose={() => setSheet(null)} onPick={pick}
-      onWrite={() => setSheet('own')} />
-    <OwnDrillSheet part={sheet === 'own' ? part : null} onClose={() => setSheet(null)} onSaved={pick} />
+    <MoreDrillsSheet part={sheet === 'more' ? part : null} players={players} usage={usage} bookmarks={bookmarks} onClose={() => setSheet(null)}
+      onPick={pick} />
+    <ViewDrillSheet drill={viewing} part={part} players={players} onClose={() => setViewing(null)} onUse={pick} />
     <LeaveSheet open={sheet === 'leave'} onClose={() => setSheet(null)} onDraft={keepDraft} saving={saveDraft.isPending}
       onLeave={() => { setSheet(null); navigate(TRAINING_PATH) }} />
   </div>

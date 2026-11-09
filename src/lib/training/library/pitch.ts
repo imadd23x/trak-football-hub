@@ -14,8 +14,9 @@ export type Shape =
   | ({ s: 'area' } & Box)
   /** A shaded zone: end zones (plain) or the middle (dashed edge). */
   | ({ s: 'zone'; edge: boolean } & Box)
-  /** Marked lines (halfway, quarters, lanes, the goal line), faint, solid or dashed. */
-  | { s: 'lines'; d: string; dashed: boolean }
+  /** Marked lines (halfway, quarters, lanes, the goal line), faint, solid or dashed; `strong` draws them as bright as
+   *  the area's edge (Change any practice's zones). */
+  | { s: 'lines'; d: string; dashed: boolean; strong?: boolean }
   /** A goal (white) or a target line (yellow). */
   | ({ s: 'goal' | 'target' } & Box)
   | { s: 'cone'; x: number; y: number }
@@ -42,10 +43,10 @@ export function rng(seed: number) {
 
 export const hash = (text: string) => [...text].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
 
-type Point = [number, number]
+export type Point = [number, number]
 
 /** `count` points spread inside a box, kept `gap` apart from each other and from `taken` where they can be. */
-function scatter(R: () => number, x: number, y: number, w: number, h: number, count: number, taken: Point[], gap = 30): Point[] {
+export function scatter(R: () => number, x: number, y: number, w: number, h: number, count: number, taken: Point[], gap = 30): Point[] {
   const out: Point[] = []
   for (let i = 0; i < count; i++) {
     let px = 0, py = 0

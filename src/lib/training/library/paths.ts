@@ -3,6 +3,8 @@
 export const DRILLS_PATH = '/coach/training/drills'
 export const MY_DRILLS_PATH = `${DRILLS_PATH}/mine`
 export const ALL_DRILLS_PATH = `${DRILLS_PATH}/all`
+/** TRAK-394: Change any practice, Steve's five things that shape every practice. */
+export const CHANGE_PRACTICE_PATH = `${DRILLS_PATH}/change`
 /** A practice page: Technical, Skill or Game related. */
 export const kindPath = (kind: 'technical' | 'skill' | 'game') => `${DRILLS_PATH}/kind/${kind}`
 /** A drill's own page. */

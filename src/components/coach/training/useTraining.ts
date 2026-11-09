@@ -4,9 +4,9 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFeature } from '@/components/trak/parked'
 import type { Json, Tables } from '@/integrations/supabase/types'
-import { WEEK, cleanDrill, trainingEnd, type Drill, type DrillDraft } from '@/lib/training/sessions'
+import { WEEK, trainingEnd } from '@/lib/training/sessions'
 import type { SavedPractice } from '@/lib/training/plans'
-import { toSave, type MyDrill, type Part } from '@/lib/training/parts'
+import { toSave, type Part } from '@/lib/training/parts'
 import type { Again } from '@/lib/training/next'
 
 /* TRAK-294 (Training 1/5): the coach's own trainings for Training home, not cancelled (a published event is cancelled,
@@ -143,7 +143,7 @@ export function useSavePlan(eventId: string) {
       const { error } = await supabase.rpc('save_training_plan', { p_event_id: eventId, p_practices: toSave(parts), p_note: note.trim() })
       if (error) throw error
     },
-    onSuccess: () => Promise.all(['training-plan', 'training-plans', 'past-sessions', 'past-trainings', 'drills', 'training-drafts']
+    onSuccess: () => Promise.all(['training-plan', 'training-plans', 'past-sessions', 'past-trainings', 'training-drafts']
       .map(key => client.invalidateQueries({ queryKey: key === 'training-plan' ? ['coach', user?.id, key, eventId] : ['coach', user?.id, key] }))),
   })
 }
@@ -183,37 +183,6 @@ export function useSaveDraft(eventId: string) {
       if (error) throw error
     },
     onSuccess: () => client.invalidateQueries({ queryKey: ['coach', user?.id, 'training-drafts'] }),
-  })
-}
-
-const DRILL_COLUMNS = 'id, name, minutes, how, tell, area, numbers, direction, targets, conditions, updated_at, part_type, players_kind, group_size'
-
-export function useDrills() {
-  const { user } = useAuth()
-  return useQuery({
-    queryKey: ['coach', user?.id, 'drills'],
-    enabled: !!user,
-    queryFn: async (): Promise<(Drill & MyDrill)[]> => {
-      const { data, error } = await supabase.from('coach_drills').select(DRILL_COLUMNS)
-        .eq('coach_user_id', user!.id).order('updated_at', { ascending: false })
-      if (error) throw error
-      return data ?? []
-    },
-  })
-}
-
-/** TRAK-340: Write your own, saved to My drills under its part, and the drill as saved. */
-export function useAddDrill() {
-  const { user } = useAuth()
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: async (drill: DrillDraft & Pick<MyDrill, 'part_type' | 'players_kind' | 'group_size'>): Promise<MyDrill> => {
-      const { data, error } = await supabase.from('coach_drills').insert({ ...cleanDrill(drill), part_type: drill.part_type,
-        players_kind: drill.players_kind, group_size: drill.group_size }).select(DRILL_COLUMNS).single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => client.invalidateQueries({ queryKey: ['coach', user?.id, 'drills'] }),
   })
 }
 

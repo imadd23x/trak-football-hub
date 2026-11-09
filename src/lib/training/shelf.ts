@@ -30,7 +30,7 @@ export type PartType = ShelfPart | 'own'
 
 /** A part the coach named: any drill fits it. */
 export const OWN_PART = { key: 'own', name: 'Your own part', note: 'Your own part', mins: 15, options: [10, 15, 20, 25],
-  guide: 'This part is yours. Pick any drill, or write your own.' } as const
+  guide: 'This part is yours. Pick any drill from the Library.' } as const
 
 /** Trak's session, the first time: its first five parts. */
 export const STANDARD: ShelfPart[] = ['warmup', 'passing', 'rondo', 'functional', 'game']

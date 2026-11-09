@@ -147,8 +147,22 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
   in the Library is ignored.
 - **No coach-made drills** (Kostas, 8 Nov): New drill, the list of the coach's drills and Add to the next training
   left the Drills tab; migration `20261109000000_drill_library_clean_start.sql` deleted the hand-written drills, every
-  plan that used one, and any draft that did. `coach_drills` stays, empty. Plan session's Write your own and From My
-  drills go in TRAK-392.
+  plan that used one, and any draft that did. `coach_drills` stays, empty. Plan session's Write your own and My drills
+  filter left in TRAK-392.
+- **Plan session uses the Library** (TRAK-392): everything else in Plan session stays (Kostas, 8 Nov); only the drills
+  change. A part's drills are the Library drills whose kind fits it (`libraryFor`: Get ready → Dry warm-up, Technical →
+  Passing & movement, Skill → Rondo, Small-sided games → Game, other Game related → Functional drills), fitted to the
+  training's squad (8–20 players; 15 when unknown) at the standard level. Set pieces, Finishing, Cool-down (no Library
+  drills yet) and a part the coach named pick from every drill and have no usual. The three choices are team drills:
+  the usual (most used lately), else the starter drill (the part's first team drill), then those used lately, then the
+  rest; the picked one always shows. Tags: Your usual, Last used, Starter drill, In My drills. Each Library choice has
+  View drill: a pop-up with the picture, Easier / Harder and what changed, the five details, why / how / watch, then Use
+  this drill (or Done for the picked one); its level is saved with the plan (`trak_level`). See more drills lists the
+  part's drills by drill type, then Individual and Goalkeeping, with the Library's search and All / You've used. Write
+  your own, the My drills filter, `useDrills` / `useAddDrill` are gone. A plan saved before keeps its drills as saved
+  (Trak drill, My drill, Library tags). Adding a drill from its page that the plan already holds (now often the starter
+  drill) updates that part to the level set, rather than adding it twice. Shared drill pieces:
+  `src/components/coach/training/library/DrillInfo.tsx`.
 
 ## Switching it on
 

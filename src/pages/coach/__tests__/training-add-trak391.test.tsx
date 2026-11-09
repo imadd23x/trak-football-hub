@@ -101,7 +101,7 @@ const openPicker = async (user: ReturnType<typeof userEvent.setup>) => {
 describe('TRAK-391: Add to training', { timeout: 30_000 }, () => {
   it('lists the trainings coming up; the drill joins a training with no plan at the end, at the level set; the plan keeps it', async () => {
     const user = userEvent.setup()
-    const keep = drill('Keep the ball')
+    const keep = drill('Pass between defenders')
     const soon = onTheMinute(Date.now() + DAY), later = onTheMinute(Date.now() + 3 * DAY)
     const { saves } = database([training('soon', soon, 'Pressing triggers'), training('later', later, 'Rondos'),
       training('gone', onTheMinute(Date.now() - 3 * DAY), 'Last week')])
@@ -110,7 +110,7 @@ describe('TRAK-391: Add to training', { timeout: 30_000 }, () => {
     const level = step(keep, PLAYERS, START_LEVEL, 1)!.level
 
     const list = await openPicker(user)
-    expect(screen.getByRole('heading', { name: 'Add Keep the ball to which training?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Add Pass between defenders to which training?' })).toBeInTheDocument()
     // Coming up only, soonest first, each with its day, time and how far its plan is.
     const items = within(list).getAllByRole('listitem').map(li => li.textContent)
     expect(items).toHaveLength(2)
@@ -121,11 +121,11 @@ describe('TRAK-391: Add to training', { timeout: 30_000 }, () => {
 
     await user.click(within(list).getByRole('button', { name: `Add to Pressing triggers, ${gameWhen(training('soon', soon, '')).day}` }))
     // Plan session at Review: Trak's five, then the drill as a sixth part. Nothing saved yet.
-    expect(await screen.findByText('Keep the ball is added at the end. Check the plan, then save. Nothing is saved until you do.')).toBeInTheDocument()
+    expect(await screen.findByText('Pass between defenders is added at the end. Check the plan, then save. Nothing is saved until you do.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument()
     const parts = rows()
     expect(parts).toHaveLength(6)
-    expect(parts[5]).toContain('Keep the ball')
+    expect(parts[5]).toContain('Pass between defenders')
     expect(saves).toHaveLength(0)
 
     await user.click(screen.getByRole('button', { name: 'Save the plan' }))
@@ -133,12 +133,12 @@ describe('TRAK-391: Add to training', { timeout: 30_000 }, () => {
     const sent = (saves[0].p_practices as Record<string, unknown>[]).at(-1)!
     const fitted = fit(keep, PLAYERS, level).details
     expect(sent).toMatchObject({
-      name: 'Keep the ball', part: 'Rondo', part_type: 'rondo', minutes: 15, source: 'trak', trak_drill: keep.id, trak_level: level,
+      name: 'Pass between defenders', part: 'Rondo', part_type: 'rondo', minutes: 15, source: 'trak', trak_drill: keep.id, trak_level: level,
       area: fitted.area, numbers: fitted.numbers, targets: fitted.targets, direction: fitted.direction, conditions: fitted.conditions,
     })
     expect(String(sent.how)).toContain(keep.how[0])
-    // Trak's own parts have no level.
-    expect((saves[0].p_practices as Record<string, unknown>[]).slice(0, 5).every(p => p.trak_level === null)).toBe(true)
+    // TRAK-392: the usual shape's own drills are the Library's, at the standard level.
+    expect((saves[0].p_practices as Record<string, unknown>[]).slice(0, 5).every(p => p.trak_level === START_LEVEL)).toBe(true)
   })
 
   it('joins a saved plan, and a draft, at the end; not twice when it’s already there', async () => {
@@ -182,8 +182,22 @@ describe('TRAK-391: Add to training', { timeout: 30_000 }, () => {
     const list = await screen.findByRole('list', { name: 'Trainings coming up' })
     expect(within(list).getByRole('listitem').textContent).toContain('Has this drill')
     await user.click(within(list).getByRole('button', { name: /^Add to Pressing triggers/ }))
-    expect(await screen.findByText('Keep the ball is already in this plan.')).toBeInTheDocument()
+    expect(await screen.findByText(/^Keep the ball is already in this plan, in Rondo\./)).toBeInTheDocument()
     expect(rows()).toHaveLength(2)
+  })
+
+  it('a drill the plan already holds (the usual shape’s starter) isn’t added twice; that part takes the level set', async () => {
+    const user = userEvent.setup()
+    const keep = drill('Keep the ball')
+    const { saves } = database([training('soon', onTheMinute(Date.now() + DAY), 'Pressing triggers')])
+    renderApp(drillPath(keep.id))
+    await user.click(await screen.findByRole('button', { name: /Harder/ }))
+    await user.click(within(await openPicker(user)).getByRole('button', { name: /^Add to Pressing triggers/ }))
+    expect(await screen.findByText('Keep the ball is already in this plan, in Rondo. It’s now set as you left it on its page. Nothing is saved until you save.')).toBeInTheDocument()
+    expect(rows()).toHaveLength(5)
+    await user.click(screen.getByRole('button', { name: 'Save the plan' }))
+    await waitFor(() => expect(saves).toHaveLength(1))
+    expect((saves[0].p_practices as Record<string, unknown>[])[2]).toMatchObject({ trak_drill: keep.id, trak_level: step(keep, PLAYERS, START_LEVEL, 1)!.level })
   })
 
   it('with no trainings coming up, says so', async () => {

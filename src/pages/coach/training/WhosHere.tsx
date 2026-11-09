@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { registerProblem } from '@/lib/event-register'
 import { planPath, type PlannerState } from '@/lib/training/plans'
-import { partColour, partLine, partsFromSaved, type Part } from '@/lib/training/parts'
+import { libraryOf, partColour, partLine, partsFromSaved, type Part } from '@/lib/training/parts'
 import { adapt, setupFor, playersOf, applySuggestion, type Adaptation } from '@/lib/training/turnout'
 import { gameWhen } from '@/components/coach/games/useGames'
 import { useHere, useRegisters, useSavePlan, useSquadSize, type Plan, type Training } from '@/components/coach/training/useTraining'
@@ -20,7 +20,8 @@ import SegmentedControl from '@/components/arc/segmented-control/segmented-contr
    existing one, TRAK-138; several names a row so a squad fits a laptop screen, Kostas 2 Nov). Once it's saved, and only
    then (Kostas, 2 Nov: not live per tap), each part of the plan shows what Trak suggests for the players who came: no
    change, a new set-up, or a swap. The coach uses it, keeps the part as planned, or changes it themselves; Save
-   today's plan saves the plan whole. */
+   today's plan saves the plan whole. TRAK-393: a Library drill is fitted again for those here, at its level; using
+   the suggestion takes the new set-up, which View then shows. */
 
 const TRAINING_PATH = '/coach/training'
 type Choice = 'use' | 'keep'
@@ -132,6 +133,8 @@ function PartColumn({ part, index, count, squad, adaptation, choice, onChoose, o
 }) {
   const players = part.drill ? playersOf(part.drill) : null
   const planned = players && squad ? setupFor(players, squad) : null
+  // TRAK-393: a Library drill says the set-up it was planned with, in its own words.
+  const lib = libraryOf(part.drill)
   const badge = !adaptation ? null : adaptation.status === 'same' ? { label: 'No change', tone: 'success' as const }
     : adaptation.status === 'adjust' ? { label: 'Adjust', tone: 'warning' as const }
     : adaptation.status === 'swap' ? { label: 'Swap', tone: 'warning' as const } : { label: 'Check it', tone: 'neutral' as const }
@@ -141,7 +144,9 @@ function PartColumn({ part, index, count, squad, adaptation, choice, onChoose, o
       <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: partColour(index, count) }} />{partLine(part, index)}</span>
     {badge && <span><Badge size="sm" tone={badge.tone}>{badge.label}</Badge></span>}
     <p className="text-[15px] font-medium text-ink break-words">{part.drill?.name ?? 'No drill yet'}</p>
-    <p className="text-[13px] text-ink-3">{part.minutes} min{planned?.ok && squad ? ` · planned for ${squad}: ${planned.text}` : ''}</p>
+    <p className="text-[13px] text-ink-3">{part.minutes} min{lib && part.drill
+      ? ` · planned: ${[part.drill.numbers, part.drill.area].filter(Boolean).join(', ')}`
+      : planned?.ok && squad ? ` · planned for ${squad}: ${planned.text}` : ''}</p>
     {adaptation && (adaptation.status === 'same'
       ? <p className="text-sm text-brand">{adaptation.message}</p>
       : <p className="flex gap-1.5 rounded-lg bg-raised p-2.5 text-sm text-ink">

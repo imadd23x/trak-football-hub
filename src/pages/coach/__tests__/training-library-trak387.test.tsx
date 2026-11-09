@@ -61,8 +61,10 @@ describe('TRAK-387: the Library home', { timeout: 20_000 }, () => {
     // Kostas, 8 Nov: no coach-made drills for the pilot.
     expect(screen.queryByRole('button', { name: /New drill/ })).toBeNull()
     expect(screen.queryByRole('searchbox', { name: 'Search my drills' })).toBeNull()
-    // The old FA Library stays until step 9.
-    expect(within(screen.getByRole('region', { name: 'From the Library' })).getAllByRole('link')).toHaveLength(7)
+    // TRAK-394: Change any practice joins Individual work and Goalkeeping; the old FA Library's tiles left.
+    expect(kinds.getByRole('link', { name: 'Change any practice' })).toHaveAttribute('href', '/coach/training/drills/change')
+    expect(screen.queryByRole('region', { name: 'From the Library' })).toBeNull()
+    expect(screen.queryByRole('link', { name: /Play It Right|Programmes/ })).toBeNull()
   })
 
   it('typing shows results as picture cards in place of everything else, with the name it was found by', async () => {

@@ -1328,6 +1328,7 @@ export type Database = {
           id: string
           retired_at: string | null
           season_objective_id: string | null
+          shared_at: string | null
           slot: number
           source: string
           squad_player_id: string
@@ -1340,6 +1341,7 @@ export type Database = {
           id?: string
           retired_at?: string | null
           season_objective_id?: string | null
+          shared_at?: string | null
           slot: number
           source: string
           squad_player_id: string
@@ -1352,6 +1354,7 @@ export type Database = {
           id?: string
           retired_at?: string | null
           season_objective_id?: string | null
+          shared_at?: string | null
           slot?: number
           source?: string
           squad_player_id?: string
@@ -1539,6 +1542,8 @@ export type Database = {
           place: number
           plan_id: string
           retired_at: string | null
+          shared_looks_like: string | null
+          shared_title: string | null
           status: string
           title: string
           updated_at: string
@@ -1550,6 +1555,8 @@ export type Database = {
           place: number
           plan_id: string
           retired_at?: string | null
+          shared_looks_like?: string | null
+          shared_title?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -1561,6 +1568,8 @@ export type Database = {
           place?: number
           plan_id?: string
           retired_at?: string | null
+          shared_looks_like?: string | null
+          shared_title?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -1571,6 +1580,55 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "season_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      season_plan_player_shares: {
+        Row: {
+          changed_at: string
+          squad_player_id: string
+        }
+        Insert: {
+          changed_at: string
+          squad_player_id: string
+        }
+        Update: {
+          changed_at?: string
+          squad_player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "season_plan_player_shares_squad_player_id_fkey"
+            columns: ["squad_player_id"]
+            isOneToOne: true
+            referencedRelation: "squad_players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      season_plan_seen: {
+        Row: {
+          seen_at: string
+          squad_player_id: string
+          viewer_user_id: string
+        }
+        Insert: {
+          seen_at?: string
+          squad_player_id: string
+          viewer_user_id: string
+        }
+        Update: {
+          seen_at?: string
+          squad_player_id?: string
+          viewer_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "season_plan_seen_squad_player_id_fkey"
+            columns: ["squad_player_id"]
+            isOneToOne: false
+            referencedRelation: "squad_players"
             referencedColumns: ["id"]
           },
         ]
@@ -1586,6 +1644,10 @@ export type Database = {
           last_shared_at: string | null
           positions_known: string | null
           shared_at: string | null
+          shared_ends_on: string | null
+          shared_eval_day: number | null
+          shared_eval_every: string | null
+          shared_starts_on: string | null
           squad: string
           starts_on: string | null
           unshared_parts: string[]
@@ -1603,6 +1665,10 @@ export type Database = {
           last_shared_at?: string | null
           positions_known?: string | null
           shared_at?: string | null
+          shared_ends_on?: string | null
+          shared_eval_day?: number | null
+          shared_eval_every?: string | null
+          shared_starts_on?: string | null
           squad: string
           starts_on?: string | null
           unshared_parts?: string[]
@@ -1620,6 +1686,10 @@ export type Database = {
           last_shared_at?: string | null
           positions_known?: string | null
           shared_at?: string | null
+          shared_ends_on?: string | null
+          shared_eval_day?: number | null
+          shared_eval_every?: string | null
+          shared_starts_on?: string | null
           squad?: string
           starts_on?: string | null
           unshared_parts?: string[]
@@ -2293,6 +2363,28 @@ export type Database = {
         Args: never
         Returns: { player_objective_id: string; squad_player_id: string }[]
       }
+      season_plan_for_player: {
+        Args: { p_child?: string }
+        Returns: {
+          also_plays: string[]
+          coach_name: string
+          ends_on: string | null
+          eval_day: number | null
+          eval_every: string | null
+          is_new: boolean
+          last_evaluation_on: string | null
+          objectives: Json
+          position: string | null
+          roles: string[]
+          season_objectives: Json
+          shared_at: string | null
+          squad: string
+          squad_player_id: string
+          starts_on: string | null
+          time_zone: string
+        }[]
+      }
+      mark_season_plan_seen: { Args: { p_child?: string }; Returns: undefined }
       watch_players: { Args: { p_squad_player_ids: string[] }; Returns: number }
       take_event_register: {
         Args: { p_event_id: string; p_present: string[] }

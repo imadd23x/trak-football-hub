@@ -1839,6 +1839,7 @@ export type Database = {
           part_type: string | null
           players_kind: string | null
           trak_drill: string | null
+          trak_level: number | null
           area: string
           conditions: string
           direction: string
@@ -1860,6 +1861,7 @@ export type Database = {
           part_type?: string | null
           players_kind?: string | null
           trak_drill?: string | null
+          trak_level?: number | null
           area?: string
           conditions?: string
           direction?: string
@@ -1881,6 +1883,7 @@ export type Database = {
           part_type?: string | null
           players_kind?: string | null
           trak_drill?: string | null
+          trak_level?: number | null
           area?: string
           conditions?: string
           direction?: string

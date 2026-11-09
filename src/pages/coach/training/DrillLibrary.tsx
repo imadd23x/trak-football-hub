@@ -14,6 +14,7 @@ import { useBookmarks, useSquadSize } from '@/components/coach/training/useTrain
 import { DrillCards } from '@/components/coach/training/library/DrillCard'
 import { DrillPitch, PitchKey } from '@/components/coach/training/library/DrillPitch'
 import { PageBookmark } from '@/components/coach/training/library/BookmarkButton'
+import { AddToTraining } from '@/components/coach/training/library/AddToTraining'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
@@ -312,8 +313,8 @@ type Kept = { drill: string; players: number; level: number; changed: Changed | 
 
 /** A drill's page (TRAK-389, from the 8 Nov mockup), fitted to the squad at the standard level: Players today, the
  *  picture and its key, Easier and Harder (each says what it changed and why), the five details with the changed ones
- *  marked, why, how and what to watch for, and Another drill. A new drill starts fresh. Add to My drills (TRAK-390)
- *  sits under them; Add to training comes with TRAK-391. */
+ *  marked, why, how and what to watch for, and Another drill. A new drill starts fresh. Add to training (TRAK-391), at
+ *  the players and level set here, and Add to My drills (TRAK-390) sit under them. */
 export function DrillPage() {
   const { drillId } = useParams()
   const drill = libraryDrill(drillId)
@@ -408,7 +409,10 @@ function DrillBody({ drill, start, squadName }: { drill: LibraryDrill; start: Sq
         <h2 id="watch" className={SIDE_HEADING}>Watch for</h2>
         <ul className="grid list-disc gap-1.5 pl-5 text-[15px] text-ink marker:text-brand">{drill.watch.map(w => <li key={w}>{w}</li>)}</ul>
       </section>
-      <PageBookmark drill={drill} />
+      <div className="grid gap-2.5">
+        <AddToTraining drill={drill} players={players} level={level} />
+        <PageBookmark drill={drill} />
+      </div>
       <p className="text-[13px] text-ink-3">{SAMPLE}</p>
     </div>
   </div>

@@ -3,10 +3,11 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight, Pencil, Plus, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { trainingMinutes } from '@/lib/training/sessions'
+import { libraryDrill } from '@/lib/training/library'
 import type { PlannerState } from '@/lib/training/plans'
 import { partInfo, type PartType } from '@/lib/training/shelf'
 import {
-  NOTE_MAX, PARTS_MAX, PART_NAME_MAX, candidates, fromMyDrill, isStandard, isSameDrill, lastShape, minuteOptions, moveTo, newKey,
+  NOTE_MAX, PARTS_MAX, PART_NAME_MAX, candidates, isStandard, libraryPart, isSameDrill, lastShape, minuteOptions, moveTo, newKey,
   partsFromSaved, partsFromShape, planProblem, playersLine, partColour, shownFor, standardShape, tagFor, totalMinutes, usageOf,
   usualFor, type Part, type PastPlan, type PlanDrill, type Usage,
 } from '@/lib/training/parts'
@@ -37,11 +38,13 @@ const SAVE_FAILED = 'Couldn’t save. Check your connection and try again. Nothi
 const REVIEW = 'review'
 
 type Start = { parts: Part[]; note: string; at: string; fromShape: boolean; copiedFrom: string | null; dirty: boolean
+  /** TRAK-391: what happened to the Library drill sent from its page. */
+  added?: { name: string; how: 'added' | 'there' | 'full' }
   /** TRAK-341: opened from a saved plan's Review page to change or add one part, then save and go back. */
   only?: 'edit' | 'add' }
 
-/** Where the planner starts: a copied plan; a drill sent from My drills; the draft; the saved plan (at Review); else
- *  the coach's last shape or Trak's five. */
+/** Where the planner starts: a copied plan; a Library drill sent from its page; the draft; the saved plan (at Review);
+ *  else the coach's last shape or Trak's five. */
 function startFrom({ state, saved, draft, past, drills, usage }: {
   state: PlannerState; saved: Plan | null; draft: Draft | undefined; past: PastPlan[]; drills: Parameters<typeof candidates>[1]; usage: Usage
 }): Start {
@@ -64,13 +67,18 @@ function startFrom({ state, saved, draft, past, drills, usage }: {
     const parts = partsFromSaved(state.copy).slice(0, PARTS_MAX)
     return { parts, note: '', at: parts[0].key, fromShape: false, copiedFrom: state.copiedFrom ?? null, dirty: true }
   }
-  if (state?.addDrill) {
-    const base = draft ? draft.parts : saved ? partsFromSaved(saved.practices) : fresh().parts
-    const drill = state.addDrill as Parameters<typeof fromMyDrill>[0]
-    const type = (drill.part_type ?? 'own') as PartType
-    const part: Part = { key: newKey(), type, name: (type === 'own' ? drill.name : partInfo(type).name).slice(0, PART_NAME_MAX),
-      minutes: drill.minutes, drill: fromMyDrill({ ...drill, part_type: drill.part_type ?? null, players_kind: drill.players_kind ?? null, group_size: drill.group_size ?? null }) }
-    return { parts: [...base, part].slice(0, PARTS_MAX), note: draft?.note ?? saved?.note ?? '', at: REVIEW, fromShape: false, copiedFrom: null, dirty: true }
+  const library = state?.addLibrary ? libraryDrill(state.addLibrary.drill) : undefined
+  if (state?.addLibrary && library) {
+    // TRAK-391 (Kostas, 8 Nov): the drill joins the plan, the draft or the coach's usual shape as a new part at the end,
+    // then Review. Already in it (Back from Training after Save as draft, say): not twice. A full plan: said, not cut.
+    const { players, level } = state.addLibrary
+    const fromShape = !draft && !saved?.practices.length
+    const base = draft ? draft.parts : saved?.practices.length ? partsFromSaved(saved.practices) : fresh().parts
+    const note = draft?.note ?? saved?.note ?? ''
+    const how = base.some(p => p.drill?.source === 'trak' && p.drill.trak_drill === library.id) ? 'there' as const
+      : base.length >= PARTS_MAX ? 'full' as const : 'added' as const
+    const parts = how === 'added' ? [...base, libraryPart(library, players, level)] : base
+    return { parts, note, at: REVIEW, fromShape, copiedFrom: null, dirty: how === 'added' || fromShape, added: { name: library.name, how } }
   }
   if (draft?.parts.length) {
     const at = draft.step < draft.parts.length ? draft.parts[draft.step].key : REVIEW
@@ -183,6 +191,10 @@ function PlannerBody({ training, saved, draft, past, drills }: {
       {start.only && <p className="text-sm text-ink-3">{start.only === 'add' ? 'Pick a drill, then add it to the plan.'
         : 'Only this part changes. The rest of the plan stays as it is.'}</p>}
     </header>
+    {start.added && <p role="status" className={`rounded-xl px-4 py-3 text-sm ${start.added.how === 'full' ? 'bg-warning/15 text-ink' : 'bg-raised text-ink-2'}`}>
+      {start.added.how === 'added' ? `${start.added.name} is added at the end. Check the plan, then save. Nothing is saved until you do.`
+        : start.added.how === 'there' ? `${start.added.name} is already in this plan.`
+        : `${start.added.name} isn’t added: a plan holds at most ${PARTS_MAX} parts. Remove one, then add it from the drill’s page.`}</p>}
     {start.copiedFrom && <p role="status" className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
       Copied from {start.copiedFrom}. Check it, change any part, then save. Nothing is saved until you do.</p>}
     {!start.only && <div className="arc"><Stepper label="Planning steps" steps={steps} current={step} onStepSelect={go} /></div>}

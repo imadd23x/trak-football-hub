@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  candidates, fitLine, fromShelf, isStandard, lastShape, minuteOptions, moveTo, partsFromSaved, partsFromShape, planProblem,
+  candidates, fitLine, fromLibrary, fromShelf, isStandard, libraryPart, lastShape, minuteOptions, moveTo, partsFromSaved, partsFromShape, planProblem,
   shownFor, standardShape, tagFor, toSave, usageOf, usualFor, type MyDrill, type PastPlan, type SavedPart,
 } from '../parts'
 import { SHELF, shelfDrill } from '../shelf'
+import { DRILL_LIMITS } from '../sessions'
+import { LEVELS, LIBRARY, fit } from '../library'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338): a plan of parts, the drills each part shows, and what's saved. */
 
@@ -127,5 +129,40 @@ describe('time and order', () => {
     expect(moveTo(['a', 'b', 'c'], 0, 2)).toEqual(['b', 'c', 'a'])
     expect(moveTo(['a', 'b', 'c'], 2, 0)).toEqual(['c', 'a', 'b'])
     expect(moveTo(['a', 'b'], 0, 5)).toEqual(['a', 'b'])
+  })
+})
+
+/* TRAK-391 (Drill Library 6/11): a Library drill joins a plan as a part. */
+describe('a Library drill in a plan', () => {
+  const keep = LIBRARY.find(d => d.name === 'Keep the ball')!
+  it('joins as its kind’s part, fitted to the players and level set, and saves its level', () => {
+    const part = libraryPart(keep, 12, 5)
+    expect(part).toMatchObject({ type: 'rondo', name: 'Rondo', minutes: 15 })
+    const { details } = fit(keep, 12, 5)
+    expect(part.drill).toMatchObject({ name: 'Keep the ball', source: 'trak', trak_drill: keep.id, trak_level: 5, drill_id: null,
+      area: details.area, numbers: details.numbers, direction: details.direction, targets: details.targets, conditions: details.conditions })
+    expect(part.drill!.how.split('\n')).toEqual([...keep.how])
+    expect(part.drill!.tell.split('\n')).toEqual([...keep.watch])
+    const [saved] = toSave([part]) as Record<string, unknown>[]
+    expect(saved).toMatchObject({ source: 'trak', trak_drill: keep.id, trak_level: 5, part_type: 'rondo' })
+  })
+  it('keeps the level to the eight there are, and every text to its limit', () => {
+    expect(fromLibrary(keep, 12, 99).trak_level).toBe(LEVELS - 1)
+    expect(fromLibrary(keep, 12, -3).trak_level).toBe(0)
+    for (const d of LIBRARY) {
+      const drill = fromLibrary(d, 20, 7)
+      expect(drill.how.length).toBeLessThanOrEqual(DRILL_LIMITS.how)
+      expect(drill.tell.length).toBeLessThanOrEqual(DRILL_LIMITS.tell)
+      for (const key of ['area', 'numbers', 'direction', 'targets', 'conditions'] as const) expect(drill[key].length).toBeLessThanOrEqual(DRILL_LIMITS.detail)
+    }
+  })
+  it('a saved plan reads the level back; other drills and older plans have none', () => {
+    const [part] = partsFromSaved([{ position: 1, name: 'Keep the ball', minutes: 15, how: '', tell: '', area: '', numbers: '', direction: '',
+      targets: '', conditions: '', source: 'trak', drill_id: null, library_session: null, trak_drill: keep.id, trak_level: 3 }])
+    expect(part.drill!.trak_level).toBe(3)
+    expect(fromShelf(SHELF[0]).trak_level).toBeNull()
+    const [old] = partsFromSaved([{ position: 1, name: 'Rondo', minutes: 15, how: '', tell: '', area: '', numbers: '', direction: '',
+      targets: '', conditions: '', source: 'own', drill_id: null, library_session: null }])
+    expect(old.drill!.trak_level).toBeNull()
   })
 })

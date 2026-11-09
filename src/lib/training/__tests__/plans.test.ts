@@ -6,7 +6,7 @@ import { fromSaved, overTime, plannedMinutes, searchSessions, sessionSummary, so
 
 const saved = (position: number, name: string, over: Partial<SavedPractice> = {}): SavedPractice => ({
   position, name, minutes: 15, how: '', tell: '', area: '', numbers: '', direction: '', targets: '', conditions: '',
-  source: 'own', drill_id: null, library_session: null, part: '', part_type: null, trak_drill: null, players_kind: null, group_size: null, ...over,
+  source: 'own', drill_id: null, library_session: null, part: '', part_type: null, trak_drill: null, players_kind: null, group_size: null, trak_level: null, ...over,
 })
 
 describe('a saved plan’s practices', () => {

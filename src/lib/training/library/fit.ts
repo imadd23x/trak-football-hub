@@ -10,6 +10,12 @@ export const LEVELS = 8
 export const START_LEVEL = 3
 /** The mockup's Players today runs from 8 to 20. */
 export const PLAYERS_TODAY = { min: 8, max: 20 } as const
+/** A drill fitted to a squad we don't know the size of. */
+export const FALLBACK_PLAYERS = 15
+
+/** How many players a squad's drills are fitted to: the roster, kept to what a drill can be drawn for. */
+export const squadPlayers = (roster: number | null | undefined) =>
+  roster ? Math.min(PLAYERS_TODAY.max, Math.max(PLAYERS_TODAY.min, roster)) : FALLBACK_PLAYERS
 
 /** Steve's five characteristics, in his order. The keys are the plan's own (PlanDrill in ../parts.ts). */
 export const DETAILS = [
@@ -171,6 +177,12 @@ export function reason(key: DetailKey, dir: Direction, d: Pick<LibraryDrill, 'te
 }
 
 export type Change = { key: DetailKey; name: string; from: string; to: string; why: string }
+
+/** What the last press changed, as the drill page and View drill say it: Easier, Harder or Players today. */
+export type Changed = { title: string; items: Change[] }
+
+export const changedBy = (by: -1 | 1, items: Change[]): Changed =>
+  ({ title: by > 0 ? 'Harder. Here’s what Trak changed:' : 'Easier. Here’s what Trak changed:', items })
 
 /** What changed between two fits of the same drill, detail by detail. `dir` adds the why; null (Players today) leaves
  *  it out, because more players isn't easier or harder. */

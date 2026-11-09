@@ -7,7 +7,7 @@ import { LIBRARIES, SESSIONS, libraryPath } from '@/lib/library/library'
 import { ON_LIBRARY, PRACTICE_KIND_COLOURS } from '@/lib/fixed-colours'
 import {
   DETAILS, KINDS, KIND_ORDER, LIBRARY, MY_DRILLS_PATH, PLAYERS_TODAY, START_LEVEL, allDrillsPath, alsoCalled, anotherDrill,
-  drillPath, fit, foundAs, kindInfo, kindPath, libraryDrill, nextLevel, refit, searchDrills, step, typesOf, type Change,
+  changedBy, drillPath, fit, foundAs, squadPlayers, type Changed, kindInfo, kindPath, libraryDrill, nextLevel, refit, searchDrills, step, typesOf, type Change,
   type Kind, type LibraryDrill, type Squad,
 } from '@/lib/training/library'
 import { useBookmarks, useSquadSize } from '@/components/coach/training/useTraining'
@@ -15,6 +15,7 @@ import { DrillCards } from '@/components/coach/training/library/DrillCard'
 import { DrillPitch, PitchKey } from '@/components/coach/training/library/DrillPitch'
 import { PageBookmark } from '@/components/coach/training/library/BookmarkButton'
 import { AddToTraining } from '@/components/coach/training/library/AddToTraining'
+import { AboutDrill, CHIP, ChangeNote, DetailList } from '@/components/coach/training/library/DrillInfo'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
@@ -31,7 +32,6 @@ import { Button } from '@/components/arc/button/button'
 type PracticeKind = Exclude<Kind, 'warmup'>
 /** Sample content until the real library (TRAK-388); said once, quietly, on each Library page. */
 const SAMPLE = 'Sample drills, not yet checked by our coaching lead.'
-const FALLBACK_PLAYERS = 15
 const GROUP_NAME: Record<Kind, string> = { warmup: 'Get ready', technical: 'Technical practices', skill: 'Skill practices', game: 'Game related practices' }
 
 /** The squad every picture is fitted to: the squad picked at the top (or the whole roster on All), kept to what a
@@ -46,7 +46,7 @@ function useLibrarySquad(): { squad: Squad | null; line: string; name: string | 
   const size = useSquadSize(name)
   if (!known || size.isPending) return { squad: null, line: '', name }
   const roster = size.data ?? 0
-  const players = roster ? Math.min(PLAYERS_TODAY.max, Math.max(PLAYERS_TODAY.min, roster)) : FALLBACK_PLAYERS
+  const players = squadPlayers(roster)
   return {
     squad: { players, level: START_LEVEL },
     line: `Each picture is set for ${players} players${name ? `, your ${name}s` : ''}.`,
@@ -301,12 +301,8 @@ export function AllDrills() {
 
 /* ── A drill ──────────────────────────────────────────────────────────── */
 
-const CHIP = 'rounded-full border border-line bg-raised px-2.5 py-0.5 text-[13px] font-medium text-ink-2'
-const SIDE_HEADING = 'text-xs font-medium uppercase tracking-[0.08em] text-ink-3'
 const STEPPER_BUTTON = 'inline-flex h-10 w-10 items-center justify-center rounded-full border border-line-strong bg-surface text-ink hover:bg-raised disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
-/** What the last press changed: Easier, Harder or Players today. */
-type Changed = { title: string; items: Change[] }
 /** The drill page as the coach left it, kept in its history entry: a page laid out again (phone ↔ laptop) or opened
  *  again with Back comes back the same. */
 type Kept = { drill: string; players: number; level: number; changed: Changed | null }
@@ -351,13 +347,12 @@ function DrillBody({ drill, start, squadName }: { drill: LibraryDrill; start: Sq
     navigate(location.pathname + location.search, { replace: true, state: { ...(location.state as object | null), drillPage: { drill: drill.id, ...next } } })
   }
   const fitted = fit(drill, players, level)
-  const hit = new Set(changed?.items.map(c => c.key))
   const another = anotherDrill(drill)
 
   const press = (by: -1 | 1) => {
     const next = step(drill, players, level, by)
     if (!next) return
-    keep({ players, level: next.level, changed: { title: by > 0 ? 'Harder. Here’s what Trak changed:' : 'Easier. Here’s what Trak changed:', items: next.changes } })
+    keep({ players, level: next.level, changed: changedBy(by, next.changes) })
   }
   const count = (by: -1 | 1) => {
     const to = Math.min(PLAYERS_TODAY.max, Math.max(PLAYERS_TODAY.min, players + by))
@@ -380,35 +375,11 @@ function DrillBody({ drill, start, squadName }: { drill: LibraryDrill; start: Sq
         <Button variant="secondary" disabled={nextLevel(drill, players, level, 1) === null} onClick={() => press(1)}><ArrowUp aria-hidden size={16} />Harder</Button>
         {another && <span className="col-span-2 grid tablet:col-span-1"><Button variant="secondary" onClick={() => navigate(drillPath(another.id))}><Repeat aria-hidden size={16} />Another drill</Button></span>}
       </div>
-      {changed ? <div role="status" className="grid gap-1.5 rounded-xl bg-warning/15 px-3.5 py-3 text-[15px] text-ink">
-          <p className="font-medium">{changed.title}</p>
-          {changed.items.length ? <ul className="grid gap-1">{changed.items.map(c =>
-            <li key={c.key}>{c.name}: {c.from} to {c.to}.{c.why ? ` ${c.why}` : ''}</li>)}</ul>
-            : <p>Nothing changes with that many.</p>}
-        </div>
-        : <p role="status" className="rounded-xl bg-raised px-3.5 py-3 text-[15px] text-ink-2">
-          Set for {squadName ? `your ${squadName}s` : 'your squad'}. Press Easier or Harder and Trak shows what it changed and why.</p>}
-      <dl className="grid overflow-hidden rounded-xl border border-line tablet:grid-cols-5">
-        {DETAILS.map(({ key, name }) => <div key={key} data-changed={hit.has(key) || undefined}
-          className={`flex justify-between gap-3 border-b border-line px-3 py-2.5 last:border-b-0 tablet:grid tablet:content-start tablet:gap-0.5 tablet:border-b-0 tablet:border-r tablet:last:border-r-0 ${hit.has(key) ? 'bg-warning/15' : ''}`}>
-          <dt className="flex-none text-xs text-ink-3">{name}</dt>
-          <dd className="text-right text-sm font-medium text-ink [overflow-wrap:anywhere] tablet:text-left">{fitted.details[key] || '—'}</dd>
-        </div>)}
-      </dl>
+      <ChangeNote changed={changed} idle={`Set for ${squadName ? `your ${squadName}s` : 'your squad'}. Press Easier or Harder and Trak shows what it changed and why.`} />
+      <DetailList details={fitted.details} changed={changed} />
     </div>
     <div className="grid gap-5 rounded-2xl border border-line bg-surface p-4">
-      <section aria-labelledby="why" className="grid gap-1.5">
-        <h2 id="why" className={SIDE_HEADING}>Why this works</h2>
-        <p className="text-[17px] text-ink">{drill.why}</p>
-      </section>
-      <section aria-labelledby="how" className="grid gap-1.5">
-        <h2 id="how" className={SIDE_HEADING}>How to play</h2>
-        <ol className="grid list-decimal gap-2 pl-5 text-[15px] text-ink marker:text-ink-3">{drill.how.map(line => <li key={line}>{line}</li>)}</ol>
-      </section>
-      <section aria-labelledby="watch" className="grid gap-1.5">
-        <h2 id="watch" className={SIDE_HEADING}>Watch for</h2>
-        <ul className="grid list-disc gap-1.5 pl-5 text-[15px] text-ink marker:text-brand">{drill.watch.map(w => <li key={w}>{w}</li>)}</ul>
-      </section>
+      <AboutDrill drill={drill} />
       <div className="grid gap-2.5">
         <AddToTraining drill={drill} players={players} level={level} />
         <PageBookmark drill={drill} />

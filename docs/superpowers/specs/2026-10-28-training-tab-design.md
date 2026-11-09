@@ -97,8 +97,8 @@ The Library is the Drills tab and feeds Plan session. It was built in 11 steps (
   and the useful FA sessions, merged and rewritten in our own words (no FA text). Kept drills also take the merged
   drills' old names as search words. Retired drills (`RETIRED`: Copy your partner, Follow and copy) are never listed,
   searched or offered, but `libraryDrill(id)` still finds them for saved plans. Set pieces wait until after the pilot;
-  the FA's under-12 games and six-week programmes are left out. Steve still checks the wording; until then each Library
-  page says so.
+  the FA's under-12 games and six-week programmes are left out. Steve checks the wording after the pilot (Kostas,
+  9 Nov); the pages don't say it's unchecked.
 - **Kinds** (`kinds.ts`): Get ready (Dry warm-up and, from TRAK-388, Cool-down), then Technical, Skill and Game
   related, each with its drill types. Each drill fits one of the session's parts (`partFor`: Dry warm-up → Dry
   warm-up, Cool-down → Cool-down, Technical → Passing & movement, Skill → Rondo, a small-sided game → Game, other Game
@@ -174,7 +174,7 @@ The Library is the Drills tab and feeds Plan session. It was built in 11 steps (
   it simple), so it shows no set-up. Code: `adapt()` in `src/lib/training/turnout.ts`.
 - **Change any practice** (TRAK-394): `drills/change` (`?part=`, `?eg=`). Steve's five things that shape every practice,
   each with his example: pick a set-up and the picture (`practiceLayout`), what changes and the key follow it;
-  Conditions shows his three rules. The answers say they are Trak's draft until Steve checks them. Words and layouts:
+  Conditions shows his three rules. Steve checks the answers after the pilot. Words and layouts:
   `src/lib/training/library/practice.ts`; drawn by `PitchPicture` in `DrillPitch.tsx`. The old FA Library's tiles left
   the Drills tab with this step.
 - **Coach-made drill code** (TRAK-395): the helpers for writing and checking a coach's own drill (`drillProblem`,

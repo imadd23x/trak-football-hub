@@ -3,16 +3,15 @@ import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } 
 import { ArrowDown, ArrowUp, ChevronRight, LayoutGrid, List, Minus, Plus, Repeat } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
-import { LIBRARIES, SESSIONS, libraryPath } from '@/lib/library/library'
 import { ON_LIBRARY, PRACTICE_KIND_COLOURS } from '@/lib/fixed-colours'
 import {
-  DETAILS, KINDS, KIND_ORDER, LIBRARY, MY_DRILLS_PATH, PLAYERS_TODAY, START_LEVEL, allDrillsPath, alsoCalled, anotherDrill,
-  changedBy, drillPath, fit, foundAs, squadPlayers, type Changed, kindInfo, kindPath, libraryDrill, nextLevel, refit, searchDrills, step, typesOf, type Change,
+  CHANGE_PRACTICE_PATH, CHARACTERISTICS, KINDS, KIND_ORDER, LIBRARY, MY_DRILLS_PATH, PLAYERS_TODAY, START_LEVEL, allDrillsPath, alsoCalled, anotherDrill,
+  changedBy, characteristic, drillPath, fit, foundAs, squadPlayers, type Changed, kindInfo, kindPath, libraryDrill, nextLevel, practiceKey, practiceLayout, refit, searchDrills, step, typesOf, type Change,
   type Kind, type LibraryDrill, type Squad,
 } from '@/lib/training/library'
 import { useBookmarks, useSquadSize } from '@/components/coach/training/useTraining'
 import { DrillCards } from '@/components/coach/training/library/DrillCard'
-import { DrillPitch, PitchKey } from '@/components/coach/training/library/DrillPitch'
+import { DrillPitch, PitchKey, PitchPicture } from '@/components/coach/training/library/DrillPitch'
 import { PageBookmark } from '@/components/coach/training/library/BookmarkButton'
 import { AddToTraining } from '@/components/coach/training/library/AddToTraining'
 import { AboutDrill, CHIP, ChangeNote, DetailList } from '@/components/coach/training/library/DrillInfo'
@@ -21,13 +20,16 @@ import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { Button } from '@/components/arc/button/button'
+import { Badge } from '@/components/arc/badge/badge'
 
 /* TRAK-387 (Drill Library 3/11, parent TRAK-384): Training › Drills is the new Library, from the 8 Nov mockup. Find a
    drill (results take the place of everything else while the coach types), My drills and All drills, then "What kind
    of practice?" with Steve's three kinds. A practice page lists its drill types simple to complex; All drills groups
    every drill Get ready → Technical → Skill → Game related. Every picture is fitted to the coach's squad at the standard
    level. Searches and filters live in the address, so Back returns to the same spot. No coach-made drills (Kostas,
-   8 Nov). The old FA Library tiles stay below until step 9 (TRAK-394). */
+   8 Nov). TRAK-394 (Drill Library 9/11): Change any practice joins the links under the kinds, and the old FA Library's
+   tiles left (Play It Right was only reached through them). The FA Library still opens at /coach/trainings for an
+   academy with Training off, and players keep Play It Right; nothing is deleted. No Programmes link (Kostas, 8 Nov). */
 
 type PracticeKind = Exclude<Kind, 'warmup'>
 /** Sample content until the real library (TRAK-388); said once, quietly, on each Library page. */
@@ -151,29 +153,13 @@ export function LibraryHome() {
               </li>)}
             </ul>
             <p className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+              <Link to={CHANGE_PRACTICE_PATH} className="font-medium text-brand underline-offset-4 hover:underline">Change any practice</Link>
               <Link to={allDrillsPath('Individual')} className="font-medium text-brand underline-offset-4 hover:underline">Individual work</Link>
               <Link to={allDrillsPath('Goalkeeping')} className="font-medium text-brand underline-offset-4 hover:underline">Goalkeeping</Link>
             </p>
             <p className="text-[13px] text-ink-3">{SAMPLE}</p>
           </section>
 
-          {/* The old FA Library stays until step 9 (TRAK-394). */}
-          <section aria-labelledby="from-library" className="grid gap-3 border-t border-line pt-6">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h2 id="from-library" className="text-lg font-medium text-ink">From the Library</h2>
-              <p className="text-sm text-ink-3">Whole sessions, for ideas</p>
-            </div>
-            <ul className="grid grid-cols-2 gap-2.5 tablet:grid-cols-4">
-              {LIBRARIES.map(library => <li key={library.key}>
-                <Link to={libraryPath(library.key)}
-                  className="flex h-20 flex-col justify-end rounded-[10px] p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  style={{ background: library.colour, color: ON_LIBRARY }}>
-                  <span className="text-[15px] font-medium leading-tight">{library.label}</span>
-                  <span className="text-[12px]">{SESSIONS.filter(s => s.library === library.name).length} sessions</span>
-                </Link>
-              </li>)}
-            </ul>
-          </section>
         </>}
     </div>
   )
@@ -387,4 +373,58 @@ function DrillBody({ drill, start, squadName }: { drill: LibraryDrill; start: Sq
       <p className="text-[13px] text-ink-3">{SAMPLE}</p>
     </div>
   </div>
+}
+
+/* ── Change any practice ────────────────────────────────────────────────── */
+
+const PRACTICE_INTRO = 'Five things shape every practice. Change one and you change what players learn, so you can fit any drill to the players in front of you.'
+
+/** TRAK-394 (from the 8 Nov mockup): Steve's five things, each with his example. Pick a set-up and the picture and
+ *  what changes follow it; Conditions shows his three rules. The thing and the set-up live in the address, so Back
+ *  returns to them. The answers are Trak's draft until Steve checks them, and the page says so. */
+export function ChangePractice() {
+  const [params, setParams] = useSearchParams()
+  const shown = characteristic(params.get('part')) ?? CHARACTERISTICS[0]
+  const examples = shown.examples ?? []
+  const asked = Number(params.get('eg') ?? 0)
+  const eg = Number.isInteger(asked) && examples[asked] ? asked : 0
+  const go = (part: string, example: number) => setParams(() => {
+    const p = new URLSearchParams()
+    if (part !== CHARACTERISTICS[0].key) p.set('part', part)
+    if (example) p.set('eg', String(example))
+    return p
+  }, { replace: true })
+
+  return (
+    <SubPage title="Change any practice" intro={PRACTICE_INTRO}>
+      <div className="arc mb-4">
+        <ChipGroup label="Five things that shape a practice" multiple={false} value={[shown.key]}
+          options={CHARACTERISTICS.map(c => ({ value: c.key, label: c.name }))}
+          onValueChange={next => { if (next[0]) go(next[0], 0) }} />
+      </div>
+      <section aria-labelledby="practice-question" className="grid gap-4 rounded-2xl border border-line bg-surface p-4">
+        <h2 id="practice-question" className="max-w-[60ch] text-xl font-medium leading-snug text-ink">{shown.question}</h2>
+        {shown.rules
+          ? <ul className="grid gap-3 tablet:grid-cols-3" aria-label="Three rules">
+            {shown.rules.map(rule => <li key={rule.title} className="grid content-start gap-1 rounded-xl bg-raised px-3.5 py-3">
+              <span className="text-[17px] font-medium leading-tight text-ink">{rule.title}</span>
+              <span className="text-[15px] text-ink-2">{rule.text}</span>
+            </li>)}
+          </ul>
+          : <div className="grid items-start gap-4 tablet:grid-cols-2">
+            <PitchPicture shapes={practiceLayout(shown.key, eg)} label={`${shown.name} example: ${examples[eg].label}`} />
+            <div className="grid content-start gap-3">
+              <div className="arc">
+                <ChipGroup label="Pick an example" multiple={false} value={[String(eg)]}
+                  options={examples.map((x, i) => ({ value: String(i), label: x.label }))}
+                  onValueChange={next => { if (next[0]) go(shown.key, Number(next[0])) }} />
+              </div>
+              <p className="text-[17px] leading-snug text-ink" aria-live="polite">{examples[eg].answer}</p>
+              <span className="arc"><Badge tone="warning" size="sm">Trak’s draft answer, Steve to check</Badge></span>
+              <PitchKey legend={practiceKey(shown.key, eg)} />
+            </div>
+          </div>}
+      </section>
+    </SubPage>
+  )
 }

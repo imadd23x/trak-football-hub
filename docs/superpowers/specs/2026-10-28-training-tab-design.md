@@ -31,7 +31,7 @@ Every text field has a length limit.
 |---|---|---|---|
 | `coach_drills` | `id` | The coach's own single drills: name (≤80), usual minutes (5–60; the app offers 10–30), how it works (≤1000), what you'll tell them (≤500), and the five details area, numbers, direction, targets, conditions (≤120 each). | 294 |
 | `training_plans` | `event_id` | One plan per training event (`coach_calendar_events(id) ON DELETE CASCADE`), and its coach. | 295 |
-| `training_plan_practices` | `event_id, position` | The plan's practices in order (positions 1–12): name, minutes, how it works, what you'll tell them, the five details (drills' limits), where it came from (`own`, `drill`, `library`) and the drill (`ON DELETE SET NULL`) or Library session it came from. A practice is a copy: changing or deleting a drill never changes a plan. | 295 |
+| `training_plan_practices` | `event_id, position` | The plan's practices in order (positions 1–12): name, minutes, how it works, what you'll tell them, the five details (drills' limits), where it came from (`own`, `drill`, `library`) and the drill (`ON DELETE SET NULL`) or Library session it came from. A practice is a copy: changing or deleting a drill never changes a plan. TRAK-391: `trak_level` (0–7, a Trak drill only), the Library drill's Easier / Harder level as the coach set it; null for every other practice and every older plan. `save_training_plan()` writes it; drafts carry it in `body`. | 295, 391 |
 | `coach_drill_bookmarks` | `coach_user_id, drill` | The Library drills a coach bookmarked (My drills): the drill's Library id (1–40) and when. See Drill Library below. | 390 |
 
 ## Read and write rules
@@ -126,8 +126,18 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
   the picture and key; Easier and Harder move to the next level that changes something and say what changed and why,
   greyed out at the end; the five details, the changed ones marked; why, how to play, watch for; Another drill (the
   next of the same type). Players, level and the last change are kept in the page's history entry, so the page laid
-  out again (phone ↔ laptop) or opened with Back comes back the same. Add to training is left out until TRAK-391
-  rather than shown doing nothing.
+  out again (phone ↔ laptop) or opened with Back comes back the same.
+- **Add to training** (TRAK-391): on a drill's page, a pop-up "Add <drill> to which training?" lists the trainings
+  coming up (the squad picked at the top, or all), each with day, time and Not planned / Draft / Planned. Picking one
+  opens Plan session at Review with the drill as a new part at the end (Kostas, 8 Nov): of the draft if there is one,
+  else the saved plan, else the coach's usual shape. Its part is its kind's (Technical → Passing & movement, Skill →
+  Rondo, Small-sided games → Game, other Game related → Functional drills, Get ready → Dry warm-up), with that part's
+  usual minutes; its five details are the fitted ones in words, at the players and level set on the page, so View and
+  Home's Today card show it unchanged. Nothing is saved until the coach saves. Already in that plan: said, not added
+  twice; a plan of 12 parts: said, not cut. Once a training coming up holds the drill (plan or draft), the button
+  reads "Added to <day>" and opens that plan, with "Add to another training" under it. The planner's state is
+  `{ addLibrary: { drill, players, level } }` (replaces TRAK-296's `addDrill`). Code:
+  `src/components/coach/training/library/AddToTraining.tsx`, `fromLibrary` / `libraryPart` in `src/lib/training/parts.ts`.
 - **Bookmarks** (TRAK-390): My drills is the Library drills a coach bookmarked. `coach_drill_bookmarks`
   (`coach_user_id`, `drill` = the Library id, 1–40 characters, `created_at`; one row per coach and drill): only the
   coach reads, adds or takes out their own; adding and taking out need the training switch (restrictive rules),

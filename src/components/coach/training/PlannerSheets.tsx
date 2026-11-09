@@ -153,7 +153,7 @@ export function OwnDrillSheet({ part, onClose, onSaved }: { part: Part | null; o
     const players = { players_kind: kind, group_size: kind === 'groups' ? size : null }
     if (!keep) {
       const { minutes: _m, ...rest } = draft
-      return onSaved({ ...rest, minutes: 0, source: 'own', trak_drill: null, drill_id: null, library_session: null, ...players })
+      return onSaved({ ...rest, minutes: 0, source: 'own', trak_drill: null, drill_id: null, library_session: null, trak_level: null, ...players })
     }
     setFailed(false)
     add.mutate({ ...draft, part_type: part.type, ...players }, {

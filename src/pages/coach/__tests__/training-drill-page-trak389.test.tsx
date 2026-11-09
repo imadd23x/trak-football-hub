@@ -49,8 +49,8 @@ describe('TRAK-389: a drill’s page', { timeout: 20_000 }, () => {
     expect(screen.getByText('Also called: piggy in the middle, keep ball, toro')).toBeInTheDocument()
     expect(await screen.findByRole('img', { name: /Area shape and size: 13x13 m\. Numbers: 12 players, 9v3\./ })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Set for your squad. Press Easier or Harder and Trak shows what it changed and why.')
-    // Add to training comes with TRAK-391; Add to My drills is TRAK-390's.
-    expect(screen.queryByRole('button', { name: /Add to training/ })).toBeNull()
+    // Add to training is TRAK-391's (training-add-trak391); Add to My drills is TRAK-390's.
+    expect(screen.getByRole('button', { name: /Add to training/ })).toBeTruthy()
   })
 
   it('Harder and Easier move a level, say what changed and why, and mark the changed details', async () => {

@@ -55,7 +55,7 @@ export function useTraining(eventId: string | undefined) {
   })
 }
 
-const PRACTICE_COLUMNS = 'position, name, minutes, how, tell, area, numbers, direction, targets, conditions, source, drill_id, library_session, part, part_type, trak_drill, players_kind, group_size'
+const PRACTICE_COLUMNS = 'position, name, minutes, how, tell, area, numbers, direction, targets, conditions, source, drill_id, library_session, part, part_type, trak_drill, players_kind, group_size, trak_level'
 export type Plan = { updatedAt: string; note: string; practices: SavedPractice[] }
 
 /** A training's plan, or null before its first save. Only its coach reads it (the database's rule). */

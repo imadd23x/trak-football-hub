@@ -1,6 +1,7 @@
 import type { Json } from '@/integrations/supabase/types'
 import { DRILL_LIMITS, blankDrill, type DrillDraft } from './sessions'
 import { PART_TYPES, STANDARD, partInfo, playersShort, shelfDrill, SHELF, type PartType, type Players, type ShelfDrill } from './shelf'
+import { LEVELS, fit, partFor, playersFor, type LibraryDrill } from './library'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): a plan is a list of parts. Each part has a name (the
    coach can rename it), one drill and its minutes. Kept apart from the screens. The limits are the database's
@@ -21,6 +22,8 @@ export type PlanDrill = DrillDraft & {
   library_session: string | null
   players_kind: PlayersKind | null
   group_size: number | null
+  /** TRAK-391: a Library drill's level (0 easiest), as the coach set it on its page. Drafts from before it have none. */
+  trak_level?: number | null
 }
 
 export type Part = { key: string; type: PartType; name: string; minutes: number; drill: PlanDrill | null }
@@ -35,7 +38,32 @@ export function fromShelf(drill: ShelfDrill): PlanDrill {
   return {
     ...blank(), minutes: 0, name: drill.name, how: drill.how, source: 'trak', trak_drill: drill.id, drill_id: null,
     library_session: null, players_kind: drill.players.kind, group_size: drill.players.kind === 'groups' ? drill.players.g : null,
+    trak_level: null,
   }
+}
+
+const clip = (text: string, max: number) => text.trim().slice(0, max)
+
+/** TRAK-391: a Library drill as a plan's drill, fitted to the players and level the coach set on its page. The five
+ *  details are the fitted ones in words, so View and Home's Today card show the drill as the coach saw it. */
+export function fromLibrary(drill: LibraryDrill, players: number, level: number): PlanDrill {
+  const at = Math.min(LEVELS - 1, Math.max(0, Math.round(level)))
+  const { details } = fit(drill, players, at)
+  const takes = playersFor(drill)
+  const detail = (text: string) => clip(text, DRILL_LIMITS.detail)
+  return {
+    name: clip(drill.name, DRILL_LIMITS.name), minutes: 0, how: clip(drill.how.join('\n'), DRILL_LIMITS.how),
+    tell: clip(drill.watch.join('\n'), DRILL_LIMITS.tell), area: detail(details.area), numbers: detail(details.numbers),
+    direction: detail(details.direction), targets: detail(details.targets), conditions: detail(details.conditions),
+    source: 'trak', trak_drill: drill.id, drill_id: null, library_session: null, players_kind: takes.kind,
+    group_size: takes.kind === 'groups' ? takes.g : null, trak_level: at,
+  }
+}
+
+/** TRAK-391: the part a Library drill joins a plan as: its kind's part, with that part's usual minutes. */
+export function libraryPart(drill: LibraryDrill, players: number, level: number): Part {
+  const type = partFor(drill)
+  return { key: newKey(), type, name: partInfo(type).name, minutes: partInfo(type).mins, drill: fromLibrary(drill, players, level) }
 }
 
 export type MyDrill = DrillDraft & { id: string; part_type: string | null; players_kind: string | null; group_size: number | null }
@@ -44,12 +72,13 @@ export type MyDrill = DrillDraft & { id: string; part_type: string | null; playe
 export function fromMyDrill(drill: MyDrill): PlanDrill {
   const { id, part_type: _p, players_kind, group_size, ...draft } = drill
   return { ...draft, source: 'drill', trak_drill: null, drill_id: id, library_session: null,
-    players_kind: (players_kind as PlayersKind | null) ?? null, group_size }
+    players_kind: (players_kind as PlayersKind | null) ?? null, group_size, trak_level: null }
 }
 
 export type SavedPart = DrillDraft & {
   position: number; source: string; drill_id: string | null; library_session: string | null
   part?: string; part_type?: string | null; trak_drill?: string | null; players_kind?: string | null; group_size?: number | null
+  trak_level?: number | null
 }
 
 const knownType = (type: string | null | undefined): PartType =>
@@ -68,7 +97,7 @@ export function partsFromSaved(practices: SavedPart[]): Part[] {
       targets: p.targets, conditions: p.conditions,
       source: (['trak', 'drill', 'own', 'library'].includes(p.source) ? p.source : 'own') as DrillSource,
       trak_drill: p.trak_drill ?? null, drill_id: p.drill_id, library_session: p.library_session,
-      players_kind: (p.players_kind as PlayersKind | null) ?? null, group_size: p.group_size ?? null,
+      players_kind: (p.players_kind as PlayersKind | null) ?? null, group_size: p.group_size ?? null, trak_level: p.trak_level ?? null,
     },
   }))
 }
@@ -88,7 +117,8 @@ export function toSave(parts: Part[]): Json {
     area: part.drill.area, numbers: part.drill.numbers, direction: part.drill.direction, targets: part.drill.targets,
     conditions: part.drill.conditions, source: part.drill.source, drill_id: part.drill.drill_id,
     library_session: part.drill.library_session, trak_drill: part.drill.trak_drill, part: part.name.trim(), part_type: part.type,
-    players_kind: part.drill.players_kind, group_size: part.drill.group_size, save_to_drills: false,
+    players_kind: part.drill.players_kind, group_size: part.drill.group_size, trak_level: part.drill.trak_level ?? null,
+    save_to_drills: false,
   }] : [])
 }
 

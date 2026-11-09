@@ -33,14 +33,6 @@ const TRAININGS = [
   training('t-u14', 'U14', 3, '17:00', 'U14 finishing', { published: false }),
   training('t-last', 'U16', -5, '18:00', 'Pressing zones'),
 ]
-const drill = (id: string, name: string, minutes: number, how: string) => ({
-  id, name, minutes, how, tell: '', area: '', numbers: '', direction: '', targets: '', conditions: '', updated_at: '2026-10-27T10:00:00Z',
-})
-const DRILLS = [
-  drill('d-1', 'Warm-up: rondos 4v1', 15, 'Four round one in a 10 m square. Two touches, then one.'),
-  drill('d-2', 'Pressing on the trigger', 25, 'Press as soon as their 6 turns back.'),
-  drill('d-3', 'Game: 8v8 with conditions', 30, '8v8 + 2 floaters in 30 × 24 m.'),
-]
 // Receiving under pressure is planned already. Each test starts from this; a save keeps the plan sent, so the plan
 // page reads it back.
 const PLANNED: [string, Record<string, unknown>[]][] = [['t-tue', [
@@ -114,7 +106,6 @@ async function backend(context: BrowserContext, unexpected: string[], trainings 
         ({ ...p, position: i + 1, ...(save_to_drills ? { source: 'drill', drill_id: `drill-${i + 1}` } : {}) })))
       return route.fulfill({ status: 204, body: '' })
     }
-    if (path === '/rest/v1/coach_drills' && req.method() === 'GET') return json(DRILLS)
     if (path === '/rest/v1/coach_drill_bookmarks') {
       if (req.method() === 'POST') { bookmarks.add((req.postDataJSON() as { drill: string }).drill); return route.fulfill({ status: 201, body: '' }) }
       if (req.method() === 'DELETE') { bookmarks.delete(url.searchParams.get('drill')!.slice(3)); return route.fulfill({ status: 204, body: '' }) }
@@ -354,6 +345,38 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(keys.missed).toEqual([])
     await added.click()
     await expect(page.getByRole('list', { name: 'The plan' }).getByRole('listitem').last()).toContainText('Pass between defenders')
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+
+  // TRAK-395 (Drill Library 11/11): the whole way, once. A Library drill, bookmarked, added to a training that has
+  // started, saved with the plan, then Who's here fits it to the players who came (1 of the U16's 2, too few for it).
+  test(`Library to Who's here at ${width} px: a drill, bookmarked, added to training, saved, refitted`, async ({ page, context }) => {
+    const started = Date.now() - 10 * MINUTE
+    const today = { ...training('t-now', 'U16', 0, '18:00', 'Keep it tight'), starts_at: new Date(started).toISOString(),
+      ends_at: new Date(started + 90 * MINUTE).toISOString() }
+    const { unexpected, errors } = await open(page, context, '/coach/training/drills', width, height, [today, ...TRAININGS], [],
+      [...SESSIONS, { id: 's-now', event_id: 't-now', session_type: 'training', title: 'Keep it tight', session_date: null, training_type: null, notes: null }],
+      [{ session_id: 's-now', squad_player_id: 'sq-1', status: 'present' }])
+    // Library → a drill → bookmark.
+    await page.getByRole('region', { name: 'What kind of practice?' }).getByRole('link', { name: /^Skill/ }).click()
+    await page.getByRole('link', { name: /^Keep the ball/ }).click()
+    await expect(page.getByRole('heading', { name: 'Keep the ball', level: 1 })).toBeVisible()
+    await page.getByRole('button', { name: 'Add to My drills' }).click()
+    await expect(page.getByRole('button', { name: 'In My drills' })).toHaveAttribute('aria-pressed', 'true')
+    // → Add to training → Plan session at Review → saved.
+    await page.getByRole('button', { name: 'Add to training' }).click()
+    await page.getByRole('dialog', { name: 'Add Keep the ball to which training?' }).getByRole('button', { name: /^Add to Keep it tight/ }).click()
+    await expect(page).toHaveURL(/\/coach\/training\/t-now\/plan$/)
+    // Keep the ball is already Rondo's starter drill, so that part takes it rather than a second copy (TRAK-392).
+    await expect(page.getByRole('list', { name: 'The plan' }).getByRole('listitem').filter({ hasText: 'Keep the ball' })).toHaveCount(1)
+    await page.getByRole('button', { name: 'Save the plan' }).click()
+    await expect(page).toHaveURL(/\/coach\/training$/)
+    // → Who's here: the Library drill is fitted again for the one who came.
+    await page.goto('/coach/training/t-now/here')
+    await expect(page.getByRole('heading', { name: 'Today’s plan for 1 player' })).toBeVisible()
+    await expect(page.getByText('Keep the ball is set up for 8 to 20 players. With 1, pick another drill.')).toBeVisible()
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
   })

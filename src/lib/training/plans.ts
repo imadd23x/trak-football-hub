@@ -29,8 +29,6 @@ export type Practice = DrillDraft & {
   source: PracticeSource
   drill_id: string | null
   library_session: string | null
-  /** Written here and ticked "Save to My drills": the save makes it one of the coach's drills too. */
-  saveToDrills: boolean
   /** TRAK-340: the part it fills, as the coach named it. */
   part?: string
 }
@@ -39,22 +37,21 @@ export type SavedPractice = Pick<Tables<'training_plan_practices'>, 'position' |
   | 'numbers' | 'direction' | 'targets' | 'conditions' | 'source' | 'drill_id' | 'library_session' | 'part' | 'part_type'
   | 'trak_drill' | 'players_kind' | 'group_size' | 'trak_level'>
 
-/** The saved practices, in order, ready to change. One already saved is never saved to My drills again. */
+/** The saved practices, in order, ready to change. */
 export function fromSaved(rows: SavedPractice[]): Practice[] {
   return [...rows].sort((a, b) => a.position - b.position).map(({ position: _p, source, ...row }) => ({
-    ...row, source: source as PracticeSource, saveToDrills: false,
+    ...row, source: source as PracticeSource,
   }))
 }
 
-/** The tag beside a practice. Written here and ticked for My drills, it is the coach's drill once saved. A Library
- *  practice names its library. */
-export function sourceLabel(practice: Pick<Practice, 'source' | 'saveToDrills'> & { library_session?: string | null }): string {
+/** The tag beside a practice. A Library practice names its library; a coach-made drill (none since 8 Nov) is theirs. */
+export function sourceLabel(practice: Pick<Practice, 'source'> & { library_session?: string | null }): string {
   if (practice.source === 'trak') return 'Trak drill'
   if (practice.source === 'library') {
     const session = practice.library_session ? sessionById(practice.library_session) : undefined
     return session ? `Library · ${libraryOf(session).label}` : 'Library'
   }
-  return practice.source === 'drill' || practice.saveToDrills ? 'Your drill' : 'Written here'
+  return practice.source === 'drill' ? 'Your drill' : 'Written here'
 }
 
 export const plannedMinutes = (practices: Pick<Practice, 'minutes'>[]) => practices.reduce((sum, p) => sum + p.minutes, 0)

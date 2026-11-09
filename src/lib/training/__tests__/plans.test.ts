@@ -10,21 +10,19 @@ const saved = (position: number, name: string, over: Partial<SavedPractice> = {}
 })
 
 describe('a saved plan’s practices', () => {
-  it('come back in order, never to be saved to My drills again', () => {
+  it('come back in order', () => {
     const practices = fromSaved([saved(2, 'Finishing 3v2'), saved(1, 'Rondos 4v1', { source: 'drill', drill_id: 'd-1' })])
     expect(practices.map(p => p.name)).toEqual(['Rondos 4v1', 'Finishing 3v2'])
-    expect(practices.every(p => !p.saveToDrills)).toBe(true)
     expect(practices[0]).toMatchObject({ source: 'drill', drill_id: 'd-1' })
     expect(practices[0]).not.toHaveProperty('position')
   })
 
   it('each says where it came from', () => {
-    expect(sourceLabel({ source: 'own', saveToDrills: false })).toBe('Written here')
-    expect(sourceLabel({ source: 'own', saveToDrills: true })).toBe('Your drill')
-    expect(sourceLabel({ source: 'drill', saveToDrills: false })).toBe('Your drill')
-    expect(sourceLabel({ source: 'trak', saveToDrills: false })).toBe('Trak drill')
-    expect(sourceLabel({ source: 'library', saveToDrills: false })).toBe('Library')
-    expect(sourceLabel({ source: 'library', saveToDrills: false, library_session: 'pressing-and-covering-session-pressing-duels' }))
+    expect(sourceLabel({ source: 'own' })).toBe('Written here')
+    expect(sourceLabel({ source: 'drill' })).toBe('Your drill')
+    expect(sourceLabel({ source: 'trak' })).toBe('Trak drill')
+    expect(sourceLabel({ source: 'library' })).toBe('Library')
+    expect(sourceLabel({ source: 'library', library_session: 'pressing-and-covering-session-pressing-duels' }))
       .toBe('Library · Defending')
   })
 })

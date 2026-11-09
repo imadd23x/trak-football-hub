@@ -32,9 +32,9 @@ export function splitTrainings<T extends TrainingEvent>(events: T[], now: number
   return { comingUp, lastWeek }
 }
 
-/* My drills (coach_drills). The limits are the database's checks; change both together. */
+/* A practice's text (training_plan_practices). The limits are the database's checks; change both together. TRAK-395:
+   coach-made drills left for the pilot (Kostas, 8 Nov), and their helpers with them; coach_drills stays, empty, for later. */
 
-export const DRILL_MINUTES = [10, 15, 20, 25, 30] as const
 export const DRILL_LIMITS = { name: 80, how: 1000, tell: 500, detail: 120 } as const
 
 /** The five details every Trak practice can carry, in the mockup's order. */
@@ -48,40 +48,7 @@ export const DRILL_DETAILS = [
 
 export type DrillDetail = (typeof DRILL_DETAILS)[number]['key']
 export type DrillDraft = { name: string; minutes: number; how: string; tell: string } & Record<DrillDetail, string>
-export type Drill = DrillDraft & { id: string; updated_at: string }
 
 export const blankDrill = (): DrillDraft => ({
   name: '', minutes: 15, how: '', tell: '', area: '', numbers: '', direction: '', targets: '', conditions: '',
 })
-
-/** What the coach typed, ready to save: spaces trimmed at both ends. */
-export function cleanDrill(draft: DrillDraft): DrillDraft {
-  const out = { ...draft }
-  for (const key of ['name', 'how', 'tell', ...DRILL_DETAILS.map(d => d.key)] as const) out[key] = draft[key].trim()
-  return out
-}
-
-/** Why a drill (or a plan's practice) can't be saved yet, or null when it can. The name is the only thing it must
- *  have. */
-export function drillProblem(draft: DrillDraft, what: 'drill' | 'practice' = 'drill'): string | null {
-  const drill = cleanDrill(draft)
-  if (!drill.name) return `Give the ${what} a name.`
-  if (drill.name.length > DRILL_LIMITS.name) return `Keep the name to ${DRILL_LIMITS.name} characters.`
-  if (drill.how.length > DRILL_LIMITS.how) return `Keep "How it works" to ${DRILL_LIMITS.how} characters.`
-  if (drill.tell.length > DRILL_LIMITS.tell) return `Keep "What you'll tell them" to ${DRILL_LIMITS.tell} characters.`
-  const long = DRILL_DETAILS.find(d => drill[d.key].length > DRILL_LIMITS.detail)
-  return long ? `Keep ${long.label} to ${DRILL_LIMITS.detail} characters.` : null
-}
-
-/** How many of the five details a drill has. */
-export const detailCount = (drill: DrillDraft) => DRILL_DETAILS.filter(d => drill[d.key].trim()).length
-
-/** The drills whose name or "how it works" holds every word typed, in the order given. */
-export function searchDrills<T extends DrillDraft>(drills: T[], query: string): T[] {
-  const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean)
-  if (!words.length) return drills
-  return drills.filter(drill => {
-    const text = `${drill.name} ${drill.how}`.toLocaleLowerCase()
-    return words.every(word => text.includes(word))
-  })
-}

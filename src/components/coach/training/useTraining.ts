@@ -10,7 +10,7 @@ import { toSave, type Part } from '@/lib/training/parts'
 import type { Again } from '@/lib/training/next'
 
 /* TRAK-294 (Training 1/5): the coach's own trainings for Training home, not cancelled (a published event is cancelled,
-   never deleted), from a week ago on; and the coach's own drills (coach_drills, only they read them).
+   never deleted), from a week ago on. (Coach-made drills left on 8 Nov; TRAK-390 bookmarks Library drills instead.)
    TRAK-295 (Training 2/5): one training, its plan, which trainings are planned, and saving a plan whole.
    TRAK-297 (Training 4/5): every planned session, to copy. Nothing new is stored: a past session is its plan.
    TRAK-298 (Training 5/5): which trainings have their register taken (the loop's Who's here and Close).

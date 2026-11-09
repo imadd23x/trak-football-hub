@@ -44,7 +44,7 @@ explicitly open; an issue being Done does not prove a newer requirement passed.
 | Shared UI | `src/components/trak/` |
 | Squad views (Players, Attributes, Availability) | `src/pages/coach/CoachSquadPage.tsx`, `src/components/coach/squad/`, `src/lib/squad/` |
 | Games (one loop per match, behind the `games` switch) | `docs/superpowers/specs/2026-10-27-games-tab-design.md`, `src/pages/coach/CoachGames.tsx`, `src/components/coach/games/`, `src/lib/games/` |
-| Training (plan each training, My drills, behind the `training` switch) | `docs/superpowers/specs/2026-10-28-training-tab-design.md`, `src/pages/coach/training/`, `src/components/coach/training/`, `src/lib/training/` |
+| Training (plan each training from the Drill Library, My drills = bookmarks, behind the `training` switch) | `docs/superpowers/specs/2026-10-28-training-tab-design.md`, `src/pages/coach/training/`, `src/components/coach/training/`, `src/lib/training/` |
 | Backend permissions and RPCs | `supabase/migrations/` in filename order |
 | Pilot operations and recovery | `docs/pilot-runbook.md`, `docs/release/s5-restore-rehearsal.md` |
 | Use-case contracts | `docs/use-cases/registry.yaml`, `docs/use-cases/OPEN-QUESTIONS.md` |

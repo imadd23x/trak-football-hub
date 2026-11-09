@@ -152,8 +152,8 @@ describe('Players today', () => {
 describe('smart search', () => {
   it('finds drills by name, drill type and kind', () => {
     expect(names('keep the ball')[0]).toBe('Keep the ball')
-    // Every rondo first (its drill type), then Win it, pass it out (a "double rondo", another name for its type).
-    expect(names('rondos')).toEqual([...LIBRARY.filter(d => d.type === 'Rondos').map(d => d.name), 'Win it, pass it out'])
+    // Every rondo first (its drill type), then Win it and get out's drills (a "double rondo", another name for its type).
+    expect(names('rondos')).toEqual(['Rondos', 'Win it and get out'].flatMap(t => LIBRARY.filter(d => d.type === t).map(d => d.name)))
     expect(searchDrills('technical', squad).every(d => d.kind === 'technical')).toBe(true)
   })
 
@@ -202,7 +202,7 @@ describe('smart search', () => {
   it('an empty search lists every drill in Library order; nonsense finds nothing', () => {
     const all = names('')
     expect(all).toHaveLength(LIBRARY.length)
-    expect(all.slice(0, 3)).toEqual(['Moving warm-up', 'Tag games', 'Copy your partner'])
+    expect(all.slice(0, 3)).toEqual(['Moving warm-up', 'Tag games', 'Speed circuit'])
     expect(names('zzzz')).toEqual([])
   })
 
@@ -221,5 +221,40 @@ describe('Another drill', () => {
     const next = anotherDrill(alone)!
     expect(next.kind).toBe('skill')
     expect(next.id).not.toBe(alone.id)
+  })
+})
+
+/* TRAK-388 (Drill Library 10/11): the real library, from the pick list Kostas marked on 9 Nov. */
+describe('the real library', () => {
+  const byName = (name: string) => LIBRARY.find(d => d.name === name)!
+
+  it('keeps every sample’s id but the two Kostas dropped, which stay findable for saved plans and are never listed', () => {
+    for (const id of ['lib-copy-your-partner', 'lib-follow-and-copy']) {
+      expect(libraryDrill(id)?.id).toBe(id)
+      expect(LIBRARY.some(d => d.id === id)).toBe(false)
+      expect(searchDrills('', { players: 12, level: START_LEVEL }).some(d => d.id === id)).toBe(false)
+    }
+    expect(LIBRARY).toHaveLength(57)
+    expect(LIBRARY.every(d => d.id.startsWith('lib-'))).toBe(true)
+  })
+
+  it('Cool-down sits in Get ready and fills Plan session’s Cool-down part', () => {
+    const cool = LIBRARY.filter(d => d.type === 'Cool-down')
+    expect(cool.map(d => d.name)).toEqual(['Easy jog and stretch', 'Walk, pass and talk'])
+    expect(cool.every(d => d.kind === 'warmup' && partFor(d) === 'cooldown')).toBe(true)
+  })
+
+  it('long passes and a keeper’s distribution are 20 to 40 m apart', () => {
+    expect(fit(byName('Long pass and control'), 12, 0).details.area).toBe('20 m between partners')
+    expect(fit(byName('Throw and roll out'), 12, 7).details.area).toBe('40 m between partners')
+    expect(fit(byName('Throw and roll out'), 12, 7).details.conditions).toBe('Pass to whoever the coach calls')
+  })
+
+  it('a ball each with no partner; 1 v 1 at every level; a keeper drill with its own rule', () => {
+    const gates = fit(byName('Dribble through the gates'), 13, START_LEVEL).details
+    expect(gates.numbers).toBe('13 players, a ball each')
+    expect(gates.targets).toBe('Cone gates around the area')
+    for (const lvl of [0, 7]) expect(fit(byName('1 v 1 to goal'), 14, lvl).details.numbers).toBe('14 players, groups of 1v1 and a keeper')
+    expect(fit(byName('Sweep behind the line'), 8, 0).details.conditions).toBe('Ball rolled through, no attacker')
   })
 })

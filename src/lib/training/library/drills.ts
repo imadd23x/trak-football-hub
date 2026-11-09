@@ -1,7 +1,10 @@
 import type { DrillTypeName, Kind } from './kinds'
 
 /* TRAK-385 (Drill Library 1/11, parent TRAK-384): the Library's drills. For now these are the 8 Nov mockup's 44 sample
-   drills, written by Claude and not yet checked by Steve; the real library replaces them in TRAK-388. Kostas, 6 Nov:
+   drills, written by Claude and not yet checked by Steve. TRAK-388 (Drill Library 10/11): the real library, from the
+   pick list Kostas marked on 9 Nov. Trak's built-in shelf (../shelf.ts) and the useful FA sessions were pooled, merged
+   and rewritten in our own words: the samples stay (two retired), 15 are new, Cool-down joins Get ready. Steve still
+   checks the wording. Kostas, 6 Nov:
    a coach can never change a Trak drill, only bookmark it, so each one lives here, not in the database.
 
    Every id starts with `lib-`, so a saved plan's `trak_drill` from the old shelf (`w1`, `p1`, `r1`… in ../shelf.ts)
@@ -50,6 +53,12 @@ export type LibraryDrill = {
   keeper?: boolean
   /** shoot: shots come from different angles. */
   angle?: boolean
+  /** pairs: partners 20 to 40 m apart (long passes, a keeper's distribution). */
+  long?: boolean
+  /** free: a ball each and no partner. */
+  solo?: boolean
+  /** func: always this many attackers v defenders in each turn. */
+  group?: readonly [attackers: number, defenders: number]
   why: string
   how: readonly string[]
   watch: readonly string[]
@@ -66,9 +75,9 @@ export const LIBRARY: readonly LibraryDrill[] = [
     id: 'lib-moving-warm-up', name: 'Moving warm-up', kind: 'warmup', type: 'Dry warm-up', focus: 'team', template: 'warm',
     rule: PACE,
     why: 'Moving through jogs, skips and leg swings gets the body ready before the ball comes out.',
-    how: ['Line up along one side of the area.', 'Jog, high knees, heel flicks and skips across and back.', 'Finish with three short sprints.'],
+    how: ['Line up along one side of the area.', 'Jog, high knees, heel flicks and skips across and back.', 'Finish with three short sprints.', 'Add hip in, hip out and shoulder-to-shoulder runs with a partner.'],
     watch: ['Good posture through every movement.', 'Short rests, so nobody cools down.'],
-    topics: 'warm-up running',
+    topics: 'warm-up running dynamic warm-up FIFA 11+ shuttle runs 5-10-5',
   },
   {
     id: 'lib-tag-games', name: 'Tag games', kind: 'warmup', type: 'Dry warm-up', focus: 'team', template: 'warm',
@@ -76,22 +85,38 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'A game gets players moving and laughing without them noticing the work.',
     how: ['Everyone inside the box. Pick two taggers.', 'A tagged player stands still until a teammate frees them.', 'Three rounds of 90 seconds.'],
     watch: ['Players look up and change direction.', 'Change the taggers every round.'],
-    topics: 'warm-up tag fun',
+    topics: 'warm-up tag fun stuck in the mud chain tag sharks and fish cat and mouse',
   },
   {
-    id: 'lib-copy-your-partner', name: 'Copy your partner', kind: 'warmup', type: 'Dry warm-up', focus: 'team', template: 'warm',
-    rule: PACE,
-    why: 'Copying a partner wakes up quick feet and the eyes at the same time.',
-    how: ['Stand opposite a partner.', 'One leads with side steps, turns and stops. The other copies.', 'Swap every 30 seconds.'],
-    watch: ['Knees bent, on the toes.', 'Eyes on the partner’s hips.'],
-    topics: 'warm-up agility footwork',
+    id: 'lib-speed-circuit', name: 'Speed circuit', kind: 'warmup', type: 'Dry warm-up', focus: 'team', template: 'warm',
+    rule: ['Walk through each station', 'Walk through each station', 'Half pace', 'Half pace', 'Three-quarter pace', 'Full pace', 'Full pace', 'Full pace, go on the coach’s call'],
+    why: 'Short, sharp footwork wakes up the legs, so players are ready to move fast when the ball comes out.',
+    how: ['Set out four stations: a ladder, low hurdles, poles to weave through and a 10 m sprint lane.', 'Groups spend two minutes at each station, then move on.', 'Finish with partner drives: one holds the other’s hips while they drive forward for 10 m.'],
+    watch: ['Quick, light steps on the balls of the feet.', 'Quality before speed. Slow down if feet hit the kit.'],
+    topics: 'warm-up speed agility quickness SAQ ladder hurdles poles resistance runs footwork',
+  },
+  {
+    id: 'lib-easy-jog-and-stretch', name: 'Easy jog and stretch', kind: 'warmup', type: 'Cool-down', focus: 'team', template: 'warm',
+    rule: ['Walk, short stretches', 'Walk, short stretches', 'Easy jog, 15-second stretches', 'Easy jog, 15-second stretches', 'Easy jog, 20-second stretches', 'Easy jog, 20-second stretches', 'Easy jog, 30-second stretches', 'Easy jog, 30-second stretches'],
+    why: 'Slowing down gently helps the body recover, and is a calm moment to end the session.',
+    how: ['Two easy laps of the area.', 'Stretch calves, hamstrings, thighs and hips. Hold each for 20 seconds.', 'Pair up for partner stretches if you like.'],
+    watch: ['Slow, steady breathing.', 'Stretches feel gentle, never painful.'],
+    topics: 'cool-down cool down warm down stretching static stretches partner stretches recovery',
+  },
+  {
+    id: 'lib-walk-pass-and-talk', name: 'Walk, pass and talk', kind: 'warmup', type: 'Cool-down', focus: 'team', template: 'pairs',
+    rule: 'Walking pace, two touches',
+    why: 'An easy end with the ball, then a few words, helps players remember what they learnt.',
+    how: ['Pairs walk and pass for three minutes.', 'Then everyone stands in a circle.', 'Each player says one thing that went well today.'],
+    watch: ['Keep it calm and short.', 'Everyone gets a turn to speak.'],
+    topics: 'cool-down cool down walking passes team talk reflection debrief',
   },
   {
     id: 'lib-pass-and-follow', name: 'Pass and follow', kind: 'technical', type: 'Passing', focus: 'team', template: 'groups',
     why: 'Moving straight after the pass is the habit that keeps a team’s ball moving.',
-    how: ['Each group stands on the cones of a square.', 'Pass to the next cone, then follow your pass.', 'Keep the ball moving round the square.'],
+    how: ['Each group stands on the cones of a square.', 'Pass to the next cone, then follow your pass.', 'Keep the ball moving round the square.', 'For a change of angle, use a triangle or a diamond.'],
     watch: ['Players move as soon as the ball leaves their foot.', 'Passes go to the far foot of the next player.'],
-    topics: 'pass and move',
+    topics: 'pass and move triangle passing diamond passing passing square',
   },
   {
     id: 'lib-move-away-come-back', name: 'Move away, come back', kind: 'technical', type: 'Passing', focus: 'team', template: 'groups',
@@ -113,7 +138,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'A clean pass is the base of everything else, so it’s worth getting right without pressure first.',
     how: ['Partners face each other with a small gate between them.', 'Pass through the gate and back.', 'Keep count of how many in a row.'],
     watch: ['Standing foot points at the target.', 'Strike through the middle of the ball.'],
-    topics: 'passing technique accuracy',
+    topics: 'passing technique accuracy passing in pairs on the move',
   },
   {
     id: 'lib-first-touch-and-turn', name: 'First touch and turn', kind: 'technical', type: 'Passing', focus: 'individual', template: 'pairs',
@@ -121,6 +146,14 @@ export const LIBRARY: readonly LibraryDrill[] = [
     how: ['Partners pass to each other.', 'Receive across the body with the back foot.', 'Turn out and pass back on the other side.'],
     watch: ['Look over the shoulder before the ball arrives.', 'First touch goes away from the imaginary defender.'],
     topics: 'receiving first touch turning half turn',
+  },
+  {
+    id: 'lib-long-pass-and-control', name: 'Long pass and control', kind: 'technical', type: 'Passing', focus: 'individual', template: 'pairs',
+    long: true, rule: ['Pass along the ground, stronger foot', 'Pass along the ground, stronger foot', 'Driven pass, stronger foot', 'Driven pass, either foot', 'Driven pass, either foot', 'Lofted pass, control in two touches', 'Lofted pass, control in one touch', 'Lofted pass, weaker foot only'],
+    why: 'A long pass that arrives cleanly switches play in one go, and only works if the receiver can kill it.',
+    how: ['Partners stand far apart, facing each other.', 'Strike a long pass to your partner.', 'Your partner controls it and plays it back the same way.'],
+    watch: ['Lock the ankle and strike through the ball.', 'The receiver moves into line early and cushions the ball.'],
+    topics: 'long passing driven pass lofted pass switch channels range of passing',
   },
   {
     id: 'lib-shift-with-the-ball', name: 'Shift with the ball', kind: 'technical', type: 'Pressing movement', focus: 'team', template: 'groups',
@@ -139,12 +172,13 @@ export const LIBRARY: readonly LibraryDrill[] = [
     topics: 'defensive line stepping up offside',
   },
   {
-    id: 'lib-follow-and-copy', name: 'Follow and copy', kind: 'technical', type: 'Follow and copy', focus: 'team', template: 'free',
-    rule: PACE,
-    why: 'Following a partner forces players to look up and react while the ball stays close.',
-    how: ['Pair up inside the area, a ball each.', 'The leader dribbles anywhere. The follower copies every move.', 'Swap roles every 30 seconds.'],
-    watch: ['Head up between touches.', 'Small touches when the leader changes direction.'],
-    topics: 'dribbling ball control awareness',
+    id: 'lib-dribble-through-the-gates', name: 'Dribble through the gates', kind: 'technical', type: 'Follow and copy', focus: 'team', template: 'free',
+    solo: true, overlay: 'gates', targets: 'Cone gates around the area',
+    rule: ['Copy the coach’s move, walking pace', 'Copy the coach’s move, walking pace', 'Copy the coach’s move, jogging', 'Copy the coach’s move, jogging', 'A new move at every gate', 'A new move at every gate', 'Weaker foot only', 'As many gates as you can in 60 seconds'],
+    why: 'Copying a move many times, with the head up between gates, turns it into one players use without thinking.',
+    how: ['Put small cone gates all around the area. Everyone has a ball.', 'The coach shows a move. Players copy it as they dribble through any gate.', 'After a minute, the coach shows a new move.'],
+    watch: ['Small touches, the ball close to the feet.', 'Heads up between gates to find the next free one.'],
+    topics: 'dribbling skills moves ball mastery through the gates skills tunnel dare to dribble running with the ball',
   },
   {
     id: 'lib-look-and-call', name: 'Look and call', kind: 'technical', type: 'Repetition', focus: 'team', template: 'groups',
@@ -165,9 +199,24 @@ export const LIBRARY: readonly LibraryDrill[] = [
   {
     id: 'lib-shoot-from-the-line', name: 'Shoot from the line', kind: 'technical', type: 'Repetition', focus: 'individual', template: 'shoot',
     why: 'Repeating a clean strike builds the habit players need when a chance arrives.',
-    how: ['Players queue at the shooting line.', 'One touch to set, then shoot.', 'Collect the ball and rejoin the queue.'],
+    how: ['Players queue at the shooting line.', 'One touch to set, then shoot.', 'Collect the ball and rejoin the queue.', 'Change the serve: a lay-off from a partner, or a feed to volley.'],
     watch: ['Look at the corner, then the ball.', 'Land on the shooting foot.'],
-    topics: 'shooting finishing striking',
+    topics: 'shooting finishing striking shooting finishing lay-off volleys edge of the box',
+  },
+  {
+    id: 'lib-one-two-and-finish', name: 'One-two and finish', kind: 'technical', type: 'Repetition', focus: 'team', template: 'shoot',
+    why: 'A quick one-two gets the shooter past a defender and into a clear shot.',
+    how: ['A wall player stands at the edge of the box.', 'Pass into the wall player, run past and take the return.', 'Shoot first time, then swap with the wall player.'],
+    watch: ['Pass firmly into the wall player’s front foot.', 'Run as soon as the pass goes.'],
+    topics: 'shooting finishing one-two wall pass combine to finish',
+  },
+  {
+    id: 'lib-turn-and-shoot', name: 'Turn and shoot', kind: 'technical', type: 'Repetition', focus: 'individual', template: 'shoot',
+    angle: true,
+    why: 'Strikers often get the ball with their back to goal, so the turn has to come before the shot.',
+    how: ['Stand with your back to goal at the edge of the box.', 'A partner plays the ball in to your feet.', 'Turn and shoot within three touches.'],
+    watch: ['Look over the shoulder before the ball arrives.', 'The first touch turns you, so the second can be the shot.'],
+    topics: 'shooting finishing turning back to goal striker',
   },
   {
     id: 'lib-tackle-practice', name: 'Tackle practice', kind: 'technical', type: 'Repetition', focus: 'individual', template: 'pairs',
@@ -193,11 +242,35 @@ export const LIBRARY: readonly LibraryDrill[] = [
     topics: 'goalkeeper gk keeper positioning angles',
   },
   {
+    id: 'lib-save-and-get-up', name: 'Save and get up', kind: 'technical', type: 'Repetition', focus: 'goalkeeping', template: 'shoot',
+    angle: true,
+    why: 'A keeper who gets up fast is ready for the rebound or the next shot.',
+    how: ['Servers stand in an arc in front of goal.', 'One shoots. The keeper saves, gets up and sets.', 'The next server shoots as soon as the keeper is set.'],
+    watch: ['Hands go to the ball first, then the body behind it.', 'Up on the feet before looking for the next ball.'],
+    topics: 'goalkeeping shot stopping diving rebounds recovery',
+  },
+  {
+    id: 'lib-throw-and-roll-out', name: 'Throw and roll out', kind: 'technical', type: 'Repetition', focus: 'goalkeeping', template: 'pairs',
+    long: true, rule: ['Roll to feet', 'Roll to feet', 'Bowl to feet', 'Throw to feet', 'Throw into space ahead', 'Side volley to a runner', 'Drop kick to a runner', 'Pass to whoever the coach calls'],
+    why: 'Most attacks start with the keeper, so a quick, accurate release is worth practising.',
+    how: ['The keeper holds the ball. A partner stands far away.', 'Release the ball to the partner the way the coach says.', 'The partner plays it back and moves to a new spot.'],
+    watch: ['Step towards the target as the ball is released.', 'The ball arrives where the partner can use it.'],
+    topics: 'goalkeeping distribution throwing kicking rolling out starting attacks',
+  },
+  {
+    id: 'lib-sweep-behind-the-line', name: 'Sweep behind the line', kind: 'technical', type: 'Repetition', focus: 'goalkeeping', template: 'shoot',
+    rule: ['Ball rolled through, no attacker', 'Ball rolled through, no attacker', 'Ball passed through, no attacker', 'Ball passed through, attacker 15 m away', 'Ball passed through, attacker 10 m away', 'Ball chipped through, attacker 10 m away', 'Ball chipped through, attacker 5 m away', 'Through ball from either side, attacker 5 m away'],
+    why: 'A keeper who reads a ball played in behind can clear it before the striker gets there.',
+    how: ['A server plays the ball into the space behind an imaginary back line.', 'The keeper reads it, comes off the line and clears or gathers it.', 'Back into the goal, ready for the next one.'],
+    watch: ['Start a few steps off the line, not on it.', 'Decide early: come for it, or stay.'],
+    topics: 'goalkeeping sweeper keeper space in behind through ball coming off the line',
+  },
+  {
     id: 'lib-keep-the-ball', name: 'Keep the ball', kind: 'skill', type: 'Rondos', focus: 'team', template: 'square',
     why: 'More players than defenders means the player on the ball should always have two people to pass to.',
     how: ['Attackers spread around the square, defenders start in the middle.', 'Attackers keep the ball for as long as they can.', 'If a defender wins it, they swap with the player who lost it.'],
     watch: ['Players move before the pass, not after it.', 'Body open, so they can see the next pass.'],
-    topics: 'possession keep ball',
+    topics: 'possession keep ball 3v1 4v1 4v2 5v2',
   },
   {
     id: 'lib-four-corners', name: 'Four corners', kind: 'skill', type: 'Rondos', focus: 'team', template: 'square',
@@ -213,7 +286,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'A gap is only useful if someone spots it and plays through it.',
     how: ['Attackers keep the ball around the square.', 'A pass that goes between two defenders scores a point.', 'First to five points, then swap defenders.'],
     watch: ['Players look up before the ball arrives.', 'The receiver moves into the gap on the far side.'],
-    topics: 'splitting pass through ball line breaking pass penetration',
+    topics: 'splitting pass through ball line breaking pass penetration target player breaking lines split pass',
   },
   {
     id: 'lib-block-the-gates', name: 'Block the gates', kind: 'skill', type: 'Rondos', focus: 'team', template: 'square',
@@ -245,7 +318,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'A run around the outside gives one defender two problems.',
     how: ['Attackers go at goal in a group.', 'A wide player must run around the player on the ball.', 'Finish from the cross or the cut-back.'],
     watch: ['The overlap starts as the ball arrives wide.', 'Other attackers get into the box early.'],
-    topics: 'overlap crossing wide play finishing',
+    topics: 'overlap crossing wide play finishing overlap and cross',
   },
   {
     id: 'lib-through-ball-and-finish', name: 'Through ball and finish', kind: 'skill', type: 'Attack in turns', focus: 'team', template: 'func',
@@ -253,7 +326,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'The space behind defenders is the most dangerous space on the pitch.',
     how: ['Attackers go at goal in a group.', 'Goals only count from a pass played behind the defenders.', 'The next group starts when the shot is taken.'],
     watch: ['The runner stays onside by bending the run.', 'The pass goes in front of the runner.'],
-    topics: 'through ball runs in behind finishing',
+    topics: 'through ball runs in behind finishing 2v1 to goal getting in behind',
   },
   {
     id: 'lib-defend-each-attack', name: 'Defend each attack', kind: 'skill', type: 'Attack in turns', focus: 'team', template: 'func',
@@ -269,7 +342,23 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'A read pass turns defending into a fast attack.',
     how: ['Attackers go at goal in a group.', 'Defenders look for the pass they can step in front of.', 'After an interception, they counter to a small goal.'],
     watch: ['Defenders hold their position, then go late.', 'First look after the interception is forward.'],
-    topics: 'interception counter attack transition',
+    topics: 'interception counter attack transition finishing waves counter-attack',
+  },
+  {
+    id: 'lib-1v1-to-goal', name: '1 v 1 to goal', kind: 'skill', type: 'Attack in turns', focus: 'team', template: 'func',
+    group: [1, 1], rule: 'Score within eight seconds',
+    why: 'Beating a player one against one is the skill that breaks a game open.',
+    how: ['Attackers and defenders queue at each side of the area.', 'The coach plays a ball in. The attacker goes at the defender and tries to score.', 'The defender wins it and dribbles over the halfway line. Next pair goes.'],
+    watch: ['Attack the defender’s front foot at speed.', 'A change of pace after the move, not before.'],
+    topics: 'dribbling 1v1 one against one beating a player take on escaping a defender recovery runs',
+  },
+  {
+    id: 'lib-cross-and-attack-the-box', name: 'Cross and attack the box', kind: 'skill', type: 'Attack in turns', focus: 'team', template: 'func',
+    overlay: 'wide', rule: 'Goals from a cross or a cut-back only',
+    why: 'Crosses only work when runners arrive in the right spaces at the right time.',
+    how: ['A wide player dribbles down the side and crosses.', 'Attackers run to the near post, the far post and the edge of the box.', 'Defenders try to clear it. Next group goes.'],
+    watch: ['Runners arrive late and fast, not standing waiting.', 'The cross goes behind the defenders, in front of the keeper.'],
+    topics: 'crossing finishing near post far post fox in the box wing play',
   },
   {
     id: 'lib-win-it-pass-it-out', name: 'Win it, pass it out', kind: 'skill', type: 'Win it and get out', focus: 'team', template: 'square',
@@ -277,7 +366,15 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'Winning the ball is only half the job. The next pass has to get it out of the crowd.',
     how: ['Two grids side by side, a rondo in each.', 'Attackers keep the ball in their grid.', 'Defenders who win it pass into the other grid to score.'],
     watch: ['The first look after winning it is away from the pressure.', 'Attackers react the moment they lose it.'],
-    topics: 'transition counter press win it',
+    topics: 'transition counter press win it 6v3 two boxes',
+  },
+  {
+    id: 'lib-win-it-back-in-five', name: 'Win it back in five', kind: 'skill', type: 'Win it and get out', focus: 'team', template: 'square',
+    rule: 'Lose it? Win it back within five seconds', targets: 'Keep the ball. Defenders score by passing out of the square',
+    why: 'The best moment to win the ball back is straight after losing it, before the other team is organised.',
+    how: ['Attackers keep the ball in the square against the defenders.', 'When defenders win it, they try to pass it out of the square to score.', 'The attackers who lost it have five seconds to win it back.'],
+    watch: ['The nearest player goes straight to the ball.', 'Teammates close the passes around it.'],
+    topics: 'counter-pressing gegenpressing transition win it back pressing after losing the ball',
   },
   {
     id: 'lib-keep-it-with-spare-players', name: 'Keep it with spare players', kind: 'skill', type: 'Possession', focus: 'team', template: 'game',
@@ -285,7 +382,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'Bigger numbers and more room make it feel like a match without the pressure of goals.',
     how: ['Two teams in one area, with no goals.', 'The team with the ball uses any spare players.', 'Ten passes in a row scores a point.'],
     watch: ['Players spread out as soon as their team wins the ball.', 'Passes go away from the pressure.'],
-    topics: 'possession keep ball',
+    topics: 'possession keep ball 10 passes',
   },
   {
     id: 'lib-switch-the-play', name: 'Switch the play', kind: 'skill', type: 'Possession', focus: 'team', template: 'game',
@@ -325,7 +422,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'Teams that stay patient get better chances, because the other team gets tired of chasing.',
     how: ['Two teams, two goals.', 'A team must complete the passes before it can shoot.', 'Any spare players join whichever team has the ball.'],
     watch: ['Nobody rushes a shot to get it over with.', 'Players offer an easy pass when a teammate is under pressure.'],
-    topics: 'patience possession build up',
+    topics: 'patience possession build up two touch',
   },
   {
     id: 'lib-go-wide-first', name: 'Go wide first', kind: 'game', type: 'Small-sided games', focus: 'team', template: 'game',
@@ -333,7 +430,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
     why: 'Using the width of the pitch pulls defenders apart and opens the middle.',
     how: ['Mark a lane down each side of the pitch.', 'A team must play one pass into a wide lane before it can shoot.', 'Any spare players join whichever team has the ball.'],
     watch: ['Wide players stay wide until the ball arrives.', 'The team looks for the gap the defenders left.'],
-    topics: 'width wingers crossing wide play',
+    topics: 'width wingers crossing wide play goals from crosses count double',
   },
   {
     id: 'lib-end-zone-game', name: 'End-zone game', kind: 'game', type: 'Small-sided games', focus: 'team', template: 'game',
@@ -376,6 +473,13 @@ export const LIBRARY: readonly LibraryDrill[] = [
     topics: 'shooting finishing',
   },
   {
+    id: 'lib-just-play', name: 'Just play', kind: 'game', type: 'Small-sided games', focus: 'team', template: 'game',
+    why: 'Players learn the game by playing it, so let them play and watch what they do.',
+    how: ['Split into small teams on small pitches with goals.', 'Play with as few rules as you can.', 'For a festival, run short games and swap opponents each round.'],
+    watch: ['Who looks for the ball and who hides.', 'Save the coaching for the break, not during play.'],
+    topics: 'free play small sided games mini goals tournament festival scrimmage',
+  },
+  {
     id: 'lib-attack-down-the-side', name: 'Attack down the side', kind: 'game', type: 'Position practice', focus: 'team', template: 'funcm',
     rule: 'A goal from a cross counts double', overlay: 'wide',
     why: 'Two players on one side learn when to overlap and when to stay, in the positions they play.',
@@ -392,12 +496,20 @@ export const LIBRARY: readonly LibraryDrill[] = [
     topics: 'defending back line back four offside line',
   },
   {
+    id: 'lib-build-through-midfield', name: 'Build through midfield', kind: 'game', type: 'Position practice', focus: 'team', template: 'funcm',
+    overlay: 'middle', rule: 'A goal after a pass through the middle zone counts double',
+    why: 'Midfielders who can receive and turn in the middle take the ball past the other team’s lines.',
+    how: ['Two even teams in their positions, one goal and a keeper.', 'Attackers build from the back through a zone in the middle.', 'Defenders win it and play out past halfway.'],
+    watch: ['Midfielders open their body to see forward before the ball arrives.', 'Players move off the ball to make space in the middle.'],
+    topics: 'midfield build-up playing through the lines central areas building the attack',
+  },
+  {
     id: 'lib-play-out-from-the-keeper', name: 'Play out from the keeper', kind: 'game', type: 'Attack v defence', focus: 'team', template: 'game',
     rule: 'Stop the ball on the target line to score', targets: 'Full-width line at the far end', overlay: 'target', keeper: true,
     why: 'A wide target rewards playing through the thirds, not just down the middle.',
     how: ['The keeper starts every attack from the goal.', 'Their team plays out and scores by stopping the ball on the target line.', 'If the other team wins it, they go straight at the goal.'],
     watch: ['Players spread wide before the keeper plays.', 'The first pass goes to the player with most time.'],
-    topics: 'playing out from the back build up goalkeeper distribution',
+    topics: 'playing out from the back build up goalkeeper distribution playing out from the back 6v4',
   },
   {
     id: 'lib-press-from-the-front', name: 'Press from the front', kind: 'game', type: 'Attack v defence', focus: 'team', template: 'game',
@@ -409,9 +521,31 @@ export const LIBRARY: readonly LibraryDrill[] = [
   },
 ]
 
-const byId = new Map(LIBRARY.map(d => [d.id, d]))
+/** TRAK-388 (Kostas, 9 Nov): drills taken out of the Library. A saved plan can still name them, so they stay findable
+ *  by id; they're never listed, searched or offered. */
+const RETIRED: readonly LibraryDrill[] = [
+  {
+    id: 'lib-copy-your-partner', name: 'Copy your partner', kind: 'warmup', type: 'Dry warm-up', focus: 'team', template: 'warm',
+    rule: PACE,
+    why: 'Copying a partner wakes up quick feet and the eyes at the same time.',
+    how: ['Stand opposite a partner.', 'One leads with side steps, turns and stops. The other copies.', 'Swap every 30 seconds.'],
+    watch: ['Knees bent, on the toes.', 'Eyes on the partner’s hips.'],
+    topics: 'warm-up agility footwork',
+  },
 
-/** A Library drill by its id, or undefined (an old shelf id, or one since removed). */
+  {
+    id: 'lib-follow-and-copy', name: 'Follow and copy', kind: 'technical', type: 'Follow and copy', focus: 'team', template: 'free',
+    rule: PACE,
+    why: 'Following a partner forces players to look up and react while the ball stays close.',
+    how: ['Pair up inside the area, a ball each.', 'The leader dribbles anywhere. The follower copies every move.', 'Swap roles every 30 seconds.'],
+    watch: ['Head up between touches.', 'Small touches when the leader changes direction.'],
+    topics: 'dribbling ball control awareness',
+  },
+]
+
+const byId = new Map([...LIBRARY, ...RETIRED].map(d => [d.id, d]))
+
+/** A Library drill by its id, retired ones included, or undefined (an old shelf id). */
 export const libraryDrill = (id: string | null | undefined) => (id ? byId.get(id) : undefined)
 
 /** Another drill (TRAK-389): the next one of the same drill type, round to the first; when the type has only this one,

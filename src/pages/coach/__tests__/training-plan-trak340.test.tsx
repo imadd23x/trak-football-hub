@@ -159,19 +159,19 @@ describe('TRAK-340: a new plan', { timeout: 30_000 }, () => {
     const user = userEvent.setup()
     const now = Date.now()
     database([training('past', onTheMinute(now - 3 * DAY)), training('soon', onTheMinute(now + DAY))], {
-      past: [trak(1, lib('Copy your partner').id, 'Copy your partner', 'Warm-up', 'warmup', 10), trak(2, lib('Four corners').id, 'Four corners', 'Rondo', 'rondo', 20),
+      past: [trak(1, lib('Tag games').id, 'Tag games', 'Warm-up', 'warmup', 10), trak(2, lib('Four corners').id, 'Four corners', 'Rondo', 'rondo', 20),
         practice(3, 'Our press', { part: 'Pressing game', part_type: 'own', minutes: 30 })],
     })
     renderApp('/coach/training/soon/plan')
     await part('Warm-up')
     await waitFor(() => expect(session()).toHaveLength(3))
-    expect(session()[0]).toContain('Copy your partner')
+    expect(session()[0]).toContain('Tag games')
     expect(session()[1]).toContain('Four corners')
     expect(session()[2]).toContain('Pressing game')
     expect(session()[2]).toContain('No drill yet')
     expect(screen.getByText('Started from the parts you used last time.')).toBeInTheDocument()
     const warmup = await part('Warm-up')
-    expect(within(warmup).getByRole('button', { name: /^Copy your partner/, pressed: true })).toHaveTextContent('Your usual · 1 of your last 1')
+    expect(within(warmup).getByRole('button', { name: /^Tag games/, pressed: true })).toHaveTextContent('Your usual · 1 of your last 1')
     await user.click(screen.getByRole('button', { name: 'Start from Trak’s 5 parts' }))
     await waitFor(() => expect(session()).toHaveLength(5))
     expect(screen.queryByRole('button', { name: 'Start from Trak’s 5 parts' })).toBeNull()
@@ -232,7 +232,7 @@ describe('TRAK-340: drills', { timeout: 30_000 }, () => {
     await part('Dry warm-up')
     await next('Passing & movement')
     const passing = await part('Passing & movement')
-    await user.click(within(passing).getByRole('button', { name: /^See more drills \(11\)/ }))
+    await user.click(within(passing).getByRole('button', { name: new RegExp(`^See more drills \\(${LIBRARY.filter(d => d.kind === 'technical').length - 3}\\)`) }))
     const sheet = await screen.findByRole('dialog', { name: 'More drills for Passing & movement' })
     expect(within(sheet).getAllByRole('heading', { level: 3 }).map(h => h.textContent))
       .toEqual(['Passing', 'Pressing movement', 'Follow and copy', 'Repetition', 'Individual', 'Goalkeeping'])

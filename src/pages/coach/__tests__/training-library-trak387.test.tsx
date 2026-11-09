@@ -127,7 +127,7 @@ describe('TRAK-387: the Library’s pages', { timeout: 20_000 }, () => {
 
   it('Game related says 11 v 11 has no sample yet', async () => {
     renderApp('/coach/training/drills/kind/game')
-    expect(await screen.findByText('Needs 22 players and a full pitch. No sample yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Needs 22 players and a full pitch. None yet.')).toBeInTheDocument()
   })
 
   it('All drills: grouped Get ready → Technical → Skill → Game related, with filters and its own search', async () => {
@@ -138,7 +138,7 @@ describe('TRAK-387: the Library’s pages', { timeout: 20_000 }, () => {
       .toEqual(['Get ready', 'Technical practices', 'Skill practices', 'Game related practices']))
     await user.click(screen.getByRole('button', { name: 'Goalkeeping' }))
     expect(await screen.findByRole('heading', { name: 'Goalkeeping', level: 1 })).toBeInTheDocument()
-    expect(screen.getByText(/^2 drills\./)).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`^${LIBRARY.filter(d => d.focus === 'goalkeeping').length} drills\\.`))).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'All' }))
     await user.type(screen.getByRole('searchbox', { name: 'Search drills' }), 'posession')
     const found = await screen.findByRole('list', { name: 'Drills found' })

@@ -182,7 +182,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         if (url.pathname === '/rest/v1/season_plans') return json([])
         // TRAK-355: who the coach is watching; no one.
         if (url.pathname === '/rest/v1/player_watches') return json([])
-        if (['get_children_awaiting_consent', 'get_roster_children_awaiting_consent', 'get_my_child_logins', 'get_my_approved_children_awaiting_signup', 'get_player_invites_for_current_user', 'family_training_history', 'my_calendar_link'].some(name => url.pathname === `/rest/v1/rpc/${name}`)) return json([])
+        if (['get_children_awaiting_consent', 'get_roster_children_awaiting_consent', 'get_my_child_logins', 'get_my_approved_children_awaiting_signup', 'get_player_invites_for_current_user', 'family_training_history', 'my_calendar_link', 'season_plan_for_player'].some(name => url.pathname === `/rest/v1/rpc/${name}`)) return json([])
         if (url.pathname === '/rest/v1/telemetry_events') return route.fulfill({ status: 201, body: '' })
         // TRAK-262: notification_settings is coach Home's Needs you switch (no row: on).
         if (['matches', 'player_details', 'coach_details', 'recognition_awards', 'session_attendance', 'event_absences', 'notification_settings',

@@ -18,6 +18,7 @@ import { trackEvent } from '@/lib/telemetry'
 import CardRevealModal from '@/components/player/CardRevealModal'
 import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
 import { OwnConsentCard } from '@/components/player/OwnConsentCard'
+import { MySeasonCard } from '@/components/player/MySeasonCard'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
 
 const QUOTES = [
@@ -475,6 +476,9 @@ export default function PlayerHome() {
         )}
 
         {user && <PlayerParentInviteCard playerUserId={user.id} hideWhenLinked />}
+
+        {/* TRAK-397: the season plan the coach shared; nothing here when there is none. */}
+        {user && <MySeasonCard key={user.id} />}
 
         {/* Hero Card: a light card like the rest; band words in their readable shades (TRAK-229) */}
         <div className="relative rounded-[24px] p-5 mb-3.5 overflow-hidden"

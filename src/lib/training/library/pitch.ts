@@ -81,6 +81,8 @@ export function layout(d: Pick<LibraryDrill, 'id' | 'overlay'>, f: Pick<Fitted, 
       for (const [cx, cy] of [[x, y], [x + s, y], [x, y + s], [x + s, y + s]]) cone(cx, cy)
       if (d.overlay === 'quarters') out.push({ s: 'lines', d: `M${x + s / 2} ${y}V${y + s}M${x} ${y + s / 2}H${x + s}`, dashed: true })
       if (D.type === 'scatter') {
+        // TRAK-388: gates to dribble through (Dribble through the gates).
+        if (d.overlay === 'gates') for (const [gx, gy] of [[0.25, 0.3], [0.72, 0.25], [0.3, 0.72], [0.75, 0.7], [0.5, 0.5]]) { cone(x + gx * s - 12, y + gy * s); cone(x + gx * s + 12, y + gy * s) }
         const a = scatter(R, x, y, s, s, G.att, [], 26), b = scatter(R, x, y, s, s, G.def, a, 26)
         a.forEach(p => { player(p[0], p[1], 'main', 9); if (!D.noBall) ball(p[0] + 11, p[1] + 8) })
         b.forEach(p => player(p[0], p[1], 'other', 9))
@@ -138,7 +140,8 @@ export function layout(d: Pick<LibraryDrill, 'id' | 'overlay'>, f: Pick<Fitted, 
     if (near) ball(near[0] + 10, near[1] + 9)
     out.push({ s: 'size', x: W / 2, y: y + Wd + 26, text: `${D.L} x ${D.W} m` })
   } else if (D.type === 'pairs') {
-    const cols = D.pairs > 5 ? 2 : 1, rows = Math.ceil(D.pairs / cols), px = D.gap * 15
+    // TRAK-388: long gaps (20 to 40 m) are drawn shorter so they fit; the size line still says the real gap.
+    const cols = D.pairs > 5 ? 2 : 1, rows = Math.ceil(D.pairs / cols), px = Math.min(D.gap * 15, cols === 2 ? 250 : 520)
     const rowH = Math.min(62, (H - 70) / rows), top = (H - rows * rowH) / 2 + rowH / 2 - 8
     for (let i = 0; i < D.pairs; i++) {
       const c = cols === 2 ? i % 2 : 0, r = cols === 2 ? Math.floor(i / 2) : i

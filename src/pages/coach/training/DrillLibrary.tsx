@@ -32,8 +32,8 @@ import { Badge } from '@/components/arc/badge/badge'
    academy with Training off, and players keep Play It Right; nothing is deleted. No Programmes link (Kostas, 8 Nov). */
 
 type PracticeKind = Exclude<Kind, 'warmup'>
-/** Sample content until the real library (TRAK-388); said once, quietly, on each Library page. */
-const SAMPLE = 'Sample drills, not yet checked by our coaching lead.'
+/** Said once, quietly, on each Library page until Steve has checked the wording (TRAK-388: the real library is in). */
+const SAMPLE = 'Drill wording not yet checked by our coaching lead.'
 const GROUP_NAME: Record<Kind, string> = { warmup: 'Get ready', technical: 'Technical practices', skill: 'Skill practices', game: 'Game related practices' }
 
 /** The squad every picture is fitted to: the squad picked at the top (or the whole roster on All), kept to what a
@@ -217,7 +217,7 @@ export function PracticePage() {
   if (!info) return <Navigate to="/coach/training/drills" replace />
   const types = typesOf(info.key)
   const shown = types.includes(type as never) ? [type] : types
-  const empty = (t: string) => t === '11 v 11' ? 'Needs 22 players and a full pitch. No sample yet.' : 'No sample yet.'
+  const empty = (t: string) => t === '11 v 11' ? 'Needs 22 players and a full pitch. None yet.' : 'None yet.'
 
   return (
     <SubPage title={info.long} intro={<>{info.note} Listed simple to complex. {line}</>}>

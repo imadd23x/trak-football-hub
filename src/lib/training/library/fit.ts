@@ -56,6 +56,7 @@ const GR = [[10, 0], [10, 3], [12, 3], [12, 2], [14, 2], [14, 2], [16, 1], [16, 
 const FN = [[3, 1, 40, 30, 0], [3, 1, 35, 30, 0], [3, 2, 35, 30, 0], [4, 2, 35, 30, 0], [4, 3, 35, 25, 3], [4, 3, 30, 25, 2], [5, 4, 30, 25, 2], [5, 4, 30, 25, 1]] // attackers, defenders, length, width, touches
 const FM = [[3, 40, 30, 0], [4, 35, 30, 0], [4, 35, 30, 0], [5, 35, 30, 0], [5, 35, 25, 3], [6, 30, 25, 2], [6, 30, 25, 2], [7, 30, 25, 1]] // players each side, length, width, touches
 const FR = [22, 22, 20, 20, 18, 18, 16, 15] // box size (m)
+const LP = [20, 20, 25, 25, 30, 30, 35, 40] // long passes and keepers' distribution: gap (m), TRAK-388
 
 const MAIN: Role = 'main', OTHER: Role = 'other', EXTRA: Role = 'extra'
 
@@ -80,8 +81,10 @@ export function fit(d: LibraryDrill, n: number, i: number): Fitted {
       return { details: details('20x20 m', `${n} players`, 'None', 'Non-directional', rule),
         draw: { type: 'scatter', att: n, def: 0, side: 20, noBall: true }, legend: [[MAIN, 'Players']] }
     case 'free': {
+      // TRAK-388: `solo` drills give everyone a ball and no partner (Dribble through the gates).
       const side = FR[i], pairs = Math.floor(n / 2)
-      return { details: details(`${side}x${side} m`, n % 2 ? `${pairs - 1} pairs and a group of 3` : `${pairs} pairs`, 'None. Follow your partner', 'Non-directional', rule),
+      const numbers = d.solo ? `${n} players, a ball each` : n % 2 ? `${pairs - 1} pairs and a group of 3` : `${pairs} pairs`
+      return { details: details(`${side}x${side} m`, numbers, d.targets || 'None. Follow your partner', 'Non-directional', rule),
         draw: { type: 'scatter', att: n, def: 0, side }, legend: [[MAIN, 'Players']] }
     }
     case 'groups': {
@@ -94,7 +97,8 @@ export function fit(d: LibraryDrill, n: number, i: number): Fitted {
         draw: { type: 'square', grids, side }, legend: d.shadow ? [[MAIN, 'Passers'], [OTHER, 'Movers']] : [[MAIN, 'Players']] }
     }
     case 'func': {
-      const [a, b, L, W, t] = FN[i]
+      // TRAK-388: `group` fixes the numbers in each turn (1 v 1 to goal); the level still sets the room and touches.
+      const [a0, b0, L, W, t] = FN[i], [a, b] = d.group ?? [a0, b0]
       return { details: details(`${L}x${W} m`, `${n} players, groups of ${a}v${b} and a keeper`, 'One goal', 'Directional. Attack the goal', join(touches(t), rule)),
         draw: { type: 'game', s: a, sb: b, j: 0, L, W, oneGoal: true, keeper: '' }, legend: [[MAIN, 'Attackers'], [OTHER, 'Defenders']] }
     }
@@ -133,13 +137,15 @@ export function fit(d: LibraryDrill, n: number, i: number): Fitted {
       }
     }
     case 'pairs': {
-      const [gap, t, foot] = PR[i], pairs = Math.floor(n / 2), odd = n % 2 === 1
+      // TRAK-388: `long` drills (long passes, a keeper's throws and kicks) are 20 to 40 m apart.
+      const [gap0, t, foot] = PR[i], gap = d.long ? LP[i] : gap0, pairs = Math.floor(n / 2), odd = n % 2 === 1
       return { details: details(`${gap} m between partners`, odd ? `${pairs - 1} pairs and a group of 3` : `${pairs} pairs`, 'Your partner', 'Non-directional. Back and forth', d.rule ? rule : `${touches(t)}, ${foot}`),
         draw: { type: 'pairs', pairs, odd, gap }, legend: [[MAIN, 'Players']] }
     }
     case 'shoot': {
       const [dist, c] = (d.focus === 'goalkeeping' ? KP : SH)[i], g = n > 10 ? 2 : 1
-      return { details: details(`${dist} m from goal`, `${n} players, ${g === 2 ? 'two goals' : 'one goal'}`, 'One goal', 'Directional. At goal', c),
+      // TRAK-388: a drill's own rule replaces the serve (Sweep behind the line).
+      return { details: details(`${dist} m from goal`, `${n} players, ${g === 2 ? 'two goals' : 'one goal'}`, 'One goal', 'Directional. At goal', d.rule ? rule : c),
         draw: { type: 'shoot', g, n, dist, angle: !!d.angle }, legend: [[MAIN, d.focus === 'goalkeeping' ? 'Servers' : 'Shooters'], [EXTRA, 'Keeper']] }
     }
   }

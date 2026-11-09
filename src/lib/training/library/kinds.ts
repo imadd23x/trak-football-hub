@@ -16,7 +16,8 @@ export const KINDS = [
     types: ['Small-sided games', 'Position practice', 'Attack v defence', '11 v 11'] },
 ] as const
 
-export const WARM_UP = { key: 'warmup', name: 'Get ready', types: ['Dry warm-up'] } as const
+/** TRAK-388 (Kostas, 9 Nov): Cool-down joins Get ready, so Plan session's Cool-down part has drills of its own. */
+export const WARM_UP = { key: 'warmup', name: 'Get ready', types: ['Dry warm-up', 'Cool-down'] } as const
 
 export type DrillTypeName = (typeof KINDS)[number]['types'][number] | (typeof WARM_UP)['types'][number]
 
@@ -33,10 +34,10 @@ export const drillOrder = (d: Pick<LibraryDrill, 'kind' | 'type' | 'focus'>) =>
   KIND_ORDER.indexOf(d.kind) * 100 + typesOf(d.kind).indexOf(d.type) * 2 + (d.focus === 'team' ? 0 : 1)
 
 /** The session part a drill fits (Kostas, 8 Nov: keep Trak's 5-part session and make the drills fit its parts):
- *  Get ready → Dry warm-up, Technical → Passing & movement, Skill → Rondo, a small-sided game → Game, and the rest of
+ *  Get ready → Dry warm-up (its Cool-down drills → Cool-down), Technical → Passing & movement, Skill → Rondo, a small-sided game → Game, and the rest of
  *  Game related → Functional drills. */
 export function partFor(d: Pick<LibraryDrill, 'kind' | 'type'>): PartType {
-  if (d.kind === 'warmup') return 'warmup'
+  if (d.kind === 'warmup') return d.type === 'Cool-down' ? 'cooldown' : 'warmup'
   if (d.kind === 'technical') return 'passing'
   if (d.kind === 'skill') return 'rondo'
   return d.type === 'Small-sided games' ? 'game' : 'functional'

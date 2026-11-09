@@ -37,6 +37,7 @@ beforeEach(() => {
     table('training_plans', []),
     table('training_notes', []),
     table('training_plan_drafts', []),
+    table('coach_drill_bookmarks', []),
     table('coach_drills', []),
     rpc('feature_on', () => true),
   )
@@ -142,10 +143,10 @@ describe('TRAK-387: the Library’s pages', { timeout: 20_000 }, () => {
     expect(cardNames(found)[0]).toBe('Keep it with spare players')
   })
 
-  it('My drills is empty until bookmarks come', async () => {
+  it('My drills says how to add one while it’s empty (TRAK-390 adds bookmarks)', async () => {
     renderApp('/coach/training/drills/mine')
     expect(await screen.findByRole('heading', { name: 'My drills', level: 1 })).toBeInTheDocument()
-    expect(screen.getByText('Nothing added yet.')).toBeInTheDocument()
+    expect(await screen.findByText(/^Nothing here yet\. Open any drill and press Add to My drills/)).toBeInTheDocument()
   })
 
   it('a drill’s page: the picture with a description, its key, the five details, why, how and what to watch for (TRAK-389 adds more)', async () => {

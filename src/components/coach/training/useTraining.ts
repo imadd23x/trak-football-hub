@@ -335,3 +335,44 @@ export function useSquadSize(squad: string | null) {
     },
   })
 }
+
+/* ── TRAK-390: bookmarks (My drills) ────────────────────────────────────── */
+
+/** The Library drills the coach bookmarked, newest first (Kostas, 8 Nov: My drills = bookmarks). Only their own. */
+export function useBookmarks() {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['coach', user?.id, 'drill-bookmarks'],
+    enabled: !!user,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase.from('coach_drill_bookmarks').select('drill, created_at')
+        .eq('coach_user_id', user!.id).order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []).map(row => row.drill)
+    },
+  })
+}
+
+/** Adds a drill to My drills, or takes it out. Shown at once; put back if the save fails. */
+export function useToggleBookmark() {
+  const { user } = useAuth()
+  const client = useQueryClient()
+  const key = ['coach', user?.id, 'drill-bookmarks']
+  return useMutation({
+    mutationFn: async ({ drill, on }: { drill: string; on: boolean }) => {
+      const { error } = on
+        ? await supabase.from('coach_drill_bookmarks').insert({ drill })
+        : await supabase.from('coach_drill_bookmarks').delete().eq('coach_user_id', user!.id).eq('drill', drill)
+      // Already there (added on another device): it's in My drills all the same.
+      if (error && !(on && error.code === '23505')) throw error
+    },
+    onMutate: async ({ drill, on }) => {
+      await client.cancelQueries({ queryKey: key })
+      const before = client.getQueryData<string[]>(key)
+      client.setQueryData<string[]>(key, (now = []) => on ? [drill, ...now.filter(d => d !== drill)] : now.filter(d => d !== drill))
+      return { before }
+    },
+    onError: (_error, _vars, context) => client.setQueryData(key, context?.before),
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
+  })
+}

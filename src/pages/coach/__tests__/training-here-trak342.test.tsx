@@ -12,6 +12,8 @@ import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
 import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
+import { fromLibrary, type PlanDrill } from '@/lib/training/parts'
+import { LIBRARY, START_LEVEL, fit } from '@/lib/training/library'
 
 const MINUTE = 60_000
 const DAY = 24 * 60 * MINUTE
@@ -195,5 +197,33 @@ describe('TRAK-342: Who’s here', { timeout: 30_000 }, () => {
     renderApp('/coach/training/soon/here')
     expect(await screen.findByText('Who’s here opens when the training starts.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Done:/ })).toBeNull()
+  })
+})
+
+/* TRAK-393 (Drill Library 8/11): a plan of Library drills is fitted again for those here, at its levels. */
+describe('TRAK-393: Library drills on the day', { timeout: 30_000 }, () => {
+  const ids = Array.from({ length: 15 }, (_, i) => `sp-${i + 1}`)
+  const keep = LIBRARY.find(d => d.name === 'Keep the ball')!
+  const warm = LIBRARY.find(d => d.name === 'Moving warm-up')!
+  const level = START_LEVEL + 1
+  const saved = (position: number, d: PlanDrill, part: string, part_type: string) =>
+    ({ position, part, part_type, ...d, minutes: 15, drill_id: null, library_session: null })
+  const LIB_PLAN = { soon: [saved(1, fromLibrary(warm, 15, START_LEVEL), 'Dry warm-up', 'warmup'), saved(2, fromLibrary(keep, 15, level), 'Rondo', 'rondo')] }
+
+  it('planned for 15, taken for 11: each Library drill says what to change, at its level; Use it saves the new set-up', async () => {
+    const user = userEvent.setup()
+    server.use(table('squad_players', ids.map((id, i) => ({ id, coach_user_id: COACH.id, player_name: `Player ${i + 1}`, age_group: 'U16', status: 'active' }))))
+    register(ids.slice(0, 11))
+    const { saves } = database([training('soon', onTheMinute(Date.now() - 10 * MINUTE))], LIB_PLAN)
+    renderApp('/coach/training/soon/here')
+    expect(await screen.findByRole('heading', { name: 'Today’s plan for 11 players' })).toBeInTheDocument()
+    const planned = fromLibrary(keep, 15, level), now = fit(keep, 11, level).details
+    expect(column('Rondo')).toHaveTextContent(`planned: ${planned.numbers}, ${planned.area}`)
+    expect(column('Rondo')).toHaveTextContent('Adjust')
+    expect(column('Rondo')).toHaveTextContent(`Numbers: ${planned.numbers} to ${now.numbers}.`)
+    await user.click(screen.getByRole('button', { name: 'Save today’s plan' }))
+    await waitFor(() => expect(saves).toHaveLength(1))
+    const rondo = (saves[0].p_practices as Record<string, unknown>[])[1]
+    expect(rondo).toMatchObject({ ...now, trak_drill: keep.id, trak_level: level })
   })
 })

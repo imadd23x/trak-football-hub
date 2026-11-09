@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { fromShelf, type PlanDrill } from '../parts'
+import { fromLibrary, fromShelf, type PlanDrill } from '../parts'
+import { DETAILS, LIBRARY, START_LEVEL, fit } from '../library'
 import { shelfDrill } from '../shelf'
 import { adapt, playersOf, setupFor, applySuggestion } from '../turnout'
 
@@ -69,5 +70,39 @@ describe('using a suggestion', () => {
 
   it('no change, or nothing to swap to: the part stays as it was', () => {
     expect(applySuggestion(part, adapt(trak('g4'), 3, 18))).toBe(part)
+  })
+})
+
+/* TRAK-393 (Drill Library 8/11): a Library drill is fitted again with the Library's own fitting. */
+describe('a Library drill on the day', () => {
+  const keep = LIBRARY.find(d => d.name === 'Keep the ball')!
+  const level = START_LEVEL + 2
+  const planned = fromLibrary(keep, 15, level)
+
+  it('planned for 15, taken for 11: each detail that changes, at the level chosen; using it takes the new set-up', () => {
+    const now = fit(keep, 11, level).details
+    const a = adapt(planned, 11, 15)
+    expect(a.status).toBe('adjust')
+    const changed = DETAILS.filter(({ key }) => now[key] !== planned[key])
+    expect(changed.length).toBeGreaterThan(0)
+    for (const { key, name } of changed) expect(a.message).toContain(`${name}: ${planned[key]} to ${now[key]}.`)
+    const part = applySuggestion({ key: 'k', type: 'rondo', name: 'Rondo', minutes: 15, drill: planned }, a)
+    expect(part.drill).toMatchObject({ ...now, trak_level: level, trak_drill: keep.id })
+    // Saved, and checked again: nothing more to change.
+    expect(adapt(part.drill!, 11, 15)).toMatchObject({ status: 'same', message: 'The same set-up still works.' })
+  })
+
+  it('everyone here: no change; fewer than 8: pick another; more than 20 fits as 20', () => {
+    expect(adapt(planned, 15, 15)).toMatchObject({ status: 'same', message: 'Everyone’s here. No change.' })
+    expect(adapt(planned, 6, 15)).toMatchObject({ status: 'swap', alt: null, message: 'Keep the ball is set up for 8 to 20 players. With 6, pick another drill.' })
+    const big = adapt(planned, 24, 15)
+    expect(big.status === 'adjust' && big.details).toEqual(fit(keep, 20, level).details)
+  })
+
+  it('a drill from an older plan keeps the old advice', () => {
+    const old = fromShelf(shelfDrill('r1')!)
+    expect(adapt(old, 11, 15)).toEqual(adapt({ ...old }, 11, 15))
+    expect(adapt(old, 11, 15).status).not.toBe('unknown')
+    expect('details' in adapt(old, 11, 15)).toBe(false)
   })
 })

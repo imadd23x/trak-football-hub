@@ -1,10 +1,14 @@
-import { fromShelf, type Part, type PlanDrill } from './parts'
+import { fromShelf, libraryOf, type Part, type PlanDrill } from './parts'
 import { shelfDrill, type Players, type ShelfDrill } from './shelf'
+import { DETAILS, PLAYERS_TODAY, START_LEVEL, fit, type Details, type LibraryDrill } from './library'
 
 /* TRAK-342 (Training redo 4/5, spec TRAK-338, 2 Nov prototype): Who's here. A plan is made for the whole squad; once
    the register is saved (Kostas, 2 Nov: suggestions only after attendance is confirmed, not per tap), Trak checks each
    part against how many came: the same set-up still works, it needs adjusting ("3 grids of 4 v 1"), or the drill
-   doesn't work with that many and Trak offers a swap. Kept apart from the screens. */
+   doesn't work with that many and Trak offers a swap. Kept apart from the screens.
+   TRAK-393 (Drill Library 8/11): a Library drill is fitted again with the Library's own fitting, for the players who
+   came at the level the coach chose, so the advice matches the drill's page: each detail that changes, from what was
+   planned to what fits now. A drill from an older plan keeps the advice above. */
 
 /** How a drill takes its players: Trak's drills say so; one of the coach's says it in its own words (Write your own's
  *  "How many players?"). Null when nobody said. */
@@ -63,12 +67,30 @@ export function setupFor(players: Players, n: number): Setup {
 
 export type Adaptation =
   | { status: 'same'; planned: Setup; now: Setup; message: string }
-  | { status: 'adjust'; planned: Setup; now: { ok: true; text: string }; message: string }
+  | { status: 'adjust'; planned: Setup; now: { ok: true; text: string }; message: string
+      /** TRAK-393: a Library drill's five details, fitted for those here. */
+      details?: Details }
   | { status: 'swap'; planned: Setup; alt: ShelfDrill | null; now: Setup; message: string }
   | { status: 'unknown'; message: string }
 
+/** TRAK-393: a Library drill fitted again for `here` players, at its level, against the details it was planned with.
+ *  Library drills are drawn for 8 to 20 players: fewer than 8 and the coach picks another; more than 20 fit as 20. */
+function refit(drill: PlanDrill, lib: LibraryDrill, here: number, squad: number): Adaptation {
+  const planned: Setup = { ok: true, text: drill.numbers }
+  if (here === squad) return { status: 'same', planned, now: planned, message: 'Everyone’s here. No change.' }
+  if (here < PLAYERS_TODAY.min) return { status: 'swap', planned, alt: null, now: { ok: false },
+    message: `${drill.name} is set up for ${PLAYERS_TODAY.min} to ${PLAYERS_TODAY.max} players. With ${here}, pick another drill.` }
+  const details = fit(lib, Math.min(PLAYERS_TODAY.max, here), drill.trak_level ?? START_LEVEL).details
+  const changed = DETAILS.filter(({ key }) => details[key] !== drill[key])
+  if (!changed.length) return { status: 'same', planned, now: planned, message: 'The same set-up still works.' }
+  return { status: 'adjust', planned, now: { ok: true, text: details.numbers }, details,
+    message: changed.map(({ key, name }) => `${name}: ${drill[key] || '—'} to ${details[key]}.`).join(' ') }
+}
+
 /** What a part needs with `here` players when it was planned for `squad`. */
 export function adapt(drill: PlanDrill, here: number, squad: number): Adaptation {
+  const lib = libraryOf(drill)
+  if (lib) return refit(drill, lib, here, squad)
   const players = playersOf(drill)
   if (!players) return { status: 'unknown', message: 'Trak doesn’t know how many players this drill takes. Check it yourself.' }
   const planned = setupFor(players, squad)
@@ -88,9 +110,11 @@ export function adapt(drill: PlanDrill, here: number, squad: number): Adaptation
   return { status: 'adjust', planned, now, message: `Change to ${now.text}.${smaller}` }
 }
 
-/** A part with Trak's suggestion used: the new set-up goes in its Numbers; a swap takes the other drill, same minutes. */
+/** A part with Trak's suggestion used: the new set-up goes in its Numbers (a Library drill takes all five fitted
+ *  details, TRAK-393); a swap takes the other drill, same minutes. */
 export function applySuggestion(part: Part, adaptation: Adaptation): Part {
   if (!part.drill) return part
+  if (adaptation.status === 'adjust' && adaptation.details) return { ...part, drill: { ...part.drill, ...adaptation.details } }
   if (adaptation.status === 'adjust') return { ...part, drill: { ...part.drill, numbers: adaptation.now.text } }
   if (adaptation.status === 'swap' && adaptation.alt && adaptation.now.ok) {
     return { ...part, drill: { ...fromShelf(adaptation.alt), numbers: adaptation.now.text } }

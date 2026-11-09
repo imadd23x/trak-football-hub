@@ -163,6 +163,14 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
   (Trak drill, My drill, Library tags). Adding a drill from its page that the plan already holds (now often the starter
   drill) updates that part to the level set, rather than adding it twice. Shared drill pieces:
   `src/components/coach/training/library/DrillInfo.tsx`.
+- **Who's here refits Library drills** (TRAK-393): once the register is saved, a Library drill is fitted again with the
+  Library's own fitting (`fit`) for the players who came, at the level saved with the plan (`trak_level`; the standard
+  level when there's none), and compared detail by detail with what was planned: "No change", or each detail that
+  changes ("Numbers: 15 players, 6v2 and 5v2 to 11 players, 6v2 and 3v2."). Use it takes all five fitted details;
+  Save today's plan saves them, so View shows the set-up for those here. Library drills are drawn for 8 to 20 players:
+  fewer than 8 here and the coach picks another drill; more than 20 fit as 20. A drill from an older plan keeps the
+  TRAK-342 advice (`setupFor` / swaps). Home's Today card stays a list of practices and minutes (Kostas, 29 Oct: keep
+  it simple), so it shows no set-up. Code: `adapt()` in `src/lib/training/turnout.ts`.
 
 ## Switching it on
 

@@ -413,3 +413,12 @@ const byId = new Map(LIBRARY.map(d => [d.id, d]))
 
 /** A Library drill by its id, or undefined (an old shelf id, or one since removed). */
 export const libraryDrill = (id: string | null | undefined) => (id ? byId.get(id) : undefined)
+
+/** Another drill (TRAK-389): the next one of the same drill type, round to the first; when the type has only this one,
+ *  the next of the same kind. Null when it's alone in its kind. */
+export function anotherDrill(d: Pick<LibraryDrill, 'id' | 'kind' | 'type'>): LibraryDrill | null {
+  let pool = LIBRARY.filter(x => x.kind === d.kind && x.type === d.type)
+  if (pool.length < 2) pool = LIBRARY.filter(x => x.kind === d.kind)
+  if (pool.length < 2) return null
+  return pool[(pool.findIndex(x => x.id === d.id) + 1) % pool.length]
+}

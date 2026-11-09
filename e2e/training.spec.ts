@@ -224,7 +224,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
 
   // TRAK-387 (Drill Library 3/11): Drills is the Library: Find a drill, My drills and All drills, the three kinds, a
   // practice page and a drill's page, each picture fitted to the squad. No coach-made drills.
-  test(`Drills at ${width} px: the Library home, a practice page and a drill`, async ({ page, context }, testInfo) => {
+  test(`Drills at ${width} px: the Library home, a practice page and a drill (Harder, Players today, Another drill)`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/training/drills', width, height)
     await expect(page.getByRole('heading', { name: 'Find a drill' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'New drill' })).toHaveCount(0)
@@ -253,9 +253,23 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
 
     await page.getByRole('link', { name: /^Keep the ball/ }).click()
     await expect(page.getByRole('img', { name: /^Keep the ball set-up\./ })).toBeVisible()
+    // TRAK-389: Harder says what changed and why; Players today refits it.
+    await page.getByRole('button', { name: 'Harder' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Harder. Here’s what Trak changed:' })).toBeVisible()
+    await page.getByRole('group', { name: 'Players today' }).getByRole('button', { name: 'One player more' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'players today. Trak refitted the drill:' })).toBeVisible()
+    // Laid out again (phone ↔ laptop), the drill keeps its level and players.
+    await page.setViewportSize({ width: width === 390 ? 1440 : 390, height })
+    await expect(page.getByRole('status').filter({ hasText: 'players today. Trak refitted the drill:' })).toBeVisible()
+    await page.setViewportSize({ width, height })
+    await expect(page.getByRole('status').filter({ hasText: 'players today. Trak refitted the drill:' })).toBeVisible()
     await page.waitForTimeout(400)
     await page.screenshot({ path: testInfo.outputPath(`training-drill-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
+    const drillKeys = await everyControlByKeyboard(page, '.trak-wide')
+    expect(drillKeys.missed).toEqual([])
+    await page.getByRole('button', { name: 'Another drill' }).click()
+    await expect(page.getByRole('heading', { name: 'Four corners', level: 1 })).toBeVisible()
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
   })

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { SHELF, PART_TYPES } from '../../shelf'
 import { setupFor } from '../../turnout'
 import {
-  KINDS, LEVELS, LIBRARY, PLAYERS_TODAY, START_LEVEL, WARM_UP, alsoCalled, fit, foundAs, libraryDrill, nextLevel,
+  KINDS, LEVELS, LIBRARY, anotherDrill, PLAYERS_TODAY, START_LEVEL, WARM_UP, alsoCalled, fit, foundAs, libraryDrill, nextLevel,
   norm, partFor, playersFor, refit, ruleAt, searchDrills, slips, step,
 } from '..'
 
@@ -209,5 +209,17 @@ describe('smart search', () => {
   it('can be narrowed to part of the Library', () => {
     expect(searchDrills('', squad, d => d.kind === 'skill').every(d => d.kind === 'skill')).toBe(true)
     expect(searchDrills('pressing', squad, d => d.kind === 'game').map(d => d.name)).toEqual(['Push them wide', 'Press from the front'])
+  })
+})
+
+describe('Another drill', () => {
+  it('the next of the same type, round to the first; the same kind when the type has only one', () => {
+    const rondos = LIBRARY.filter(d => d.type === 'Rondos')
+    expect(anotherDrill(rondos[0])?.id).toBe(rondos[1].id)
+    expect(anotherDrill(rondos.at(-1)!)?.id).toBe(rondos[0].id)
+    const alone = drill('Win it, pass it out') // the only "Win it and get out"
+    const next = anotherDrill(alone)!
+    expect(next.kind).toBe('skill')
+    expect(next.id).not.toBe(alone.id)
   })
 })

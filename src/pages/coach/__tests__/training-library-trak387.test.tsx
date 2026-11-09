@@ -148,15 +148,15 @@ describe('TRAK-387: the Library’s pages', { timeout: 20_000 }, () => {
     expect(screen.getByText('Nothing added yet.')).toBeInTheDocument()
   })
 
-  it('a drill’s page: the picture with a description, its key, the five details, why, how and what to watch for', async () => {
+  it('a drill’s page: the picture with a description, its key, the five details, why, how and what to watch for (TRAK-389 adds more)', async () => {
     const keep = LIBRARY.find(d => d.name === 'Keep the ball')!
     renderApp(`/coach/training/drills/d/${keep.id}`)
     expect(await screen.findByRole('heading', { name: 'Keep the ball', level: 1 })).toBeInTheDocument()
     expect(await screen.findByRole('img', { name: /^Keep the ball set-up\. Area shape and size: 13x13 m\. Numbers: 12 players, 9v3\./ })).toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Key' })).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Attackers', 'Defenders'])
     expect(screen.getByText('Area shape and size').nextSibling).toHaveTextContent('13x13 m')
-    expect(screen.getByRole('heading', { name: 'Why' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'How it works' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Why this works' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'How to play' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Watch for' })).toBeInTheDocument()
   })
 

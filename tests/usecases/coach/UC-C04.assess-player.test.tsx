@@ -209,10 +209,10 @@ useCase('UC-C04', () => {
       rpc('coach_squad_player_consent_required', () => false),
       table('season_plans', [{ id: 'plan-1', squad: 'U16', starts_on: day(-120), ends_on: day(200), shared_at: new Date(Date.now() - 90 * DAY).toISOString(),
         unshared_parts: [], unshared_players: [], eval_every: '2w', eval_day: 0 }]),
-      table('season_evaluations', []),
+      table('season_evaluations', []), table('player_objectives', []), rpc('stuck_player_objectives', () => []),
       table('coach_assessments', [{ squad_player_id: 'squad-1', created_at: '2026-08-20T10:00:00Z', published_at: '2026-08-20T10:00:00Z',
         work_rate: 8, tactical: 7, attitude: 6, technical: 5, physical: 4, coachability: 3 }]),
-      http.post(`${SUPABASE_URL}/rest/v1/rpc/publish_evaluation`, async ({ request }) => {
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/publish_evaluation_with_objectives`, async ({ request }) => {
         const args = await request.json() as Record<string, unknown> & { p_players: { squad_player_id: string }[] }
         published.push(args)
         return HttpResponse.json({ evaluation_id: 'ev-1', assessments: args.p_players.map(p => ({ squad_player_id: p.squad_player_id, assessment_id: 'as-1' })) })

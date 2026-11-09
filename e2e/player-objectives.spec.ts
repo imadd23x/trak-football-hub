@@ -41,6 +41,8 @@ async function backend(context: BrowserContext, unexpected: string[]) {
     if (path === '/rest/v1/season_objectives' && req.method() === 'GET')
       return json([{ id: 'so-press', place: 1, title: 'Win it back within 5 seconds', looks_like: 'The nearest three press the moment we lose it.' }])
     if (path === '/rest/v1/player_objectives') return json(held)
+    if (path === '/rest/v1/objective_progress') return json([])
+    if (path === '/rest/v1/rpc/stuck_player_objectives') return json([])
     if (path === '/rest/v1/rpc/save_player_objectives') {
       const body = req.postDataJSON(), id = body.p_squad_player_id
       saves.push(body)

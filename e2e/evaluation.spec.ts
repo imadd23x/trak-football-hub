@@ -49,7 +49,7 @@ async function backend(context: BrowserContext, unexpected: string[]) {
     if (path === '/rest/v1/season_plans' && method === 'GET') return json([plan])
     if (path === '/rest/v1/season_evaluations') return json(evaluations)
     if (path === '/rest/v1/coach_assessments' && method === 'GET') return json([lastTime])
-    if (path === '/rest/v1/rpc/publish_evaluation') {
+    if (path === '/rest/v1/rpc/publish_evaluation_with_objectives') {
       const args = req.postDataJSON()
       published.push(args)
       if (fail > 0) { fail -= 1; return json({ message: 'Service unavailable' }, 503) }

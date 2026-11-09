@@ -29,6 +29,9 @@ import { needsYou } from '@/lib/coach-needs-you'
 import { unplacedBySquad } from '@/lib/positions'
 import { useWatchList } from '@/components/coach/season-plan/useWatching'
 import { useSquadEvaluations } from '@/components/coach/season-plan/useEvaluation'
+import { useStuckObjectives } from '@/components/coach/season-plan/useObjectiveProgress'
+import { usePlayerObjectives } from '@/components/coach/season-plan/usePlayerObjectives'
+import { StuckSheet, type StuckTarget } from '@/components/coach/season-plan/StuckSheet'
 import { evalDay } from '@/lib/evaluation'
 import { Button } from '@/components/arc/button/button'
 import { squadShape } from '@/lib/squad/shape'
@@ -164,6 +167,24 @@ export default function CoachHomePage() {
   }))
   // TRAK-355: a watched player whose reminder is due comes back, one card each, opening the step where they were left.
   const watching = useWatchList(user?.id, roster, seasonPlanOn)
+  // TRAK-365: an objective with Not yet three evaluations in a row, one card each. Asked only where an evaluation exists.
+  const [stuckTarget, setStuckTarget] = useState<StuckTarget | null>(null)
+  const stuck = useStuckObjectives(user?.id, seasonPlanOn && evaluations.evaluated.size > 0)
+  const heldObjectives = usePlayerObjectives(user?.id, seasonPlanOn && (stuck.data?.length ?? 0) > 0)
+  const stuckEvents: OwedEvent[] = (stuck.data ?? []).flatMap(row => {
+    const player = roster.players.find(p => p.id === row.squad_player_id)
+    const objective = heldObjectives.of(row.squad_player_id).find(o => o.id === row.player_objective_id)
+    const squad = player?.age_group?.trim() ?? null
+    if (!player || !objective || (!everySquad && !coachSquad.inSquad(squad ?? ''))) return []
+    return [{
+      id: `stuck:${objective.id}`,
+      title: `${player.player_name.split(' ')[0]} is stuck on an objective`,
+      when: '',
+      squad: coachSquad.squads.length >= 2 ? squad : null,
+      reason: `“${objective.title}”: Not yet three times in a row.`,
+      action: <span className="arc"><Button size="sm" onClick={() => setStuckTarget({ objectiveId: objective.id, objective: objective.title, playerId: player.id, playerName: player.player_name })}>Choose</Button></span>,
+    }]
+  })
   const watchEvents: OwedEvent[] = !seasonPlanOn ? [] : watching.list.filter(w => w.ready).map(w => ({
     id: `watch:${w.playerId}`,
     title: `${w.why === '4 weeks, the latest' ? 'Watched 4 weeks' : w.why} · Set ${w.name.split(' ')[0]} up`,
@@ -192,7 +213,7 @@ export default function CoachHomePage() {
         </div>
         {/* Shown once the switch is known, so a coach who turned it off never sees it flash in. */}
         {(needsYouSwitch.data === true || needsYouSwitch.isError) && <div className={wide ? 'mt-6' : 'mt-5'}>
-          <NeedsYou items={needsReady ? cards : null} events={[...owedEvents, ...planEvents, ...evaluationEvents, ...positionEvents, ...watchEvents]}
+          <NeedsYou items={needsReady ? cards : null} events={[...owedEvents, ...planEvents, ...evaluationEvents, ...stuckEvents, ...positionEvents, ...watchEvents]}
             failed={!!roster.error || owed.failed || gamesFailed}
             onRetry={() => { roster.retry(); owed.retry(); if (evaluations.failed) evaluations.retry(); if (gamesOn) { void games.refetch(); void plans.refetch(); void shares.refetch() } }}
             onOpen={item => item.kind === 'draft'
@@ -204,6 +225,7 @@ export default function CoachHomePage() {
         {user && <SeasonPlanCard coachId={user.id} squads={coachSquad.squads} squad={planSquad(coachSquad)} everySquad={everySquad}
           onPick={coachSquad.pick} className={wide ? 'mt-6' : 'mt-5'} />}
       </div>
+      {user && <StuckSheet coachId={user.id} target={stuckTarget} onClose={() => setStuckTarget(null)} onSwapped={id => navigate(`/coach/squad/player/${id}`)} />}
       <QuickAdd onSaved={() => setWeekVersion(v => v + 1)} />
     </MobileShell>
   )

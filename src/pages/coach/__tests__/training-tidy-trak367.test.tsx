@@ -55,6 +55,7 @@ function database(events: Record<string, unknown>[], start: Record<string, Recor
     }),
     http.get(`${SUPABASE_URL}/rest/v1/training_plan_drafts`, () => HttpResponse.json([])),
     http.get(`${SUPABASE_URL}/rest/v1/coach_drills`, () => HttpResponse.json([])),
+    http.get(`${SUPABASE_URL}/rest/v1/coach_drill_bookmarks`, () => HttpResponse.json([])),
     rpc('save_training_plan', args => {
       saves.push(args)
       plans.set(String(args.p_event_id), (args.p_practices as Record<string, unknown>[]).map((p, i) => ({ ...p, position: i + 1 })))

@@ -431,6 +431,24 @@ export type Database = {
           referencedColumns: ["id"]
         }]
       }
+      coach_drill_bookmarks: {
+        Row: {
+          coach_user_id: string
+          created_at: string
+          drill: string
+        }
+        Insert: {
+          coach_user_id?: string
+          created_at?: string
+          drill: string
+        }
+        Update: {
+          coach_user_id?: string
+          created_at?: string
+          drill?: string
+        }
+        Relationships: []
+      }
       coach_drills: {
         Row: {
           group_size: number | null

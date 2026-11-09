@@ -69,6 +69,8 @@ async function backend(context: BrowserContext, unexpected: string[], trainings 
     .map(value => Buffer.from(JSON.stringify(value)).toString('base64url')).join('.') + '.synthetic'
   await context.addInitScript(session => localStorage.setItem('sb-xbykbqolvqyqmipikuae-auth-token', JSON.stringify(session)),
     { access_token: token, refresh_token: 'synthetic-training294-refresh', expires_in: 3600, expires_at: exp, token_type: 'bearer', user })
+  // TRAK-390: the coach's bookmarks (My drills), kept for the test.
+  const bookmarks = new Set<string>()
   await context.route('**/*', async route => {
     const req = route.request(), url = new URL(req.url())
     if (url.origin === 'http://127.0.0.1:4189') return route.continue()
@@ -113,6 +115,11 @@ async function backend(context: BrowserContext, unexpected: string[], trainings 
       return route.fulfill({ status: 204, body: '' })
     }
     if (path === '/rest/v1/coach_drills' && req.method() === 'GET') return json(DRILLS)
+    if (path === '/rest/v1/coach_drill_bookmarks') {
+      if (req.method() === 'POST') { bookmarks.add((req.postDataJSON() as { drill: string }).drill); return route.fulfill({ status: 201, body: '' }) }
+      if (req.method() === 'DELETE') { bookmarks.delete(url.searchParams.get('drill')!.slice(3)); return route.fulfill({ status: 204, body: '' }) }
+      return json([...bookmarks].map(drill => ({ drill, created_at: '2026-11-09T00:00:00Z' })))
+    }
     // Every other read is empty.
     if (path.startsWith('/rest/v1/')) return json(req.method() === 'GET' || path.startsWith('/rest/v1/rpc/') ? [] : null)
     unexpected.push(`${req.method()} ${path}`)
@@ -224,7 +231,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
 
   // TRAK-387 (Drill Library 3/11): Drills is the Library: Find a drill, My drills and All drills, the three kinds, a
   // practice page and a drill's page, each picture fitted to the squad. No coach-made drills.
-  test(`Drills at ${width} px: the Library home, a practice page and a drill (Harder, Players today, Another drill)`, async ({ page, context }, testInfo) => {
+  test(`Drills at ${width} px: the Library home, a practice page and a drill (Harder, Players today, Another drill, bookmarks)`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/training/drills', width, height)
     await expect(page.getByRole('heading', { name: 'Find a drill' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'New drill' })).toHaveCount(0)
@@ -251,7 +258,12 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.screenshot({ path: testInfo.outputPath(`training-drills-skill-${width}.png`), fullPage: true })
     expect(await sideways(page)).toBeLessThanOrEqual(0)
 
+    // TRAK-390: the card's bookmark adds the drill to My drills.
+    await page.getByRole('button', { name: 'Add to My drills: Keep the ball' }).click()
+    await expect(page.getByRole('button', { name: 'In My drills: Keep the ball' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByText('Added to My drills')).toBeVisible()
     await page.getByRole('link', { name: /^Keep the ball/ }).click()
+    await expect(page.getByRole('button', { name: 'In My drills' })).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByRole('img', { name: /^Keep the ball set-up\./ })).toBeVisible()
     // TRAK-389: Harder says what changed and why; Players today refits it.
     await page.getByRole('button', { name: 'Harder' }).click()
@@ -270,6 +282,13 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(drillKeys.missed).toEqual([])
     await page.getByRole('button', { name: 'Another drill' }).click()
     await expect(page.getByRole('heading', { name: 'Four corners', level: 1 })).toBeVisible()
+    // My drills shows it.
+    await page.goto('/coach/training/drills/mine')
+    await expect(page.getByRole('heading', { name: 'Skill practices', level: 2 })).toBeVisible()
+    await expect(page.getByRole('link', { name: /^Keep the ball/ })).toBeVisible()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`training-my-drills-${width}.png`), fullPage: true })
+    expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
   })

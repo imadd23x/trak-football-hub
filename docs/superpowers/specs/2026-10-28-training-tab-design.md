@@ -32,6 +32,7 @@ Every text field has a length limit.
 | `coach_drills` | `id` | The coach's own single drills: name (≤80), usual minutes (5–60; the app offers 10–30), how it works (≤1000), what you'll tell them (≤500), and the five details area, numbers, direction, targets, conditions (≤120 each). | 294 |
 | `training_plans` | `event_id` | One plan per training event (`coach_calendar_events(id) ON DELETE CASCADE`), and its coach. | 295 |
 | `training_plan_practices` | `event_id, position` | The plan's practices in order (positions 1–12): name, minutes, how it works, what you'll tell them, the five details (drills' limits), where it came from (`own`, `drill`, `library`) and the drill (`ON DELETE SET NULL`) or Library session it came from. A practice is a copy: changing or deleting a drill never changes a plan. | 295 |
+| `coach_drill_bookmarks` | `coach_user_id, drill` | The Library drills a coach bookmarked (My drills): the drill's Library id (1–40) and when. See Drill Library below. | 390 |
 
 ## Read and write rules
 
@@ -116,7 +117,7 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
   `PitchKey` says what each colour means. Drills played in turns draw the players who are on.
 - **Drills tab** (TRAK-387): `/coach/training/drills` is the Library home (Find a drill, My drills, All drills, the
   three kinds, then the old FA Library tiles until TRAK-394); `drills/kind/:kind` a practice page, `drills/all` All
-  drills (`?show=` a kind, Individual or Goalkeeping), `drills/mine` My drills (empty until TRAK-390), `drills/d/:id` a
+  drills (`?show=` a kind, Individual or Goalkeeping), `drills/mine` My drills (bookmarks, TRAK-390), `drills/d/:id` a
   drill's page. Searches and filters
   sit in the address (`?q=`, `?type=`, `?show=`), so Back returns to them. Every picture is fitted to the squad picked
   at the top (the whole roster on All), kept to 8–20 players, at level 4 of 8. Code: `src/pages/coach/training/
@@ -125,8 +126,15 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
   the picture and key; Easier and Harder move to the next level that changes something and say what changed and why,
   greyed out at the end; the five details, the changed ones marked; why, how to play, watch for; Another drill (the
   next of the same type). Players, level and the last change are kept in the page's history entry, so the page laid
-  out again (phone ↔ laptop) or opened with Back comes back the same. Add to training and Add to My drills are left
-  out until TRAK-391 and TRAK-390 rather than shown doing nothing.
+  out again (phone ↔ laptop) or opened with Back comes back the same. Add to training is left out until TRAK-391
+  rather than shown doing nothing.
+- **Bookmarks** (TRAK-390): My drills is the Library drills a coach bookmarked. `coach_drill_bookmarks`
+  (`coach_user_id`, `drill` = the Library id, 1–40 characters, `created_at`; one row per coach and drill): only the
+  coach reads, adds or takes out their own; adding and taking out need the training switch (restrictive rules),
+  reading doesn't, so switching off keeps them; nothing to change, so no update grant. A bookmark sits in every card's
+  corner and as Add to My drills / In My drills on a drill's page, with a short message each time; a failed save puts
+  it back and says so. The Library home counts them; My drills groups them by kind. A bookmark for a drill no longer
+  in the Library is ignored.
 - **No coach-made drills** (Kostas, 8 Nov): New drill, the list of the coach's drills and Add to the next training
   left the Drills tab; migration `20261109000000_drill_library_clean_start.sql` deleted the hand-written drills, every
   plan that used one, and any draft that did. `coach_drills` stays, empty. Plan session's Write your own and From My

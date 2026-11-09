@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { drillPath, fit, type LibraryDrill } from '@/lib/training/library'
 import { DrillPitch } from './DrillPitch'
+import { CardBookmark } from './BookmarkButton'
 
 /* TRAK-387 (Drill Library 3/11): a picture-first drill card (Kostas, 6 Nov, from Tarek's mockup). The same fit as the
    drill's page, so the card and the page always match. `note` says how a search found it ("Also called waves"). */
@@ -23,13 +24,16 @@ export function DrillCard({ drill, players, level, note = '' }: { drill: Library
   )
 }
 
-/** Cards in a grid: two across on a phone, as many as fit on a laptop. */
+/** Cards in a grid: two across on a phone, as many as fit on a laptop. Each has its bookmark (TRAK-390). */
 export function DrillCards({ drills, players, level, notes, label }: {
   drills: LibraryDrill[]; players: number; level: number; notes?: (d: LibraryDrill) => string; label?: string
 }) {
   return (
     <ul aria-label={label} className="grid grid-cols-2 gap-2.5 tablet:gap-3 tablet:[grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
-      {drills.map(d => <li key={d.id} className="min-w-0"><DrillCard drill={d} players={players} level={level} note={notes?.(d)} /></li>)}
+      {drills.map(d => <li key={d.id} className="relative min-w-0">
+        <DrillCard drill={d} players={players} level={level} note={notes?.(d)} />
+        <CardBookmark drill={d} />
+      </li>)}
     </ul>
   )
 }

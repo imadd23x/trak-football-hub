@@ -10,11 +10,12 @@ import {
   drillPath, fit, foundAs, kindInfo, kindPath, libraryDrill, nextLevel, refit, searchDrills, step, typesOf, type Change,
   type Kind, type LibraryDrill, type Squad,
 } from '@/lib/training/library'
-import { useSquadSize } from '@/components/coach/training/useTraining'
+import { useBookmarks, useSquadSize } from '@/components/coach/training/useTraining'
 import { DrillCards } from '@/components/coach/training/library/DrillCard'
 import { DrillPitch, PitchKey } from '@/components/coach/training/library/DrillPitch'
+import { PageBookmark } from '@/components/coach/training/library/BookmarkButton'
 import { CoachTrail } from '@/components/coach/CoachTrail'
-import { WIDE_COLUMN } from '@/components/trak'
+import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { Button } from '@/components/arc/button/button'
@@ -30,6 +31,7 @@ type PracticeKind = Exclude<Kind, 'warmup'>
 /** Sample content until the real library (TRAK-388); said once, quietly, on each Library page. */
 const SAMPLE = 'Sample drills, not yet checked by our coaching lead.'
 const FALLBACK_PLAYERS = 15
+const GROUP_NAME: Record<Kind, string> = { warmup: 'Get ready', technical: 'Technical practices', skill: 'Skill practices', game: 'Game related practices' }
 
 /** The squad every picture is fitted to: the squad picked at the top (or the whole roster on All), kept to what a
  *  drill can be drawn for, at the standard level. */
@@ -108,8 +110,10 @@ const GLYPHS: Record<PracticeKind, ReactNode> = {
 /** The Drills tab: Find a drill, My drills and All drills, then the three kinds of practice. */
 export function LibraryHome() {
   const { squad, line } = useLibrarySquad()
+  const bookmarks = useBookmarks()
   const [query, setQuery] = useQueryParam('q')
   const searching = !!query.trim()
+  const saved = (bookmarks.data ?? []).filter(id => libraryDrill(id)).length
   const found = squad && searching ? searchDrills(query, squad) : []
 
   return (
@@ -127,7 +131,7 @@ export function LibraryHome() {
         </section>
         : <>
           <div className="grid gap-3 tablet:grid-cols-2">
-            <HomeLink to={MY_DRILLS_PATH} icon={<List aria-hidden size={26} />} title="My drills" note="Nothing added yet" />
+            <HomeLink to={MY_DRILLS_PATH} icon={<List aria-hidden size={26} />} title="My drills" note={!bookmarks.isSuccess ? ' ' : saved ? plural(saved, 'drill') : 'Nothing added yet'} />
             <HomeLink to={allDrillsPath()} icon={<LayoutGrid aria-hidden size={26} />} title="All drills" note={`Every drill in the Library, ${LIBRARY.length} in all`} />
           </div>
 
@@ -191,11 +195,26 @@ function HomeLink({ to, icon, title, note }: { to: string; icon: ReactNode; titl
 
 /* ── My drills ──────────────────────────────────────────────────────────── */
 
-/** Drills the coach added from the Library. Adding comes with bookmarks (TRAK-390). */
+/** The Library drills the coach bookmarked (TRAK-390), as picture cards grouped Get ready → Technical → Skill → Game
+ *  related. A drill no longer in the Library is left out. */
 export function MyDrills() {
+  const { squad, line } = useLibrarySquad()
+  const bookmarks = useBookmarks()
+  const mine = (bookmarks.data ?? []).flatMap(id => libraryDrill(id) ?? [])
   return (
-    <SubPage title="My drills" intro="Drills you added from the Library.">
-      <Empty>Nothing added yet.</Empty>
+    <SubPage title="My drills" intro={<>Drills you added from the Library. {mine.length ? line : ''}</>}>
+      {bookmarks.error ? <LoadError what="your drills" onRetry={() => void bookmarks.refetch()} retrying={bookmarks.isFetching} />
+        : !squad || bookmarks.isPending ? <LoadingSkeleton label="Loading your drills…" rows={2} />
+        : !mine.length ? <Empty>Nothing here yet. Open any drill and press Add to My drills, or tap the bookmark on its card.</Empty>
+        : <div className="grid gap-7">
+          {KIND_ORDER.map(kind => {
+            const drills = LIBRARY.filter(d => d.kind === kind && mine.includes(d))
+            return drills.length ? <section key={kind} aria-labelledby={`mine-${kind}`}>
+              <GroupLabel id={`mine-${kind}`}>{GROUP_NAME[kind]}</GroupLabel>
+              <DrillCards drills={drills} players={squad.players} level={squad.level} />
+            </section> : null
+          })}
+        </div>}
     </SubPage>
   )
 }
@@ -239,7 +258,6 @@ export function PracticePage() {
 /* ── All drills ─────────────────────────────────────────────────────────── */
 
 const SHOW = ['Technical', 'Skill', 'Game related', 'Individual', 'Goalkeeping'] as const
-const GROUP_NAME: Record<Kind, string> = { warmup: 'Get ready', technical: 'Technical practices', skill: 'Skill practices', game: 'Game related practices' }
 
 const keepFor = (show: string) => (d: LibraryDrill) =>
   !show ? true : show === 'Individual' ? d.focus === 'individual' : show === 'Goalkeeping' ? d.focus === 'goalkeeping' : kindInfo(d.kind).name === show
@@ -294,8 +312,8 @@ type Kept = { drill: string; players: number; level: number; changed: Changed | 
 
 /** A drill's page (TRAK-389, from the 8 Nov mockup), fitted to the squad at the standard level: Players today, the
  *  picture and its key, Easier and Harder (each says what it changed and why), the five details with the changed ones
- *  marked, why, how and what to watch for, and Another drill. A new drill starts fresh. Add to training and Add to My
- *  drills come with TRAK-391 and TRAK-390. */
+ *  marked, why, how and what to watch for, and Another drill. A new drill starts fresh. Add to My drills (TRAK-390)
+ *  sits under them; Add to training comes with TRAK-391. */
 export function DrillPage() {
   const { drillId } = useParams()
   const drill = libraryDrill(drillId)
@@ -390,6 +408,7 @@ function DrillBody({ drill, start, squadName }: { drill: LibraryDrill; start: Sq
         <h2 id="watch" className={SIDE_HEADING}>Watch for</h2>
         <ul className="grid list-disc gap-1.5 pl-5 text-[15px] text-ink marker:text-brand">{drill.watch.map(w => <li key={w}>{w}</li>)}</ul>
       </section>
+      <PageBookmark drill={drill} />
       <p className="text-[13px] text-ink-3">{SAMPLE}</p>
     </div>
   </div>

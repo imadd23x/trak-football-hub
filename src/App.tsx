@@ -53,6 +53,7 @@ const PlayerEvent = lazy(() => import("./pages/player/PlayerEvent"));
 const PlayerCalendar = lazy(() => import("./pages/player/PlayerCalendar"));
 const PlayerProfilePage = lazy(() => import("./pages/player/PlayerProfilePage"));
 const PlayerFeedback = lazy(() => import("./pages/player/PlayerFeedback"));
+const PlayerSeason = lazy(() => import("./pages/player/PlayerSeason"));
 const HowTrakWorks = lazy(() => import("./pages/HowTrakWorks"));
 
 const CoachHomePage = lazy(() => import("./pages/coach/CoachHomePage"));
@@ -157,6 +158,8 @@ const App = () => (
             <Route path="/player/event/:id" element={<RouteGuard allowedRole="player"><PlayerEvent /></RouteGuard>} />
             <Route path="/player/calendar" element={<RouteGuard allowedRole="player"><PlayerCalendar /></RouteGuard>} />
             <Route path="/player/profile" element={<RouteGuard allowedRole="player"><PlayerProfilePage /></RouteGuard>} />
+            {/* TRAK-398: the player's My season page, opened from the Home card. */}
+            <Route path="/player/season" element={<RouteGuard allowedRole="player"><PlayerSeason /></RouteGuard>} />
             <Route path="/player/passport" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerPassport /></ParkedScreen></RouteGuard>} />
             <Route path="/player/evolution" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerEvolutionCard /></ParkedScreen></RouteGuard>} />
             <Route path="/player/feedback/:assessmentId" element={<RouteGuard allowedRole="player"><PlayerFeedback /></RouteGuard>} />

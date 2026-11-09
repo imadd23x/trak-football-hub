@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 
-// TRAK-397 (Season plan 18/18 build 2/8): the My season card on the player's Home in a real browser, at 1280, 834 and
+// TRAK-397 and TRAK-398 (Season plan 18/18 builds 2 and 3): the My season card and page on the player's Home in a real browser, at 1280, 834 and
 // 390. The player app stays one phone-width column, centred. New and Got it clear after a tap; a failed read shows no
 // card and nothing else on Home changes. Production build, synthetic intercepted backend.
 const playerId = '97397000-0000-4000-8000-000000000002'
@@ -36,7 +36,8 @@ async function backend(context: BrowserContext, unexpected: string[], state: { i
           { id: 'so-1', place: 1, title: 'Win it back within 5 seconds', looks_like: 'The nearest three press.' },
           { id: 'so-2', place: 2, title: 'Stay compact', looks_like: 'No more than 35 m.' }],
         objectives: [
-          { id: 'po-1', slot: 1, title: 'Holds the line together', status: 'open', current: 'on_track', supports: null, history: [] },
+          { id: 'po-1', slot: 1, title: 'Holds the line together', status: 'open', current: 'on_track', supports: null,
+            history: [{ due_on: '2026-10-04', status: 'not_yet' }, { due_on: '2026-11-01', status: 'on_track' }] },
           { id: 'po-2', slot: 2, title: 'Talks to the keeper at every corner', status: 'open', current: 'some_progress', supports: null, history: [] }],
         is_new: state.isNew, shared_at: '2026-11-01T10:00:00Z' }])
     }
@@ -76,6 +77,36 @@ for (const [width, height] of [[1280, 800], [834, 1112], [390, 844]] as const) {
     await expect(card.getByRole('button', { name: 'Open my season' })).toBeVisible()
     expect(state.seen).toBe(1)
     await page.screenshot({ path: testInfo.outputPath(`my-season-card-seen-${width}.png`) })
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}
+
+for (const [width, height] of [[1280, 800], [834, 1112], [390, 844]] as const) {
+  test(`the My season page at ${width} px: opens from the card, clears New, nothing scrolls sideways, Back returns to Home`, async ({ context, page }, testInfo) => {
+    const unexpected: string[] = [], errors: string[] = [], state = { isNew: true, fail: false, seen: 0 }
+    page.on('pageerror', error => errors.push(error.message))
+    await backend(context, unexpected, state)
+    await page.setViewportSize({ width, height })
+    await page.goto('/player/home')
+    await page.getByRole('region', { name: 'My season' }).getByRole('button', { name: 'Open my season' }).click()
+    await expect(page).toHaveURL(/\/player\/season$/)
+    await expect(page.getByRole('heading', { name: 'My season' })).toBeVisible()
+    await expect(page.getByText(/^Set by Coach Rami\./)).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Your position' }).getByText('Can also play Midfielder')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Squad objectives' }).getByText('No more than 35 m.')).toBeVisible()
+    const history = page.getByRole('list', { name: 'History of Holds the line together' })
+    await expect(history.getByRole('listitem')).toHaveText(['Sun 4 OctNot yet', 'Sun 1 NovOn track'])
+    await expect.poll(() => state.seen).toBe(1)
+    expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
+    const box = await page.getByRole('region', { name: 'Your objectives' }).boundingBox()
+    expect(box!.width).toBeLessThanOrEqual(390)
+    await page.screenshot({ path: testInfo.outputPath(`my-season-page-${width}.png`), fullPage: true })
+
+    await page.getByRole('link', { name: 'Back' }).click()
+    await expect(page).toHaveURL(/\/player\/home$/)
+    // Opening the page cleared New, so the card is quiet when Home comes back.
+    await expect(page.getByRole('region', { name: 'My season' }).getByText('New', { exact: true })).toHaveCount(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
   })

@@ -44,7 +44,7 @@ async function playerBackend(context: BrowserContext, hasMatches: boolean, unexp
     if (['coach_shared_feedback', 'player_parent_links', 'recognition_awards'].some(table => path === `/rest/v1/${table}`)) return rows([])
     if (path === '/rest/v1/rpc/my_consent_status') return json({ required: false, invited_parent: null })
     if (path === '/rest/v1/rpc/my_session_is_live' || path === '/rest/v1/rpc/feature_on') return json(true)
-    if (['child_events', 'get_player_invites_for_current_user'].some(rpc => path === `/rest/v1/rpc/${rpc}`)) return json([])
+    if (['child_events', 'get_player_invites_for_current_user', 'season_plan_for_player'].some(rpc => path === `/rest/v1/rpc/${rpc}`)) return json([])
     unexpected.push(`${req.method()} ${path}`)
     return route.fulfill({ status: 500, body: 'Unmocked request blocked' })
   })

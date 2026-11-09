@@ -1,13 +1,14 @@
-import type { ReactNode } from 'react'
-import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronRight, LayoutGrid, List } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowDown, ArrowUp, ChevronRight, LayoutGrid, List, Minus, Plus, Repeat } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { LIBRARIES, SESSIONS, libraryPath } from '@/lib/library/library'
 import { ON_LIBRARY, PRACTICE_KIND_COLOURS } from '@/lib/fixed-colours'
 import {
-  DETAILS, KINDS, KIND_ORDER, LIBRARY, MY_DRILLS_PATH, PLAYERS_TODAY, START_LEVEL, allDrillsPath, fit, foundAs, kindInfo,
-  kindPath, libraryDrill, searchDrills, typesOf, type Kind, type LibraryDrill, type Squad,
+  DETAILS, KINDS, KIND_ORDER, LIBRARY, MY_DRILLS_PATH, PLAYERS_TODAY, START_LEVEL, allDrillsPath, alsoCalled, anotherDrill,
+  drillPath, fit, foundAs, kindInfo, kindPath, libraryDrill, nextLevel, refit, searchDrills, step, typesOf, type Change,
+  type Kind, type LibraryDrill, type Squad,
 } from '@/lib/training/library'
 import { useSquadSize } from '@/components/coach/training/useTraining'
 import { DrillCards } from '@/components/coach/training/library/DrillCard'
@@ -16,6 +17,7 @@ import { CoachTrail } from '@/components/coach/CoachTrail'
 import { WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
+import { Button } from '@/components/arc/button/button'
 
 /* TRAK-387 (Drill Library 3/11, parent TRAK-384): Training › Drills is the new Library, from the 8 Nov mockup. Find a
    drill (results take the place of everything else while the coach types), My drills and All drills, then "What kind
@@ -31,17 +33,21 @@ const FALLBACK_PLAYERS = 15
 
 /** The squad every picture is fitted to: the squad picked at the top (or the whole roster on All), kept to what a
  *  drill can be drawn for, at the standard level. */
-function useLibrarySquad(): { squad: Squad | null; line: string } {
+function useLibrarySquad(): { squad: Squad | null; line: string; name: string | null } {
   const { user } = useAuth()
   const coachSquad = useCoachSquad(user?.id)
-  const name = coachSquad.everySquad ? null : coachSquad.squad
+  // Wait for the squads, so the squad (and the drill page's Easier, Harder and Players today) doesn't start over when
+  // they arrive. Without them, the whole roster.
+  const known = coachSquad.ready || coachSquad.failed
+  const name = known && !coachSquad.everySquad ? coachSquad.squad : null
   const size = useSquadSize(name)
-  if (size.isPending) return { squad: null, line: '' }
+  if (!known || size.isPending) return { squad: null, line: '', name }
   const roster = size.data ?? 0
   const players = roster ? Math.min(PLAYERS_TODAY.max, Math.max(PLAYERS_TODAY.min, roster)) : FALLBACK_PLAYERS
   return {
     squad: { players, level: START_LEVEL },
     line: `Each picture is set for ${players} players${name ? `, your ${name}s` : ''}.`,
+    name,
   }
 }
 
@@ -274,52 +280,117 @@ export function AllDrills() {
   )
 }
 
-/* ── A drill ────────────────────────────────────────────────────────────── */
+/* ── A drill ──────────────────────────────────────────────────────────── */
 
-/** A drill's page, at the standard level for the squad: the picture and its key, the five details, why, how and what
- *  to watch for. Easier / Harder, Players today and Another drill come in step 4 (TRAK-389). */
+const CHIP = 'rounded-full border border-line bg-raised px-2.5 py-0.5 text-[13px] font-medium text-ink-2'
+const SIDE_HEADING = 'text-xs font-medium uppercase tracking-[0.08em] text-ink-3'
+const STEPPER_BUTTON = 'inline-flex h-10 w-10 items-center justify-center rounded-full border border-line-strong bg-surface text-ink hover:bg-raised disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+
+/** What the last press changed: Easier, Harder or Players today. */
+type Changed = { title: string; items: Change[] }
+/** The drill page as the coach left it, kept in its history entry: a page laid out again (phone ↔ laptop) or opened
+ *  again with Back comes back the same. */
+type Kept = { drill: string; players: number; level: number; changed: Changed | null }
+
+/** A drill's page (TRAK-389, from the 8 Nov mockup), fitted to the squad at the standard level: Players today, the
+ *  picture and its key, Easier and Harder (each says what it changed and why), the five details with the changed ones
+ *  marked, why, how and what to watch for, and Another drill. A new drill starts fresh. Add to training and Add to My
+ *  drills come with TRAK-391 and TRAK-390. */
 export function DrillPage() {
   const { drillId } = useParams()
   const drill = libraryDrill(drillId)
-  const { squad } = useLibrarySquad()
+  const { squad, name } = useLibrarySquad()
   if (!drill) return <Navigate to="/coach/training/drills" replace />
-  const fitted = squad ? fit(drill, squad.players, squad.level) : null
-  const kind = kindInfo(drill.kind).name
+  return <SubPage title={drill.name} intro={<DrillHead drill={drill} />}>
+    {!squad ? <LoadingSkeleton label="Loading the drill…" rows={2} />
+      : <DrillBody key={drill.id} drill={drill} start={squad} squadName={name} />}
+  </SubPage>
+}
 
-  return (
-    <SubPage title={drill.name} intro={<span className="flex flex-wrap gap-1.5">
-      <span className="rounded-full border border-line bg-raised px-2.5 py-0.5 text-[13px] font-medium text-ink-2">{kind}</span>
-      <span className="rounded-full border border-line bg-raised px-2.5 py-0.5 text-[13px] font-medium text-ink-2">{drill.type}</span>
-      {drill.focus !== 'team' && <span className="rounded-full border border-line bg-raised px-2.5 py-0.5 text-[13px] font-medium text-ink-2">{drill.focus === 'individual' ? 'Individual' : 'Goalkeeping'}</span>}
-    </span>}>
-      {!squad || !fitted ? <LoadingSkeleton label="Loading the drill…" rows={2} />
-        : <div className="grid items-start gap-4 laptop:grid-cols-[minmax(0,1.5fr)_minmax(280px,1fr)]">
-          <div className="grid gap-3.5 rounded-2xl border border-line bg-surface p-4">
-            <DrillPitch drill={drill} players={squad.players} level={squad.level} />
-            <PitchKey legend={fitted.legend} />
-            <dl className="grid overflow-hidden rounded-xl border border-line tablet:grid-cols-5">
-              {DETAILS.map(({ key, name }) => <div key={key} className="flex justify-between gap-3 border-b border-line px-3 py-2.5 last:border-b-0 tablet:grid tablet:content-start tablet:gap-0.5 tablet:border-b-0 tablet:border-r tablet:last:border-r-0">
-                <dt className="flex-none text-xs text-ink-3">{name}</dt>
-                <dd className="text-right text-sm font-medium text-ink [overflow-wrap:anywhere] tablet:text-left">{fitted.details[key] || '—'}</dd>
-              </div>)}
-            </dl>
-          </div>
-          <div className="grid gap-5 rounded-2xl border border-line bg-surface p-4">
-            <section aria-labelledby="why" className="grid gap-1.5">
-              <h2 id="why" className="text-xs font-medium uppercase tracking-[0.08em] text-ink-3">Why</h2>
-              <p className="text-[17px] text-ink">{drill.why}</p>
-            </section>
-            <section aria-labelledby="how" className="grid gap-1.5">
-              <h2 id="how" className="text-xs font-medium uppercase tracking-[0.08em] text-ink-3">How it works</h2>
-              <ol className="grid list-decimal gap-2 pl-5 text-[15px] text-ink marker:text-ink-3">{drill.how.map(step => <li key={step}>{step}</li>)}</ol>
-            </section>
-            <section aria-labelledby="watch" className="grid gap-1.5">
-              <h2 id="watch" className="text-xs font-medium uppercase tracking-[0.08em] text-ink-3">Watch for</h2>
-              <ul className="grid list-disc gap-1.5 pl-5 text-[15px] text-ink marker:text-brand">{drill.watch.map(w => <li key={w}>{w}</li>)}</ul>
-            </section>
-            <p className="text-[13px] text-ink-3">{SAMPLE}</p>
-          </div>
-        </div>}
-    </SubPage>
-  )
+function DrillHead({ drill }: { drill: LibraryDrill }) {
+  const also = alsoCalled(drill)
+  return <span className="grid gap-2">
+    <span className="flex flex-wrap gap-1.5">
+      <span className={CHIP}>{kindInfo(drill.kind).name}</span>
+      {drill.kind !== 'warmup' && <span className={CHIP}>{drill.type}</span>}
+      {drill.focus !== 'team' && <span className={CHIP}>{drill.focus === 'individual' ? 'Individual' : 'Goalkeeping'}</span>}
+    </span>
+    {also.length > 0 && <span className="text-sm text-ink-3">Also called: {also.join(', ')}</span>}
+  </span>
+}
+
+function DrillBody({ drill, start, squadName }: { drill: LibraryDrill; start: Squad; squadName: string | null }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const kept = (location.state as { drillPage?: Kept } | null)?.drillPage
+  const was = kept?.drill === drill.id ? kept : null
+  const [players, setPlayers] = useState(was?.players ?? start.players)
+  const [level, setLevel] = useState(was?.level ?? start.level)
+  const [changed, setChanged] = useState<Changed | null>(was?.changed ?? null)
+  const keep = (next: Omit<Kept, 'drill'>) => {
+    setPlayers(next.players); setLevel(next.level); setChanged(next.changed)
+    navigate(location.pathname + location.search, { replace: true, state: { ...(location.state as object | null), drillPage: { drill: drill.id, ...next } } })
+  }
+  const fitted = fit(drill, players, level)
+  const hit = new Set(changed?.items.map(c => c.key))
+  const another = anotherDrill(drill)
+
+  const press = (by: -1 | 1) => {
+    const next = step(drill, players, level, by)
+    if (!next) return
+    keep({ players, level: next.level, changed: { title: by > 0 ? 'Harder. Here’s what Trak changed:' : 'Easier. Here’s what Trak changed:', items: next.changes } })
+  }
+  const count = (by: -1 | 1) => {
+    const to = Math.min(PLAYERS_TODAY.max, Math.max(PLAYERS_TODAY.min, players + by))
+    if (to === players) return
+    keep({ players: to, level, changed: { title: `${to} players today. Trak refitted the drill:`, items: refit(drill, players, to, level) } })
+  }
+
+  return <div className="grid items-start gap-4 laptop:grid-cols-[minmax(0,1.5fr)_minmax(280px,1fr)]">
+    <div className="grid gap-3.5 rounded-2xl border border-line bg-surface p-4">
+      <div className="flex flex-wrap items-center justify-end gap-2.5" role="group" aria-label="Players today">
+        <span className="text-sm text-ink-2">Players today</span>
+        <button type="button" className={STEPPER_BUTTON} aria-label="One player fewer" disabled={players <= PLAYERS_TODAY.min} onClick={() => count(-1)}><Minus aria-hidden size={18} /></button>
+        <span className="min-w-[30px] text-center text-[22px] font-medium tabular-nums text-ink" aria-live="polite">{players}</span>
+        <button type="button" className={STEPPER_BUTTON} aria-label="One player more" disabled={players >= PLAYERS_TODAY.max} onClick={() => count(1)}><Plus aria-hidden size={18} /></button>
+      </div>
+      <DrillPitch drill={drill} players={players} level={level} />
+      <PitchKey legend={fitted.legend} />
+      <div className="arc grid grid-cols-2 gap-2 tablet:grid-cols-3">
+        <Button variant="secondary" disabled={nextLevel(drill, players, level, -1) === null} onClick={() => press(-1)}><ArrowDown aria-hidden size={16} />Easier</Button>
+        <Button variant="secondary" disabled={nextLevel(drill, players, level, 1) === null} onClick={() => press(1)}><ArrowUp aria-hidden size={16} />Harder</Button>
+        {another && <span className="col-span-2 grid tablet:col-span-1"><Button variant="secondary" onClick={() => navigate(drillPath(another.id))}><Repeat aria-hidden size={16} />Another drill</Button></span>}
+      </div>
+      {changed ? <div role="status" className="grid gap-1.5 rounded-xl bg-warning/15 px-3.5 py-3 text-[15px] text-ink">
+          <p className="font-medium">{changed.title}</p>
+          {changed.items.length ? <ul className="grid gap-1">{changed.items.map(c =>
+            <li key={c.key}>{c.name}: {c.from} to {c.to}.{c.why ? ` ${c.why}` : ''}</li>)}</ul>
+            : <p>Nothing changes with that many.</p>}
+        </div>
+        : <p role="status" className="rounded-xl bg-raised px-3.5 py-3 text-[15px] text-ink-2">
+          Set for {squadName ? `your ${squadName}s` : 'your squad'}. Press Easier or Harder and Trak shows what it changed and why.</p>}
+      <dl className="grid overflow-hidden rounded-xl border border-line tablet:grid-cols-5">
+        {DETAILS.map(({ key, name }) => <div key={key} data-changed={hit.has(key) || undefined}
+          className={`flex justify-between gap-3 border-b border-line px-3 py-2.5 last:border-b-0 tablet:grid tablet:content-start tablet:gap-0.5 tablet:border-b-0 tablet:border-r tablet:last:border-r-0 ${hit.has(key) ? 'bg-warning/15' : ''}`}>
+          <dt className="flex-none text-xs text-ink-3">{name}</dt>
+          <dd className="text-right text-sm font-medium text-ink [overflow-wrap:anywhere] tablet:text-left">{fitted.details[key] || '—'}</dd>
+        </div>)}
+      </dl>
+    </div>
+    <div className="grid gap-5 rounded-2xl border border-line bg-surface p-4">
+      <section aria-labelledby="why" className="grid gap-1.5">
+        <h2 id="why" className={SIDE_HEADING}>Why this works</h2>
+        <p className="text-[17px] text-ink">{drill.why}</p>
+      </section>
+      <section aria-labelledby="how" className="grid gap-1.5">
+        <h2 id="how" className={SIDE_HEADING}>How to play</h2>
+        <ol className="grid list-decimal gap-2 pl-5 text-[15px] text-ink marker:text-ink-3">{drill.how.map(line => <li key={line}>{line}</li>)}</ol>
+      </section>
+      <section aria-labelledby="watch" className="grid gap-1.5">
+        <h2 id="watch" className={SIDE_HEADING}>Watch for</h2>
+        <ul className="grid list-disc gap-1.5 pl-5 text-[15px] text-ink marker:text-brand">{drill.watch.map(w => <li key={w}>{w}</li>)}</ul>
+      </section>
+      <p className="text-[13px] text-ink-3">{SAMPLE}</p>
+    </div>
+  </div>
 }

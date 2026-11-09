@@ -117,10 +117,16 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
 - **Drills tab** (TRAK-387): `/coach/training/drills` is the Library home (Find a drill, My drills, All drills, the
   three kinds, then the old FA Library tiles until TRAK-394); `drills/kind/:kind` a practice page, `drills/all` All
   drills (`?show=` a kind, Individual or Goalkeeping), `drills/mine` My drills (empty until TRAK-390), `drills/d/:id` a
-  drill's page (the picture, key, five details, why, how, watch for; TRAK-389 adds the rest). Searches and filters
+  drill's page. Searches and filters
   sit in the address (`?q=`, `?type=`, `?show=`), so Back returns to them. Every picture is fitted to the squad picked
   at the top (the whole roster on All), kept to 8–20 players, at level 4 of 8. Code: `src/pages/coach/training/
   DrillLibrary.tsx`, `src/components/coach/training/library/DrillCard.tsx`, paths in `src/lib/training/library/paths.ts`.
+- **A drill's page** (TRAK-389): kind, type and "Also called" (3 other names); Players today (8–20) refits the drill;
+  the picture and key; Easier and Harder move to the next level that changes something and say what changed and why,
+  greyed out at the end; the five details, the changed ones marked; why, how to play, watch for; Another drill (the
+  next of the same type). Players, level and the last change are kept in the page's history entry, so the page laid
+  out again (phone ↔ laptop) or opened with Back comes back the same. Add to training and Add to My drills are left
+  out until TRAK-391 and TRAK-390 rather than shown doing nothing.
 - **No coach-made drills** (Kostas, 8 Nov): New drill, the list of the coach's drills and Add to the next training
   left the Drills tab; migration `20261109000000_drill_library_clean_start.sql` deleted the hand-written drills, every
   plan that used one, and any draft that did. `coach_drills` stays, empty. Plan session's Write your own and From My

@@ -56,8 +56,14 @@ test('a coach picks Ελληνικά on a laptop: the menu and Settings turn Gre
   await expect(menu.getByRole('button', { name: 'Ρυθμίσεις' })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { name: 'Γλώσσα', exact: true })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Ενότητες ρυθμίσεων' }).getByRole('button'))
-    .toHaveText(['Προφίλ', 'Σύλλογος', 'Γλώσσα', 'Ειδοποιήσεις', 'Πώς λειτουργεί', 'Λογαριασμός'])
-  await expect(page.getByRole('button', { name: 'Νέο' })).toBeVisible()
+    .toHaveText(['Προφίλ', 'Σύλλογος', 'Γλώσσα', 'Ειδοποιήσεις', 'Πώς λειτουργεί το Trak', 'Λογαριασμός'])
+  // Kostas's words (10 Nov review): "+ Δημιουργία", wider than "+ Create", shows whole.
+  const create = page.getByRole('button', { name: 'Δημιουργία' })
+  await expect(create).toBeVisible()
+  expect(await create.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+  // A long section name wraps rather than running out of the list.
+  const how = page.getByRole('navigation', { name: 'Ενότητες ρυθμίσεων' }).getByRole('button', { name: 'Πώς λειτουργεί το Trak' })
+  expect(await how.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
   await expect(page.locator('html')).toHaveAttribute('lang', 'el')
   await expect.poll(() => account.language).toBe('el')
   await expect(page.getByRole('button', { name: 'Ελληνικά' })).toHaveAttribute('aria-pressed', 'true')

@@ -30,6 +30,8 @@ export interface BottomSheetProps {
   onDetentChange?: (index: number) => void;
   closeLabel?: string;
   className?: string;
+  /** Trak (TRAK-404, Kostas 10 Nov): up to 64rem wide instead of 36rem, for a sheet with a picture beside its text. */
+  wide?: boolean;
   children: ReactNode;
 }
 
@@ -82,7 +84,7 @@ export function BottomSheet({ trigger, open: openProp, defaultOpen = false, onOp
   </DialogPrimitive.Root>;
 }
 
-function Sheet({ title, description, aside, detents = [.45, .92], initialDetent = 0, onDetentChange, closeLabel = "Close", className, children, onDismiss }: Omit<BottomSheetProps, "trigger" | "open" | "defaultOpen" | "onOpenChange"> & { onDismiss: () => void }) {
+function Sheet({ title, description, aside, detents = [.45, .92], initialDetent = 0, onDetentChange, closeLabel = "Close", className, wide = false, children, onDismiss }: Omit<BottomSheetProps, "trigger" | "open" | "defaultOpen" | "onOpenChange"> & { onDismiss: () => void }) {
   const [isPresent, safeToRemove] = usePresence();
   const reduced = useReducedMotion() ?? false;
   const detentKey = detents.join(",");
@@ -362,7 +364,7 @@ function Sheet({ title, description, aside, detents = [.45, .92], initialDetent 
       // Radix waits for the click before treating a press as outside. A press on the trigger while the sheet leaves reopens it first, so that press must not close it again.
       onPointerDownOutside={event => { const { present, at } = presenceChange.current; if (!present || event.detail.originalEvent.timeStamp < at) event.preventDefault(); }}
     >
-      <motion.div ref={sheetRef} className={[styles.sheet, className].filter(Boolean).join(" ")} style={style} data-expanded={expanded ? "" : undefined} onKeyDown={sheetKey}>
+      <motion.div ref={sheetRef} className={[styles.sheet, wide ? styles.wide : undefined, className].filter(Boolean).join(" ")} style={style} data-expanded={expanded ? "" : undefined} onKeyDown={sheetKey}>
         <div className={styles.header} onPointerDown={headerDown} onPointerMove={headerMove} onPointerUp={headerUp} onPointerCancel={headerUp}>
           <button type="button" className={styles.grabber} data-grabber="" aria-label={expanded ? "Collapse sheet" : "Expand sheet"} aria-expanded={expanded} onClick={grabberClick} onKeyDown={grabberKey}>
             <span className={styles.grabberBar} aria-hidden="true" />

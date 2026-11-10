@@ -41,7 +41,7 @@ describe('TRAK-220: every Arc panel opened into <body> carries the arc class', (
       .filter(file => readFileSync(join(process.cwd(), file), 'utf8').includes('<BottomSheet'))
     // TRAK-263: the coach's player profile editor (foot, nationality, traits). Imad, 23 Oct: Home's Take register and View log.
     // TRAK-294: New drill. TRAK-285: a player's line-up sheet on a phone. TRAK-339: Use a past plan, and the register
-    // TRAK-340: the planner's Add a part, See more drills, Write your own and Leave. TRAK-298: a training's Who's here and log.
+    // TRAK-340: the planner's Add a part, Find another drill (TRAK-404) and View drill. TRAK-298: a training's Who's here and log.
     // TRAK-391: a Library drill's Add to training.
     // TRAK-353: a player's position, roles and Can also play. TRAK-354: a player's objectives. TRAK-357: New formation and Rename. TRAK-360: Use for matches. TRAK-365: a stuck objective's choices.
     expect(files.sort()).toEqual(['src/components/coach/CoachWeekStrip.tsx', 'src/components/coach/games/LineUpAndJobs.tsx',

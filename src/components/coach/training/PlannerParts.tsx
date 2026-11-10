@@ -22,11 +22,12 @@ export function DrillTile({ drill, picked, tag, onPick }: { drill: PlanDrill; pi
   </button>
 }
 
-export function ActionTile({ icon, label, onClick }: { icon: 'plus' | 'search'; label: string; onClick: () => void }) {
+export function ActionTile({ icon, label, note, onClick }: { icon: 'plus' | 'search'; label: string; note?: string; onClick: () => void }) {
   return <button type="button" onClick={onClick}
-    className="flex h-full min-h-28 w-full flex-col items-center justify-center gap-1.5 rounded-[14px] border border-dashed border-line bg-surface p-3.5 text-center text-brand hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+    className="flex h-full min-h-[72px] w-full flex-col items-center justify-center gap-1 rounded-[14px] border border-dashed border-line bg-surface p-3.5 text-center text-brand hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
     {icon === 'plus' ? <Plus aria-hidden size={18} /> : <Search aria-hidden size={18} />}
     <span className="text-[15px] font-medium text-ink">{label}</span>
+    {note && <span className="text-[13px] text-ink-3">{note}</span>}
   </button>
 }
 

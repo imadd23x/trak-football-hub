@@ -2363,6 +2363,10 @@ export type Database = {
         Args: never
         Returns: { player_objective_id: string; squad_player_id: string }[]
       }
+      evaluation_progress: {
+        Args: { p_assessments: string[]; p_child?: string }
+        Returns: { assessment_id: string; due_on: string; objectives: Json }[]
+      }
       season_plan_for_player: {
         Args: { p_child?: string }
         Returns: {

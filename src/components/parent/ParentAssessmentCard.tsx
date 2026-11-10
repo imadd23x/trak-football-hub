@@ -4,8 +4,10 @@ import { formatParentDate } from '@/lib/parent-data'
 import type { ParentAssessment } from '@/lib/parent-assessments'
 
 /** TRAK-194 (Kostas, 16 Oct): the date leads and the coach isn't named; "Dora Fotiadi · Good" read as the parent rating the coach. */
-export function ParentAssessmentCard({ assessment, active = true, showOpenLink = true, openHref }: {
+export function ParentAssessmentCard({ assessment, active = true, showOpenLink = true, openHref, progressLine }: {
   assessment: ParentAssessment; active?: boolean; showOpenLink?: boolean
+  /** TRAK-401: "Progress: 1 on track, 1 some progress" on an evaluation's assessment. */
+  progressLine?: string | null
   /** Where Open assessment goes; the parent's page unless given (the player's is /player/feedback/:id). */
   openHref?: string
 }) {
@@ -16,6 +18,7 @@ export function ParentAssessmentCard({ assessment, active = true, showOpenLink =
       <ParentRating rating={assessment.coach_rating} missing="Not assessed" />
     </div>
     <ParentAssessmentBands assessment={assessment} />
+    {progressLine && <p className="mt-3 text-sm text-muted-foreground">{progressLine}</p>}
     {showOpenLink && <Link to={openHref ?? `/parent/assessment/${encodeURIComponent(assessment.id)}`} tabIndex={active ? 0 : -1}
       className="inline-flex min-h-11 items-center mt-3 text-sm text-primary focus-visible:ring-2 focus-visible:ring-primary">Open assessment</Link>}
   </div>

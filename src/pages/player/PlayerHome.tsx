@@ -20,6 +20,7 @@ import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCa
 import { OwnConsentCard } from '@/components/player/OwnConsentCard'
 import { MySeasonCard } from '@/components/player/MySeasonCard'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
+import { progressSummary, useEvaluationProgress } from '@/lib/evaluation-progress'
 
 const QUOTES = [
   { text: "The more difficult the victory, the greater the happiness in winning.", author: "Pelé" },
@@ -125,6 +126,16 @@ export default function PlayerHome() {
   useEffect(() => {
     if (shownAssessmentId) trackEvent('feedback_opened', { assessment_id: shownAssessmentId })
   }, [shownAssessmentId])
+
+  // TRAK-401: an evaluation's assessment card says how the objectives went. Only evaluation assessments are asked for; a
+  // failed read leaves the card as it was (the evaluation page says it when it can't load).
+  const evaluationIds = recentAssessments.filter(a => a.evaluation_id).map(a => a.id as string)
+  const evaluationProgress = useEvaluationProgress(evaluationIds)
+  const progressLines: Record<string, string> = {}
+  for (const [id, p] of evaluationProgress.data ?? []) {
+    const line = progressSummary(p.objectives)
+    if (line) progressLines[id] = line
+  }
 
   useEffect(() => {
     if (!user) return
@@ -664,7 +675,7 @@ export default function PlayerHome() {
         {coachAssessment && (
           <div className="mt-5">
             <ParentAssessmentCarousel key={recentAssessments.map(a => a.id).join(',')} assessments={recentAssessments}
-              allHref={null} openHref={id => `/player/feedback/${encodeURIComponent(id)}`} />
+              allHref={null} openHref={id => `/player/feedback/${encodeURIComponent(id)}`} progressLines={progressLines} />
             {feedbackLoadFailed ? (
               <p role="alert" className="mt-4 text-[12px] text-ink-2">
                 Couldn't load your coach's message.{' '}

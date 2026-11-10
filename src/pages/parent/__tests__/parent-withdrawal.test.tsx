@@ -90,6 +90,7 @@ beforeEach(() => {
     http.post(endpoint('rpc/get_children_awaiting_consent'), () => HttpResponse.json([])),
     // J8.8 (TRAK-131): Home reads the selected child's events.
     http.post(endpoint('rpc/child_events'), () => HttpResponse.json([])),
+    http.post(endpoint('rpc/season_plan_for_player'), () => HttpResponse.json([])), // TRAK-399: Home's Season plan card
     http.post(endpoint('telemetry_events'), () => new HttpResponse(null, { status: 201 })),
     http.all('*', ({ request }) => { unexpected.push(`${request.method} ${request.url}`); return new HttpResponse(null, { status: 500 }) }),
   )

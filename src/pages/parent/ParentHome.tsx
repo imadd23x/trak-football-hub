@@ -13,6 +13,7 @@ import { useChildrenAwaitingConsent, useParentDevelopment, useParentEvents, useP
 import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
 import { CalendarHomePrompt } from '@/components/trak/AddToCalendar'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
+import { FamilySeasonCard } from '@/components/parent/FamilySeasonCard'
 import { ParentConsentBar } from '@/pages/parent/ParentConsent'
 
 export default function ParentHome() {
@@ -72,6 +73,8 @@ export default function ParentHome() {
                     .gte('event_date', from).lte('event_date', to).order('event_date', { ascending: true })} />}
                 {/* TRAK-133 (J8.10): once there are events, offer the phone calendar. */}
                 <CalendarHomePrompt hasEvents={(eventsQuery.data?.length ?? 0) > 0} />
+                {/* TRAK-399: the Season plan card for the chosen child; nothing when the coach has not shared. */}
+                {selectedChild && <FamilySeasonCard key={selectedChild.id} child={selectedChild} />}
                 {matches.length > 0 && (
                   <section className="rounded-xl p-5 mb-4 bg-card border border-border" aria-label="Recorded matches summary">
                     <div className="flex items-start justify-between gap-3">

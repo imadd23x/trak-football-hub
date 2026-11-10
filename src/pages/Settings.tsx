@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
-import { ArrowLeft, Bell, BookOpen, Building2, CalendarDays, KeyRound, LogOut, ShieldCheck, UserRound, Users } from 'lucide-react'
+import { ArrowLeft, Bell, BookOpen, Building2, CalendarDays, KeyRound, Languages, LogOut, ShieldCheck, UserRound, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { useParentChildren } from '@/contexts/ParentChildrenContext'
@@ -24,12 +24,15 @@ import { PlayerFace } from '@/components/trak/PlayerFace'
 import { Button } from '@/components/arc/button/button'
 import { Input } from '@/components/arc/input/input'
 import { SettingsPage, SettingsRow, SettingsRows, type SettingsSection } from '@/components/arc/blocks/settings-page/settings-page'
+import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
+import { i18n, isLanguage, LANGUAGES, showLanguage, useLanguage, useTranslation } from '@/lib/i18n'
 
+// TRAK-406: the messages are words in settings.json, read when shown, so they are in the language showing.
 const nameSchema = z
   .string()
   .trim()
-  .min(2, { message: 'Name is too short' })
-  .max(80, { message: 'Name must be under 80 characters' })
+  .min(2, { message: 'nameTooShort' })
+  .max(80, { message: 'nameTooLong' })
 
 export default function Settings() {
   const { user, profile } = useAuth()
@@ -43,6 +46,7 @@ type Operation = 'name' | 'player' | 'delete' | 'password' | 'signout'
 function AccountSettings({ userId }: { userId: string }) {
   const navigate = useNavigate()
   const { user, profile, signOut, refreshProfile } = useAuth()
+  const { t } = useTranslation()
   const role = profile?.role
   const childLogin = isTechnicalChildAddress(user?.email)
   const mounted = useRef(false)
@@ -122,7 +126,7 @@ function AccountSettings({ userId }: { userId: string }) {
 
   const saveName = async () => {
     const parsed = nameSchema.safeParse(nameDraft)
-    if (!parsed.success) { toast.error(parsed.error.issues[0].message); return }
+    if (!parsed.success) { toast.error(t(`settings:${parsed.error.issues[0].message as 'nameTooShort' | 'nameTooLong'}`)); return }
     if (!begin('name')) return
     try {
       const { client } = await getSettingsAccount(userId, isCurrent)
@@ -136,13 +140,13 @@ function AccountSettings({ userId }: { userId: string }) {
       setDisplayName(data.full_name)
       setJustSaved(true)
       await refreshProfile()
-      if (isCurrent()) toast.success('Name updated')
-    } catch { if (isCurrent()) toast.error('Could not save name') }
+      if (isCurrent()) toast.success(t('settings:nameUpdated'))
+    } catch { if (isCurrent()) toast.error(t('settings:nameSaveError')) }
     finally { finish() }
   }
 
   const changePassword = async () => {
-    if (childLogin) {toast.info('Ask your parent or guardian to set a new password from their Trak profile.');return}
+    if (childLogin) {toast.info(t('settings:childPassword'));return}
     if (!user?.email || !begin('password')) return
     try {
       const account = await getSettingsAccount(userId, isCurrent)
@@ -151,19 +155,15 @@ function AccountSettings({ userId }: { userId: string }) {
         redirectTo: `${window.location.origin}/reset-password`,
       })
       if (error) throw error
-      if (isCurrent()) toast.success('Check your email for a reset link')
-    } catch { if (isCurrent()) toast.error('Could not send reset email') }
+      if (isCurrent()) toast.success(t('settings:resetSent'))
+    } catch { if (isCurrent()) toast.error(t('settings:resetError')) }
     finally { finish() }
   }
 
   const deleteAccount = async () => {
     // TRAK-155: deleting a guardian account withdraws the approvals they gave.
-    const approvals = role === 'parent'
-      ? ' It also withdraws the approvals you gave for your children.'
-      : ''
-    if (operation.current || !window.confirm(
-      `Delete your account? Your sign-in and profile will be removed.${approvals} Some academy history and consent records may be retained. This cannot be undone.`
-    ) || !begin('delete')) return
+    const approvals = role === 'parent' ? t('settings:deleteApprovals') : ''
+    if (operation.current || !window.confirm(t('settings:deleteConfirm', { approvals })) || !begin('delete')) return
     try {
       const { client } = await getSettingsAccount(userId, isCurrent)
       const { error } = await client.rpc('delete_my_account')
@@ -171,7 +171,7 @@ function AccountSettings({ userId }: { userId: string }) {
       await assertSettingsAccount(userId, isCurrent)
       // RouteGuard owns navigation after a confirmed sign-out.
       await signOut(userId)
-    } catch { if (isCurrent()) toast.error('Could not delete account. Please contact support.') }
+    } catch { if (isCurrent()) toast.error(t('settings:deleteError')) }
     finally { finish() }
   }
 
@@ -180,7 +180,7 @@ function AccountSettings({ userId }: { userId: string }) {
     try {
       await assertSettingsAccount(userId, isCurrent)
       await signOut(userId)
-    } catch { if (isCurrent()) toast.error('Could not sign out. Please try again.') }
+    } catch { if (isCurrent()) toast.error(t('settings:signOutError')) }
     finally { finish() }
   }
 
@@ -192,54 +192,59 @@ function AccountSettings({ userId }: { userId: string }) {
   })
   const named = role !== 'player'
   const nameChanged = named && nameDraft !== displayName
-  const subtitle = role === 'coach' ? [coachRoleVal, coachClub].filter(Boolean).join(' · ') || 'Coach'
-    : role === 'parent' ? 'Parent account' : role === 'player' ? 'Player' : 'Academy'
+  const subtitle = role === 'coach' ? [coachRoleVal, coachClub].filter(Boolean).join(' · ') || t('settings:subtitleCoach')
+    : role === 'parent' ? t('settings:subtitleParent') : role === 'player' ? t('settings:subtitlePlayer') : t('settings:subtitleAcademy')
 
   const sections: SettingsSection[] = [
     {
-      id: 'profile', label: 'Profile', icon: UserRound, pending: nameChanged ? 1 : 0,
-      description: 'Your name, and how you sign in.',
+      id: 'profile', label: t('settings:profile'), icon: UserRound, pending: nameChanged ? 1 : 0,
+      description: t('settings:profileDescription'),
       content: <>
         <div className="mb-4 flex items-center gap-4">
           {role === 'player' ? <PlayerFace name={displayName || '?'} size="xl" /> : <Avatar name={displayName || '?'} size="xl" />}
           <div className="grid min-w-0 gap-0.5">
             <strong className="truncate text-sm font-medium text-ink">{displayName || '—'}</strong>
             <span className="truncate text-sm text-ink-3">{subtitle}</span>
-            <small className="text-xs text-ink-3">Profile photos are coming soon.</small>
+            <small className="text-xs text-ink-3">{t('settings:photosSoon')}</small>
           </div>
         </div>
         <SettingsRows>
           {named
             ? <div className="pb-3">
-                <Input label="Full name" value={nameDraft} autoComplete="name" disabled={pending === 'name'}
+                <Input label={t('settings:fullName')} value={nameDraft} autoComplete="name" disabled={pending === 'name'}
                   onChange={e => setNameDraft(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') void saveName(); if (e.key === 'Escape') setNameDraft(displayName) }} />
               </div>
             // TRAK-103: a player's name is the academy's roster name; the database refuses a rename.
-            : <SettingsRow label="Name">
-                <span className="grid"><span className="text-ink">{displayName || '—'}</span><span className="text-xs text-ink-3">Your academy sets your name.</span></span>
+            : <SettingsRow label={t('settings:name')}>
+                <span className="grid"><span className="text-ink">{displayName || '—'}</span><span className="text-xs text-ink-3">{t('settings:academySetsName')}</span></span>
               </SettingsRow>}
-          <SettingsRow label={childLogin ? 'Username' : 'Email'}>{childLogin ? childUsername(user?.email) : user?.email || '—'}</SettingsRow>
+          <SettingsRow label={childLogin ? t('settings:username') : t('settings:email')}>{childLogin ? childUsername(user?.email) : user?.email || '—'}</SettingsRow>
         </SettingsRows>
       </>,
     },
     // TRAK-72 item 11: a coach's club, age group and role come from the academy (Trak sets up staff, TRAK-12).
     ...(role === 'coach' ? [{
-      id: 'club', label: 'Club', icon: Building2, description: 'Your academy sets these. Ask them if something is wrong.',
-      content: roleData === 'loading' ? <p role="status" className="text-sm text-ink-3">Loading profile…</p>
+      id: 'club', label: t('settings:club'), icon: Building2, description: t('settings:clubDescription'),
+      content: roleData === 'loading' ? <p role="status" className="text-sm text-ink-3">{t('settings:loadingProfile')}</p>
         : roleData === 'error' ? <div role="alert" className="text-sm text-ink-3">
-            <p>Could not load your profile details.</p>
-            <button onClick={() => setLoadAttempt(value => value + 1)} className="mt-2 text-brand">Retry</button>
+            <p>{t('settings:profileLoadError')}</p>
+            <button onClick={() => setLoadAttempt(value => value + 1)} className="mt-2 text-brand">{t('common:retry')}</button>
           </div>
         : <SettingsRows>
-            <SettingsRow label="Club">{coachClub || '—'}</SettingsRow>
-            <SettingsRow label="Age group">{coachTeam || '—'}</SettingsRow>
-            <SettingsRow label="Role">{coachRoleVal || '—'}</SettingsRow>
+            <SettingsRow label={t('settings:club')}>{coachClub || '—'}</SettingsRow>
+            <SettingsRow label={t('settings:ageGroup')}>{coachTeam || '—'}</SettingsRow>
+            <SettingsRow label={t('settings:role')}>{coachRoleVal || '—'}</SettingsRow>
           </SettingsRows>,
     }] : []),
+    // TRAK-406: everyone picks the language Trak shows them; it is saved on their account.
+    {
+      id: 'language', label: t('settings:language'), icon: Languages, description: t('settings:languageDescription'),
+      content: <LanguageChoice userId={userId} />,
+    },
     // TRAK-261 (Imad, 22 Oct): a parent's linked children and consent are here too, as on their Profile tab.
     ...(role === 'parent' ? [{
-      id: 'family', label: 'Family', icon: Users, description: 'Your linked children, and the logins you made for them.',
+      id: 'family', label: t('settings:family'), icon: Users, description: t('settings:familyDescription'),
       content: <div className="grid gap-3">
         <ParentFamilyContent><ParentConnections /></ParentFamilyContent>
         <ParentChildCredentials key={userId} />
@@ -248,6 +253,8 @@ function AccountSettings({ userId }: { userId: string }) {
       id: 'consent', label: 'Consent', icon: ShieldCheck, description: "What your children's coaches may record, approved or withdrawn.",
       content: <ParentConsent />,
     }] : []),
+    // TRAK-406: the two consent sections stay in English until counsel says whether consent wording must be in Greek
+    // (TRAK-22); the same goes for the consent screen.
     // TRAK-177: a 15–17 player at a consent-age-15 academy, who agreed for themselves, withdraws here.
     ...(role === 'player' && decidesOwnConsent(consent.data) ? [{
       id: 'consent', label: 'Consent', icon: ShieldCheck, description: 'You agreed for yourself. You can withdraw it here.',
@@ -256,42 +263,40 @@ function AccountSettings({ userId }: { userId: string }) {
     // TRAK-136 (J8.13): the reminder 2 days before each event goes to guardians and to players with their own
     // email; a child's username login never gets email. TRAK-261: a coach's two in-app switches.
     ...(role === 'coach' ? [{
-      id: 'notifications', label: 'Notifications', icon: Bell, description: 'What Trak shows you in the app. On unless you turn it off.',
+      id: 'notifications', label: t('settings:notifications'), icon: Bell, description: t('settings:notificationsCoachDescription'),
       content: <SettingsRows>
-        <NotificationSwitch userId={userId} column="cant_make_it_alerts" label="Can't make it" noun="alert"
-          hint="In the bell when a family says their child can't make an event." />
-        <NotificationSwitch userId={userId} column="needs_you" label="Needs you" noun="Needs you"
-          hint="Players to assess and drafts to finish, on Home." />
+        <NotificationSwitch userId={userId} column="cant_make_it_alerts" words="cantMakeIt" />
+        <NotificationSwitch userId={userId} column="needs_you" words="needsYou" />
       </SettingsRows>,
     }] : (role === 'parent' || (role === 'player' && !childLogin)) ? [{
-      id: 'notifications', label: 'Notifications', icon: Bell, description: 'Emails from Trak. On unless you turn them off.',
+      id: 'notifications', label: t('settings:notifications'), icon: Bell, description: t('settings:notificationsEmailDescription'),
       content: <EventReminders userId={userId} />,
     }] : []),
     // TRAK-133 (J8.10): add Trak to a phone calendar, see when it last synced, get a new link.
     ...((role === 'player' || role === 'parent') ? [{
-      id: 'calendar', label: 'Calendar', icon: CalendarDays, description: 'Your events in your phone’s calendar.',
+      id: 'calendar', label: t('settings:calendar'), icon: CalendarDays, description: t('settings:calendarDescription'),
       content: <CalendarSettings />,
     }] : []),
     ...(role === 'club' ? [{
-      id: 'access', label: 'Access', icon: ShieldCheck, description: 'What this account can see.',
-      content: <p className="text-sm text-ink-2">Read-only academy view. You can see all coaches and squads but cannot edit player or coach records.</p>,
+      id: 'access', label: t('settings:access'), icon: ShieldCheck, description: t('settings:accessDescription'),
+      content: <p className="text-sm text-ink-2">{t('settings:accessText')}</p>,
     }] : []),
     // TRAK-261 (Imad, 22 Oct): Arc's Billing becomes How Trak works, for everyone.
     {
-      id: 'how', label: 'How Trak works', icon: BookOpen, description: 'Performance bands and the rating engine.',
-      content: <Link to="/how-it-works" className="text-sm font-medium text-brand">Read how Trak works</Link>,
+      id: 'how', label: t('settings:howTrakWorks'), icon: BookOpen, description: t('settings:howDescription'),
+      content: <Link to="/how-it-works" className="text-sm font-medium text-brand">{t('settings:howLink')}</Link>,
     },
     {
-      id: 'account', label: 'Account', icon: KeyRound, description: 'Your password, signing out, and leaving Trak.',
+      id: 'account', label: t('settings:account'), icon: KeyRound, description: t('settings:accountDescription'),
       content: <SettingsRows>
-        <SettingsRow label="Password">
-          <Button type="button" variant="secondary" size="sm" onClick={changePassword} disabled={!!pending}>{childLogin ? 'Ask your guardian' : 'Send reset email'}</Button>
+        <SettingsRow label={t('settings:password')}>
+          <Button type="button" variant="secondary" size="sm" onClick={changePassword} disabled={!!pending}>{childLogin ? t('settings:askGuardian') : t('settings:sendResetEmail')}</Button>
         </SettingsRow>
-        <SettingsRow label="This device">
-          <Button type="button" variant="secondary" size="sm" onClick={signOutAccount} disabled={!!pending}><LogOut size={15} strokeWidth={1.8} aria-hidden="true" />Sign out</Button>
+        <SettingsRow label={t('settings:thisDevice')}>
+          <Button type="button" variant="secondary" size="sm" onClick={signOutAccount} disabled={!!pending}><LogOut size={15} strokeWidth={1.8} aria-hidden="true" />{t('settings:signOut')}</Button>
         </SettingsRow>
-        <SettingsRow label="Leave Trak">
-          <Button type="button" variant="danger" size="sm" onClick={deleteAccount} disabled={!!pending}>Delete my account</Button>
+        <SettingsRow label={t('settings:leaveTrak')}>
+          <Button type="button" variant="danger" size="sm" onClick={deleteAccount} disabled={!!pending}>{t('settings:deleteAccount')}</Button>
         </SettingsRow>
       </SettingsRows>,
     },
@@ -304,13 +309,13 @@ function AccountSettings({ userId }: { userId: string }) {
       <div className={`${role === 'coach' ? WIDE_COLUMN : 'mx-auto trak-read px-5'} pt-5 pb-12`}>
         {/* A phone's way back; a coach's laptop has the frame's side menu and top bar (TRAK-259). */}
         {!(role === 'coach' && wide) && <div className="relative flex items-center justify-center mb-4 h-10">
-          <button onClick={() => navigate(-1)} aria-label="Back"
+          <button onClick={() => navigate(-1)} aria-label={t('common:back')}
             className="absolute left-0 flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-ink">
             <ArrowLeft size={16} />
           </button>
-          <span aria-hidden="true" className="text-[17px] text-ink">Settings</span>
+          <span aria-hidden="true" className="text-[17px] text-ink">{t('settings:title')}</span>
         </div>}
-        <SettingsPage title="Settings" sections={sections} bar={named ? {
+        <SettingsPage title={t('settings:title')} sections={sections} bar={named ? {
           state: pending === 'name' ? 'saving' : nameChanged ? 'edit' : justSaved ? 'saved' : null,
           count: nameChanged ? 1 : 0,
           onSave: () => { void saveName() },
@@ -329,6 +334,35 @@ const decidesOwnConsent = (s: OwnConsentStatus | null | undefined) =>
 /** OwnConsentSettings brings its own section; here the Arc section is already around it. */
 function Bare({ children }: { label: string; children: ReactNode }) {
   return <>{children}</>
+}
+
+/**
+ * TRAK-406 (Languages 1/8): the language Trak shows. It changes at once on this device, then is saved on the account,
+ * so Trak opens in it on every phone and laptop the person signs in on (AccountLanguage). If the words can't load
+ * (offline), nothing changes. If only the account save fails, this device keeps the new language and says so.
+ */
+function LanguageChoice({ userId }: { userId: string }) {
+  const { t, language } = useLanguage()
+  const { refreshProfile } = useAuth()
+  const busy = useRef(false)
+  const choose = async (value: string) => {
+    if (!isLanguage(value) || value === language || busy.current) return
+    busy.current = true
+    try {
+      try { await showLanguage(value) } catch { toast.error(t('settings:languageLoadError')); return }
+      // From here the words are the new language's: i18n.t, not this render's t.
+      try {
+        const { client } = await getSettingsAccount(userId, () => true)
+        const { data, error } = await client.from('profiles').update({ language: value })
+          .eq('user_id', userId).select('language').maybeSingle()
+        if (error || data?.language !== value) throw error ?? new Error('Language save was not confirmed')
+        await refreshProfile()
+        toast.success(i18n.t('settings:languageNow'))
+      } catch { toast.error(i18n.t('settings:languageDeviceOnly')) }
+    } finally { busy.current = false }
+  }
+  return <SegmentedControl label={t('settings:language')} value={language} onValueChange={value => { void choose(value) }}
+    options={LANGUAGES.map(option => ({ value: option.code, label: option.name }))} />
 }
 
 /** A parent's consent: each signed-up child's withdrawal, and approved children who have no account yet (TRAK-98). */
@@ -351,12 +385,16 @@ type SwitchColumn = 'event_reminders' | 'cant_make_it_alerts' | 'needs_you'
  * offers a retry rather than a switch that may be wrong.
  */
 function EventReminders({ userId }: { userId: string }) {
-  return <NotificationSwitch userId={userId} column="event_reminders" label="Event reminders" noun="reminder"
-    hint="An email 2 days before each event, listing what's on, when and where. One email a day, whatever the number of children." />
+  return <NotificationSwitch userId={userId} column="event_reminders" words="eventReminders" />
 }
 
 /** One switch on the person's own notification_settings row (TRAK-136; TRAK-261 adds the coach's two). */
-function NotificationSwitch({ userId, column, label, noun, hint }: { userId: string; column: SwitchColumn; label: string; noun: string; hint: string }) {
+/** TRAK-406: `words` names the switch's words in settings.json: its label, its hint, and the noun its messages use. */
+function NotificationSwitch({ userId, column, words }: { userId: string; column: SwitchColumn; words: 'cantMakeIt' | 'needsYou' | 'eventReminders' }) {
+  const { t } = useTranslation()
+  const label = t(`settings:${words}`)
+  const hint = t(`settings:${words}Hint`)
+  const noun = t(`settings:${words}Noun`)
   const client = useQueryClient()
   const [on, setOn] = useState<boolean | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -391,20 +429,20 @@ function NotificationSwitch({ userId, column, label, noun, hint }: { userId: str
       setOn(next)
       // Home's Needs you and the bell read the same row (TRAK-262).
       void client.invalidateQueries({ queryKey: ['coach', userId] })
-      toast.success(next ? `${label} on` : `${label} off`)
+      toast.success(next ? t('settings:switchOn', { label }) : t('settings:switchOff', { label }))
     } catch {
-      toast.error(`Couldn't save your ${noun} setting. Try again.`)
+      toast.error(t('settings:switchSaveError', { noun, label }))
     } finally {
       setSaving(false)
     }
   }
 
-  if (state === 'loading') return <p role="status" className="py-3.5 text-sm text-muted-foreground">Loading…</p>
+  if (state === 'loading') return <p role="status" className="py-3.5 text-sm text-muted-foreground">{t('common:loading')}</p>
   if (state === 'error') {
     return (
       <div role="alert" className="py-3.5 text-sm text-muted-foreground">
-        <p>Couldn't load your {noun} setting.</p>
-        <button onClick={() => setAttempt(value => value + 1)} className="mt-2 text-primary">Retry</button>
+        <p>{t('settings:switchLoadError', { noun, label })}</p>
+        <button onClick={() => setAttempt(value => value + 1)} className="mt-2 text-primary">{t('common:retry')}</button>
       </div>
     )
   }

@@ -16,6 +16,7 @@ import { SquadSwitcher } from '@/components/coach/SquadSwitcher'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { BARLESS, COACH_SCREEN_PATH, placeOf, tabOf, type CoachScreen } from '@/lib/coach-places'
 import { CoachTrailProvider, TrailLink, type Trail } from '@/components/coach/CoachTrail'
+import { useTranslation } from '@/lib/i18n'
 
 /* TRAK-259 (Imad, 22 Oct): the coach's frame, around every coach page.
    Laptop: Arc's sidebar rail (the club, Home, Calendar, Squads, Library, then
@@ -57,13 +58,16 @@ function useCoachIdentity(userId: string | undefined) {
 
 export function CoachFrame() {
   const { user, profile } = useAuth()
+  const { t } = useTranslation()
   if (profile?.role !== 'coach' || !user) return <Outlet />
-  return <Framed userId={user.id} name={profile.full_name || 'Coach'} />
+  return <Framed userId={user.id} name={profile.full_name || t('nav:coach')} />
 }
 
 function Framed({ userId, name }: { userId: string; name: string }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  // TRAK-406: the menus are in the language showing, and change with it.
+  const { t } = useTranslation()
   const wide = useSideMenuScreen()
   const identity = useCoachIdentity(userId).data
   const games = useFeature('games')
@@ -87,17 +91,17 @@ function Framed({ userId, name }: { userId: string; name: string }) {
   useEffect(() => () => { document.documentElement.style.removeProperty('--rail-w') }, [])
 
   const items: RailEntry[] = [
-    { id: 'home', label: 'Home', icon: House },
-    { id: 'calendar', label: 'Schedule', icon: CalendarDays }, // TRAK-255: the coach's is called Schedule
-    { id: 'squad', label: 'Squad', icon: Users },
+    { id: 'home', label: t('nav:home'), icon: House },
+    { id: 'calendar', label: t('nav:schedule'), icon: CalendarDays }, // TRAK-255: the coach's is called Schedule
+    { id: 'squad', label: t('nav:squad'), icon: Users },
     // TRAK-306 (Kostas, 28 Oct): Imad's pitch (TRAK-265) for Games; a cone for Training, and for Library in its place.
-    ...(games ? [{ id: 'games', label: 'Matches', icon: PitchIcon }] : []),
-    training ? { id: 'training', label: 'Training', icon: TrafficCone } : { id: 'library', label: 'Library', icon: TrafficCone },
+    ...(games ? [{ id: 'games', label: t('nav:matches'), icon: PitchIcon }] : []),
+    training ? { id: 'training', label: t('nav:training'), icon: TrafficCone } : { id: 'library', label: t('nav:library'), icon: TrafficCone },
   ]
   const select = (id: string) => { if (id in TO) navigate(TO[id as Screen]) }
   // TRAK-334: a nav row starts a fresh trail; every other page's trail is where the coach came from.
   const tabs = [...items.map(item => TO[item.id as Screen]), TO.settings]
-  const club = identity?.club || 'Your academy'
+  const club = identity?.club || t('nav:yourAcademy')
   const barred = BARLESS.test(pathname)
   // TRAK-324: the squad switcher sits in the sidebar, not in the top bar. TRAK-376: on a phone, in the sidebar's sheet.
   const switcher = <SquadSwitcher coachId={userId} />
@@ -106,7 +110,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
     <SidebarRail label={club} title={trail?.current ?? (place ? tabOf(pathname).label : title)} narrow={!wide}
       trail={trail?.crumbs.map(crumb => <TrailLink key={crumb.href} crumb={crumb} />)} sheetOpen={sheetOpen} onSheetOpenChange={setSheetOpen} onWidthChange={setRail}
       brand={{ name: club, logo: <Avatar name={club} src={identity?.logo ?? undefined} size="sm" /> }}
-      items={items} footerItem={{ id: 'settings', label: 'Settings', icon: Settings }}
+      items={items} footerItem={{ id: 'settings', label: t('nav:settings'), icon: Settings }}
       profile={{ name, detail: identity?.role ?? undefined, avatar: <Avatar name={name} size="sm" /> }}
       active={screen ?? ''} onSelect={select}
       afterBrand={!barred && switcher}
@@ -114,13 +118,13 @@ function Framed({ userId, name }: { userId: string; name: string }) {
       <Suspense fallback={<div className="min-h-screen bg-ground" />}><Outlet /></Suspense>
     </SidebarRail>
     {!wide && !barred && <div className="arc fixed inset-x-0 z-50 px-3 pointer-events-none" style={{ bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
-      <GlassTabBar label="Coach" value={screen ?? ''} onValueChange={value => navigate(TO[value as Screen])}
+      <GlassTabBar label={t('nav:coach')} value={screen ?? ''} onValueChange={value => navigate(TO[value as Screen])}
         style={{ ['--glass-active' as string]: 'rgb(var(--t-brand))' }}
         items={[
-          { value: 'home', label: 'Home', icon: <House /> },
-          { value: 'squad', label: 'Squad', icon: <Users /> },
-          ...(games ? [{ value: 'games', label: 'Matches', icon: <PitchIcon /> }] : []),
-          training ? { value: 'training', label: 'Training', icon: <TrafficCone /> } : { value: 'library', label: 'Library', icon: <TrafficCone /> },
+          { value: 'home', label: t('nav:home'), icon: <House /> },
+          { value: 'squad', label: t('nav:squad'), icon: <Users /> },
+          ...(games ? [{ value: 'games', label: t('nav:matches'), icon: <PitchIcon /> }] : []),
+          training ? { value: 'training', label: t('nav:training'), icon: <TrafficCone /> } : { value: 'library', label: t('nav:library'), icon: <TrafficCone /> },
         ]}
         actionNode={<CoachCreate placement="bar" onSaved={saved} />} />
     </div>}
@@ -131,8 +135,9 @@ function Framed({ userId, name }: { userId: string; name: string }) {
 export function CoachMenuButton({ name }: { name: string }) {
   const wide = useSideMenuScreen()
   const frame = useCoachFrame()
+  const { t } = useTranslation()
   if (wide || !frame) return null
-  return <button type="button" onClick={frame.openMenu} aria-label="Open menu" aria-haspopup="dialog"
+  return <button type="button" onClick={frame.openMenu} aria-label={t('nav:openMenu')} aria-haspopup="dialog"
     className="arc flex-none rounded-full transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
     <Avatar name={name} size="md" />
   </button>

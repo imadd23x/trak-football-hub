@@ -1,7 +1,7 @@
 // Arc Pro (uiarc.dev): licensed source, not covered by this repository's licence. See src/components/arc/PRO.md.
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 import { animate, motion, useMotionValue, useReducedMotion, useSpring, useTransform, useVelocity } from "motion/react";
 import type { AnimationPlaybackControls, MotionStyle, MotionValue } from "motion/react";
@@ -71,6 +71,33 @@ interface TabProps {
   onSelect: () => void;
 }
 
+/** TRAK-406: a label longer than its tab ("Προπόνηση" in Greek; German will have more) gets a smaller font, down to
+ *  9 px, instead of being cut to "Προπόνη…". A label that fits keeps the bar's size. Measured again when the tab's
+ *  width or the label changes, and once the font has loaded. */
+const SMALLEST_LABEL = 9;
+function useFittedLabel(text: ReactNode, slot: MotionValue<number>) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      el.style.fontSize = "";
+      if (!el.clientWidth || el.scrollWidth <= el.clientWidth) return;
+      const size = parseFloat(getComputedStyle(el).fontSize);
+      el.style.fontSize = `${Math.max(SMALLEST_LABEL, Math.floor(size * el.clientWidth / el.scrollWidth * 10) / 10)}px`;
+    };
+    fit();
+    const stop = slot.on("change", fit);
+    // The label spans its tab, so its own size follows the tab's as the bar lays out.
+    const resized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
+    resized?.observe(el);
+    let live = true;
+    void document.fonts?.ready.then(() => { if (live) fit(); });
+    return () => { live = false; stop(); resized?.disconnect(); };
+  }, [text, slot]);
+  return ref;
+}
+
 /** One tab. Its tint and magnification follow the lens position, so the colour crossfades with the glide instead of switching. */
 function Tab({ item, index, selected, focusable, slot, height, pos, lift, presence, compact, buttonRef, onSelect }: TabProps) {
   const near = useTransform(() => presence.get() * Math.max(0, 1 - Math.abs(pos.get() - index)));
@@ -81,6 +108,7 @@ function Tab({ item, index, selected, focusable, slot, height, pos, lift, presen
   const labelY = useTransform(compact, v => 5 * v);
   const labelScale = useTransform(compact, v => 1 - v * .12);
   const badge = item.badge !== undefined && item.badge !== "" && item.badge !== 0;
+  const label = useFittedLabel(item.label, slot);
 
   return <motion.button ref={buttonRef} type="button" role="tab" aria-selected={selected} tabIndex={focusable ? 0 : -1}
     className={styles.item} style={{ width: slot, height, color: tint }} data-active={selected || undefined} onClick={onSelect}>
@@ -88,7 +116,7 @@ function Tab({ item, index, selected, focusable, slot, height, pos, lift, presen
       {item.icon}
       {badge ? <span className={styles.badge} aria-hidden>{item.badge}</span> : null}
     </motion.span>
-    <motion.span className={styles.label} style={{ opacity: labelOpacity, y: labelY, scale: labelScale }}>{item.label}</motion.span>
+    <motion.span ref={label} className={styles.label} style={{ opacity: labelOpacity, y: labelY, scale: labelScale }}>{item.label}</motion.span>
     {badge ? <span className={styles.hidden}>, {item.badge} new</span> : null}
   </motion.button>;
 }

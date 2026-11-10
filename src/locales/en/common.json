@@ -1,0 +1,17 @@
+{
+  "back": "Back",
+  "retry": "Retry",
+  "loading": "Loading…",
+  "save": "Save",
+  "saveLong": " changes",
+  "saving": "Saving",
+  "discard": "Discard",
+  "changesSaved": "Changes saved",
+  "saveStatus": "Save status",
+  "unsavedChanges": "Unsaved changes",
+  "unsaved_one": " unsaved",
+  "unsaved_other": " unsaved",
+  "change_one": "change",
+  "change_other": "changes",
+  "settingsSections": "Settings sections"
+}

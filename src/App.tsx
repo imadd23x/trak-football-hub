@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AccountLanguage } from "@/components/trak/AccountLanguage";
 import { ParentChildrenProvider } from "@/contexts/ParentChildrenContext";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PlayerConsentWatcher } from "@/components/player/PlayerConsentWatcher";
@@ -130,6 +131,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ParentChildrenProvider>
+          {/* TRAK-406: Trak shows the language saved on the signed-in account. */}
+          <AccountLanguage />
           {/* G6: an open player or guardian session drops coach content on withdrawal (TRAK-13, TRAK-88). */}
           <PlayerConsentWatcher />
           {/* TRAK-104: signs out an open app whose session a password reset ended. */}

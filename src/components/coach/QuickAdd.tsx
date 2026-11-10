@@ -15,6 +15,7 @@ import { TimePicker } from '@/components/arc/time-picker/time-picker'
 import { ActionMorph, type MorphRow } from '@/components/arc/action-morph/action-morph'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { useCreateSaved } from './coach-frame-context'
+import { useTranslation } from '@/lib/i18n'
 
 /* TRAK-182 part 8 (Imad, 15 Oct): the coach's "+" opens a menu, then the
    shortest form that makes a real record. Only "New event" finishes here (a
@@ -67,6 +68,7 @@ export function QuickAdd({ onSaved }: { onSaved?: () => void; corner?: 'top' | '
 /** The coach's "+". `bar`: round, in the phone's glass tab bar, growing upward. `top`: "+ Create" at a laptop's top right, growing down. */
 export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; onSaved?: () => void }) {
   const { user } = useAuth()
+  const { t } = useTranslation()
   // TRAK-176: a new event belongs to the squad picked; wait until the squads are known.
   const coachSquad = useCoachSquad(user?.id)
   const navigate = useNavigate()
@@ -217,11 +219,11 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
     <Button size="md" className="w-full" onClick={continueMatch}>Continue</Button>
   </div>
 
-  return <ActionMorph label={bar ? 'Quick add' : 'Create'} anchor={bar ? 'bottom' : 'top'} lift={bar ? keyboard : 0}
+  return <ActionMorph label={bar ? t('nav:quickAdd') : t('nav:create')} anchor={bar ? 'bottom' : 'top'} lift={bar ? keyboard : 0}
     // At the top the root needs a size of its own: in the bar the slot gives it one.
     className={bar ? undefined : 'arc'} style={bar ? undefined : { width: 104, height: 40 }} rows={rows} view={view} onViewChange={show} onSelect={choose}
     faces={[{ id: 'event', title: 'New event', content: eventFace }, { id: 'match', title: 'Log a match', content: matchFace }]}
     trigger={bar
       ? <Plus size={22} strokeWidth={2.2} aria-hidden="true" className="text-brand" />
-      : <><Plus size={16} strokeWidth={2.2} aria-hidden="true" className="text-brand" />Create</>} />
+      : <><Plus size={16} strokeWidth={2.2} aria-hidden="true" className="text-brand" />{t('nav:create')}</>} />
 }

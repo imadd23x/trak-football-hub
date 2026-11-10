@@ -119,19 +119,25 @@ describe('TRAK-340: a new plan', { timeout: 30_000 }, () => {
       '1Dry warm-upMoving warm-up10 min', '2Passing & movementPass and follow15 min', '3RondoKeep the ball15 min',
       '4Functional drillsAttack down the side25 min', '5GamePass then score25 min',
     ].map(s => expect.stringContaining(s)))
-    // TRAK-392: the starter drill from the Library is picked; why it works shows once picked, the others' don't.
+    // TRAK-392: the starter drill from the Library is picked. TRAK-404 (Kostas, 10 Nov): the choices show names only
+    // (and why they're offered); View drill has the rest.
     const picked = within(warmup).getByRole('button', { name: /^Moving warm-up/, pressed: true })
-    expect(picked).toHaveTextContent(lib('Moving warm-up').why)
     expect(picked).toHaveTextContent('Starter drill')
-    const other = within(warmup).getByRole('button', { name: /^Tag games/, pressed: false })
-    expect(other.textContent).not.toContain(lib('Tag games').why)
+    expect(picked.textContent).not.toContain(lib('Moving warm-up').why)
+    expect(within(warmup).getAllByRole('button', { name: /^View drill:/ }).length).toBeGreaterThan(0)
+    // TRAK-404: no logistics line, guide line or "We picked a drill" line.
+    expect(screen.queryByText(/Main Venue|Pitch 2|· 90 min/)).toBeNull()
+    expect(screen.queryByText(/Get them moving before the ball comes out/)).toBeNull()
+    expect(screen.queryByText(/We picked/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Save as draft' })).toBeNull()
+    expect(within(warmup).getByRole('button', { name: 'Remove Dry warm-up' })).toHaveTextContent('')
     // No coach-made drills (Kostas, 8 Nov).
     expect(screen.queryByRole('button', { name: 'Write your own' })).toBeNull()
     expect(screen.getByText('Fits your 90 minutes.')).toBeInTheDocument()
 
     // Pick another warm-up and give it 15 minutes.
     await user.click(within(warmup).getByRole('button', { name: /^Tag games/ }))
-    expect(within(warmup).getByRole('button', { name: /^Tag games/, pressed: true })).toHaveTextContent(lib('Tag games').why)
+    expect(within(warmup).getByRole('button', { name: /^Tag games/, pressed: true })).toBeInTheDocument()
     await user.click(within(warmup).getByRole('button', { name: '15 min' }))
     expect(screen.getByText('5 min over. That’s fine, it’s only a guide.')).toBeInTheDocument()
 
@@ -280,18 +286,27 @@ describe('TRAK-392: View drill', { timeout: 30_000 }, () => {
 })
 
 describe('TRAK-340: drafts and a saved plan', { timeout: 30_000 }, () => {
-  it('Save as draft keeps the parts and the step; the planner carries on from there', async () => {
+  // TRAK-404 (Kostas, 10 Nov): no Save as draft; every change saves the draft by itself, and leaving never asks.
+  it('every change saves the draft by itself, with the parts and the step; just looking saves nothing', async () => {
     const user = userEvent.setup()
     const { draftsSent } = database([training('soon', onTheMinute(Date.now() + DAY))])
     renderApp('/coach/training/soon/plan')
-    await part('Dry warm-up')
+    const warmup = await part('Dry warm-up')
     await next('Passing & movement')
-    await next('Rondo')
-    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
-    await waitFor(() => expect(draftsSent).toHaveLength(1))
-    expect(draftsSent[0]).toMatchObject({ event_id: 'soon', step: 2 })
-    expect((draftsSent[0].body as { parts: unknown[] }).parts).toHaveLength(5)
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/training'))
+    await new Promise(r => setTimeout(r, 1200))
+    expect(draftsSent).toHaveLength(0)
+    // The step bar jumps to any step, back or ahead (Kostas, 10 Nov).
+    const steps = () => screen.getByRole('navigation', { name: 'Planning steps' })
+    await user.click(within(steps()).getByRole('button', { name: /Dry warm-up/ }))
+    await user.click(within(await part('Dry warm-up')).getByRole('button', { name: /^Tag games/ }))
+    expect(warmup).toBeDefined()
+    await user.click(within(steps()).getByRole('button', { name: /Rondo/ }))
+    expect(await part('Rondo')).toBeInTheDocument()
+    await waitFor(() => expect(draftsSent.at(-1)).toMatchObject({ event_id: 'soon', step: 2 }), { timeout: 3000 })
+    expect((draftsSent.at(-1)!.body as { parts: { drill: { name: string } }[] }).parts[0].drill.name).toBe('Tag games')
+    expect(await screen.findByText('Draft saved')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save as draft' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Back' }))
   })
 
   it('with a draft, the Next training card says so and Continue plan carries on where the coach stopped', async () => {

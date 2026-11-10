@@ -15,7 +15,7 @@ import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): the planner's pop-ups. Add a part (Trak's eight, or
-   the coach's own name) and Leave. TRAK-392 (Drill Library 7/11): See more drills lists the part's Library drills by
+   the coach's own name). TRAK-404 took Leave out: drafts save themselves. TRAK-392 (Drill Library 7/11): See more drills lists the part's Library drills by
    drill type, with search; View drill shows one with its picture and Easier / Harder, then Use this drill. Write your
    own and the My drills filter left with coach-made drills (Kostas, 8 Nov). */
 
@@ -157,20 +157,6 @@ export function ViewDrillSheet({ drill, part, players, onClose, onUse }: {
           <Button onClick={use}>Use this drill</Button>
         </>}
       </div>
-    </div>
-  </BottomSheet>
-}
-
-/** Leaving with changes not saved: keep them as a draft, or let them go. */
-export function LeaveSheet({ open, onClose, onDraft, onLeave, saving }: {
-  open: boolean; onClose: () => void; onDraft: () => void; onLeave: () => void; saving: boolean
-}) {
-  return <BottomSheet className="arc" open={open} onOpenChange={next => { if (!next) onClose() }} title="Leave this plan?"
-    description="Your changes aren’t saved yet. Save them as a draft to carry on later, or leave without saving.">
-    <div className="flex flex-wrap justify-end gap-2 pb-4">
-      <Button variant="ghost" onClick={onLeave}>Leave without saving</Button>
-      <Button variant="secondary" onClick={onClose}>Keep planning</Button>
-      <Button loading={saving} onClick={onDraft}>Save as draft</Button>
     </div>
   </BottomSheet>
 }

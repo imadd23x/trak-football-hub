@@ -121,7 +121,7 @@ describe('TRAK-297: Copy a past session', { timeout: 30_000 }, () => {
     const parts = await screen.findByRole('list', { name: 'Parts of the session' })
     expect(within(parts).getAllByRole('listitem').map(item => item.textContent)).toEqual([
       expect.stringContaining('Rondos 4v1'), expect.stringContaining('Pressing duels'), expect.stringContaining('Game 8v8')])
-    expect(screen.getByText(/Copied from Pressing zones, .+ Nothing is saved until you do\./)).toBeInTheDocument()
+    expect(screen.getByText(/Copied from Pressing zones, .+ then save it\./)).toBeInTheDocument()
     expect(screen.getByText('70 of 90 min')).toBeInTheDocument()
     expect(saves).toHaveLength(0)
 

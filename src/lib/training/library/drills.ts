@@ -143,9 +143,9 @@ export const LIBRARY: readonly LibraryDrill[] = [
   {
     id: 'lib-first-touch-and-turn', name: 'First touch and turn', kind: 'technical', type: 'Passing', focus: 'individual', template: 'pairs',
     why: 'A good first touch that opens the body saves a whole second in a game.',
-    how: ['Partners pass to each other.', 'Receive across the body with the back foot.', 'Turn out and pass back on the other side.'],
-    watch: ['Look over the shoulder before the ball arrives.', 'First touch goes away from the imaginary defender.'],
-    topics: 'receiving first touch turning half turn',
+    how: ['Partners face each other. Put a cone a step behind each player.', 'Receive across your body with your back foot, so the first touch takes you round the cone.', 'Come back round it and pass to your partner, who does the same.'],
+    watch: ['Look over the shoulder before the ball arrives.', 'Open the body: hips face where you want to go.'],
+    topics: 'receiving first touch turning half turn back foot',
   },
   {
     id: 'lib-long-pass-and-control', name: 'Long pass and control', kind: 'technical', type: 'Passing', focus: 'individual', template: 'pairs',
@@ -316,9 +316,9 @@ export const LIBRARY: readonly LibraryDrill[] = [
     id: 'lib-overlap-and-finish', name: 'Overlap and finish', kind: 'skill', type: 'Attack in turns', focus: 'team', template: 'func',
     rule: 'One overlap before the shot',
     why: 'A run around the outside gives one defender two problems.',
-    how: ['Attackers go at goal in a group.', 'A wide player must run around the player on the ball.', 'Finish from the cross or the cut-back.'],
-    watch: ['The overlap starts as the ball arrives wide.', 'Other attackers get into the box early.'],
-    topics: 'overlap crossing wide play finishing overlap and cross',
+    how: ['Groups attack the goal in turns.', 'A wide player must run round the player on the ball.', 'Cross or cut it back. The others attack the near post, the far post and the edge of the box.'],
+    watch: ['The overlap starts as the ball arrives wide.', 'Runners arrive late and fast, not standing waiting.'],
+    topics: 'overlap crossing wide play finishing overlap and cross crossing near post far post fox in the box cross and attack the box',
   },
   {
     id: 'lib-through-ball-and-finish', name: 'Through ball and finish', kind: 'skill', type: 'Attack in turns', focus: 'team', template: 'func',
@@ -338,7 +338,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
   },
   {
     id: 'lib-intercept-and-counter', name: 'Intercept and counter', kind: 'skill', type: 'Attack in turns', focus: 'team', template: 'func',
-    rule: 'Goal after an interception counts double',
+    rule: 'Defenders who intercept counter to a small goal',
     why: 'A read pass turns defending into a fast attack.',
     how: ['Attackers go at goal in a group.', 'Defenders look for the pass they can step in front of.', 'After an interception, they counter to a small goal.'],
     watch: ['Defenders hold their position, then go late.', 'First look after the interception is forward.'],
@@ -353,28 +353,12 @@ export const LIBRARY: readonly LibraryDrill[] = [
     topics: 'dribbling 1v1 one against one beating a player take on escaping a defender recovery runs',
   },
   {
-    id: 'lib-cross-and-attack-the-box', name: 'Cross and attack the box', kind: 'skill', type: 'Attack in turns', focus: 'team', template: 'func',
-    overlay: 'wide', rule: 'Goals from a cross or a cut-back only',
-    why: 'Crosses only work when runners arrive in the right spaces at the right time.',
-    how: ['A wide player dribbles down the side and crosses.', 'Attackers run to the near post, the far post and the edge of the box.', 'Defenders try to clear it. Next group goes.'],
-    watch: ['Runners arrive late and fast, not standing waiting.', 'The cross goes behind the defenders, in front of the keeper.'],
-    topics: 'crossing finishing near post far post fox in the box wing play',
-  },
-  {
     id: 'lib-win-it-pass-it-out', name: 'Win it, pass it out', kind: 'skill', type: 'Win it and get out', focus: 'team', template: 'square',
-    rule: 'Win it, then pass into the other grid to score', grids: 2,
-    why: 'Winning the ball is only half the job. The next pass has to get it out of the crowd.',
-    how: ['Two grids side by side, a rondo in each.', 'Attackers keep the ball in their grid.', 'Defenders who win it pass into the other grid to score.'],
-    watch: ['The first look after winning it is away from the pressure.', 'Attackers react the moment they lose it.'],
-    topics: 'transition counter press win it 6v3 two boxes',
-  },
-  {
-    id: 'lib-win-it-back-in-five', name: 'Win it back in five', kind: 'skill', type: 'Win it and get out', focus: 'team', template: 'square',
-    rule: 'Lose it? Win it back within five seconds', targets: 'Keep the ball. Defenders score by passing out of the square',
-    why: 'The best moment to win the ball back is straight after losing it, before the other team is organised.',
-    how: ['Attackers keep the ball in the square against the defenders.', 'When defenders win it, they try to pass it out of the square to score.', 'The attackers who lost it have five seconds to win it back.'],
-    watch: ['The nearest player goes straight to the ball.', 'Teammates close the passes around it.'],
-    topics: 'counter-pressing gegenpressing transition win it back pressing after losing the ball',
+    grids: 2, rule: 'Win it, pass it into the other grid. Lose it, five seconds to win it back',
+    why: 'Transitions decide games: the team that wins the ball must get it out of the crowd, and the team that lost it must win it straight back.',
+    how: ['Two grids side by side, a rondo in each.', 'Defenders who win the ball try to pass it into the other grid to score.', 'The attackers who lost it have five seconds to win it back before the pass goes.'],
+    watch: ['After winning it, the first look is away from the pressure.', 'After losing it, the nearest player goes straight to the ball and the others close the passes.'],
+    topics: 'transition double rondo 6v3 two boxes counter-pressing win it back in five gegenpressing',
   },
   {
     id: 'lib-keep-it-with-spare-players', name: 'Keep it with spare players', kind: 'skill', type: 'Possession', focus: 'team', template: 'game',
@@ -402,19 +386,12 @@ export const LIBRARY: readonly LibraryDrill[] = [
   },
   {
     id: 'lib-protect-your-ball', name: 'Protect your ball', kind: 'skill', type: 'Whole squad', focus: 'individual', template: 'square',
-    rule: 'Ball stays in the area', ballEach: true,
-    why: 'Dribbling only counts when someone is trying to take the ball.',
-    how: ['Attackers each have a ball inside the area.', 'Defenders try to knock balls out.', 'Lose your ball and you swap with the defender.'],
-    watch: ['Players shield the ball with their body.', 'They change speed to escape, not just direction.'],
-    topics: 'dribbling shielding protect the ball 1v1',
-  },
-  {
-    id: 'lib-steal-the-ball', name: 'Steal the ball', kind: 'skill', type: 'Whole squad', focus: 'individual', template: 'square',
-    rule: 'Win the ball and keep it', ballEach: true,
-    why: 'Real tackles happen against someone who doesn’t want to lose the ball.',
-    how: ['Attackers each have a ball inside the area.', 'Defenders try to win a ball and keep it.', 'Whoever loses a ball becomes a defender.'],
-    watch: ['Defenders slow down as they get close.', 'They tackle when the ball leaves the attacker’s foot.'],
-    topics: 'tackling 1v1 defending winning the ball',
+    ballEach: true,
+    rule: ['Defenders knock balls out', 'Defenders knock balls out', 'Defenders knock balls out', 'Defenders knock balls out', 'Defenders win a ball and keep it', 'Defenders win a ball and keep it', 'Defenders win a ball and keep it', 'Defenders win a ball and keep it'],
+    why: 'Dribbling only counts when someone is trying to take the ball, and tackling only counts against someone who wants to keep it.',
+    how: ['Attackers each have a ball inside the area. A few defenders start without one.', 'Defenders try to knock balls out. At the harder levels they must win a ball and keep it.', 'Lose your ball and you swap with the defender.'],
+    watch: ['Attackers shield the ball with their body and change speed to escape.', 'Defenders slow down as they get close, then tackle when the ball leaves the attacker’s foot.'],
+    topics: 'dribbling shielding tackling 1v1 steal the ball bib tag stay on the ball',
   },
   {
     id: 'lib-pass-then-score', name: 'Pass then score', kind: 'game', type: 'Small-sided games', focus: 'team', template: 'game',
@@ -465,7 +442,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
     topics: 'interception transition counter attack',
   },
   {
-    id: 'lib-shoot-early', name: 'Shoot early', kind: 'game', type: 'Small-sided games', focus: 'individual', template: 'game',
+    id: 'lib-shoot-early', name: 'Shoot early', kind: 'game', type: 'Small-sided games', focus: 'team', template: 'game',
     rule: 'Shot on target 1 point, goal 3',
     why: 'Rewarding every shot on target teaches players to take the chance.',
     how: ['Normal game with two goals.', 'A shot on target scores one point.', 'A goal scores three.'],
@@ -521,9 +498,33 @@ export const LIBRARY: readonly LibraryDrill[] = [
   },
 ]
 
-/** TRAK-388 (Kostas, 9 Nov): drills taken out of the Library. A saved plan can still name them, so they stay findable
+/** TRAK-388 (Kostas, 9 Nov) and the 10 Nov read-through (merged into another drill): drills taken out of the Library. A saved plan can still name them, so they stay findable
  *  by id; they're never listed, searched or offered. */
 const RETIRED: readonly LibraryDrill[] = [
+  {
+    id: 'lib-steal-the-ball', name: 'Steal the ball', kind: 'skill', type: 'Whole squad', focus: 'individual', template: 'square',
+    rule: 'Win the ball and keep it', ballEach: true,
+    why: 'Real tackles happen against someone who doesn’t want to lose the ball.',
+    how: ['Attackers each have a ball inside the area.', 'Defenders try to win a ball and keep it.', 'Whoever loses a ball becomes a defender.'],
+    watch: ['Defenders slow down as they get close.', 'They tackle when the ball leaves the attacker’s foot.'],
+    topics: 'tackling 1v1 defending winning the ball',
+  },
+  {
+    id: 'lib-win-it-back-in-five', name: 'Win it back in five', kind: 'skill', type: 'Win it and get out', focus: 'team', template: 'square',
+    rule: 'Lose it? Win it back within five seconds', targets: 'Keep the ball. Defenders score by passing out of the square',
+    why: 'The best moment to win the ball back is straight after losing it, before the other team is organised.',
+    how: ['Attackers keep the ball in the square against the defenders.', 'When defenders win it, they try to pass it out of the square to score.', 'The attackers who lost it have five seconds to win it back.'],
+    watch: ['The nearest player goes straight to the ball.', 'Teammates close the passes around it.'],
+    topics: 'counter-pressing gegenpressing transition win it back pressing after losing the ball',
+  },
+  {
+    id: 'lib-cross-and-attack-the-box', name: 'Cross and attack the box', kind: 'skill', type: 'Attack in turns', focus: 'team', template: 'func',
+    overlay: 'wide', rule: 'Goals from a cross or a cut-back only',
+    why: 'Crosses only work when runners arrive in the right spaces at the right time.',
+    how: ['A wide player dribbles down the side and crosses.', 'Attackers run to the near post, the far post and the edge of the box.', 'Defenders try to clear it. Next group goes.'],
+    watch: ['Runners arrive late and fast, not standing waiting.', 'The cross goes behind the defenders, in front of the keeper.'],
+    topics: 'crossing finishing near post far post fox in the box wing play',
+  },
   {
     id: 'lib-copy-your-partner', name: 'Copy your partner', kind: 'warmup', type: 'Dry warm-up', focus: 'team', template: 'warm',
     rule: PACE,

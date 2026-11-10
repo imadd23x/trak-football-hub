@@ -31,6 +31,8 @@
   outline: none;
   will-change: transform;
 }
+/* Trak (TRAK-404): a sheet with a picture beside its text. */
+.sheet.wide { width: min(100%, 64rem); }
 
 /* The whole header is the handle, so a drag can start anywhere above the content. */
 .header { position: relative; flex: none; padding: var(--space-2) var(--space-5) var(--space-4); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }

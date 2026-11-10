@@ -420,7 +420,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     expect(errors).toEqual([])
   })
 
-  test(`Planner pop-ups at ${width} px: Add a part, See more drills, View drill`, async ({ page, context }, testInfo) => {
+  test(`Planner pop-ups at ${width} px: Add a part, Find another drill, View drill`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/training/t-thu/plan', width, height)
     await expect(page.getByRole('region', { name: 'Dry warm-up' })).toBeVisible()
     await page.getByRole('button', { name: 'Add a part' }).first().click()
@@ -438,6 +438,8 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     const warmup = page.getByRole('region', { name: 'Dry warm-up' })
     await warmup.getByRole('button', { name: 'View drill: Tag games' }).click()
     const view = page.getByRole('dialog', { name: 'Tag games' })
+    // Kostas, 10 Nov: wider than the other pop-ups on a laptop, so the words beside the picture aren't squeezed.
+    if (width > 1000) expect((await view.boundingBox())!.width).toBeGreaterThan(900)
     await expect(view.getByRole('img', { name: /^Tag games set-up\./ })).toBeVisible()
     await view.getByRole('button', { name: 'Harder' }).click()
     await expect(view.getByText('Harder. Here’s what Trak changed:')).toBeVisible()
@@ -448,11 +450,11 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(warmup.getByRole('button', { name: /^Tag games/, pressed: true })).toBeVisible()
 
-    // See more drills: every Library drill for the part, by drill type.
+    // TRAK-404: Find another drill, the fourth choice: the part's drills by drill type, then the rest of the Library.
     await page.getByRole('button', { name: /^Next: Passing & movement/ }).click()
-    await page.getByRole('region', { name: 'Passing & movement' }).getByRole('button', { name: /^See more drills/ }).click()
-    const more = page.getByRole('dialog', { name: 'More drills for Passing & movement' })
-    await expect(more.getByRole('heading', { level: 3 })).toHaveText(['Passing', 'Pressing movement', 'Follow and copy', 'Repetition', 'Individual', 'Goalkeeping'])
+    await page.getByRole('region', { name: 'Passing & movement' }).getByRole('button', { name: /^Find another drill/ }).click()
+    const more = page.getByRole('dialog', { name: 'Find another drill for Passing & movement' })
+    await expect(more.getByRole('heading', { level: 3 })).toHaveText(['Passing', 'Pressing movement', 'Follow and copy', 'Repetition', 'Individual', 'Goalkeeping', 'Get ready', 'Skill practices', 'Game related practices'])
     await page.waitForTimeout(600)
     await page.screenshot({ path: testInfo.outputPath(`training-plan-more-${width}.png`) })
     expect(await sideways(page)).toBeLessThanOrEqual(0)

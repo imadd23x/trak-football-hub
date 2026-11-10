@@ -231,21 +231,31 @@ describe('TRAK-340: Your session', { timeout: 30_000 }, () => {
 })
 
 describe('TRAK-340: drills', { timeout: 30_000 }, () => {
-  it('See more drills lists every Library drill for the part by drill type, with search; one picked there shows in the three', async () => {
+  // TRAK-404 (Kostas, 10 Nov): a fourth choice, Find another drill, opens the whole Drill Library: the part's own drills
+  // first, then the rest by kind.
+  it('Find another drill lists the part’s drills by drill type, then the rest of the Library; one picked there shows in the choices', async () => {
     const user = userEvent.setup()
     database([training('soon', onTheMinute(Date.now() + DAY))])
     renderApp('/coach/training/soon/plan')
     await part('Dry warm-up')
     await next('Passing & movement')
     const passing = await part('Passing & movement')
-    await user.click(within(passing).getByRole('button', { name: new RegExp(`^See more drills \\(${LIBRARY.filter(d => d.kind === 'technical').length - 3}\\)`) }))
-    const sheet = await screen.findByRole('dialog', { name: 'More drills for Passing & movement' })
+    await user.click(within(passing).getByRole('button', { name: /^Find another drill/ }))
+    const sheet = await screen.findByRole('dialog', { name: 'Find another drill for Passing & movement' })
     expect(within(sheet).getAllByRole('heading', { level: 3 }).map(h => h.textContent))
-      .toEqual(['Passing', 'Pressing movement', 'Follow and copy', 'Repetition', 'Individual', 'Goalkeeping'])
+      .toEqual(['Passing', 'Pressing movement', 'Follow and copy', 'Repetition', 'Individual', 'Goalkeeping', 'Get ready', 'Skill practices', 'Game related practices'])
+    expect(within(sheet).getByText('The rest of the Drill Library')).toBeInTheDocument()
+    expect(within(sheet).getAllByRole('button', { name: /^Pick / })).toHaveLength(LIBRARY.length - 1)
     expect(within(sheet).queryByRole('button', { name: 'My drills' })).toBeNull()
     await user.type(within(sheet).getByRole('searchbox', { name: 'Search drills' }), 'gate')
     await user.click(await within(sheet).findByRole('button', { name: 'Pick Pass through the gate' }))
     expect(within(await part('Passing & movement')).getByRole('button', { name: /^Pass through the gate/, pressed: true })).toBeInTheDocument()
+    // A drill of another kind can fill the part too.
+    await user.click(within(await part('Passing & movement')).getByRole('button', { name: /^Find another drill/ }))
+    const again = await screen.findByRole('dialog', { name: 'Find another drill for Passing & movement' })
+    await user.type(within(again).getByRole('searchbox', { name: 'Search drills' }), 'four corners')
+    await user.click(await within(again).findByRole('button', { name: 'Pick Four corners' }))
+    expect(within(await part('Passing & movement')).getByRole('button', { name: /^Four corners/, pressed: true })).toBeInTheDocument()
   })
 })
 

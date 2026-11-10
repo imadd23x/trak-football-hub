@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ArrowRight, Pencil, Plus, Search, X } from 'lucide-react'
+import { ArrowRight, Pencil, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { trainingMinutes } from '@/lib/training/sessions'
 import { libraryDrill, squadPlayers, type LibraryDrill } from '@/lib/training/library'
@@ -271,11 +271,11 @@ function PlannerBody({ training, saved, draft, past, players }: {
                   className="justify-self-start rounded px-1 py-1 text-sm font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">View drill</button>}
               </li>
             })}
-            {!hasOwnDrills(part.type) && <li><ActionTile icon="search" label="Browse all drills" onClick={() => setSheet('more')} /></li>}
+            {/* TRAK-404 (Kostas, 10 Nov): a fourth choice, any drill from the Drill Library. */}
+            <li className="grid grid-rows-[1fr_auto] gap-1"><ActionTile icon="search" label="Find another drill" note="From the Drill Library" onClick={() => setSheet('more')} />
+              {/* As tall as a View drill link, so this tile ends level with the others. */}
+              <span aria-hidden className="invisible px-1 py-1 text-sm">View drill</span></li>
           </ul>
-          {hasOwnDrills(part.type) && all.length > 3 && <div><button type="button" onClick={() => setSheet('more')}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded px-1 text-sm font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-            <Search aria-hidden size={14} />See more drills ({all.length - 3})</button></div>}
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
           {start.only ? <>

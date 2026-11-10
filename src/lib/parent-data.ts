@@ -11,6 +11,9 @@ export interface ParentChild {
   name: string
 }
 
+/** "Alex" from "Alex Example": the family season screens say "Alex's season". */
+export const firstName = (child: ParentChild) => child.name.trim().split(/\s+/)[0] ?? child.name
+
 // Explicit projections keep private assessment fields out of the parent client.
 // Coach deletion retains history with a null author; generated types predate this.
 export type ParentAward = Pick<Tables<'recognition_awards'>,

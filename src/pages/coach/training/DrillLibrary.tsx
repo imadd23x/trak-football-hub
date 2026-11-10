@@ -20,7 +20,6 @@ import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { Button } from '@/components/arc/button/button'
-import { Badge } from '@/components/arc/badge/badge'
 
 /* TRAK-387 (Drill Library 3/11, parent TRAK-384): Training › Drills is the new Library, from the 8 Nov mockup. Find a
    drill (results take the place of everything else while the coach types), My drills and All drills, then "What kind
@@ -32,8 +31,6 @@ import { Badge } from '@/components/arc/badge/badge'
    academy with Training off, and players keep Play It Right; nothing is deleted. No Programmes link (Kostas, 8 Nov). */
 
 type PracticeKind = Exclude<Kind, 'warmup'>
-/** Sample content until the real library (TRAK-388); said once, quietly, on each Library page. */
-const SAMPLE = 'Sample drills, not yet checked by our coaching lead.'
 const GROUP_NAME: Record<Kind, string> = { warmup: 'Get ready', technical: 'Technical practices', skill: 'Skill practices', game: 'Game related practices' }
 
 /** The squad every picture is fitted to: the squad picked at the top (or the whole roster on All), kept to what a
@@ -121,7 +118,7 @@ export function LibraryHome() {
 
   return (
     <div className="grid gap-6 pt-2">
-      <div className="grid max-w-[720px] gap-3">
+      <div className="grid gap-3">
         <h2 className="text-[22px] font-medium tracking-[-0.01em] text-ink tablet:text-[28px]">Find a drill</h2>
         <FindBox value={query} onChange={setQuery} big />
       </div>
@@ -157,7 +154,6 @@ export function LibraryHome() {
               <Link to={allDrillsPath('Individual')} className="font-medium text-brand underline-offset-4 hover:underline">Individual work</Link>
               <Link to={allDrillsPath('Goalkeeping')} className="font-medium text-brand underline-offset-4 hover:underline">Goalkeeping</Link>
             </p>
-            <p className="text-[13px] text-ink-3">{SAMPLE}</p>
           </section>
 
         </>}
@@ -217,7 +213,7 @@ export function PracticePage() {
   if (!info) return <Navigate to="/coach/training/drills" replace />
   const types = typesOf(info.key)
   const shown = types.includes(type as never) ? [type] : types
-  const empty = (t: string) => t === '11 v 11' ? 'Needs 22 players and a full pitch. No sample yet.' : 'No sample yet.'
+  const empty = (t: string) => t === '11 v 11' ? 'Needs 22 players and a full pitch. None yet.' : 'None yet.'
 
   return (
     <SubPage title={info.long} intro={<>{info.note} Listed simple to complex. {line}</>}>
@@ -236,7 +232,6 @@ export function PracticePage() {
               {drills.length ? <DrillCards drills={drills} players={squad.players} level={squad.level} /> : <Empty>{empty(t)}</Empty>}
             </section>
           })}
-          <p className="text-[13px] text-ink-3">{SAMPLE}</p>
         </div>}
     </SubPage>
   )
@@ -267,7 +262,7 @@ export function AllDrills() {
           options={[{ value: '', label: 'All' }, ...SHOW.map(s => ({ value: s, label: s }))]}
           onValueChange={next => setShow(next[0] ?? '')} />
       </div>
-      <div className="mb-6 max-w-[720px]"><FindBox value={query} onChange={setQuery} /></div>
+      <div className="mb-6"><FindBox value={query} onChange={setQuery} /></div>
       {!squad ? <LoadingSkeleton label="Loading the drills…" rows={3} />
         : !found.length ? <Empty>No drills match. Try another word.</Empty>
         : searching ? <DrillCards drills={found} players={squad.players} level={squad.level} notes={d => foundAs(d, query, squad)} label="Drills found" />
@@ -279,7 +274,6 @@ export function AllDrills() {
               <DrillCards drills={drills} players={squad.players} level={squad.level} />
             </section> : null
           })}
-          <p className="text-[13px] text-ink-3">{SAMPLE}</p>
         </div>}
     </SubPage>
   )
@@ -370,7 +364,6 @@ function DrillBody({ drill, start, squadName }: { drill: LibraryDrill; start: Sq
         <AddToTraining drill={drill} players={players} level={level} />
         <PageBookmark drill={drill} />
       </div>
-      <p className="text-[13px] text-ink-3">{SAMPLE}</p>
     </div>
   </div>
 }
@@ -381,7 +374,7 @@ const PRACTICE_INTRO = 'Five things shape every practice. Change one and you cha
 
 /** TRAK-394 (from the 8 Nov mockup): Steve's five things, each with his example. Pick a set-up and the picture and
  *  what changes follow it; Conditions shows his three rules. The thing and the set-up live in the address, so Back
- *  returns to them. The answers are Trak's draft until Steve checks them, and the page says so. */
+ *  returns to them. The answers are Trak's own; Steve checks them after the pilot (Kostas, 9 Nov). */
 export function ChangePractice() {
   const [params, setParams] = useSearchParams()
   const shown = characteristic(params.get('part')) ?? CHARACTERISTICS[0]
@@ -420,7 +413,6 @@ export function ChangePractice() {
                   onValueChange={next => { if (next[0]) go(shown.key, Number(next[0])) }} />
               </div>
               <p className="text-[17px] leading-snug text-ink" aria-live="polite">{examples[eg].answer}</p>
-              <span className="arc"><Badge tone="warning" size="sm">Trak’s draft answer, Steve to check</Badge></span>
               <PitchKey legend={practiceKey(shown.key, eg)} />
             </div>
           </div>}

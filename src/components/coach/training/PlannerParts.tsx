@@ -1,39 +1,33 @@
 import type { KeyboardEvent } from 'react'
 import { Reorder, useDragControls, type DragControls } from 'motion/react'
-import { Check, GripVertical, Pencil, Plus, Search, Users, X } from 'lucide-react'
-import { fitLine, libraryOf, partColour, partLine, playersLine, totalMinutes, type Part, type PlanDrill } from '@/lib/training/parts'
+import { Check, GripVertical, Pencil, Plus, Search, X } from 'lucide-react'
+import { fitLine, partColour, partLine, playersLine, totalMinutes, type Part, type PlanDrill } from '@/lib/training/parts'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 
-/* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): the planner's pieces. A drill tile (its description only
-   once it's picked, Kostas 2 Nov), the time bar, and Your session: the whole session at a glance, where the coach shapes
+/* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): the planner's pieces. A drill tile (its name only since
+   TRAK-404), the time bar, and Your session: the whole session at a glance, where the coach shapes
    it (drag or arrow keys to move a part, × to remove one, Add a part). */
 
-/** A drill to pick for a part. A Library drill (TRAK-392) says its numbers and area, and why it works once picked; a
- *  drill from an older plan says how many players it takes, and how it works once picked. */
+/** A drill to pick for a part: its name, the tick when picked, and why it's offered (Your usual, Starter drill…). */
 export function DrillTile({ drill, picked, tag, onPick }: { drill: PlanDrill; picked: boolean; tag: string; onPick: () => void }) {
-  const lib = libraryOf(drill)
-  const line = lib ? [drill.numbers, drill.area].filter(Boolean).join(' · ') : playersLine(drill)
-  const note = lib ? lib.why : drill.how
-  // As the mockup (Kostas, 3 Nov): the tick sits in the corner of the picked drill, the name has the width, the rest is small.
+  // TRAK-404 (Kostas, 10 Nov): the name only (and why it's offered); View drill, under the tile, has the rest.
+  // As the mockup (Kostas, 3 Nov): the tick sits in the corner of the picked drill.
   return <button type="button" aria-pressed={picked} onClick={onPick}
     className={`relative flex h-full w-full flex-col items-start gap-1.5 rounded-[14px] border p-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${picked ? 'border-2 border-brand bg-brand/5' : 'border-line bg-surface hover:bg-raised'}`}>
     {picked && <span className="absolute right-3 top-3 inline-flex h-[22px] w-[22px] items-center justify-center rounded-full bg-brand text-on-brand">
       <Check aria-hidden size={13} /></span>}
     <span className="pr-7 text-[15px] font-medium leading-snug text-ink break-words">{drill.name}</span>
-    {/* The drill type shows above the name (the mockup), but is read after it. */}
-    {lib && lib.kind !== 'warmup' && <span className="-order-1 text-[12px] font-medium text-ink-3">{lib.type}</span>}
-    {line && <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-2">{!lib && <Users aria-hidden size={14} />}{line}</span>}
-    {picked && note && <span className="text-[13px] leading-snug text-ink-2 break-words">{note}</span>}
     {tag && <span className={`mt-auto rounded-full px-2.5 py-0.5 text-[12px] font-medium ${tag.startsWith('Your usual') || tag === 'Starter drill' || tag === 'In My drills' ? 'bg-brand/10 text-brand' : 'bg-raised text-ink-2'}`}>{tag}</span>}
   </button>
 }
 
-export function ActionTile({ icon, label, onClick }: { icon: 'plus' | 'search'; label: string; onClick: () => void }) {
+export function ActionTile({ icon, label, note, onClick }: { icon: 'plus' | 'search'; label: string; note?: string; onClick: () => void }) {
   return <button type="button" onClick={onClick}
-    className="flex h-full min-h-28 w-full flex-col items-center justify-center gap-1.5 rounded-[14px] border border-dashed border-line bg-surface p-3.5 text-center text-brand hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+    className="flex h-full min-h-[72px] w-full flex-col items-center justify-center gap-1 rounded-[14px] border border-dashed border-line bg-surface p-3.5 text-center text-brand hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
     {icon === 'plus' ? <Plus aria-hidden size={18} /> : <Search aria-hidden size={18} />}
     <span className="text-[15px] font-medium text-ink">{label}</span>
+    {note && <span className="text-[13px] text-ink-3">{note}</span>}
   </button>
 }
 
@@ -124,7 +118,7 @@ function SessionRow({ part, index, count, state, onOpen, onMove, onRemove }: {
       </span>
       <span className="flex-none text-[13px] text-ink-2">{part.minutes} min</span>
     </button>
-    <button type="button" aria-label={`Remove ${part.name}`} title="Remove this part" onClick={onRemove}
+    <button type="button" aria-label={`Remove ${part.name}`} title={`Remove ${part.name}`} onClick={onRemove}
       className="inline-flex h-11 w-9 flex-none items-center justify-center rounded-lg text-ink-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
       <X aria-hidden size={16} /></button>
   </Reorder.Item>

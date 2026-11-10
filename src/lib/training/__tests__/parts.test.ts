@@ -39,7 +39,9 @@ describe('the drills a part offers', () => {
       expect(drills.every(d => partFor(d) === type)).toBe(true)
       expect(drills[0].focus).toBe('team')
     }
-    for (const type of ['setpieces', 'finishing', 'cooldown', 'own'] as const) {
+    // TRAK-388: Cool-down has its own two drills.
+    expect(libraryFor('cooldown').map(d => d.name)).toEqual(['Easy jog and stretch', 'Walk, pass and talk'])
+    for (const type of ['setpieces', 'finishing', 'own'] as const) {
       expect(hasOwnDrills(type)).toBe(false)
       expect(libraryFor(type)).toHaveLength(LIBRARY.length)
     }

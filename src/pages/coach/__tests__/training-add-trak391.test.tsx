@@ -121,7 +121,7 @@ describe('TRAK-391: Add to training', { timeout: 30_000 }, () => {
 
     await user.click(within(list).getByRole('button', { name: `Add to Pressing triggers, ${gameWhen(training('soon', soon, '')).day}` }))
     // Plan session at Review: Trak's five, then the drill as a sixth part. Nothing saved yet.
-    expect(await screen.findByText('Pass between defenders is added at the end. Check the plan, then save. Nothing is saved until you do.')).toBeInTheDocument()
+    expect(await screen.findByText('Pass between defenders is added at the end. Check the plan, then save it.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument()
     const parts = rows()
     expect(parts).toHaveLength(6)
@@ -193,7 +193,7 @@ describe('TRAK-391: Add to training', { timeout: 30_000 }, () => {
     renderApp(drillPath(keep.id))
     await user.click(await screen.findByRole('button', { name: /Harder/ }))
     await user.click(within(await openPicker(user)).getByRole('button', { name: /^Add to Pressing triggers/ }))
-    expect(await screen.findByText('Keep the ball is already in this plan, in Rondo. It’s now set as you left it on its page. Nothing is saved until you save.')).toBeInTheDocument()
+    expect(await screen.findByText('Keep the ball is already in this plan, in Rondo. It’s now set as you left it on its page.')).toBeInTheDocument()
     expect(rows()).toHaveLength(5)
     await user.click(screen.getByRole('button', { name: 'Save the plan' }))
     await waitFor(() => expect(saves).toHaveLength(1))

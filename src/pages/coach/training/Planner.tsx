@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ArrowRight, Pencil, Plus, Search, X } from 'lucide-react'
+import { ArrowRight, Pencil, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { trainingMinutes } from '@/lib/training/sessions'
 import { libraryDrill, squadPlayers, type LibraryDrill } from '@/lib/training/library'
@@ -8,7 +8,7 @@ import type { PlannerState } from '@/lib/training/plans'
 import { partInfo, type PartType } from '@/lib/training/shelf'
 import {
   NOTE_MAX, PARTS_MAX, PART_NAME_MAX, candidates, fromLibrary, hasOwnDrills, isStandard, libraryOf, libraryPart, isSameDrill, lastShape, minuteOptions, moveTo, newKey,
-  partsFromSaved, partsFromShape, planProblem, playersLine, partColour, shownFor, standardShape, tagFor, totalMinutes, usageOf,
+  partsFromSaved, partsFromShape, planProblem, partColour, shownFor, standardShape, tagFor, totalMinutes, usageOf,
   usualFor, type Part, type PastPlan, type PlanDrill, type Usage,
 } from '@/lib/training/parts'
 import { gameWhen } from '@/components/coach/games/useGames'
@@ -16,7 +16,7 @@ import {
   useBookmarks, useDrafts, usePastSessions, useSaveDraft, useSavePlan, useSquadSize, type Draft, type Plan, type Training,
 } from '@/components/coach/training/useTraining'
 import { ActionTile, DrillTile, PlanRows, SessionCard, TimeBar, TotalLine } from '@/components/coach/training/PlannerParts'
-import { AddPartSheet, LeaveSheet, MoreDrillsSheet, ViewDrillSheet } from '@/components/coach/training/PlannerSheets'
+import { AddPartSheet, MoreDrillsSheet, ViewDrillSheet } from '@/components/coach/training/PlannerSheets'
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { useParked } from '@/components/trak/parked'
 import { LoadError } from '@/components/trak'
@@ -30,10 +30,13 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    through them one step each, then Review, and saves the plan whole. A new plan starts from the parts the coach saved
    last time, or Trak's five (Kostas, 2 Nov: some coaches don't follow the standard five, so the shape is theirs). Each
    part offers three drills, the usual one picked, plus See more and Write your own. Your session, beside it, is the
-   whole session at a glance, where parts are moved, removed and added. Save as draft keeps it for later, only the
+   whole session at a glance, where parts are moved, removed and added. A draft keeps it for later, only the
    coach's. Replaces Write my own (TRAK-295). TRAK-392 (Drill Library 7/11): the drills are the Library's, fitted to
    the training's squad; View drill shows one with Easier / Harder, and the level set there is saved with the plan.
-   Write your own left with coach-made drills (Kostas, 8 Nov); plans saved before keep their drills as saved. */
+   Write your own left with coach-made drills (Kostas, 8 Nov); plans saved before keep their drills as saved.
+   TRAK-404 (Kostas, 10 Nov): less on the page. The three choices show names only (View drill has the rest); no
+   logistics line, guide lines or "We picked a drill" line; the step bar jumps to any step; × alone removes a part; and
+   there's no Save as draft: every change saves the draft by itself, so leaving never asks. */
 
 const TRAINING_PATH = '/coach/training'
 const SAVE_FAILED = 'Couldn’t save. Check your connection and try again. Nothing you changed is lost.'
@@ -124,7 +127,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
   const [dirty, setDirty] = useState(start.dirty)
   // Opened from Review to change one part: Back to Review, not Next.
   const [fromReview, setFromReview] = useState(start.at === REVIEW && !!saved)
-  const [sheet, setSheet] = useState<'add' | 'more' | 'leave' | null>(null)
+  const [sheet, setSheet] = useState<'add' | 'more' | null>(null)
   const [viewing, setViewing] = useState<LibraryDrill | null>(null)
   const bookmarks = useBookmarks().data ?? []
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -132,7 +135,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
   const savePlan = useSavePlan(training.id)
   const saveDraft = useSaveDraft(training.id)
   const length = trainingMinutes(training)
-  const { day, time } = gameWhen(training)
+  const { day } = gameWhen(training)
 
   const setParts = (next: Part[]) => { setPartsRaw(next); setDirty(true); setProblem(null) }
   const step = at === REVIEW ? parts.length : Math.max(0, parts.findIndex(p => p.key === at))
@@ -165,17 +168,34 @@ function PlannerBody({ training, saved, draft, past, players }: {
     setAt(next[0].key)
   }
 
-  const keepDraft = () => {
-    if (parked) return comingSoon()
-    saveDraft.mutate({ step, parts, note }, {
-      onSuccess: () => { toast.success('Draft saved. Only you see it.'); navigate(TRAINING_PATH) },
-      onError: () => { setSheet(null); setProblem(SAVE_FAILED) },
-    })
+  // TRAK-404 (Kostas, 10 Nov): every change saves the draft by itself, a moment after the coach stops. Not when only one
+  // part of a saved plan is open (that saves straight to the plan), and not once the plan itself is being saved.
+  const autosave = !start.only && !parked
+  const [drafted, setDrafted] = useState(false)
+  const done = useRef(false)
+  const latest = useRef({ step, parts, note })
+  latest.current = { step, parts, note }
+  const keepDraft = useRef(() => {})
+  keepDraft.current = () => {
+    if (!autosave || done.current) return
+    saveDraft.mutate(latest.current, { onSuccess: () => setDrafted(true), onError: () => setProblem(SAVE_FAILED) })
   }
+  const pending = useRef(false)
+  useEffect(() => {
+    if (!autosave || !dirty) return
+    setDrafted(false)
+    pending.current = true
+    const timer = setTimeout(() => { pending.current = false; keepDraft.current() }, 800)
+    return () => clearTimeout(timer)
+  }, [parts, note, step, dirty, autosave])
+  // Leaving within that moment still keeps the change.
+  useEffect(() => () => { if (pending.current) keepDraft.current() }, [])
+
   const save = () => {
     if (parked) return comingSoon()
     const why = planProblem(parts)
     if (why) return setProblem(why)
+    done.current = true
     savePlan.mutate({ parts, note }, {
       onSuccess: () => {
         toast.success('Plan saved')
@@ -183,10 +203,10 @@ function PlannerBody({ training, saved, draft, past, players }: {
         if (start.only) navigate(reviewPage, { replace: true })
         else navigate(TRAINING_PATH, { replace: true, state: { savedPlan: training.id } })
       },
-      onError: error => setProblem('code' in error && error.code === 'P0001' ? `${error.message}.` : SAVE_FAILED),
+      onError: error => { done.current = false; setProblem('code' in error && error.code === 'P0001' ? `${error.message}.` : SAVE_FAILED) },
     })
   }
-  const leave = () => dirty ? setSheet('leave') : navigate(TRAINING_PATH)
+  const leave = () => navigate(TRAINING_PATH)
   const reviewPage = `${TRAINING_PATH}/${training.id}`
 
   const steps = [...parts.map(p => ({ id: p.key, label: p.name })), { id: REVIEW, label: 'Review' }]
@@ -197,17 +217,18 @@ function PlannerBody({ training, saved, draft, past, players }: {
       <CoachTrail current={`Plan session · ${day}`} />
       <h1 className="text-[24px] font-medium tracking-[-0.01em] text-ink break-words">{start.only && part
         ? `${start.only === 'add' ? 'Add' : 'Edit'}: ${part.name}` : `Plan session: ${training.title}`}</h1>
-      <p className="text-sm text-ink-2">{[start.only ? training.title : null, day, time, training.venue, length ? `${length} min` : null].filter(Boolean).join(' · ')}</p>
+      {/* TRAK-404 (Kostas, 10 Nov): no logistics here. Opened for one part, the training's name says which plan. */}
+      {start.only && <p className="text-sm text-ink-2">{training.title}</p>}
       {start.only && <p className="text-sm text-ink-3">{start.only === 'add' ? 'Pick a drill, then add it to the plan.'
         : 'Only this part changes. The rest of the plan stays as it is.'}</p>}
     </header>
     {start.added && <p role="status" className={`rounded-xl px-4 py-3 text-sm ${start.added.how === 'full' ? 'bg-warning/15 text-ink' : 'bg-raised text-ink-2'}`}>
-      {start.added.how === 'added' ? `${start.added.name} is added at the end. Check the plan, then save. Nothing is saved until you do.`
-        : start.added.how === 'there' ? `${start.added.name} is already in this plan, in ${start.added.part}. It’s now set as you left it on its page. Nothing is saved until you save.`
+      {start.added.how === 'added' ? `${start.added.name} is added at the end. Check the plan, then save it.`
+        : start.added.how === 'there' ? `${start.added.name} is already in this plan, in ${start.added.part}. It’s now set as you left it on its page.`
         : `${start.added.name} isn’t added: a plan holds at most ${PARTS_MAX} parts. Remove one, then add it from the drill’s page.`}</p>}
     {start.copiedFrom && <p role="status" className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
-      Copied from {start.copiedFrom}. Check it, change any part, then save. Nothing is saved until you do.</p>}
-    {!start.only && <div className="arc"><Stepper label="Planning steps" steps={steps} current={step} onStepSelect={go} /></div>}
+      Copied from {start.copiedFrom}. Check it, change any part, then save it.</p>}
+    {!start.only && <div className="arc"><Stepper label="Planning steps" steps={steps} current={step} onStepSelect={go} jumpAhead /></div>}
     {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
 
     <div className="grid gap-5 laptop:grid-cols-[minmax(0,1fr)_360px] laptop:items-start">
@@ -239,26 +260,22 @@ function PlannerBody({ training, saved, draft, past, players }: {
             </div>
           </div>
         </div>
-        <p className="max-w-[640px] text-sm text-ink-2">{partInfo(part.type).guide}</p>
         <div className="grid gap-3">
-          {/* A part that picks from every drill already says so in its guide line. */}
-          <p className="text-sm font-medium text-ink">Pick a drill {hasOwnDrills(part.type) && <span className="font-normal text-ink-3">{!part.drill ? 'Pick one for this part.'
-            : tagFor(part.drill, part.type, all, usage).startsWith('Your usual') ? 'We picked your usual. Change it if you like.'
-            : 'We picked a drill to start with. Change it if you like.'}</span>}</p>
           <ul aria-label={`Drills for ${part.name}`} className="grid gap-3 tablet:grid-cols-2 laptop:grid-cols-4">
             {shownFor(part.type, part.drill, all, usage).map(d => {
               const lib = libraryOf(d)
-              return <li key={`${d.source}:${d.trak_drill ?? d.drill_id ?? d.name}`} className="grid content-start gap-1">
+              // The tiles in a row share one height, so their View drill links line up.
+              return <li key={`${d.source}:${d.trak_drill ?? d.drill_id ?? d.name}`} className="grid grid-rows-[1fr_auto] gap-1">
                 <DrillTile drill={d} picked={isSameDrill(d, part.drill)} tag={tagFor(d, part.type, all, usage, bookmarks)} onPick={() => pick(d)} />
                 {lib && <button type="button" aria-label={`View drill: ${lib.name}`} onClick={() => setViewing(lib)}
                   className="justify-self-start rounded px-1 py-1 text-sm font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">View drill</button>}
               </li>
             })}
-            {!hasOwnDrills(part.type) && <li><ActionTile icon="search" label="Browse all drills" onClick={() => setSheet('more')} /></li>}
+            {/* TRAK-404 (Kostas, 10 Nov): a fourth choice, any drill from the Drill Library. */}
+            <li className="grid grid-rows-[1fr_auto] gap-1"><ActionTile icon="search" label="Find another drill" note="From the Drill Library" onClick={() => setSheet('more')} />
+              {/* As tall as a View drill link, so this tile ends level with the others. */}
+              <span aria-hidden className="invisible px-1 py-1 text-sm">View drill</span></li>
           </ul>
-          {hasOwnDrills(part.type) && all.length > 3 && <div><button type="button" onClick={() => setSheet('more')}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded px-1 text-sm font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-            <Search aria-hidden size={14} />See more drills ({all.length - 3})</button></div>}
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
           {start.only ? <>
@@ -266,23 +283,23 @@ function PlannerBody({ training, saved, draft, past, players }: {
             <span className="flex-1" />
             <Button loading={savePlan.isPending} onClick={save}>{start.only === 'add' ? 'Add to the plan' : 'Save and go back to Review'}</Button>
           </> : fromReview ? <>
-            <Button variant="ghost" loading={saveDraft.isPending} onClick={keepDraft}>Save as draft</Button>
+            <DraftNote saving={saveDraft.isPending} saved={drafted} />
             <span className="flex-1" />
-            <Button variant="ghost" onClick={() => remove(step)}><X aria-hidden size={16} />Remove this part</Button>
+            <RemoveButton name={part.name} onRemove={() => remove(step)} />
             <Button onClick={() => { setFromReview(false); go(parts.length) }}>Back to Review<ArrowRight aria-hidden size={16} /></Button>
           </> : <>
             <Button variant="secondary" onClick={() => step === 0 ? leave() : go(step - 1)}>{step === 0 ? 'Cancel' : 'Back'}</Button>
-            <Button variant="ghost" loading={saveDraft.isPending} onClick={keepDraft}>Save as draft</Button>
+            <DraftNote saving={saveDraft.isPending} saved={drafted} />
             <span className="flex-1" />
-            <Button variant="ghost" onClick={() => remove(step)}><X aria-hidden size={16} />Remove this part</Button>
+            <RemoveButton name={part.name} onRemove={() => remove(step)} />
             <Button onClick={() => go(step + 1)}>Next: {step + 1 < parts.length ? parts[step + 1].name : 'Review'}<ArrowRight aria-hidden size={16} /></Button>
           </>}
         </div>
       </section> : <Review parts={parts} length={length} note={note} onNote={value => { setNote(value); setDirty(true) }}
         onEdit={i => { setFromReview(true); go(i) }} onRemove={remove} onReorder={setParts} onMove={(i, by) => setParts(moveTo(parts, i, i + by))}
         onAdd={() => setSheet('add')}
-        onBack={() => parts.length ? go(parts.length - 1) : leave()} onDraft={keepDraft} onSave={save}
-        saving={savePlan.isPending} drafting={saveDraft.isPending} />}
+        onBack={() => parts.length ? go(parts.length - 1) : leave()} onSave={save}
+        saving={savePlan.isPending} draftNote={autosave ? <DraftNote saving={saveDraft.isPending} saved={drafted} /> : null} />}
 
       {part && start.only ? <OnTheDay parts={parts} title="Your session" />
         : part ? <SessionCard parts={parts} length={length} current={part.key} onOpen={key => setAt(key)} onReorder={setParts}
@@ -295,17 +312,15 @@ function PlannerBody({ training, saved, draft, past, players }: {
     <MoreDrillsSheet part={sheet === 'more' ? part : null} players={players} usage={usage} bookmarks={bookmarks} onClose={() => setSheet(null)}
       onPick={pick} />
     <ViewDrillSheet drill={viewing} part={part} players={players} onClose={() => setViewing(null)} onUse={pick} />
-    <LeaveSheet open={sheet === 'leave'} onClose={() => setSheet(null)} onDraft={keepDraft} saving={saveDraft.isPending}
-      onLeave={() => { setSheet(null); navigate(TRAINING_PATH) }} />
   </div>
 }
 
 /** The last step, and a saved plan opened again: the whole plan, a part to change, remove or add, and a note. */
-function Review({ parts, length, note, onNote, onEdit, onRemove, onReorder, onMove, onAdd, onBack, onDraft, onSave, saving, drafting }: {
+function Review({ parts, length, note, onNote, onEdit, onRemove, onReorder, onMove, onAdd, onBack, onSave, saving, draftNote }: {
   parts: Part[]; length: number | null; note: string; onNote: (note: string) => void; onEdit: (index: number) => void
   onRemove: (index: number) => void; onReorder: (parts: Part[]) => void; onMove: (index: number, by: -1 | 1) => void
-  onAdd: () => void; onBack: () => void; onDraft: () => void; onSave: () => void
-  saving: boolean; drafting: boolean
+  onAdd: () => void; onBack: () => void; onSave: () => void
+  saving: boolean; draftNote: ReactNode
 }) {
   return <section aria-labelledby="review" className="arc grid min-w-0 gap-4 rounded-2xl border border-line bg-surface p-5">
     <div className="flex flex-wrap items-end justify-between gap-3">
@@ -323,7 +338,7 @@ function Review({ parts, length, note, onNote, onEdit, onRemove, onReorder, onMo
       value={note} onChange={e => onNote(e.target.value)} placeholder="For example: remind the back four to talk to each other in the box" />
     <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
       <Button variant="secondary" onClick={onBack}>Back</Button>
-      <Button variant="ghost" loading={drafting} onClick={onDraft}>Save as draft</Button>
+      {draftNote}
       <span className="flex-1" />
       <Button size="lg" loading={saving} onClick={onSave}>Save the plan</Button>
     </div>
@@ -343,4 +358,16 @@ function OnTheDay({ parts, title = 'On the day' }: { parts: Part[]; title?: stri
     </div>
     <p className="text-sm text-ink-3">Planned for your whole squad.</p>
   </aside>
+}
+
+/** TRAK-404: says quietly that the draft saved itself. */
+function DraftNote({ saving, saved }: { saving: boolean; saved: boolean }) {
+  return <span role="status" className="text-sm text-ink-3">{saving ? 'Saving draft…' : saved ? 'Draft saved' : ''}</span>
+}
+
+/** TRAK-404 (Kostas, 10 Nov): × alone removes a part; its name is still read out. */
+function RemoveButton({ name, onRemove }: { name: string; onRemove: () => void }) {
+  return <button type="button" aria-label={`Remove ${name}`} title={`Remove ${name}`} onClick={onRemove}
+    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-2 hover:bg-raised hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+    <X aria-hidden size={18} /></button>
 }

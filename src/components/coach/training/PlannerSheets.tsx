@@ -4,7 +4,7 @@ import { PART_TYPES, type PartType } from '@/lib/training/shelf'
 import {
   PART_NAME_MAX, drillKey, fromLibrary, hasOwnDrills, isSameDrill, libraryFor, libraryOf, tagFor, type Part, type PlanDrill, type Usage,
 } from '@/lib/training/parts'
-import { START_LEVEL, alsoCalled, changedBy, fit, kindInfo, nextLevel, searchDrills, step, type Changed, type LibraryDrill } from '@/lib/training/library'
+import { KIND_ORDER, LIBRARY, START_LEVEL, alsoCalled, changedBy, fit, kindInfo, nextLevel, searchDrills, step, type Changed, type LibraryDrill } from '@/lib/training/library'
 import { DrillPitch, PitchKey } from './library/DrillPitch'
 import { AboutDrill, CHIP, ChangeNote, DetailList } from './library/DrillInfo'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
@@ -15,7 +15,7 @@ import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): the planner's pop-ups. Add a part (Trak's eight, or
-   the coach's own name) and Leave. TRAK-392 (Drill Library 7/11): See more drills lists the part's Library drills by
+   the coach's own name). TRAK-404 took Leave out: drafts save themselves. TRAK-392 (Drill Library 7/11): See more drills lists the part's Library drills by
    drill type, with search; View drill shows one with its picture and Easier / Harder, then Use this drill. Write your
    own and the My drills filter left with coach-made drills (Kostas, 8 Nov). */
 
@@ -58,15 +58,18 @@ export function AddPartSheet({ open, onClose, onAdd }: { open: boolean; onClose:
 
 type Filter = 'all' | 'used'
 
-/** Every Library drill for the part, grouped by drill type (team drills first, then Individual and Goalkeeping), to
- *  search and pick from. */
+/** Find another drill (TRAK-404, Kostas 10 Nov: a fourth choice, from the whole Drill Library). The part's own drills
+ *  first, grouped by drill type (team drills first, then Individual and Goalkeeping), then the rest of the Library by
+ *  kind; the search covers it all. */
 export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPick }: {
   part: Part | null; players: number; usage: Usage; bookmarks: readonly string[]; onClose: () => void; onPick: (drill: PlanDrill) => void
 }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   useEffect(() => { if (part) { setQuery(''); setFilter('all') } }, [part?.key]) // eslint-disable-line react-hooks/exhaustive-deps -- a new part starts afresh
-  const pool = useMemo(() => part ? libraryFor(part.type) : [], [part])
+  const own = useMemo(() => part ? libraryFor(part.type) : [], [part])
+  const rest = useMemo(() => part && hasOwnDrills(part.type) ? LIBRARY.filter(d => !own.includes(d)) : [], [part, own])
+  const pool = useMemo(() => [...own, ...rest], [own, rest])
   const all = useMemo(() => pool.map(d => fromLibrary(d, players, START_LEVEL)), [pool, players])
   if (!part) return null
   const byId = new Map(all.map(d => [d.trak_drill, d]))
@@ -75,11 +78,16 @@ export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPi
   const groupOf = (d: LibraryDrill) => d.focus === 'individual' ? 'Individual' : d.focus === 'goalkeeping' ? 'Goalkeeping'
     : d.kind === 'warmup' ? kindInfo(d.kind).name : d.type
   // Searching, the best match first, in one list; otherwise by drill type, in the Library's order.
+  const mine = shown.filter(d => own.includes(d)), others = shown.filter(d => !own.includes(d))
   const groups = query.trim() ? [{ name: 'Drills found', drills: shown }]
-    : [...new Set(shown.filter(d => d.focus === 'team').map(groupOf)), 'Individual', 'Goalkeeping']
-      .map(name => ({ name, drills: shown.filter(d => groupOf(d) === name) })).filter(g => g.drills.length)
+    : [...[...new Set(mine.filter(d => d.focus === 'team').map(groupOf)), 'Individual', 'Goalkeeping']
+        .map(name => ({ name, drills: mine.filter(d => groupOf(d) === name) })),
+      // The rest of the Library, by kind.
+      ...KIND_ORDER.map(kind => ({ name: kind === 'warmup' ? kindInfo(kind).name : (kindInfo(kind) as { long: string }).long, drills: others.filter(d => d.kind === kind), rest: true }))]
+      .filter(g => g.drills.length)
+  const firstRest = groups.findIndex(g => 'rest' in g)
   return <BottomSheet className="arc" open onOpenChange={next => { if (!next) onClose() }} detents={[0.92]}
-    title={hasOwnDrills(part.type) ? `More drills for ${part.name}` : 'All drills'}>
+    title={`Find another drill for ${part.name}`}>
     <div className="grid gap-4 pb-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[220px] flex-1"><SearchField label="Search drills" placeholder="For example: rondo, 4v2, pressing" value={query} onValueChange={setQuery} /></div>
@@ -88,7 +96,8 @@ export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPi
       </div>
       {groups.length === 0 ? <p className="text-[15px] text-ink-2">{filter === 'used' && !query.trim()
         ? 'You haven’t used any of these drills yet.' : 'No drills match. Try another word.'}</p>
-        : groups.map(group => <section key={group.name} aria-label={group.name} className="grid gap-2">
+        : groups.map((group, i) => <section key={group.name} aria-label={group.name} className="grid gap-2">
+          {i === firstRest && i > 0 && <p className="border-t border-line pt-3 text-sm font-medium text-ink-2">The rest of the Drill Library</p>}
           <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-ink-3">{group.name}</h3>
           <ul aria-label={group.name} className="divide-y divide-line rounded-2xl border border-line bg-surface px-4">
             {group.drills.map(lib => {
@@ -131,7 +140,8 @@ export function ViewDrillSheet({ drill, part, players, onClose, onUse }: {
   }
   const also = alsoCalled(drill)
   const use = () => onUse(fromLibrary(drill, players, level))
-  return <BottomSheet className="arc" open onOpenChange={next => { if (!next) onClose() }} detents={[0.96]} title={drill.name}
+  // Kostas, 10 Nov: wider than the other pop-ups, so the picture and the words beside it have room.
+  return <BottomSheet className="arc" wide open onOpenChange={next => { if (!next) onClose() }} detents={[0.96]} title={drill.name}
     description={also.length ? `Also called: ${also.join(', ')}` : undefined}>
     <div className="grid gap-4 pb-4">
       <p className="flex flex-wrap gap-1.5">
@@ -157,20 +167,6 @@ export function ViewDrillSheet({ drill, part, players, onClose, onUse }: {
           <Button onClick={use}>Use this drill</Button>
         </>}
       </div>
-    </div>
-  </BottomSheet>
-}
-
-/** Leaving with changes not saved: keep them as a draft, or let them go. */
-export function LeaveSheet({ open, onClose, onDraft, onLeave, saving }: {
-  open: boolean; onClose: () => void; onDraft: () => void; onLeave: () => void; saving: boolean
-}) {
-  return <BottomSheet className="arc" open={open} onOpenChange={next => { if (!next) onClose() }} title="Leave this plan?"
-    description="Your changes aren’t saved yet. Save them as a draft to carry on later, or leave without saving.">
-    <div className="flex flex-wrap justify-end gap-2 pb-4">
-      <Button variant="ghost" onClick={onLeave}>Leave without saving</Button>
-      <Button variant="secondary" onClick={onClose}>Keep planning</Button>
-      <Button loading={saving} onClick={onDraft}>Save as draft</Button>
     </div>
   </BottomSheet>
 }

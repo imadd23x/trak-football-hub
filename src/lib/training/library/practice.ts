@@ -3,8 +3,8 @@ import { CANVAS, hash, rng, scatter, type Point, type Shape } from './pitch'
 
 /* TRAK-394 (Drill Library 9/11, parent TRAK-384): Change any practice, from the 8 Nov mockup. Steve's five things that
    shape every practice, each with his example: pick one of its set-ups and see the picture and what changes.
-   Conditions has his three rules instead. The "what changes" answers are Trak's draft, for Steve to check (said on the
-   page). Only words and positions here; the page (ChangePractice in pages/coach/training/DrillLibrary.tsx) draws them with the drill
+   Conditions has his three rules instead. The "what changes" answers are Trak's own; Steve checks them after the pilot
+   (Kostas, 9 Nov), so the page no longer says they're a draft. Only words and positions here; the page (ChangePractice in pages/coach/training/DrillLibrary.tsx) draws them with the drill
    picture's colours. */
 
 export type CharacteristicKey = 'area' | 'numbers' | 'targets' | 'direction' | 'conditions'

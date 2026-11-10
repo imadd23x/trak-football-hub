@@ -13,6 +13,7 @@ import { drillOrder, kindInfo, type DrillTypeName } from './kinds'
 export const ALSO_CALLED: Record<DrillTypeName, readonly string[]> = {
   'Dry warm-up': ['warm-up', 'activation', 'tag game', 'warmup', 'warm up', 'movement prep', 'dynamic warm-up', 'tig'],
   'Passing': ['passing drill', 'passing pattern', 'pass and move', 'passing square', 'y passing', 'diamond passing', 'combination play', 'one-two', 'wall pass'],
+  'Cool-down': ['cool down', 'warm down', 'stretching', 'recovery', 'warmdown'],
   'Pressing movement': ['pressing cones', 'shadow play', 'shadow pressing', 'pressing drill', 'team shape', 'shifting', 'unopposed defending'],
   'Follow and copy': ['truck and trailer', 'follow the leader', 'mirror', 'copycat', 'shadow dribbling'],
   'Repetition': ['technical repetition', 'technique', 'unopposed', 'ball mastery', 'drill'],

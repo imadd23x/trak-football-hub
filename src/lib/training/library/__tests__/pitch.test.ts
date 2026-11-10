@@ -90,7 +90,7 @@ describe('a card zooms onto the drill', () => {
   })
 
   it('a small square fills more of the card than the full picture', () => {
-    expect(cardView(draw('Copy your partner', 8)).w).toBeLessThan(CANVAS.w)
+    expect(cardView(draw('Tag games', 8)).w).toBeLessThan(CANVAS.w)
   })
 
   it('an empty drawing keeps the whole canvas', () => {

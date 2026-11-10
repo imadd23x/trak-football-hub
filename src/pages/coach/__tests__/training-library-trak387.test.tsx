@@ -65,6 +65,8 @@ describe('TRAK-387: the Library home', { timeout: 20_000 }, () => {
     expect(kinds.getByRole('link', { name: 'Change any practice' })).toHaveAttribute('href', '/coach/training/drills/change')
     expect(screen.queryByRole('region', { name: 'From the Library' })).toBeNull()
     expect(screen.queryByRole('link', { name: /Play It Right|Programmes/ })).toBeNull()
+    // Kostas, 9 Nov: Steve checks the wording after the pilot, so no page says it's unchecked.
+    expect(screen.queryByText(/coaching lead|not yet checked/)).toBeNull()
   })
 
   it('typing shows results as picture cards in place of everything else, with the name it was found by', async () => {
@@ -127,7 +129,7 @@ describe('TRAK-387: the Library’s pages', { timeout: 20_000 }, () => {
 
   it('Game related says 11 v 11 has no sample yet', async () => {
     renderApp('/coach/training/drills/kind/game')
-    expect(await screen.findByText('Needs 22 players and a full pitch. No sample yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Needs 22 players and a full pitch. None yet.')).toBeInTheDocument()
   })
 
   it('All drills: grouped Get ready → Technical → Skill → Game related, with filters and its own search', async () => {
@@ -138,7 +140,7 @@ describe('TRAK-387: the Library’s pages', { timeout: 20_000 }, () => {
       .toEqual(['Get ready', 'Technical practices', 'Skill practices', 'Game related practices']))
     await user.click(screen.getByRole('button', { name: 'Goalkeeping' }))
     expect(await screen.findByRole('heading', { name: 'Goalkeeping', level: 1 })).toBeInTheDocument()
-    expect(screen.getByText(/^2 drills\./)).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`^${LIBRARY.filter(d => d.focus === 'goalkeeping').length} drills\\.`))).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'All' }))
     await user.type(screen.getByRole('searchbox', { name: 'Search drills' }), 'posession')
     const found = await screen.findByRole('list', { name: 'Drills found' })

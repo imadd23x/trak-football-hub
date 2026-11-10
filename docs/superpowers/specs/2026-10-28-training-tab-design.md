@@ -6,17 +6,22 @@ this file in the same PR.
 
 ## Objective
 
-Each training gets a plan, written the coach's own way, and one loop: Plan → Who's here → Run it → Close. A coach who
-uses their own drills types a plan fast and reuses it; a coach who wants help picks from the Library. Both land on the
-same plan. Everything sits behind the `training` academy switch. With the switch off, Trak behaves exactly as today.
+Each training gets a plan and one loop: Logistics (from the schedule) → Plan → Who's here → Notes (optional). The
+plan is built from Trak's Drill Library, fitted to the squad, and the coach can reuse a past plan. View is the plan
+read at the pitch side; Run it left the loop (TRAK-309). A training closes on its own once it has ended with its
+register taken (Kostas, 28 Oct). Everything sits behind the `training` academy switch. With the switch off, Trak
+behaves exactly as before. (TRAK-395 brought this file up to date with what's live on 9 Nov.)
 
 ## Decisions this rests on
 
 - TRAK-293's decisions (Kostas, 27 Oct), unchanged.
-- **Training replaces Library in the nav** where the switch is on. The Library's pages (`/coach/trainings/...`) stay
-  as they are and open from Training › Drills; on them the nav marks Training.
+- **Training replaces Library in the nav** where the switch is on. The old FA Library (`/coach/trainings/...`, with
+  Play It Right) stays as it is for academies with the switch off. Since TRAK-394 nothing in Training links to it, and
+  players keep Play It Right on their Trainings page. Nothing is deleted.
 - **Coach only.** No player, guardian, other coach or academy admin reads a drill or a plan in this build, so there
   are no copy tables (unlike Games).
+- **No coach-made drills for the pilot** (Kostas, 8 Nov). Every drill is a Trak Library drill; a coach bookmarks one,
+  never changes it.
 - **Times are the academy's.** Coming up and Last week compare instants (`starts_at`, `ends_at`), which the database
   sets on the academy's clock (TRAK-175). A training with no time lasts its whole day, as TRAK-230 locks it.
 - **Not built** (TRAK-293): Build it with Trak, Homework, Value of the month, the objectives nudge, "What this session
@@ -29,9 +34,9 @@ Every text field has a length limit.
 
 | Table | Key | Holds | Slice |
 |---|---|---|---|
-| `coach_drills` | `id` | The coach's own single drills: name (≤80), usual minutes (5–60; the app offers 10–30), how it works (≤1000), what you'll tell them (≤500), and the five details area, numbers, direction, targets, conditions (≤120 each). | 294 |
+| `coach_drills` | `id` | The coach's own single drills: name (≤80), usual minutes (5–60), how it works (≤1000), what you'll tell them (≤500), and the five details (≤120 each). **Empty and unused since 8 Nov** (no coach-made drills for the pilot); kept for that later feature. | 294 |
 | `training_plans` | `event_id` | One plan per training event (`coach_calendar_events(id) ON DELETE CASCADE`), and its coach. | 295 |
-| `training_plan_practices` | `event_id, position` | The plan's practices in order (positions 1–12): name, minutes, how it works, what you'll tell them, the five details (drills' limits), where it came from (`own`, `drill`, `library`) and the drill (`ON DELETE SET NULL`) or Library session it came from. A practice is a copy: changing or deleting a drill never changes a plan. TRAK-391: `trak_level` (0–7, a Trak drill only), the Library drill's Easier / Harder level as the coach set it; null for every other practice and every older plan. `save_training_plan()` writes it; drafts carry it in `body`. | 295, 391 |
+| `training_plan_practices` | `event_id, position` | The plan's practices in order (positions 1–12): name, minutes, how it works, what you'll tell them, the five details (drills' limits), where it came from (`own`, `drill`, `library`, `trak`) and the drill (`ON DELETE SET NULL`) or Library session it came from. A practice is a copy: changing or deleting a drill never changes a plan. TRAK-391: `trak_level` (0–7, a Trak drill only), the Library drill's Easier / Harder level as the coach set it; null for every other practice and every older plan. `save_training_plan()` writes it; drafts carry it in `body`. | 295, 391 |
 | `coach_drill_bookmarks` | `coach_user_id, drill` | The Library drills a coach bookmarked (My drills): the drill's Library id (1–40) and when. See Drill Library below. | 390 |
 
 ## Read and write rules
@@ -43,9 +48,9 @@ Reads don't need the switch, so switching Training off hides the tab without los
 From 295, a plan's event must be the coach's own training, not cancelled, and a practice can name only the coach's
 own drill. A plan is saved whole by `save_training_plan(event, practices)` (1 to 12 practices, all or none), so a
 half-saved plan can't exist. It runs as the coach (`SECURITY INVOKER`), so the rules above apply unchanged, and says
-in words why it refuses (not your training, cancelled, no practice, more than 12). A practice written here and
-ticked "Save to My drills" becomes one of the coach's drills in the same save. Practices are replaced whole on each
-save, so the coach gets select, insert and delete on them, never update.
+in words why it refuses (not your training, cancelled, no practice, more than 12). Practices are replaced whole on
+each save, so the coach gets select, insert and delete on them, never update. Drafts (`training_plan_drafts`) are the
+coach's own, saved by Save as draft.
 
 Nobody else reads these tables.
 
@@ -53,70 +58,71 @@ Nobody else reads these tables.
 
 | Route | Screen | Slice |
 |---|---|---|
-| `/coach/training` | Training home, Sessions: Coming up (not over yet, soonest first) and Last week (over in the past 7 days, newest first), the squad pills, New session | 294 |
-| `/coach/training/drills` | Training home, Drills: the Drill Library (TRAK-387; see Drill Library below). Was My drills and New drill (294). | 294, 387 |
-| `/coach/training/:eventId/plan` | Write my own (and Copy a past session, 297) | 295 |
-| `/coach/training/:eventId` | The plan, with the loop strip | 295, 298 |
-| `/coach/training/:eventId/run` | Run it: the plan at the pitch side | 298 |
+| `/coach/training` | Sessions, laid out like Matches: the Next training card (where it is in its loop and its one next action), Upcoming trainings in a row (four, the rest one tap away), Notes asked on the card after a training | 294, 339 |
+| `/coach/training/past` | Past trainings, with their plans; Use this plan copies one into a training coming up | 297, 339 |
+| `/coach/training/drills…` | The Drill Library (see below) | 387–394 |
+| `/coach/training/:eventId/plan` | Plan session: the plan's parts one step each, then Review | 340, 392 |
+| `/coach/training/:eventId` | The plan (Review once saved): Edit one part, × to remove (with Undo), Add a part, the loop strip | 295, 341 |
+| `/coach/training/:eventId/here` | Who's here: the register, then each Library drill refitted to the players who came | 342, 393 |
+| `/coach/training/:eventId/view` | View: the plan at the pitch side, big type, when each practice starts. `/run` redirects here | 298, 309 |
 
-"How do you want to plan it?" (from Plan this session, or New session after "Which training?") remembers the
-coach's last way on this device. Write my own is the only way in 295; Copy a past session joins it in 297. A
-training's page starts at the top whenever the coach opens it.
+**Plan session** (TRAK-340, `src/pages/coach/training/Planner.tsx`). A plan is a list of parts (Trak's five: Dry
+warm-up, Passing & movement, Rondo, Functional drills, Game; or the shape the coach saved last time; extra parts: Set
+pieces, Finishing, Cool-down or one the coach names). The coach goes through them one step each, then Review, and saves
+the plan whole; Save as draft keeps it for later. Each part offers three Library drills and See more; Your session,
+beside it, is the whole session at a glance. How the drills are chosen: see Drill Library below.
 
-From 296, "Add another" offers Write it · From My drills · From the Library, and each practice offers Swap; both open
-one sheet (`AddSheet`) with three views. No new tables: a drill or a Library session is copied into the plan as a
-practice (`source` `drill` or `library`). My drills' best fit is the coach's drills closest to the slot's minutes (a
-swapped practice's, or what's left of the training to the nearest 5, kept to 10–30). A Library session takes its
-short name, the slot's minutes or 20, its summary as how it works, and its pitch and players as the area and numbers;
-the Library view keeps to the training's squad's age group until the coach asks for every age, and previews a
-session inside the sheet with no link. From Training › Drills, a drill card adds the drill to the next training not
-planned yet: the planner opens with it added, once.
+**The loop** (TRAK-298, TRAK-309). Each step comes from what exists, so nothing new is stored: Plan is a saved plan;
+Who's here is the register taken (the event's completed session, TRAK-138), opened with the existing `TakeRegister`
+(published, not cancelled, started); the training closes on its own once it has ended with its register taken.
 
-From 297, "Copy a past session" shows in "How do you want to plan it?" once the coach has planned another session. A
-past session is its plan: nothing new is stored. The list reads the coach's plans, their trainings and practices,
-newest first, and searches by title or a practice's name. Copying opens Write my own filled in (sources kept: a drill
-or Library practice stays one), with a note that nothing is saved until Save the plan; it replaces what was there.
+A drill sent from its page, or a copied plan, travels in the planner's own history entry: changing between phone and
+laptop width lays the coach's pages out again, and the planner must come back with it. Saving replaces that entry with
+the plan, so Back never reopens the planner to add it twice.
 
-A drill sent by Add to, or a copied session, travels in the planner's own history entry and stays there: changing
-between phone and laptop width lays the coach's pages out again, and the planner must come back with it. Saving
-replaces that entry with the plan, so Back never reopens the planner to add it twice.
-
-From 298, the plan page runs the loop. Each step comes from what exists, so nothing new is stored: Plan is a saved
-plan; Who's here is the register taken (the event's completed session, TRAK-138); Run it is done once the training is
-over; Close is automatic (Kostas, 28 Oct): a training is closed once it has ended with its register taken. Who's here
-opens the existing register (`TakeRegister`) as everywhere else: published, not cancelled, started. Run it
-(`/coach/training/:eventId/run`) is the plan at the pitch side, with when each practice starts. A closed training
-shows View log (`SessionLog`), and Last week says Closed or No register and opens the training's page. Sending who came
-to a weekly check-in waits for the check-in.
-
-Both routes are inside `ParkedScreen unless="training"`, so with the switch off the screen shows "Coming soon" and
+Every route is inside `ParkedScreen unless="training"`, so with the switch off the screen shows "Coming soon" and
 every write handler stops at `useParked()`.
 
 Code: `src/pages/coach/training/`, `src/components/coach/training/`, `src/lib/training/`.
 
-## Drill Library (TRAK-384, building)
+## Drill Library (TRAK-384, built 8–9 Nov)
 
-The new Library replaces the Drills tab and feeds Plan session, in 11 steps (TRAK-385 to TRAK-395). Step 1 (TRAK-385)
-is the engine in `src/lib/training/library/`, with no screens, so nothing changes for anyone yet:
+The Library is the Drills tab and feeds Plan session. It was built in 11 steps (TRAK-385 to TRAK-395). The engine is
+`src/lib/training/library/`, with no screens:
 
 - **Drills** (`drills.ts`) live in the app, not the database: a coach can only bookmark a Trak drill, never change
   it. Each id starts with `lib-`, so an old plan's `trak_drill` (`w1`, `p1`… from `shelf.ts`) never finds a Library
-  drill. The 44 drills now are sample content; the real library replaces them (TRAK-388).
-- **Kinds** (`kinds.ts`): Get ready, then Technical, Skill and Game related, each with its drill types. Each drill
-  fits one of the session's parts (Technical → Passing & movement, Skill → Rondo, a small-sided game → Game, other
-  Game related → Functional drills) and has a players shape so Who's here keeps working until TRAK-393.
+  drill. An id never changes once a plan can name it.
+- **The real library** (TRAK-388, Kostas's pick list, 9 Nov; read through 10 Nov): 54 drills, from Trak's 45 built-in drills (`shelf.ts`)
+  and the useful FA sessions, merged and rewritten in our own words (no FA text). Kept drills also take the merged
+  drills' old names as search words. Retired drills (`RETIRED`: Copy your partner, Follow and copy; and, merged on 10
+  Nov, Steal the ball, Win it back in five, Cross and attack the box) are never listed,
+  searched or offered, but `libraryDrill(id)` still finds them for saved plans. Set pieces wait until after the pilot;
+  the FA's under-12 games and six-week programmes are left out. Steve checks the wording after the pilot (Kostas,
+  9 Nov); the pages don't say it's unchecked.
+- **Kinds** (`kinds.ts`): Get ready (Dry warm-up and, from TRAK-388, Cool-down), then Technical, Skill and Game
+  related, each with its drill types. Each drill fits one of the session's parts (`partFor`: Dry warm-up → Dry
+  warm-up, Cool-down → Cool-down, Technical → Passing & movement, Skill → Rondo, a small-sided game → Game, other Game
+  related → Functional drills).
 - **Fit** (`fit.ts`): a drill fitted to any number of players at one of 8 levels gives the five details (area,
   numbers, targets, direction, conditions). Every drill starts at level 4 of 8. Easier / Harder goes to the next
-  level that really changes something and says why; Players today refits at the same level.
+  level that really changes something and says why; Players today refits at the same level. Each drill names a
+  template (how it takes its players); a few options tune one (TRAK-388): `long` pairs are 20–40 m apart, `solo` gives
+  everyone a ball and no partner, `group` fixes the numbers in each turn (1 v 1), and a shooting drill's own rule
+  replaces the serve. The 10 Nov read-through: fewer players in a turn get a proportionally smaller area (1 v 1 is
+  about 20x15 m), a three-team game gets 2.5 times a rondo's room, and a position practice leaves at most about three
+  waiting.
 - **Search** (`search.ts`): by name, type, other names coaches use, topics and the fitted numbers, with "4 v 4" =
   "4v4" and one spelling slip allowed (two in long words).
 - **Pitch picture** (TRAK-386): `pitch.ts` lays a fitted drill out to scale on a 640 × 420 canvas, with roles, not
   colours; `components/coach/training/library/DrillPitch.tsx` draws it in the fixed pitch colours
   (`lib/fixed-colours.ts` `PITCH`). `full` is the whole canvas with the size line and a one-line description for
   screen readers; `card` zooms onto the drill and is hidden from screen readers, as the card says it in words.
-  `PitchKey` says what each colour means. Drills played in turns draw the players who are on.
+  `PitchKey` says what each colour means. Drills played in turns draw the players who are on. Long gaps are drawn
+  shorter so they fit; the size line still says the real gap. Known gap: Sweep behind the line uses the shooting
+  picture until it gets its own.
 - **Drills tab** (TRAK-387): `/coach/training/drills` is the Library home (Find a drill, My drills, All drills, the
-  three kinds, then the old FA Library tiles until TRAK-394); `drills/kind/:kind` a practice page, `drills/all` All
+  three kinds, then Change any practice, Individual work and Goalkeeping); `drills/kind/:kind` a practice page, `drills/all` All
   drills (`?show=` a kind, Individual or Goalkeeping), `drills/mine` My drills (bookmarks, TRAK-390), `drills/d/:id` a
   drill's page. Searches and filters
   sit in the address (`?q=`, `?type=`, `?show=`), so Back returns to them. Every picture is fitted to the squad picked
@@ -130,8 +136,7 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
 - **Add to training** (TRAK-391): on a drill's page, a pop-up "Add <drill> to which training?" lists the trainings
   coming up (the squad picked at the top, or all), each with day, time and Not planned / Draft / Planned. Picking one
   opens Plan session at Review with the drill as a new part at the end (Kostas, 8 Nov): of the draft if there is one,
-  else the saved plan, else the coach's usual shape. Its part is its kind's (Technical → Passing & movement, Skill →
-  Rondo, Small-sided games → Game, other Game related → Functional drills, Get ready → Dry warm-up), with that part's
+  else the saved plan, else the coach's usual shape. Its part is `partFor`'s, with that part's
   usual minutes; its five details are the fitted ones in words, at the players and level set on the page, so View and
   Home's Today card show it unchanged. Nothing is saved until the coach saves. Already in that plan: said, not added
   twice; a plan of 12 parts: said, not cut. Once a training coming up holds the drill (plan or draft), the button
@@ -150,10 +155,9 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
   plan that used one, and any draft that did. `coach_drills` stays, empty. Plan session's Write your own and My drills
   filter left in TRAK-392.
 - **Plan session uses the Library** (TRAK-392): everything else in Plan session stays (Kostas, 8 Nov); only the drills
-  change. A part's drills are the Library drills whose kind fits it (`libraryFor`: Get ready → Dry warm-up, Technical →
-  Passing & movement, Skill → Rondo, Small-sided games → Game, other Game related → Functional drills), fitted to the
-  training's squad (8–20 players; 15 when unknown) at the standard level. Set pieces, Finishing, Cool-down (no Library
-  drills yet) and a part the coach named pick from every drill and have no usual. The three choices are team drills:
+  change. A part's drills are the Library drills that fit it (`libraryFor`, by `partFor`), fitted to the training's
+  squad (8–20 players; 15 when unknown) at the standard level. Set pieces, Finishing (no Library drills of their own)
+  and a part the coach named pick from every drill and have no usual. The three choices are team drills:
   the usual (most used lately), else the starter drill (the part's first team drill), then those used lately, then the
   rest; the picked one always shows. Tags: Your usual, Last used, Starter drill, In My drills. Each Library choice has
   View drill: a pop-up with the picture, Easier / Harder and what changed, the five details, why / how / watch, then Use
@@ -171,6 +175,15 @@ is the engine in `src/lib/training/library/`, with no screens, so nothing change
   fewer than 8 here and the coach picks another drill; more than 20 fit as 20. A drill from an older plan keeps the
   TRAK-342 advice (`setupFor` / swaps). Home's Today card stays a list of practices and minutes (Kostas, 29 Oct: keep
   it simple), so it shows no set-up. Code: `adapt()` in `src/lib/training/turnout.ts`.
+- **Change any practice** (TRAK-394): `drills/change` (`?part=`, `?eg=`). Steve's five things that shape every practice,
+  each with his example: pick a set-up and the picture (`practiceLayout`), what changes and the key follow it;
+  Conditions shows his three rules. Steve checks the answers after the pilot. Words and layouts:
+  `src/lib/training/library/practice.ts`; drawn by `PitchPicture` in `DrillPitch.tsx`. The old FA Library's tiles left
+  the Drills tab with this step.
+- **Coach-made drill code** (TRAK-395): the helpers for writing and checking a coach's own drill (`drillProblem`,
+  `cleanDrill`, `detailCount`, their search, "Save to My drills") are gone. `DRILL_LIMITS`, `DRILL_DETAILS` and
+  `blankDrill` stay: they are a practice's limits and fields. A practice saved as `drill` before 8 Nov still reads
+  "Your drill".
 
 ## Switching it on
 

@@ -1,8 +1,6 @@
-/** TRAK-294 (Training 1/5): Training home's two lists and My drills' rules. */
+/** TRAK-294 (Training 1/5): Training home's two lists. */
 import { describe, expect, it } from 'vitest'
-import {
-  DRILL_LIMITS, blankDrill, cleanDrill, detailCount, drillProblem, searchDrills, splitTrainings, trainingEnd, trainingMinutes,
-} from '../sessions'
+import { splitTrainings, trainingEnd, trainingMinutes } from '../sessions'
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
@@ -51,42 +49,5 @@ describe('TRAK-294: Coming up and Last week', () => {
   it("an untimed training stays coming up all its day", () => {
     const morning = training('untimed', NOW - 10 * HOUR, { ends_at: null, start_time: null })
     expect(splitTrainings([morning], NOW)).toEqual({ comingUp: [morning], lastWeek: [] })
-  })
-})
-
-describe('TRAK-294: a drill', () => {
-  it('needs a name, and nothing else', () => {
-    expect(drillProblem(blankDrill())).toBe('Give the drill a name.')
-    expect(drillProblem({ ...blankDrill(), name: '   ' })).toBe('Give the drill a name.')
-    expect(drillProblem({ ...blankDrill(), name: 'Rondos 4v1' })).toBeNull()
-    // TRAK-295: a plan's practice says so.
-    expect(drillProblem(blankDrill(), 'practice')).toBe('Give the practice a name.')
-  })
-
-  it("is refused past the database's limits, each said plainly", () => {
-    const ok = { ...blankDrill(), name: 'Rondos' }
-    expect(drillProblem({ ...ok, name: 'x'.repeat(DRILL_LIMITS.name + 1) })).toMatch(/name to 80/)
-    expect(drillProblem({ ...ok, how: 'x'.repeat(DRILL_LIMITS.how + 1) })).toMatch(/How it works/)
-    expect(drillProblem({ ...ok, tell: 'x'.repeat(DRILL_LIMITS.tell + 1) })).toMatch(/tell them/)
-    expect(drillProblem({ ...ok, targets: 'x'.repeat(DRILL_LIMITS.detail + 1) })).toBe('Keep Targets to 120 characters.')
-    // Spaces at either end don't count.
-    expect(drillProblem({ ...ok, name: ` ${'x'.repeat(DRILL_LIMITS.name)} ` })).toBeNull()
-  })
-
-  it('is saved trimmed, and counts its details', () => {
-    const drill = cleanDrill({ ...blankDrill(), name: '  Rondos ', area: ' 10 × 10 m ', numbers: '  ' })
-    expect(drill).toMatchObject({ name: 'Rondos', area: '10 × 10 m', numbers: '' })
-    expect(detailCount(drill)).toBe(1)
-  })
-
-  it('is found by every word typed, in its name or how it works', () => {
-    const drills = [
-      { ...blankDrill(), name: 'Rondos 4v1', how: 'Keep the ball in a square' },
-      { ...blankDrill(), name: '1v1 in channels', how: 'Attack the front foot' },
-    ]
-    expect(searchDrills(drills, '').map(d => d.name)).toEqual(['Rondos 4v1', '1v1 in channels'])
-    expect(searchDrills(drills, 'RONDO').map(d => d.name)).toEqual(['Rondos 4v1'])
-    expect(searchDrills(drills, 'front channels').map(d => d.name)).toEqual(['1v1 in channels'])
-    expect(searchDrills(drills, 'rondo front')).toEqual([])
   })
 })

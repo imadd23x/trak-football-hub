@@ -118,7 +118,7 @@ export function LibraryHome() {
 
   return (
     <div className="grid gap-6 pt-2">
-      <div className="grid max-w-[720px] gap-3">
+      <div className="grid gap-3">
         <h2 className="text-[22px] font-medium tracking-[-0.01em] text-ink tablet:text-[28px]">Find a drill</h2>
         <FindBox value={query} onChange={setQuery} big />
       </div>
@@ -262,7 +262,7 @@ export function AllDrills() {
           options={[{ value: '', label: 'All' }, ...SHOW.map(s => ({ value: s, label: s }))]}
           onValueChange={next => setShow(next[0] ?? '')} />
       </div>
-      <div className="mb-6 max-w-[720px]"><FindBox value={query} onChange={setQuery} /></div>
+      <div className="mb-6"><FindBox value={query} onChange={setQuery} /></div>
       {!squad ? <LoadingSkeleton label="Loading the drills…" rows={3} />
         : !found.length ? <Empty>No drills match. Try another word.</Empty>
         : searching ? <DrillCards drills={found} players={squad.players} level={squad.level} notes={d => foundAs(d, query, squad)} label="Drills found" />

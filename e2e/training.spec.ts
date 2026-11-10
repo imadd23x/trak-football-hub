@@ -325,7 +325,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await coming.getByRole('button', { name: /^Add to Before AEK U16 on Saturday/ }).click()
 
     await expect(page).toHaveURL(/\/coach\/training\/t-thu\/plan$/)
-    await expect(page.getByText('Pass between defenders is added at the end. Check the plan, then save. Nothing is saved until you do.')).toBeVisible()
+    await expect(page.getByText('Pass between defenders is added at the end. Check the plan, then save it.')).toBeVisible()
     const plan = page.getByRole('list', { name: 'The plan' }).getByRole('listitem')
     await expect(plan).toHaveCount(6)
     await expect(plan.last()).toContainText('Pass between defenders')

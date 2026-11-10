@@ -232,7 +232,7 @@ describe('TRAK-339: Past trainings', { timeout: 30_000 }, () => {
     const pick = await screen.findByRole('dialog', { name: 'Copy Pressing into which training?' })
     await user.click(within(pick).getByRole('button', { name: /^Copy here: Counter-attacks/ }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/next/plan'))
-    expect(await screen.findByText(/Copied from Pressing, .+ Nothing is saved until you do\./)).toBeInTheDocument()
+    expect(await screen.findByText(/Copied from Pressing, .+ then save it\./)).toBeInTheDocument()
   })
 
   it('with none yet, says so', async () => {

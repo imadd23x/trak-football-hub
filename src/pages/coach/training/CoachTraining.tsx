@@ -291,7 +291,7 @@ function OpenDrafts({ drafts }: { drafts: { training: Training; draft: Draft }[]
   return <section aria-labelledby="open-drafts" className="arc grid gap-2 rounded-2xl border border-line bg-surface p-5">
     <h2 id="open-drafts" className="text-lg font-medium text-ink">Open drafts</h2>
     <p className="text-sm text-ink-3">Only you see a draft.</p>
-    {drafts.length === 0 ? <p className="pt-1 text-sm text-ink-2">No drafts. Stop a plan half-way with Save as draft and it waits here.</p>
+    {drafts.length === 0 ? <p className="pt-1 text-sm text-ink-2">No drafts. A plan you start and leave half-way waits here.</p>
       : <ul className="mt-1 divide-y divide-line border-t border-line">
         {drafts.map(({ training, draft }) => <li key={training.id} className="flex items-center justify-between gap-3 py-3">
           <span className="grid min-w-0">

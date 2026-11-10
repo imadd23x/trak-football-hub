@@ -98,12 +98,15 @@ export function fit(d: LibraryDrill, n: number, i: number): Fitted {
     }
     case 'func': {
       // TRAK-388: `group` fixes the numbers in each turn (1 v 1 to goal); the level still sets the room and touches.
-      const [a0, b0, L, W, t] = FN[i], [a, b] = d.group ?? [a0, b0]
+      const [a0, b0, L0, W0, t] = FN[i], [a, b] = d.group ?? [a0, b0]
+      // 10 Nov read-through: fewer players in each turn get a smaller area, in proportion (1 v 1 is about 20x15 m).
+      const k = Math.sqrt((a + b) / (a0 + b0)), L = round5(L0 * k), W = round5(W0 * k)
       return { details: details(`${L}x${W} m`, `${n} players, groups of ${a}v${b} and a keeper`, 'One goal', 'Directional. Attack the goal', join(touches(t), rule)),
         draw: { type: 'game', s: a, sb: b, j: 0, L, W, oneGoal: true, keeper: '' }, legend: [[MAIN, 'Attackers'], [OTHER, 'Defenders']] }
     }
     case 'funcm': {
-      const [a0, L, W, t] = FM[i], a = Math.min(a0, Math.floor((n - 1) / 2)), rest = n - a * 2 - 1
+      // 10 Nov read-through: at most about three wait to rotate in, so an easier level never leaves half the squad idle.
+      const [a0, L, W, t] = FM[i], half = Math.floor((n - 1) / 2), a = Math.min(half, Math.max(a0, half - 1)), rest = n - a * 2 - 1
       return { details: details(`${L}x${W} m`, `${n} players, ${a}v${a} and a keeper${rest ? `, ${rest} rotate in` : ''}`, 'One goal', 'Directional. Attack the goal', join(touches(t), rule)),
         draw: { type: 'game', s: a, sb: a, j: 0, L, W, oneGoal: true, keeper: 'right' }, legend: [[MAIN, 'Attackers'], [OTHER, 'Defenders'], [EXTRA, 'Keeper']] }
     }
@@ -116,7 +119,8 @@ export function fit(d: LibraryDrill, n: number, i: number): Fitted {
       const [r, a, t] = SQ[i], g = d.grids === 2 ? 2 : d.third ? 1 : n >= 14 ? 2 : 1
       const sizes = g === 2 ? [Math.ceil(n / 2), Math.floor(n / 2)] : [n]
       const grids = sizes.map(s => { const def = Math.max(1, Math.round(s * (d.third ? 1 / 3 : r))); return { att: s - def, def } })
-      const side = Math.round(Math.sqrt(a * sizes[0]))
+      // 10 Nov read-through: a three-team game plays inside the area, so it needs far more room than a rondo round it.
+      const side = Math.round(Math.sqrt(a * (d.third ? 2.5 : 1) * sizes[0]))
       const ov = g === 1 ? `${grids[0].att}v${grids[0].def}`
         : grids[0].att === grids[1].att && grids[0].def === grids[1].def ? `${grids[0].att}v${grids[0].def} in each grid`
         : `${grids[0].att}v${grids[0].def} and ${grids[1].att}v${grids[1].def}`

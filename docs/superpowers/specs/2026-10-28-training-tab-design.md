@@ -93,9 +93,10 @@ The Library is the Drills tab and feeds Plan session. It was built in 11 steps (
 - **Drills** (`drills.ts`) live in the app, not the database: a coach can only bookmark a Trak drill, never change
   it. Each id starts with `lib-`, so an old plan's `trak_drill` (`w1`, `p1`… from `shelf.ts`) never finds a Library
   drill. An id never changes once a plan can name it.
-- **The real library** (TRAK-388, Kostas's pick list, 9 Nov): 57 drills, from Trak's 45 built-in drills (`shelf.ts`)
+- **The real library** (TRAK-388, Kostas's pick list, 9 Nov; read through 10 Nov): 54 drills, from Trak's 45 built-in drills (`shelf.ts`)
   and the useful FA sessions, merged and rewritten in our own words (no FA text). Kept drills also take the merged
-  drills' old names as search words. Retired drills (`RETIRED`: Copy your partner, Follow and copy) are never listed,
+  drills' old names as search words. Retired drills (`RETIRED`: Copy your partner, Follow and copy; and, merged on 10
+  Nov, Steal the ball, Win it back in five, Cross and attack the box) are never listed,
   searched or offered, but `libraryDrill(id)` still finds them for saved plans. Set pieces wait until after the pilot;
   the FA's under-12 games and six-week programmes are left out. Steve checks the wording after the pilot (Kostas,
   9 Nov); the pages don't say it's unchecked.
@@ -108,7 +109,9 @@ The Library is the Drills tab and feeds Plan session. It was built in 11 steps (
   level that really changes something and says why; Players today refits at the same level. Each drill names a
   template (how it takes its players); a few options tune one (TRAK-388): `long` pairs are 20–40 m apart, `solo` gives
   everyone a ball and no partner, `group` fixes the numbers in each turn (1 v 1), and a shooting drill's own rule
-  replaces the serve.
+  replaces the serve. The 10 Nov read-through: fewer players in a turn get a proportionally smaller area (1 v 1 is
+  about 20x15 m), a three-team game gets 2.5 times a rondo's room, and a position practice leaves at most about three
+  waiting.
 - **Search** (`search.ts`): by name, type, other names coaches use, topics and the fitted numbers, with "4 v 4" =
   "4v4" and one spelling slip allowed (two in long words).
 - **Pitch picture** (TRAK-386): `pitch.ts` lays a fitted drill out to scale on a 640 × 420 canvas, with roles, not

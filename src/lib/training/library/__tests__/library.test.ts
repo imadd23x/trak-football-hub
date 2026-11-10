@@ -229,12 +229,13 @@ describe('the real library', () => {
   const byName = (name: string) => LIBRARY.find(d => d.name === name)!
 
   it('keeps every sample’s id but the two Kostas dropped, which stay findable for saved plans and are never listed', () => {
-    for (const id of ['lib-copy-your-partner', 'lib-follow-and-copy']) {
+    // 10 Nov read-through: three more merged into another drill.
+    for (const id of ['lib-copy-your-partner', 'lib-follow-and-copy', 'lib-steal-the-ball', 'lib-win-it-back-in-five', 'lib-cross-and-attack-the-box']) {
       expect(libraryDrill(id)?.id).toBe(id)
       expect(LIBRARY.some(d => d.id === id)).toBe(false)
       expect(searchDrills('', { players: 12, level: START_LEVEL }).some(d => d.id === id)).toBe(false)
     }
-    expect(LIBRARY).toHaveLength(57)
+    expect(LIBRARY).toHaveLength(54)
     expect(LIBRARY.every(d => d.id.startsWith('lib-'))).toBe(true)
   })
 
@@ -256,5 +257,39 @@ describe('the real library', () => {
     expect(gates.targets).toBe('Cone gates around the area')
     for (const lvl of [0, 7]) expect(fit(byName('1 v 1 to goal'), 14, lvl).details.numbers).toBe('14 players, groups of 1v1 and a keeper')
     expect(fit(byName('Sweep behind the line'), 8, 0).details.conditions).toBe('Ball rolled through, no attacker')
+  })
+})
+
+/* 10 Nov read-through (Kostas: "make sure they make football sense"). */
+describe('the numbers make football sense', () => {
+  const byName = (name: string) => LIBRARY.find(d => d.name === name)!
+
+  it('1 v 1 plays on a 1 v 1 sized pitch, smaller as it gets harder', () => {
+    expect(fit(byName('1 v 1 to goal'), 14, START_LEVEL).details.area).toBe('20x15 m')
+    expect(fit(byName('1 v 1 to goal'), 14, 0).details.area).toBe('30x20 m')
+    expect(fit(byName('1 v 1 to goal'), 14, 7).details.area).toBe('15x15 m')
+    // Drills with the usual numbers keep their area.
+    expect(fit(byName('Overlap and finish'), 14, START_LEVEL).details.area).toBe('35x30 m')
+  })
+
+  it('a three-team game has room to play inside the area', () => {
+    expect(fit(byName('Three-team keep ball'), 14, START_LEVEL).details.area).toBe('23x23 m')
+    expect(fit(byName('Keep the ball'), 14, START_LEVEL).details.area).toBe('10x10 m each')
+  })
+
+  it('a position practice never leaves more than three waiting', () => {
+    for (const n of [8, 12, 14, 17, 20]) for (let lvl = 0; lvl < 8; lvl++) {
+      const numbers = fit(byName('Attack down the side'), n, lvl).details.numbers
+      const waiting = Number(/(\d+) rotate in/.exec(numbers)?.[1] ?? 0)
+      expect(waiting, `${n} players, level ${lvl}: ${numbers}`).toBeLessThanOrEqual(3)
+    }
+  })
+
+  it('merged drills carry both ideas', () => {
+    expect(ruleAt(byName('Protect your ball'), 0)).toBe('Defenders knock balls out')
+    expect(ruleAt(byName('Protect your ball'), 7)).toBe('Defenders win a ball and keep it')
+    expect(ruleAt(byName('Win it, pass it out'), 3)).toMatch(/five seconds to win it back/)
+    expect(byName('Overlap and finish').how.join(' ')).toMatch(/near post, the far post/)
+    expect(byName('Shoot early').focus).toBe('team')
   })
 })

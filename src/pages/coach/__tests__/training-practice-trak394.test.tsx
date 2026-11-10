@@ -1,7 +1,7 @@
 /**
  * TRAK-394 (Drill Library 9/11, parent TRAK-384): Change any practice, from the Drills tab. Steve's five things, each
  * with his example: pick a set-up and the picture, what changes and the key follow it; Conditions shows his three
- * rules. The answers say they are Trak's draft. Test people are named after footballers.
+ * rules. Test people are named after footballers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
@@ -49,7 +49,8 @@ describe('TRAK-394: Change any practice', { timeout: 20_000 }, () => {
     expect(screen.getByRole('heading', { level: 2, name: /Passing between the other team’s lines/ })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Area shape and size example: 20 wide, 40 long' })).toBeInTheDocument()
     expect(screen.getByText(/Lines sit further apart.*This is harder\./)).toBeInTheDocument()
-    expect(screen.getByText('Trak’s draft answer, Steve to check')).toBeInTheDocument()
+    // Kostas, 9 Nov: Steve checks after the pilot, so the page doesn't say the answers are a draft.
+    expect(screen.queryByText(/Steve to check/)).toBeNull()
     expect(within(screen.getByRole('list', { name: 'Key' })).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Team A', 'Team B'])
   })
 
@@ -79,7 +80,6 @@ describe('TRAK-394: Change any practice', { timeout: 20_000 }, () => {
     expect(within(screen.getByRole('list', { name: 'Three rules' })).getAllByRole('listitem').map(li => li.firstChild?.textContent))
       .toEqual(['Justify it', 'Start points are not conditions', 'Apply it'])
     expect(screen.queryByRole('img', { name: /example/ })).toBeNull()
-    expect(screen.queryByText('Trak’s draft answer, Steve to check')).toBeNull()
   })
 
   it('an address it doesn’t know opens the first thing and set-up', async () => {

@@ -3,8 +3,8 @@ import type { DrillTypeName, Kind } from './kinds'
 /* TRAK-385 (Drill Library 1/11, parent TRAK-384): the Library's drills. For now these are the 8 Nov mockup's 44 sample
    drills, written by Claude and not yet checked by Steve. TRAK-388 (Drill Library 10/11): the real library, from the
    pick list Kostas marked on 9 Nov. Trak's built-in shelf (../shelf.ts) and the useful FA sessions were pooled, merged
-   and rewritten in our own words: the samples stay (two retired), 15 are new, Cool-down joins Get ready. Steve still
-   checks the wording. Kostas, 6 Nov:
+   and rewritten in our own words: the samples stay (two retired), 15 are new, Cool-down joins Get ready. Steve checks
+   the wording after the pilot (Kostas, 9 Nov), so the pages don't say it's unchecked. Kostas, 6 Nov:
    a coach can never change a Trak drill, only bookmark it, so each one lives here, not in the database.
 
    Every id starts with `lib-`, so a saved plan's `trak_drill` from the old shelf (`w1`, `p1`, `r1`… in ../shelf.ts)

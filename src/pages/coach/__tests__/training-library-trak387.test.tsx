@@ -65,6 +65,8 @@ describe('TRAK-387: the Library home', { timeout: 20_000 }, () => {
     expect(kinds.getByRole('link', { name: 'Change any practice' })).toHaveAttribute('href', '/coach/training/drills/change')
     expect(screen.queryByRole('region', { name: 'From the Library' })).toBeNull()
     expect(screen.queryByRole('link', { name: /Play It Right|Programmes/ })).toBeNull()
+    // Kostas, 9 Nov: Steve checks the wording after the pilot, so no page says it's unchecked.
+    expect(screen.queryByText(/coaching lead|not yet checked/)).toBeNull()
   })
 
   it('typing shows results as picture cards in place of everything else, with the name it was found by', async () => {

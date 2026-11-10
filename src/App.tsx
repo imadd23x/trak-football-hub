@@ -70,6 +70,7 @@ const TrainingsPage = lazy(() => import("./pages/TrainingsPage"));
 const CoachLibrary = lazy(() => import("./pages/coach/library/CoachLibrary"));
 
 const ParentHome = lazy(() => import("./pages/parent/ParentHome"));
+const ParentSeason = lazy(() => import("./pages/parent/ParentSeason"));
 const ParentMatches = lazy(() => import("./pages/parent/ParentMatches"));
 const ParentAssessments = lazy(() => import("./pages/parent/ParentAssessments"));
 const ParentAssessment = lazy(() => import("./pages/parent/ParentAssessment"));
@@ -213,6 +214,8 @@ const App = () => (
 
             {/* Parent routes */}
             <Route path="/parent/home" element={<RouteGuard allowedRole="parent"><ParentHome /></RouteGuard>} />
+            {/* TRAK-400: the family's Season plan page, opened from the Home card. */}
+            <Route path="/parent/season" element={<RouteGuard allowedRole="parent"><ParentSeason /></RouteGuard>} />
             <Route path="/parent/matches" element={<RouteGuard allowedRole="parent"><ParentMatches /></RouteGuard>} />
             {/* TRAK-171 (live run 3): one Events page for parents, the tab's; old links land there. */}
             <Route path="/parent/events" element={<Navigate to="/parent/matches" replace />} />

@@ -18,6 +18,7 @@ import { FormationBoard, type BoardPlayer } from './FormationBoard'
 import { NameSheet, type NameSheetMode } from './NameSheet'
 import { UseForMatchesSheet } from './UseForMatchesSheet'
 import { weekdayDayMonth } from '@/lib/squad/format'
+import { i18n, useTranslation } from '@/lib/i18n'
 import { refusal, useFormationWrites, useFormations, type Formation, type FormationDraft } from './useFormations'
 
 /* TRAK-357 (Season plan 9/18, spec TRAK-348; Tarek's My Formations mockup, without its Instructions tab): Squad ›
@@ -29,20 +30,21 @@ import { refusal, useFormationWrites, useFormations, type Formation, type Format
    TRAK-360: Use for matches copies the saved formation into upcoming matches; Make default loads it into a fresh match of
    its format; Set for matchday lists the matches it was copied to. */
 
-const SAVE_FAILED = "Couldn't save the formation. Check your connection and try again; your changes are still here."
-const FORMAT_OPTIONS = FORMATS.map(format => ({ value: String(format), label: `${format} a side` }))
+const saveFailed = () => i18n.t('coachSquad:fmSaveFailed')
+/** TRAK-407: read when shown, so the labels follow the language. */
+const formatOptions = () => FORMATS.map(format => ({ value: String(format), label: i18n.t('coachSquad:fmASide', { count: format }) }))
 const same = (a: FormationDraft, b: FormationDraft) => JSON.stringify([a.name, a.format, a.shape, a.starters]) === JSON.stringify([b.name, b.format, b.shape, b.starters])
 const draftOf = ({ name, format, shape, starters }: Formation): FormationDraft => ({ name, format, shape, starters })
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 type Edit = { draft: FormationDraft; history: FormationDraft[] }
 
 export function FormationsTab({ roster }: { roster: SquadRoster }) {
   const { user } = useAuth()
+  const { t } = useTranslation()
   // The squad picked, or a coach's only squad.
   const squad = roster.squad ?? (roster.squads.length === 1 ? roster.squads[0] : null)
   if (!squad || !user) return <div className="grid justify-items-center gap-2 pt-14 text-center">
-    <p className="text-[15px] font-medium text-ink-2">Pick one squad to see its formations</p>
-    <p className="max-w-sm text-sm text-ink-3">A formation belongs to one squad, so its players never mix with another's. Choose a squad in the menu.</p>
+    <p className="text-[15px] font-medium text-ink-2">{t('coachSquad:fmPickSquad')}</p>
+    <p className="max-w-sm text-sm text-ink-3">{t('coachSquad:fmPickSquadBody')}</p>
   </div>
   // Keyed by squad, so one squad's edits never show in another's.
   return <Playbook key={squad} coachId={user.id} squad={squad} roster={roster} />
@@ -50,6 +52,7 @@ export function FormationsTab({ roster }: { roster: SquadRoster }) {
 
 function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; roster: SquadRoster }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [params, setParams] = useSearchParams()
   const formations = useFormations(coachId, squad)
   const roles = usePlayerRoles(coachId)
@@ -97,28 +100,28 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
 
   // Arc's styles apply inside .arc; a phone's frame doesn't give one (the laptop's does), so each view brings its own.
   if (unplaced > 0) return <section aria-labelledby="formations-locked" className="arc grid justify-items-start gap-3 rounded-2xl border border-line bg-surface p-6">
-    <h2 id="formations-locked" className="text-lg font-medium text-ink">Place {plural(unplaced, 'player')} to open Formations</h2>
-    <p className="max-w-prose text-sm text-ink-2">A formation is built from where each player plays, so every player in {squad} needs a position first.</p>
-    <Button variant="secondary" onClick={() => navigate('/coach/season-plan/positions')}>Go to Positions</Button>
+    <h2 id="formations-locked" className="text-lg font-medium text-ink">{t('coachSquad:fmPlaceToOpen', { count: unplaced })}</h2>
+    <p className="max-w-prose text-sm text-ink-2">{t('coachSquad:fmNeedsPosition', { squad })}</p>
+    <Button variant="secondary" onClick={() => navigate('/coach/season-plan/positions')}>{t('coachSquad:fmGoPositions')}</Button>
   </section>
-  if (formations.isError || roles.isError) return <LoadError what="your formations" onRetry={() => { void formations.refetch(); void roles.refetch() }} />
-  if (!list || roles.isPending || writes.start.isPending) return <LoadingSkeleton label="Loading your formations…" lines={3} rows={2} />
+  if (formations.isError || roles.isError) return <LoadError what={t('coachSquad:fmWhat')} onRetry={() => { void formations.refetch(); void roles.refetch() }} />
+  if (!list || roles.isPending || writes.start.isPending) return <LoadingSkeleton label={t('coachSquad:fmLoading')} lines={3} rows={2} />
 
   const header = <div className="flex flex-wrap items-end justify-between gap-3">
     <div className="grid gap-0.5">
-      <h2 className="text-lg font-medium text-ink">Your matchday playbook</h2>
-      <p className="text-sm text-ink-2">Save a shape and a starting line-up for every way {squad} plays.</p>
+      <h2 className="text-lg font-medium text-ink">{t('coachSquad:fmPlaybook')}</h2>
+      <p className="text-sm text-ink-2">{t('coachSquad:fmPlaybookBody', { squad })}</p>
     </div>
     <Button variant="secondary" onClick={() => { setNamingProblem(null); setNaming({ kind: 'new', format: 11, shape: DEFAULT_FORMATION[11] }) }}>
-      <Plus size={18} aria-hidden="true" />New formation</Button>
+      <Plus size={18} aria-hidden="true" />{t('coachSquad:fmNew')}</Button>
   </div>
   const nameSheet = naming && <NameSheet mode={naming} problem={namingProblem} saving={writes.save.isPending} onClose={() => setNaming(null)} onDone={named => {
     if (naming.kind === 'rename') return rename(named.name)
     const from = current ?? { name: named.name, format: named.format, shape: named.shape, starters: {} }
     const draft = { ...named, starters: current ? reshapeXI(from.starters, from.shape, named.shape, named.format) : {} }
     writes.save.mutate({ id: null, draft }, {
-      onSuccess: id => { setNaming(null); if (id) choose(id); toast(`${named.name} created.`) },
-      onError: error => setNamingProblem(refusal(error) ?? SAVE_FAILED),
+      onSuccess: id => { setNaming(null); if (id) choose(id); toast(t('coachSquad:fmCreated', { name: named.name })) },
+      onError: error => setNamingProblem(refusal(error) ?? saveFailed()),
     })
   }} />
 
@@ -133,30 +136,30 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
       onSuccess: () => {
         setNaming(null)
         setEdits(all => (all[saved.id] ? { ...all, [saved.id]: { ...all[saved.id], draft: { ...all[saved.id].draft, name } } } : all))
-        toast(`Renamed ${name}.`)
+        toast(t('coachSquad:fmRenamed', { name }))
       },
-      onError: error => setNamingProblem(refusal(error) ?? SAVE_FAILED),
+      onError: error => setNamingProblem(refusal(error) ?? saveFailed()),
     })
   }
 
   if (!saved || !current) return <div className="arc grid gap-5">
     {header}
     <div className="grid justify-items-center gap-2 rounded-2xl border border-line bg-surface p-8 text-center">
-      <p className="text-[15px] font-medium text-ink">No formations yet</p>
-      <p className="max-w-sm text-sm text-ink-3">Create one: pick a format and a shape, then put your players where you want them.</p>
+      <p className="text-[15px] font-medium text-ink">{t('coachSquad:fmNone')}</p>
+      <p className="max-w-sm text-sm text-ink-3">{t('coachSquad:fmNoneBody')}</p>
     </div>
     {nameSheet}
   </div>
 
   const dirty = !!edit && !same(edit.draft, draftOf(saved))
   const copyTo = (eventIds: string[]) => writes.use.mutate({ id: saved.id, eventIds }, {
-    onSuccess: () => { setUsing(false); setUseProblem(null); toast(`${saved.name} copied to ${eventIds.length === 1 ? '1 match' : `${eventIds.length} matches`}.`) },
-    onError: error => setUseProblem((error as { code?: string }).code === 'P0001' ? 'A match has kicked off, so its plan is locked. Pick the others and try again.'
-      : "Couldn't copy the formation. Check your connection and try again."),
+    onSuccess: () => { setUsing(false); setUseProblem(null); toast(t('coachSquad:fmCopied', { name: saved.name, count: eventIds.length })) },
+    onError: error => setUseProblem((error as { code?: string }).code === 'P0001' ? t('coachSquad:fmLocked')
+      : t('coachSquad:fmCopyFailed')),
   })
   const makeDefault = (on: boolean) => writes.setDefault.mutate({ id: saved.id, on }, {
-    onSuccess: () => toast(on ? `${saved.name} is the default for ${saved.format} a side.` : `${saved.name} is no longer the default.`),
-    onError: () => setProblem("Couldn't change the default. Check your connection and try again."),
+    onSuccess: () => toast(on ? t('coachSquad:fmDefaultOn', { name: saved.name, count: saved.format }) : t('coachSquad:fmDefaultOff', { name: saved.name })),
+    onError: () => setProblem(t('coachSquad:fmDefaultFailed')),
   })
   const change = (next: (draft: FormationDraft) => FormationDraft) => {
     setProblem(null)
@@ -172,33 +175,33 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
     if (same(draft, draftOf(saved)) && history.length === 1) { const { [saved.id]: _gone, ...rest } = all; return rest }
     return { ...all, [saved.id]: { draft, history: history.slice(0, -1) } }
   })
-  const discard = () => { setEdits(({ [saved.id]: _gone, ...rest }) => rest); setProblem(null); toast('Changes discarded.') }
+  const discard = () => { setEdits(({ [saved.id]: _gone, ...rest }) => rest); setProblem(null); toast(t('coachSquad:fmDiscarded')) }
   const save = () => writes.save.mutate({ id: saved.id, draft: current }, {
-    onSuccess: () => { setEdits(({ [saved.id]: _gone, ...rest }) => rest); setProblem(null); toast(`${current.name} saved.`) },
-    onError: error => setProblem(refusal(error) ?? SAVE_FAILED),
+    onSuccess: () => { setEdits(({ [saved.id]: _gone, ...rest }) => rest); setProblem(null); toast(t('coachSquad:fmSaved', { name: current.name })) },
+    onError: error => setProblem(refusal(error) ?? saveFailed()),
   })
   const remove = () => writes.remove.mutate(saved.id, {
     onSuccess: () => {
       setEdits(({ [saved.id]: _gone, ...rest }) => rest)
       setConfirming(false)
       setParams(p => { const next = new URLSearchParams(p); next.delete('formation'); return next }, { replace: true })
-      toast(`${saved.name} deleted.`)
+      toast(t('coachSquad:fmDeleted', { name: saved.name }))
     },
-    onError: () => setProblem("Couldn't delete the formation. Check your connection and try again."),
+    onError: () => setProblem(t('coachSquad:fmDeleteFailed')),
   })
   const starting = new Set(Object.values(current.starters))
   const bench = [...boardPlayers.values()].filter(p => p.canPlay && !starting.has(p.id))
 
   return <div className="arc grid gap-5">
     {header}
-    <div role="group" aria-label="Saved formations" className="grid gap-2 tablet:grid-cols-2 laptop:grid-cols-3">
+    <div role="group" aria-label={t('coachSquad:fmSavedList')} className="grid gap-2 tablet:grid-cols-2 laptop:grid-cols-3">
       {list.map(f => {
         const shown = edits[f.id]?.draft ?? draftOf(f), changed = !!edits[f.id] && !same(edits[f.id].draft, draftOf(f))
         return <button key={f.id} type="button" aria-pressed={f.id === saved.id} onClick={() => choose(f.id)}
           className={`flex min-h-16 items-center gap-3 rounded-xl border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${f.id === saved.id ? 'border-brand bg-brand/10' : 'border-line bg-surface'}`}>
           <span className="grid min-w-0 flex-1">
             <span className="truncate text-[15px] font-medium text-ink">{shown.name}</span>
-            <span className="text-sm text-ink-3">{shown.shape} · {changed ? 'Unsaved changes' : `${plural(Object.keys(shown.starters).length, 'starter')} saved`}</span>
+            <span className="text-sm text-ink-3">{shown.shape} · {changed ? t('coachSquad:fmUnsaved') : t('coachSquad:fmStartersSaved', { count: Object.keys(shown.starters).length })}</span>
           </span>
           {f.id === saved.id && <Check size={18} aria-hidden="true" className="shrink-0 text-brand" />}
         </button>
@@ -210,56 +213,56 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
         <div className="grid gap-0.5">
           <div className="flex items-center gap-1">
             <h2 id="formation-name" className="text-xl font-medium text-ink">{current.name}</h2>
-            <button type="button" aria-label="Rename formation" onClick={() => { setNamingProblem(null); setNaming({ kind: 'rename', name: saved.name }) }}
+            <button type="button" aria-label={t('coachSquad:fmRename')} onClick={() => { setNamingProblem(null); setNaming({ kind: 'rename', name: saved.name }) }}
               className="grid size-10 place-items-center rounded-md text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Pencil size={18} aria-hidden="true" /></button>
           </div>
-          <p role="status" className="flex items-center gap-1.5 text-sm text-ink-3">{dirty ? 'Unsaved changes' : <><Check size={14} aria-hidden="true" />All changes saved</>}</p>
+          <p role="status" className="flex items-center gap-1.5 text-sm text-ink-3">{dirty ? t('coachSquad:fmUnsaved') : <><Check size={14} aria-hidden="true" />{t('coachSquad:fmAllSaved')}</>}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {dirty && <Button variant="ghost" onClick={discard}>Discard changes</Button>}
-          <Button onClick={save} disabled={!dirty} loading={writes.save.isPending && !naming}>Save changes</Button>
+          {dirty && <Button variant="ghost" onClick={discard}>{t('coachSquad:fmDiscard')}</Button>}
+          <Button onClick={save} disabled={!dirty} loading={writes.save.isPending && !naming}>{t('coachSchedule:saveChanges')}</Button>
         </div>
       </div>
       {problem && <Alert tone="danger" title={problem} />}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="secondary" size="sm" disabled={dirty} onClick={() => { setUseProblem(null); setUsing(true) }}>Use for matches</Button>
+        <Button variant="secondary" size="sm" disabled={dirty} onClick={() => { setUseProblem(null); setUsing(true) }}>{t('coachSquad:fmUse')}</Button>
         <Button variant="ghost" size="sm" disabled={dirty} loading={writes.setDefault.isPending} onClick={() => makeDefault(!saved.isDefault)}>
-          {saved.isDefault ? 'Remove default' : `Make default for ${saved.format} a side`}</Button>
-        {saved.isDefault && <Badge size="sm" tone="info">Default for {saved.format} a side</Badge>}
-        {dirty && <span className="text-sm text-ink-3">Save your changes first: a match gets the saved formation.</span>}
+          {saved.isDefault ? t('coachSquad:fmRemoveDefault') : t('coachSquad:fmMakeDefault', { count: saved.format })}</Button>
+        {saved.isDefault && <Badge size="sm" tone="info">{t('coachSquad:fmDefaultBadge', { count: saved.format })}</Badge>}
+        {dirty && <span className="text-sm text-ink-3">{t('coachSquad:fmSaveFirst')}</span>}
       </div>
 
       <div className="grid grid-cols-2 gap-3 tablet:max-w-sm">
-        <Select label="Format" options={FORMAT_OPTIONS} value={String(current.format)} onValueChange={value => {
+        <Select label={t('coachSquad:fmFormat')} options={formatOptions()} value={String(current.format)} onValueChange={value => {
           const format = Number(value) as Format, shape = DEFAULT_FORMATION[format]
           change(d => ({ ...d, format, shape, starters: reshapeXI(d.starters, d.shape, shape, format) }))
         }} />
-        <Select label="Shape" options={FORMATIONS[current.format].map(s => ({ value: s, label: s }))} value={current.shape}
+        <Select label={t('coachSquad:fmShape')} options={FORMATIONS[current.format].map(s => ({ value: s, label: s }))} value={current.shape}
           onValueChange={shape => change(d => ({ ...d, shape, starters: reshapeXI(d.starters, d.shape, shape, d.format) }))} />
       </div>
 
       <FormationBoard title={current.name} shape={current.shape} format={current.format} starters={current.starters} players={boardPlayers} bench={bench}
         onSwap={(a: Spot, b: Spot) => change(d => ({ ...d, starters: swapXI(d.starters, a, b) }))} onUndo={undo} canUndo={!!edit?.history.length} />
 
-      <section aria-label="Set for matchday" className="grid gap-2 border-t border-line pt-4">
-        <h3 className="text-[15px] font-medium text-ink">Set for matchday</h3>
+      <section aria-label={t('coachSquad:fmSetMatchday')} className="grid gap-2 border-t border-line pt-4">
+        <h3 className="text-[15px] font-medium text-ink">{t('coachSquad:fmSetMatchday')}</h3>
         {saved.copies.length === 0
-          ? <p className="text-sm text-ink-3">Not copied to a match yet. A copy never changes when this formation does.</p>
+          ? <p className="text-sm text-ink-3">{t('coachSquad:fmNotCopied')}</p>
           : <ul className="m-0 grid list-none gap-1 p-0">{saved.copies.map(copy => <li key={copy.eventId} className="text-sm text-ink-2">
-            {copy.label} · copied {weekdayDayMonth(copy.copiedAt.slice(0, 10))}
-            {copy.notComing > 0 && ` · ${plural(copy.notComing, 'player')} not coming`}
-            {copy.skipped > 0 && ` · ${copy.skipped} skipped`}</li>)}</ul>}
+            {t('coachSquad:fmCopiedOn', { label: copy.label, day: weekdayDayMonth(copy.copiedAt.slice(0, 10)) })}
+            {copy.notComing > 0 && t('coachSquad:fmNotComing', { count: copy.notComing })}
+            {copy.skipped > 0 && t('coachSquad:fmSkipped', { count: copy.skipped })}</li>)}</ul>}
       </section>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
         {confirming
           ? <>
-            <span className="text-sm text-ink-2">Delete {saved.name}? Your other formations stay as they are.</span>
-            <Button variant="danger" size="sm" loading={writes.remove.isPending} onClick={remove}>Delete</Button>
-            <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>Keep it</Button>
+            <span className="text-sm text-ink-2">{t('coachSquad:fmDeleteAsk', { name: saved.name })}</span>
+            <Button variant="danger" size="sm" loading={writes.remove.isPending} onClick={remove}>{t('coachSchedule:delete')}</Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>{t('coachSquad:fmKeep')}</Button>
           </>
-          : <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>Delete formation</Button>}
+          : <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>{t('coachSquad:fmDelete')}</Button>}
       </div>
     </section>
     {nameSheet}

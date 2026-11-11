@@ -51,6 +51,17 @@ describe('TRAK-407: the coach\'s Squad in Greek', () => {
     expect(bornLine('2012-02-26', new Date(2026, 9, 22))).toBe('26/2/2012 · 14 ετών')
   })
 
+  it('counts formations\' players and matches in Greek, and in English as before', async () => {
+    expect(i18n.t('coachSquad:fmPlaceToOpen', { count: 1 })).toBe('Place 1 player to open Formations')
+    expect(i18n.t('coachSquad:fmCopied', { name: 'Press', count: 1 })).toBe('Press copied to 1 match.')
+    expect(i18n.t('coachSquad:fmCopyTo', { count: 3 })).toBe('Copy to 3 matches')
+    expect(i18n.t('coachSquad:fmASide', { count: 9 })).toBe('9 a side')
+    await showLanguage('el')
+    expect(i18n.t('coachSquad:fmCopyTo', { count: 1 })).toBe('Αντιγραφή σε 1 αγώνα')
+    expect(i18n.t('coachSquad:fmCopyTo', { count: 3 })).toBe('Αντιγραφή σε 3 αγώνες')
+    expect(i18n.t('coachSquad:fmASide', { count: 9 })).toBe('9×9')
+  })
+
   it('keeps English as it was', () => {
     expect(i18n.t('coachSquad:notEligibleWhy', { count: 1 })).toBe(" — consent pending, so the family can't see or answer events yet.")
     expect(i18n.t('coachSquad:squadPlayers', { squad: 'U14' })).toBe('U14 players')

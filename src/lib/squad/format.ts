@@ -1,4 +1,4 @@
-import { currentLanguage } from '@/lib/i18n'
+import { currentLanguage, i18n } from '@/lib/i18n'
 
 /* TRAK-250: small pure helpers the Squad tabs share. */
 
@@ -26,7 +26,7 @@ export function bornLine(born: string, today: Date) {
   const [y, m, d] = born.split('-').map(Number)
   const month = today.getMonth() + 1
   const age = today.getFullYear() - y - (month < m || (month === m && today.getDate() < d) ? 1 : 0)
-  return `${d}/${m}/${y} · ${age} years old`
+  return i18n.t('coachSquad:bornLine', { date: `${d}/${m}/${y}`, count: age })
 }
 
 /** PostgREST value quoting for an `or=` filter, so a squad name with a comma or bracket cannot change the filter. */

@@ -19,8 +19,12 @@ import { PlayerObjectivesSection } from '@/components/coach/season-plan/PlayerOb
 import { isPosition } from '@/lib/positions'
 import { PositionAndRolesSheet } from './PositionAndRolesSheet'
 import { usePlayerRoles } from './usePlayerRoles'
+import { useTranslation } from '@/lib/i18n'
+import { POSITION_WORD } from '@/lib/position-words'
+import { ATTRIBUTE_WORD } from '@/lib/squad/attribute-words'
+import { ROLE_WORD, TRAIT_WORD, shown } from '@/lib/squad/trait-words'
 
-const FOOT = { left: 'Left', right: 'Right', both: 'Both' } as const
+const FOOT = { left: 'coachSquad:footLeft', right: 'coachSquad:footRight', both: 'coachSquad:footBoth' } as const
 /** The assessments shown at first, newest first. TRAK-368: "All N" shows the rest here too. */
 const SHOWN = 6
 
@@ -30,7 +34,6 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
     <dd className="m-0 min-w-0 text-[15px] text-ink">{children}</dd>
   </div>
 }
-const notSet = <span className="text-ink-3">Not set</span>
 
 /**
  * TRAK-263 (Imad, 22 Oct): one player's profile in Squad's Players view. Foot, nationality, born and traits (the
@@ -56,6 +59,8 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
   placement?: { position: string | null }
 }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+  const notSet = <span className="text-ink-3">{t('coachSchedule:notSet')}</span>
   const client = useQueryClient()
   const first = player.name.split(' ')[0]
   const key = ['coach', coachId, 'player-assessments', player.id]
@@ -85,7 +90,7 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
   </div>
 
   // As everywhere in the coach's app: nothing is recorded about a player still waiting for consent.
-  if (player.waiting) return <>{header}<p className="text-sm text-ink-2">{first} is waiting for consent. Nothing can be recorded about them until it's in.</p></>
+  if (player.waiting) return <>{header}<p className="text-sm text-ink-2">{t('coachSquad:waitingConsentBody', { name: first })}</p></>
 
   return <>
     {header}
@@ -94,19 +99,19 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
     <div className="grid gap-5 laptop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] laptop:items-start">
       <div className="grid gap-5">
         {placement && <PositionAndRoles coachId={coachId} id={player.id} name={player.name} position={placement.position} />}
-        <section aria-label={`About ${first}`} className="grid gap-2">
-          {factsFailed ? <LoadError what={`${first}'s profile`} onRetry={onRetryFacts} />
-            : !facts ? <LoadingSkeleton label={`Loading ${first}'s profile…`} />
+        <section aria-label={t('coachSquad:aboutName', { name: first })} className="grid gap-2">
+          {factsFailed ? <LoadError what={t('coachSquad:profileWhat', { name: first })} onRetry={onRetryFacts} />
+            : !facts ? <LoadingSkeleton label={t('coachSquad:loadingProfile', { name: first })} />
             : <>
               <dl className="m-0 border-t border-line">
-                <Fact label="Preferred foot">{facts.foot ? FOOT[facts.foot] : notSet}</Fact>
-                <Fact label="Nationality">{facts.nationality ?? notSet}</Fact>
-                <Fact label="Born">{facts.born ? bornLine(facts.born, new Date()) : notSet}</Fact>
-                <Fact label="Traits">{facts.traits.length
-                  ? <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label={`${first}'s traits`}>
-                      {facts.traits.map(trait => <li key={trait} className="rounded-full border border-line bg-raised px-2.5 py-0.5 text-sm text-ink">{trait}</li>)}
+                <Fact label={t('coachSquad:preferredFoot')}>{facts.foot ? t(FOOT[facts.foot]) : notSet}</Fact>
+                <Fact label={t('coachSquad:nationality')}>{facts.nationality ?? notSet}</Fact>
+                <Fact label={t('coachSquad:born')}>{facts.born ? bornLine(facts.born, new Date()) : notSet}</Fact>
+                <Fact label={t('coachSquad:traits')}>{facts.traits.length
+                  ? <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label={t('coachSquad:traitsOf', { name: first })}>
+                      {facts.traits.map(trait => <li key={trait} className="rounded-full border border-line bg-raised px-2.5 py-0.5 text-sm text-ink">{shown(TRAIT_WORD, trait)}</li>)}
                     </ul>
-                  : <span className="text-ink-3">None picked yet</span>}</Fact>
+                  : <span className="text-ink-3">{t('coachSquad:nonePicked')}</span>}</Fact>
               </dl>
               <span className="justify-self-start"><PlayerFactsEditor playerId={player.id} name={player.name} coachId={coachId} facts={facts} /></span>
             </>}
@@ -115,39 +120,39 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
 
       <section aria-labelledby={`season-${player.id}`}>
         <div className="grid gap-0.5">
-          <h4 id={`season-${player.id}`} className="text-base font-medium text-ink">Season so far</h4>
-          {seasonFailed ? <LoadError what={`${first}'s season`} onRetry={onRetrySeason} /> : <p className="text-sm text-ink-3">{season
-            ? `Average of ${season.count} ${season.count === 1 ? 'assessment' : 'assessments'} since ${since}, out of 10, against the squad`
-            : 'No assessment this season yet.'}</p>}
+          <h4 id={`season-${player.id}`} className="text-base font-medium text-ink">{t('coachSquad:seasonSoFar')}</h4>
+          {seasonFailed ? <LoadError what={t('coachSquad:seasonWhat', { name: first })} onRetry={onRetrySeason} /> : <p className="text-sm text-ink-3">{season
+            ? t('coachSquad:seasonAverage', { count: season.count, since })
+            : t('coachSquad:noSeasonAssessment')}</p>}
         </div>
-        {season && !seasonFailed && <RadarChart label={`${player.name}'s season average against the squad`} size={240} rings={5} max={10}
-          axes={ATTRIBUTES.map(([k, label]) => ({ key: k, label }))}
-          series={[{ key: 'player', label: first, values: season.scores }, ...(squadSeason ? [{ key: 'squad', label: 'Squad average', values: squadSeason }] : [])]}
+        {season && !seasonFailed && <RadarChart label={t('coachSquad:radarLabel', { name: player.name })} size={240} rings={5} max={10}
+          axes={ATTRIBUTES.map(([k]) => ({ key: k, label: t(ATTRIBUTE_WORD[k]) }))}
+          series={[{ key: 'player', label: first, values: season.scores }, ...(squadSeason ? [{ key: 'squad', label: t('coachSquad:squadAverage'), values: squadSeason }] : [])]}
           formatValue={value => value.toFixed(1)} />}
       </section>
     </div>
 
     {placement && <PlayerObjectivesSection coachId={coachId} id={player.id} name={player.name} position={placement.position} squad={squad} />}
 
-    {assessments.isError ? <LoadError what={`${first}'s assessments`} onRetry={() => { void assessments.refetch() }} />
-      : !assessments.data ? <LoadingSkeleton label={`Loading ${first}'s assessments…`} lines={2} rows={2} />
+    {assessments.isError ? <LoadError what={t('coachSquad:assessmentsWhat', { name: first })} onRetry={() => { void assessments.refetch() }} />
+      : !assessments.data ? <LoadingSkeleton label={t('coachSquad:loadingAssessments', { name: first })} lines={2} rows={2} />
       : <section aria-labelledby={`assessments-${player.id}`} className="grid grid-cols-[minmax(0,1fr)] gap-2">
         <div className="flex items-baseline justify-between gap-3">
-          <h4 id={`assessments-${player.id}`} className="text-base font-medium text-ink">Assessments</h4>
+          <h4 id={`assessments-${player.id}`} className="text-base font-medium text-ink">{t('coachSquad:assessments')}</h4>
           {list.length > SHOWN
-            ? <button type="button" onClick={() => showAll(!all)} className="text-sm font-medium text-brand">{all ? `Show the latest ${SHOWN}` : `All ${list.length}`}</button>
-            : list.length > 1 && <span className="text-sm text-ink-3 [@media(pointer:fine)]:hidden">Swipe for earlier</span>}
+            ? <button type="button" onClick={() => showAll(!all)} className="text-sm font-medium text-brand">{all ? t('coachSquad:showLatest', { count: SHOWN }) : t('coachSquad:allCount', { count: list.length })}</button>
+            : list.length > 1 && <span className="text-sm text-ink-3 [@media(pointer:fine)]:hidden">{t('coachSquad:swipeEarlier')}</span>}
         </div>
-        {list.length === 0 ? <p className="text-sm text-ink-2">No assessment yet.</p>
-          : all && list.length > SHOWN ? <ol className="m-0 grid list-none gap-3 p-0 laptop:grid-cols-2" aria-label={`All of ${first}'s assessments`}>
+        {list.length === 0 ? <p className="text-sm text-ink-2">{t('coachSquad:noAssessmentYet')}</p>
+          : all && list.length > SHOWN ? <ol className="m-0 grid list-none gap-3 p-0 laptop:grid-cols-2" aria-label={t('coachSquad:allAssessmentsOf', { name: first })}>
             {list.map(assessment => <li key={assessment.id} className="min-w-0">{card(assessment)}</li>)}
           </ol>
           : <div className="arc">
             {/* As ParentAssessmentCarousel: the viewport is the row, so 88% is of what's visible and the next card peeks in. */}
             {/* Imad, 24 Oct: room above and below, so a card lifted on hover keeps its edge and shadow; firm snapping only
                 under a finger: on a trackpad or wheel any snapping pulled the row back mid-swipe. */}
-            <ScrollArea orientation="horizontal" snap="x mandatory" fade={0} label={`${first}'s assessments`} className="-mt-2 -mb-4" viewportClassName="flex gap-3 pt-2 pb-4">
-              {list.slice(0, SHOWN).map((assessment, index) => <div key={assessment.id} role="group" aria-label={`Assessment ${index + 1} of ${Math.min(list.length, SHOWN)}`}
+            <ScrollArea orientation="horizontal" snap="x mandatory" fade={0} label={t('coachSquad:assessmentsOf', { name: first })} className="-mt-2 -mb-4" viewportClassName="flex gap-3 pt-2 pb-4">
+              {list.slice(0, SHOWN).map((assessment, index) => <div key={assessment.id} role="group" aria-label={t('coachSquad:assessmentNofM', { n: index + 1, total: Math.min(list.length, SHOWN) })}
                 className="min-w-0 basis-[88%] laptop:basis-[calc(50%-6px)] shrink-0 grow-0" style={{ scrollSnapAlign: 'start' }}>
                 {card(assessment)}
               </div>)}
@@ -157,7 +162,7 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
 
     <button type="button" onClick={() => navigate('/coach/assess', { state: { preselectedPlayerId: player.id } })}
       className="inline-flex min-h-11 items-center gap-1.5 self-start text-[15px] font-medium text-brand">
-      Assess {first} <ArrowRight size={16} aria-hidden />
+      {t('coachSquad:assessName', { name: first })} <ArrowRight size={16} aria-hidden />
     </button>
   </>
 }
@@ -165,21 +170,22 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
 /** TRAK-353: the player's main position, roles and Can also play, with one Edit for all three (the mockup's profile). */
 function PositionAndRoles({ coachId, id, name, position }: { coachId: string; id: string; name: string; position: string | null }) {
   const [editing, setEditing] = useState(false)
+  const { t } = useTranslation()
   const roles = usePlayerRoles(coachId)
   const first = name.split(' ')[0]
   const { also, roles: held } = roles.of(id)
   return <section aria-labelledby={`position-${id}`} className="grid gap-2">
     <div className="flex items-baseline justify-between gap-3">
-      <h4 id={`position-${id}`} className="text-base font-medium text-ink">Position and roles</h4>
-      <button type="button" onClick={() => setEditing(true)} aria-label={`Edit ${first}'s position and roles`} aria-haspopup="dialog"
-        className="min-h-11 rounded-md text-[15px] font-medium text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Edit</button>
+      <h4 id={`position-${id}`} className="text-base font-medium text-ink">{t('coachSquad:positionAndRoles')}</h4>
+      <button type="button" onClick={() => setEditing(true)} aria-label={t('coachSquad:editPositionRoles', { name: first })} aria-haspopup="dialog"
+        className="min-h-11 rounded-md text-[15px] font-medium text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{t('coachSchedule:edit')}</button>
     </div>
-    {roles.isError ? <LoadError what={`${first}'s roles`} onRetry={() => { void roles.refetch() }} />
-      : !roles.data ? <LoadingSkeleton label={`Loading ${first}'s roles…`} lines={2} />
+    {roles.isError ? <LoadError what={t('coachSquad:rolesWhat', { name: first })} onRetry={() => { void roles.refetch() }} />
+      : !roles.data ? <LoadingSkeleton label={t('coachSquad:loadingRoles', { name: first })} lines={2} />
       : <dl className="m-0 border-t border-line">
-        <Fact label="Main position">{isPosition(position) ? position : <span className="text-ink-3">No position yet</span>}</Fact>
-        <Fact label="Roles">{held.length ? held.join(', ') : <span className="text-ink-3">No role yet</span>}</Fact>
-        <Fact label="Can also play">{also.length ? also.join(', ') : <span className="text-ink-3">None yet</span>}</Fact>
+        <Fact label={t('coachSquad:mainPosition')}>{isPosition(position) ? t(POSITION_WORD[position]) : <span className="text-ink-3">{t('coachSquad:noPositionYet')}</span>}</Fact>
+        <Fact label={t('coachSquad:roles')}>{held.length ? held.map(role => shown(ROLE_WORD, role)).join(', ') : <span className="text-ink-3">{t('coachSquad:noRoleYet')}</span>}</Fact>
+        <Fact label={t('coachSquad:canAlsoPlay')}>{also.length ? also.map(p => t(POSITION_WORD[p])).join(', ') : <span className="text-ink-3">{t('coachSquad:noneYet')}</span>}</Fact>
       </dl>}
     <PositionAndRolesSheet coachId={coachId} player={{ id, name, position }} open={editing} onOpenChange={setEditing} saveNeedsChange
       onSaved={() => setEditing(false)} />

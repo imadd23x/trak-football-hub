@@ -6,12 +6,7 @@ import { dayMonth } from '@/lib/squad/format'
 import { Card, Missing } from './parts'
 import type { SquadRoster } from './useSquadRoster'
 import { useTranslation } from '@/lib/i18n'
-
-/* TRAK-407: an attribute's name in the language showing; the key is what is saved. */
-const ATTRIBUTE_WORD = {
-  work_rate: 'coachHome:attributeWorkRate', technical: 'coachHome:attributeTechnical', physical: 'coachHome:attributePhysical',
-  coachability: 'coachHome:attributeCoachability', attitude: 'coachHome:attributeAttitude', tactical: 'coachHome:attributeTactical',
-} as const
+import { ATTRIBUTE_WORD } from '@/lib/squad/attribute-words'
 
 /* TRAK-250: Squad > Attributes. The six assessment attributes averaged across the squad, week by week,
    with the spread of each child's latest value. Coach-only: it is never shown to players or parents. */

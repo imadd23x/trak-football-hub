@@ -1,3 +1,5 @@
+import { useTranslation } from '@/lib/i18n'
+import { optionWords } from '@/lib/games/match-words'
 import { EVALUATION_LIMITS, PLAN_WORKED, hasPlayed, setPlayed, withScore, type EvaluationForm, type PlanWorked, type ScoredGoal } from '@/lib/games/evaluation'
 import { Checkbox } from '@/components/arc/checkbox/checkbox'
 import { NumberField } from '@/components/arc/number-field/number-field'
@@ -21,6 +23,7 @@ export function ResultStep({ eventId, form, onFormChange, starters, bench, goals
   /** The plan's instructions in order, as they locked at kick-off. */
   goals: string[]
 }) {
+  const { t } = useTranslation()
   const played = [...starters.filter(p => hasPlayed(form, p.id, true)), ...bench.filter(p => hasPlayed(form, p.id, false))]
   const setGoal = (index: number, next: Partial<ScoredGoal>) =>
     onFormChange({ ...form, goals: form.goals.map((goal, i) => i === index ? { ...goal, ...next } : goal) })
@@ -34,22 +37,22 @@ export function ResultStep({ eventId, form, onFormChange, starters, bench, goals
     <div className="grid gap-4 tablet:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] tablet:items-start">
       <div className="grid min-w-0 gap-4">
         <section aria-labelledby="evaluation-result" className={card}>
-          <h2 id="evaluation-result" className="text-lg font-medium text-ink">Result</h2>
+          <h2 id="evaluation-result" className="text-lg font-medium text-ink">{t('coachMatches:evStepResult')}</h2>
           <div className="flex flex-wrap items-end gap-4">
-            <NumberField label="Our score" value={form.ourScore} min={0} max={EVALUATION_LIMITS.score}
+            <NumberField label={t('coachSchedule:ourScore')} value={form.ourScore} min={0} max={EVALUATION_LIMITS.score}
               onValueChange={value => onFormChange(withScore(form, value))} />
-            <NumberField label="Their score" value={form.theirScore} min={0} max={EVALUATION_LIMITS.score}
+            <NumberField label={t('coachSchedule:theirScore')} value={form.theirScore} min={0} max={EVALUATION_LIMITS.score}
               onValueChange={value => onFormChange({ ...form, theirScore: value })} />
           </div>
           {form.goals.length > 0 && <ol className="grid gap-4">
             {form.goals.map((goal, index) => <li key={index}>
               {/* One above the other: side by side, half a laptop's width cut the names short. */}
               <fieldset className="grid gap-3">
-                <legend className="mb-2 text-sm font-medium text-ink">Goal {index + 1}</legend>
-                <Select label="Scored by" value={goal.scorer ?? NONE} onValueChange={value => setGoal(index, { scorer: pick(value), ...(value === goal.assist && { assist: null }) })}
-                  options={[{ value: NONE, label: 'Not recorded' }, ...played.map(p => ({ value: p.id, label: p.name }))]} />
-                <Select label="Assist" value={goal.assist ?? NONE} onValueChange={value => setGoal(index, { assist: pick(value) })}
-                  options={[{ value: NONE, label: 'No assist' }, ...played.filter(p => p.id !== goal.scorer).map(p => ({ value: p.id, label: p.name }))]} />
+                <legend className="mb-2 text-sm font-medium text-ink">{t('coachMatches:goalN', { n: index + 1 })}</legend>
+                <Select label={t('coachMatches:scoredBy')} value={goal.scorer ?? NONE} onValueChange={value => setGoal(index, { scorer: pick(value), ...(value === goal.assist && { assist: null }) })}
+                  options={[{ value: NONE, label: t('coachMatches:notRecorded') }, ...played.map(p => ({ value: p.id, label: p.name }))]} />
+                <Select label={t('coachMatches:assist')} value={goal.assist ?? NONE} onValueChange={value => setGoal(index, { assist: pick(value) })}
+                  options={[{ value: NONE, label: t('coachMatches:noAssist') }, ...played.filter(p => p.id !== goal.scorer).map(p => ({ value: p.id, label: p.name }))]} />
               </fieldset>
             </li>)}
           </ol>}
@@ -57,32 +60,32 @@ export function ResultStep({ eventId, form, onFormChange, starters, bench, goals
 
         {form.theirScore > 0 && <section aria-labelledby="evaluation-how" className={card}>
           <div className="flex items-start justify-between gap-3">
-            <h2 id="evaluation-how" className="text-lg font-medium text-ink">How they scored</h2>
-            <OnlyYou what="how they scored" />
+            <h2 id="evaluation-how" className="text-lg font-medium text-ink">{t('coachMatches:howTheyScored')}</h2>
+            <OnlyYou what={t('coachMatches:howTheyScoredWhat')} />
           </div>
-          <Textarea label="How their goals came" rows={3} value={form.howTheyScored} maxLength={EVALUATION_LIMITS.howTheyScored}
+          <Textarea label={t('coachMatches:howGoalsCame')} rows={3} value={form.howTheyScored} maxLength={EVALUATION_LIMITS.howTheyScored}
             onChange={event => onFormChange({ ...form, howTheyScored: event.target.value })} />
         </section>}
 
         {goals.length > 0 && <section aria-labelledby="evaluation-team" className={card}>
-          <h2 id="evaluation-team" className="text-lg font-medium text-ink">Did the plan work?</h2>
-          {goals.map((goal, index) => <RadioGroup key={index} label={goal} name={`plan-worked-${eventId}-${index}`} options={PLAN_WORKED}
+          <h2 id="evaluation-team" className="text-lg font-medium text-ink">{t('coachMatches:didPlanWork')}</h2>
+          {goals.map((goal, index) => <RadioGroup key={index} label={goal} name={`plan-worked-${eventId}-${index}`} options={optionWords('planWorked', PLAN_WORKED)}
             value={form.planWorked[index] ?? ''} onValueChange={value => answer(index, value as PlanWorked)} />)}
         </section>}
       </div>
 
       <section aria-labelledby="evaluation-played" className={card}>
         <div>
-          <h2 id="evaluation-played" className="text-lg font-medium text-ink">Who played</h2>
-          <p className="mt-1 text-sm text-ink-3">{starters.length ? 'Untick a starter who didn’t play, and tick who came on.' : 'Tick everyone who played.'}</p>
+          <h2 id="evaluation-played" className="text-lg font-medium text-ink">{t('coachMatches:whoPlayed')}</h2>
+          <p className="mt-1 text-sm text-ink-3">{starters.length ? t('coachMatches:untickHint') : t('coachMatches:tickEveryone')}</p>
         </div>
-        {starters.length + bench.length === 0 ? <p className="text-sm text-ink-2">Nobody in this squad can be recorded yet.</p> : <>
+        {starters.length + bench.length === 0 ? <p className="text-sm text-ink-2">{t('coachMatches:nobodyRecordable')}</p> : <>
           {starters.length > 0 && <fieldset className="grid gap-2">
-            <legend className="mb-2 text-sm font-medium text-ink">Started</legend>
+            <legend className="mb-2 text-sm font-medium text-ink">{t('coachMatches:started')}</legend>
             {starters.map(player => tick(player, true))}
           </fieldset>}
           {bench.length > 0 && <fieldset className="grid gap-2">
-            <legend className="mb-2 text-sm font-medium text-ink">{starters.length ? 'Came on' : 'Played'}</legend>
+            <legend className="mb-2 text-sm font-medium text-ink">{starters.length ? t('coachMatches:cameOn') : t('coachMatches:played')}</legend>
             {bench.map(player => tick(player, false))}
           </fieldset>}
         </>}

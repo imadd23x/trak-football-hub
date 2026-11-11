@@ -28,14 +28,15 @@ export const COMPETITION_WORD = {
   league: 'coachSchedule:competitionLeague', tournament: 'coachSchedule:competitionTournament', friendly: 'coachSchedule:competitionFriendly',
 } as const
 
-type Option = { value: string; label: string; description?: string }
+type Option = { value: string; label: string; description?: string; summary?: string }
 
 /** A fixed list's options (how strong they are, a player's context, the expectation) with their words in the language
  *  showing; the value is what is saved. Call it from a component that uses useTranslation(). */
-export function optionWords<T extends Option>(kind: 'strength' | 'context' | 'expectation', options: readonly T[]): T[] {
+export function optionWords<T extends Option>(kind: 'strength' | 'context' | 'expectation' | 'didJob' | 'against' | 'planWorked', options: readonly T[]): T[] {
   return options.map(option => ({
     ...option,
     label: i18n.t(`coachMatches:${kind}_${option.value}` as 'coachMatches:saved'),
     ...(option.description ? { description: i18n.t(`coachMatches:${kind}_${option.value}_desc` as 'coachMatches:saved') } : {}),
+    ...(option.summary ? { summary: i18n.t(`coachMatches:${kind}_${option.value}_sum` as 'coachMatches:saved') } : {}),
   }))
 }

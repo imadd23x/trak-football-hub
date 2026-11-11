@@ -4,6 +4,7 @@ import { STATE, matchActions, type GameState } from '@/lib/games/loop'
 import { MATCH_WORD, optionWords } from '@/lib/games/match-words'
 import { CONTEXT, EXPECTATIONS, markerWords } from '@/lib/games/lineup'
 import { STRENGTHS } from '@/lib/games/plan'
+import { AGAINST, DID_JOB, PLAN_WORKED, summary } from '@/lib/games/evaluation'
 import { matchResult } from '@/lib/games/results'
 import { shown } from '@/lib/squad/trait-words'
 import { gameTitle } from '@/components/coach/games/useGames'
@@ -42,6 +43,17 @@ describe('TRAK-407: Matches in Greek', () => {
     expect(markerWords(plan)).toEqual(['lead', 'has a job', 'context: first start and playing up an age group'])
     await showLanguage('el')
     expect(markerWords(plan)).toEqual(['ηγέτης', 'έχει ρόλο', 'πλαίσιο: πρώτη φορά βασικός και παίζει σε μεγαλύτερη ηλικιακή ομάδα'])
+  })
+
+  it('has a word for every evaluation answer, and sums a player up in the language showing', async () => {
+    const lists = () => [optionWords('didJob', DID_JOB), optionWords('against', AGAINST), optionWords('planWorked', PLAN_WORKED)]
+    expect(lists()).toEqual([DID_JOB, AGAINST, PLAN_WORKED])
+    expect(summary({ didJob: 'yes', against: 'met', note: '' })).toBe('Did the job · Met')
+    const english = lists().flat().map(option => option.label)
+    await showLanguage('el')
+    lists().flat().forEach((option, i) => expect(option.label).not.toBe(english[i]))
+    expect(summary({ didJob: 'yes', against: 'met', note: '' })).toBe('Έκανε τον ρόλο του · Όπως αναμενόταν')
+    expect(i18n.t('coachMatches:publishTo', { count: 1 })).toBe('Δημοσίευση σε 1 παίκτη και οικογένεια')
   })
 
   it('says a result and a title in the language showing', async () => {

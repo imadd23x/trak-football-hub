@@ -10,6 +10,7 @@
 import { calendarFields, displayEventTime, toAcademyInstant, toInstant } from '@/lib/event-time'
 import { describeEventKit, readKitSnapshot, type EventKitSnapshot } from '@/lib/kit-templates'
 import { trainingThemeFrom, type TrainingTheme } from '@/lib/training-theme'
+import { currentLanguage } from '@/lib/i18n'
 import { splitVenue } from '@/lib/venue-link'
 
 export type EventKind = 'training' | 'match' | 'other'
@@ -138,7 +139,8 @@ export const PAST_DATE_PROBLEM = 'This date has passed: log it instead'
 
 /** `2026-10-31` -> `Saturday 31 October`, as Schedule's Review and sheets write a day. */
 export function formatEventDay(date: string) {
-  return new Date(date + 'T12:00:00').toLocaleDateString('en-GB', {
+  // TRAK-407: the day and month names in the language showing (English as before).
+  return new Date(date + 'T12:00:00').toLocaleDateString(currentLanguage() === 'en' ? 'en-GB' : currentLanguage(), {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 }

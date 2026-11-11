@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 import { supabase } from '@/integrations/supabase/client'
 
 /* TRAK-99 (J5): why a player the consent gate refuses isn't ready yet.
@@ -22,8 +23,9 @@ export const WAIT_TITLE: Record<WaitReason | 'unknown', string> = {
 }
 
 export function waitText(reason: WaitReason | null, name: string): string {
-  if (reason === 'parent') return `You can assess ${name} once a parent has approved their account.`
-  if (reason === 'player') return `You can assess ${name} once they've signed up and agreed for themselves.`
-  if (reason === 'signup') return `A parent has approved. You can assess ${name} once they've set up their Trak account.`
-  return `You can assess ${name} once a parent has approved and they've set up their Trak account.`
+  // TRAK-407: in the language showing (English as it was).
+  if (reason === 'parent') return i18n.t('coachAssess:waitText_parent', { name })
+  if (reason === 'player') return i18n.t('coachAssess:waitText_player', { name })
+  if (reason === 'signup') return i18n.t('coachAssess:waitText_signup', { name })
+  return i18n.t('coachAssess:waitText_unknown', { name })
 }

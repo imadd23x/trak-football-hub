@@ -13,6 +13,7 @@ import { useFeatureState } from '@/components/trak/parked'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { CoachMenuButton } from '@/components/coach/CoachFrame'
+import { useTranslation } from '@/lib/i18n'
 
 /* TRAK-250: Squad is a full-width coach workspace with views of the same
    roster. The view lives in the URL (?tab=), so a view can be linked and a
@@ -25,24 +26,26 @@ import { CoachMenuButton } from '@/components/coach/CoachFrame'
    TRAK-357 (spec TRAK-348): where the season plan is on, Formations takes Attributes' place. TRAK-359: and Availability
    goes, as Matches marks who isn't attending. Elsewhere Squad stays as it is. */
 type TabId = 'players' | 'formations' | 'attributes' | 'availability'
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'players', label: 'Players' },
-  { id: 'attributes', label: 'Attributes' },
-  { id: 'availability', label: 'Availability' },
-]
-const SEASON_PLAN_TABS: { id: TabId; label: string }[] = [
-  { id: 'players', label: 'Players' },
-  { id: 'formations', label: 'Formations' },
-]
+/* TRAK-407: each label is a word key, read in the language showing. */
+const TABS = [
+  { id: 'players', label: 'coachSquad:tabPlayers' },
+  { id: 'attributes', label: 'coachSquad:tabAttributes' },
+  { id: 'availability', label: 'coachSquad:tabAvailability' },
+] as const satisfies readonly { id: TabId; label: string }[]
+const SEASON_PLAN_TABS = [
+  { id: 'players', label: 'coachSquad:tabPlayers' },
+  { id: 'formations', label: 'coachSquad:tabFormations' },
+] as const satisfies readonly { id: TabId; label: string }[]
 
 export default function CoachSquadPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile } = useAuth()
+  const { t } = useTranslation()
   const [params, setParams] = useSearchParams()
   const seasonPlan = useFeatureState('season_plan')
   const tabs = seasonPlan.on ? SEASON_PLAN_TABS : TABS
-  const active: TabId = tabs.find(t => t.id === params.get('tab'))?.id ?? 'players'
+  const active: TabId = tabs.find(tab => tab.id === params.get('tab'))?.id ?? 'players'
   // TRAK-305: All or one squad, as picked at the top of the frame.
   const roster = useSquadRoster()
   const choose = (id: string) => setParams({ tab: id }, { replace: true })
@@ -68,19 +71,19 @@ export default function CoachSquadPage() {
         {/* TRAK-351: a player's page has the screen to itself. Not `hidden`: the header's flex would show it anyway. */}
         {openId == null && <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 pb-4">
           {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
-          <CoachMenuButton name={profile?.full_name || 'Coach'} />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Squad</h1>
+          <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
+          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">{t('nav:squad')}</h1>
           {/* On a phone the views take the full width, under the title; on a coach's tablet or laptop they sit in the header. */}
           <div className="arc order-last w-full tablet:order-none tablet:w-[440px]">
-            <GlassSegmented label="Squad view" value={active} onValueChange={choose} fullWidth
-              options={tabs.map(t => ({ value: t.id, label: t.label }))} />
+            <GlassSegmented label={t('coachSquad:squadView')} value={active} onValueChange={choose} fullWidth
+              options={tabs.map(tab => ({ value: tab.id, label: t(tab.label) }))} />
           </div>
         </header>}
 
-        <section aria-label={tabs.find(t => t.id === active)!.label} className="pb-8">
+        <section aria-label={t(tabs.find(tab => tab.id === active)!.label)} className="pb-8">
           {/* TRAK-368: a player's page stays up when only the assessments failed, and says so there. */}
           {(openId != null && active === 'players' ? roster.rosterError : roster.error) ? <SquadLoadError onRetry={roster.retry} />
-            : roster.isPending ? <LoadingSkeleton label="Loading your squad…" lines={2} avatar rows={4} className="pt-6" />
+            : roster.isPending ? <LoadingSkeleton label={t('coachSchedule:loadingSquad')} lines={2} avatar rows={4} className="pt-6" />
             : roster.players.length === 0 ? <PreparingSquad />
             : active === 'players' ? <PlayersTab roster={roster} openId={openId} onOpen={openPlayer} onBack={back} />
             : active === 'formations' ? <FormationsTab roster={roster} />
@@ -94,6 +97,7 @@ export default function CoachSquadPage() {
 }
 
 function PreparingSquad() {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center text-center pt-14 px-6">
       <div
@@ -102,8 +106,8 @@ function PreparingSquad() {
       >
         <Users size={22} className="text-brand" strokeWidth={1.5} />
       </div>
-      <p className="text-[15px] text-ink-2 font-medium mb-1">Your squad is being prepared</p>
-      <p className="text-[12px] text-ink-3 leading-relaxed mb-5">Your academy will add players to this squad.</p>
+      <p className="text-[15px] text-ink-2 font-medium mb-1">{t('coachSquad:preparingTitle')}</p>
+      <p className="text-[12px] text-ink-3 leading-relaxed mb-5">{t('coachSquad:preparingBody')}</p>
     </div>
   )
 }

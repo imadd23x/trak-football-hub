@@ -1,4 +1,5 @@
 import type { AssessmentRow } from './snapshot'
+import { i18n } from '@/lib/i18n'
 
 export const ATTRIBUTES = [
   ['work_rate', 'Work rate'],
@@ -101,13 +102,13 @@ export function focusAttribute(rows: AttributeRow[]): { row: AttributeRow; sente
   if (!focus) return null
 
   const { row, avg } = focus
-  let sentence = `Lowest average (${avg.toFixed(1)})`
-  if (row.fallingWeeks >= 2) sentence += `, and falling for ${row.fallingWeeks} weeks`
+  // TRAK-407: in the language showing (English as it was).
+  let sentence = i18n.t('coachSquad:focusLowest', { avg: avg.toFixed(1) })
+  if (row.fallingWeeks >= 2) sentence += i18n.t('coachSquad:focusFalling', { count: row.fallingWeeks })
   sentence += '.'
   if (row.range) {
     const { min, max, wide } = row.range
-    sentence += ` The range is ${wide ? 'wide' : 'narrow'} (${min}–${max})`
-    sentence += wide ? ': a few children are carrying the rest.' : '.'
+    sentence += i18n.t(wide ? 'coachSquad:focusRangeWide' : 'coachSquad:focusRangeNarrow', { min, max })
   }
   return { row, sentence }
 }

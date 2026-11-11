@@ -1,5 +1,6 @@
 import 'i18next'
 import type coachHome from '@/locales/en/coachHome.json'
+import type coachMatches from '@/locales/en/coachMatches.json'
 import type coachSchedule from '@/locales/en/coachSchedule.json'
 import type coachSquad from '@/locales/en/coachSquad.json'
 import type common from '@/locales/en/common.json'
@@ -14,6 +15,7 @@ declare module 'i18next' {
     defaultNS: 'common'
     resources: {
       coachHome: typeof coachHome
+      coachMatches: typeof coachMatches
       coachSchedule: typeof coachSchedule
       coachSquad: typeof coachSquad
       common: typeof common

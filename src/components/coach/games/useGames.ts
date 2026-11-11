@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
@@ -211,7 +212,7 @@ export function useWhoCanCome(game: { id: string; squad?: string | null }) {
   }
 }
 
-export const gameTitle = (game: { opponent?: string | null; title: string }) => game.opponent ? `vs ${game.opponent}` : game.title
+export const gameTitle = (game: { opponent?: string | null; title: string }) => game.opponent ? i18n.t('coachSchedule:vsOpponent', { opponent: game.opponent }) : game.title
 
 /** When a game is, on this phone's clock (Imad, 23 Oct), and the academy's own time when that differs. */
 export function gameWhen(game: { event_date?: string | null; start_time?: string | null; starts_at: string }) {

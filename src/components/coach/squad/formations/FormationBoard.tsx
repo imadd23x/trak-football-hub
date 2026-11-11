@@ -4,9 +4,12 @@ import { PlayerFace } from '@/components/trak/PlayerFace'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { lineName, slotsOf, type Format } from '@/lib/games/formations'
 import type { Position } from '@/lib/positions'
-import { fitOf, positionsShort, shortPosition, slotPosition, type Fit, type Spot, type XI } from '@/lib/squad/formation-board'
+import { fitOf, slotPosition, type Fit, type Spot, type XI } from '@/lib/squad/formation-board'
 import type { Dragging } from './usePointerSwap'
 import { usePointerSwap } from './usePointerSwap'
+import { i18n, useTranslation } from '@/lib/i18n'
+import { isPosition } from '@/lib/positions'
+import { POSITION_WORD } from '@/lib/position-words'
 
 /* TRAK-357 (Season plan 9/18, spec TRAK-348): one pitch beside one bench, for Formations and, next, the match line-up
    (TRAK-358). The pitch is portrait and attacks upwards, with Matches' places (slotsOf) turned so our goal is at the
@@ -19,19 +22,26 @@ import { usePointerSwap } from './usePointerSwap'
 export type BoardPlayer = { id: string; name: string; shirt: number | null; position: string | null; also: Position[]; canPlay: boolean }
 
 const first = (name: string) => name.split(/\s+/)[0] ?? name
-const lower = (position: string) => position.toLowerCase()
+/* TRAK-407: positions and lines in the language showing. What is saved ('Goalkeeper') is unchanged. */
+const SHORT_WORD = { Goalkeeper: 'coachSquad:filterGK', Defender: 'coachSquad:filterDEF', Midfielder: 'coachSquad:filterMID', Attacker: 'coachSquad:filterATT' } as const
+const positionWord = (position: string) => (isPosition(position) ? i18n.t(POSITION_WORD[position]) : position)
+const lower = (position: string) => positionWord(position).toLocaleLowerCase()
+/** lineName's word: a position, "Forward" for the front line, or "Player". */
+const lineWord = (line: string) => (line === 'Forward' ? i18n.t('coachSquad:fmForward') : line === 'Player' ? i18n.t('nav:player') : positionWord(line))
+const positionsShown = (position: string | null, also: readonly string[]) =>
+  [position, ...also].filter(isPosition).map(p => i18n.t(SHORT_WORD[p])).join(' / ') || i18n.t('coachSquad:fmNoPosition')
 /** A place's height from the top: Matches puts the lines from y 8 (our keeper) to 88 (the front line); here they
  *  span 12% to 88%, so a face and its name always stay inside the pitch. */
 const topOf = (y: number) => 12 + ((88 - y) * 76) / 80
 const MARK = 'absolute grid size-4 place-items-center rounded-full border border-surface text-[10px] font-bold leading-none'
 
 function fitWords(player: BoardPlayer, fit: Fit) {
-  if (!player.canPlay) return "Can't be picked any more: they left the squad, or consent isn't in place."
-  if (fit === 'listed') return 'Plays here.'
-  if (fit === 'also') return 'Can also play here.'
-  if (fit === 'unknown') return 'No position recorded.'
-  const also = player.also.length ? `, can also play ${player.also.map(lower).join(' and ')}` : ''
-  return `Out of position: plays ${lower(player.position!)}${also}.`
+  if (!player.canPlay) return i18n.t('coachSquad:fitGone')
+  if (fit === 'listed') return i18n.t('coachSquad:fitListed')
+  if (fit === 'also') return i18n.t('coachSquad:fitAlso')
+  if (fit === 'unknown') return i18n.t('coachSquad:fitUnknown')
+  const also = player.also.length ? i18n.t('coachSquad:fitOutAlso', { positions: player.also.map(lower).join(i18n.t('coachSquad:fmAnd')) }) : ''
+  return i18n.t('coachSquad:fitOut', { position: lower(player.position!), also })
 }
 function ringClass(player: BoardPlayer, fit: Fit) {
   if (!player.canPlay) return 'shadow-[0_0_0_3px_rgb(var(--t-danger))]'
@@ -84,6 +94,7 @@ type PlaceProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 /** One place on the pitch: the face and first name, or an empty "+", and the line it asks for. Highlighted while
  *  selected, or while a drag is over it. */
 export function BoardPlace({ at, on, over, face, line, size, style, ...button }: PlaceProps) {
+  const { t } = useTranslation()
   return <button type="button" {...button} aria-pressed={on}
     className={`absolute grid w-[56px] -translate-x-1/2 -translate-y-1/2 select-none justify-items-center gap-[3px] rounded-xl p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-safe:transition-colors tablet:w-[76px] ${
       over ? 'bg-brand/20 ring-2 ring-brand' : on ? 'bg-brand/15 ring-2 ring-brand' : ''}`}
@@ -92,7 +103,7 @@ export function BoardPlace({ at, on, over, face, line, size, style, ...button }:
       <BoardFace {...face} size={size} />
       <span className="max-w-full truncate rounded bg-surface/90 px-0.5 text-[11px] font-medium leading-4 text-ink tablet:text-[12px]">{first(face.name)}</span>
     </> : <span aria-hidden="true" className="grid size-7 place-items-center rounded-full border border-dashed border-ink/40 bg-surface/70 text-ink-3 tablet:size-9">+</span>}
-    <span aria-hidden="true" className="hidden text-[11px] leading-3 text-ink-3 tablet:block">{shortPosition(line)}</span>
+    <span aria-hidden="true" className="hidden text-[11px] leading-3 text-ink-3 tablet:block">{t(SHORT_WORD[line])}</span>
   </button>
 }
 
@@ -132,6 +143,7 @@ export function FormationBoard({ title, shape, format, starters, players, bench,
   const swapping = usePointerSwap((from, to) => { setSelected(null); onSwap(from, to) })
   const { drag, bind, wasDrag } = swapping
   const phone = useIsMobile()
+  const { t } = useTranslation()
   const slots = slotsOf(shape).slice(0, format)
   const fits = new Map(slots.map(({ slot }) => {
     const player = players.get(starters[slot])
@@ -164,15 +176,16 @@ export function FormationBoard({ title, shape, format, starters, players, bench,
 
   return <div className="grid gap-5 laptop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] laptop:items-start">
     <div className="grid gap-3">
-      <BoardPitch label={`${title}, ${shape}, starting players. Attacking upwards.`} shape={shape} format={format} place={(slot, at) => {
+      <BoardPitch label={t('coachSquad:fmPitchLabel', { title, shape })} shape={shape} format={format} place={(slot, at) => {
         const spot: Spot = `slot:${slot}`
         const player = players.get(starters[slot])
         const fit = fits.get(slot)!
-        const line = lineName(shape, slot)
+        const line = lineWord(lineName(shape, slot))
         const on = selected === spot
-        const label = player ? `${player.name}, ${line}, place ${slot}. ${fitWords(player, fit)}${on ? ' Selected.' : ''}`
-          : `Place ${slot}, ${line}, empty.${on ? ' Selected.' : ''}`
-        return <BoardPlace key={slot} {...bind(spot, player?.name ?? `Place ${slot}`)} at={at} on={on} over={drag?.over === spot}
+        const chosen = on ? t('coachSquad:fmSelectedSuffix') : ''
+        const label = player ? t('coachSquad:fmPlaceFilled', { name: player.name, line, slot, fit: fitWords(player, fit) }) + chosen
+          : t('coachSquad:fmPlaceEmpty', { slot, line }) + chosen
+        return <BoardPlace key={slot} {...bind(spot, player?.name ?? t('coachSquad:fmPlaceN', { slot }))} at={at} on={on} over={drag?.over === spot}
           face={player ? { name: player.name, ring: ringClass(player, fit) } : null} line={slotPosition(shape, slot)} size={phone ? 'sm' : 'md'}
           aria-label={label} title={player ? `${player.name} · ${fitWords(player, fit)}` : undefined}
           data-fit={player ? (player.canPlay ? fit : 'gone') : 'empty'} onClick={() => tap(spot)} />
@@ -180,38 +193,38 @@ export function FormationBoard({ title, shape, format, starters, players, bench,
       <DragGhost drag={drag} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-2">
-        <span>{filled === slots.length ? `${filled} starters · ${bench.length} on the bench`
-          : `${filled} of ${slots.length} starters · ${slots.length - filled} ${slots.length - filled === 1 ? 'place' : 'places'} empty · ${bench.length} on the bench`}</span>
+        <span>{filled === slots.length ? t('coachSquad:fmStartersBench', { starters: filled, bench: bench.length })
+          : t('coachSquad:fmStartersPartial', { filled, total: slots.length, count: slots.length - filled, bench: bench.length })}</span>
         {count('out') > 0 && <span className="flex items-center gap-2"><span aria-hidden="true" className="size-3.5 rounded-full shadow-[0_0_0_3px_rgb(var(--t-orange))]" />
-          {count('out')} out of position</span>}
+          {t('coachSquad:fmOutCount', { count: count('out') })}</span>}
         {count('unknown') > 0 && <span className="flex items-center gap-2"><span aria-hidden="true" className="size-3.5 rounded-full outline-dashed outline-2 outline-line-strong" />
-          {count('unknown')} with no position recorded</span>}
+          {t('coachSquad:fmUnknownCount', { count: count('unknown') })}</span>}
         {gone > 0 && <span className="flex items-center gap-2 text-danger"><span aria-hidden="true" className="size-3.5 rounded-full shadow-[0_0_0_3px_rgb(var(--t-danger))]" />
-          {gone} can't be picked any more</span>}
+          {t('coachSquad:fmGoneCount', { count: gone })}</span>}
         <button type="button" onClick={onUndo} disabled={!canUndo}
           className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-brand disabled:text-ink-3 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          <Undo2 size={16} aria-hidden="true" />Undo last change</button>
+          <Undo2 size={16} aria-hidden="true" />{t('coachSquad:fmUndo')}</button>
       </div>
       <p role="status" className="min-h-5 text-sm text-ink-2">{selected ? (selectedName
-        ? `${selectedName} selected. Tap ${selected.startsWith('bench:') ? 'a place on the pitch' : 'another player, on the pitch or the bench,'} to swap, or press Escape.`
-        : 'Empty place selected. Tap a player to put there, or press Escape.') : ''}</p>
+        ? t(selected.startsWith('bench:') ? 'coachSquad:fmSelectedBench' : 'coachSquad:fmSelectedPitch', { name: selectedName })
+        : t('coachSquad:fmSelectedEmpty')) : ''}</p>
     </div>
 
     <section aria-labelledby="formation-bench" className="grid content-start gap-3">
       <div className="grid gap-0.5">
-        <h3 id="formation-bench" className="text-base font-medium text-ink">Bench <span className="font-normal text-ink-3">· {bench.length}</span></h3>
-        <p className="text-sm text-ink-3">Drag a player onto a place, or tap one and then another.</p>
+        <h3 id="formation-bench" className="text-base font-medium text-ink">{t('coachSquad:fmBench')} <span className="font-normal text-ink-3">· {bench.length}</span></h3>
+        <p className="text-sm text-ink-3">{t('coachSquad:fmBenchHelp')}</p>
       </div>
-      {bench.length === 0 ? <p className="text-sm text-ink-2">Everyone is starting.</p>
-        : <ul role="group" aria-label="Bench" className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2 p-0">
+      {bench.length === 0 ? <p className="text-sm text-ink-2">{t('coachSquad:fmEveryoneStarting')}</p>
+        : <ul role="group" aria-label={t('coachSquad:fmBench')} className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2 p-0">
           {bench.map(player => {
             const spot: Spot = `bench:${player.id}`
             const on = selected === spot
-            const where = positionsShort(player.position, player.also)
+            const where = positionsShown(player.position, player.also)
             return <li key={player.id}>
               <BoardBenchFace {...bind(spot, player.name)} on={on} over={drag?.over === spot} onClick={() => tap(spot)}
                 face={{ name: player.name }} detail={`${player.shirt != null ? `#${player.shirt} · ` : ''}${where}`}
-                aria-label={`${player.name}, bench${player.shirt != null ? `, number ${player.shirt}` : ''}, ${where}.${on ? ' Selected.' : ''}`} />
+                aria-label={(player.shirt != null ? t('coachSquad:fmBenchPlayerNumber', { name: player.name, shirt: player.shirt, where }) : t('coachSquad:fmBenchPlayer', { name: player.name, where })) + (on ? t('coachSquad:fmSelectedSuffix') : '')} />
             </li>
           })}
         </ul>}

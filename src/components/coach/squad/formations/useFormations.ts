@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import type { Format } from '@/lib/games/formations'
@@ -29,7 +30,7 @@ export function useFormations(coachId: string, squad: string) {
         isDefault: row.is_default === true,
         copies: (row.formation_copies ?? []).map(c => ({
           eventId: c.event_id, copiedAt: c.copied_at, notComing: c.not_coming, skipped: c.skipped,
-          label: c.coach_calendar_events?.opponent ? `vs ${c.coach_calendar_events.opponent}` : c.coach_calendar_events?.title ?? 'A match',
+          label: c.coach_calendar_events?.opponent ? i18n.t('coachSchedule:vsOpponent', { opponent: c.coach_calendar_events.opponent }) : c.coach_calendar_events?.title ?? i18n.t('coachSquad:fmAMatch'),
         })).sort((a, b) => b.copiedAt.localeCompare(a.copiedAt)),
       }))
     },
@@ -39,8 +40,8 @@ export function useFormations(coachId: string, squad: string) {
 /** Why a write was refused, in the coach's words; null for a dropped connection. */
 export function refusal(error: unknown): string | null {
   const code = (error as { code?: string } | null)?.code
-  if (code === '23505') return 'You already have a formation with that name in this squad.'
-  if (code === '42501') return "One of these players can't be picked any more: they left the squad, or consent isn't in place. Take them off and save again."
+  if (code === '23505') return i18n.t('coachSquad:fmNameTaken')
+  if (code === '42501') return i18n.t('coachSquad:fmPlayerGone')
   return null
 }
 

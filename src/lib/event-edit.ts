@@ -3,6 +3,15 @@ import {
   type EventForm, type EventKind, type EventRow, type Repeat,
 } from '@/lib/coach-events'
 import { localTodayISO } from '@/lib/event-time'
+import { i18n } from '@/lib/i18n'
+
+/** TRAK-407: the words the form's lists show, in the language showing: t(KIND_WORD.match). */
+export const KIND_WORD = { match: 'coachSchedule:kindMatch', training: 'coachSchedule:kindTraining', other: 'coachSchedule:kindOther' } as const satisfies Record<EventKind, string>
+export const STEP_WORD = { what: 'coachSchedule:stepWhat', when: 'coachSchedule:stepWhen', families: 'coachSchedule:stepFamilies', review: 'coachSchedule:stepReview' } as const
+export const COMPETITION_WORD = { league: 'coachSchedule:competitionLeague', tournament: 'coachSchedule:competitionTournament', friendly: 'coachSchedule:competitionFriendly' } as const
+export const WEEKDAY_WORD = ['coachSchedule:weekdayMon', 'coachSchedule:weekdayTue', 'coachSchedule:weekdayWed', 'coachSchedule:weekdayThu', 'coachSchedule:weekdayFri', 'coachSchedule:weekdaySat', 'coachSchedule:weekdaySun'] as const
+export const THEME_WORD = { technical: 'coachSchedule:themeTechnical', attacking: 'coachSchedule:themeAttacking', defending: 'coachSchedule:themeDefending', transition: 'coachSchedule:themeTransition',
+  goalkeeping: 'coachSchedule:themeGoalkeeping', physical: 'coachSchedule:themePhysical', psychological: 'coachSchedule:themePsychological' } as const
 
 /* TRAK-331 (Imad, 2 Nov): what the event sheet (EventEditSheet) and the pages that save it share, moved out of
    Schedule as it was. */
@@ -45,7 +54,7 @@ export const playedMatch = (form: EventForm, editing: EventRow | null, games: bo
 
 /** TRAK-288: where Games is on, New event asks a match's competition, so publishing its evaluation can read it. */
 export const competitionProblem = (form: EventForm, editing: EventRow | null, games: boolean) =>
-  games && !editing && form.kind === 'match' && !form.competition ? 'Pick the competition' : null
+  games && !editing && form.kind === 'match' && !form.competition ? i18n.t('coachSchedule:problemCompetition') : null
 
 /** What stops Next on a step: only what that step can fix. */
 export function stepProblem(step: number, form: EventForm, repeat: Repeat, editing: EventRow | null, games: boolean) {

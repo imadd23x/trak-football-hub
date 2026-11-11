@@ -36,6 +36,7 @@ import { evalDay } from '@/lib/evaluation'
 import { Button } from '@/components/arc/button/button'
 import { squadShape } from '@/lib/squad/shape'
 import { localParts, localTodayISO } from '@/lib/event-time'
+import { dateLocale, useLanguage } from '@/lib/i18n'
 
 /* TRAK-262 (Imad, 22 Oct): coach Home on Arc. Squad pills (each squad, then All, which is Home's only); the week
    in Tarek's colour key with one next step per event; the Squad shape radar; Needs you. "Assess a player" and
@@ -46,6 +47,8 @@ import { localParts, localTodayISO } from '@/lib/event-time'
 export default function CoachHomePage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
+  // TRAK-407: the words, and a new render when the language changes.
+  const { t, language } = useLanguage()
   const coachSquad = useCoachSquad(user?.id)
   const wide = useSideMenuScreen()
   // TRAK-182 part 8: a quick-add draft shows in the week at once.
@@ -53,7 +56,7 @@ export default function CoachHomePage() {
   // TRAK-305: All or one squad, as picked at the top of the frame. All exists only with two squads or more.
   const { everySquad } = coachSquad
   const roster = useSquadRoster()
-  const squadLabel = everySquad ? 'All squads' : coachSquad.squad ?? coachSquad.squads[0] ?? 'Your squad'
+  const squadLabel = everySquad ? t('coachHome:allSquads') : coachSquad.squad ?? coachSquad.squads[0] ?? t('coachHome:yourSquad')
 
   // The coach's "Needs you" switch (Settings, TRAK-261): on unless turned off. A switch that can't be read shows the cards.
   const needsYouSwitch = useQuery({
@@ -76,7 +79,8 @@ export default function CoachHomePage() {
   const cards = useMemo(() => loaded
     ? needsYou({ players: roster.players, waitingForParent: roster.consentPending, assessments: roster.assessments, now: Date.now(),
       evaluatedSquads: evaluations.failed ? undefined : evaluations.evaluated })
-    : null, [loaded, roster.players, roster.consentPending, roster.assessments, evaluations.evaluated, evaluations.failed])
+    // TRAK-407: the reasons are words, so a new language writes them again.
+    : null, [loaded, roster.players, roster.consentPending, roster.assessments, evaluations.evaluated, evaluations.failed, language])
 
   // Imad, 24 Oct: events the week marks "Needs you" are in Needs you too, with the week's own next step.
   const client = useQueryClient()
@@ -117,10 +121,10 @@ export default function CoachHomePage() {
     return {
       id: item.id,
       title: event ? eventHeading(event) : item.title,
-      when: `${format(parseISO(item.date), 'EEE d MMM')}${item.time ? ` · ${item.time}` : ''}`,
+      when: `${format(parseISO(item.date), 'EEE d MMM', { locale: dateLocale() })}${item.time ? ` · ${item.time}` : ''}`,
       squad: coachSquad.squads.length >= 2 ? squadName(item.source.squad) : null,
-      reason: item.step === 'evaluate' ? 'Played, not evaluated yet' : item.step === 'publish-evaluation' ? 'Evaluation draft · only you see it'
-        : item.kind === 'match' ? 'Played, not logged yet' : 'Started, no register yet',
+      reason: item.step === 'evaluate' ? t('coachHome:owedEvaluate') : item.step === 'publish-evaluation' ? t('coachHome:owedEvaluationDraft')
+        : item.kind === 'match' ? t('coachHome:owedLog') : t('coachHome:owedRegister'),
       action: <NextStep item={item} coachId={user.id} roster={undefined} onChanged={owedChanged} />,
       // TRAK-290: from 09:00 the morning after the draft was saved (the academy's clock), worked out as Home is read.
       urgent: remindAt !== undefined && Date.now() >= Date.parse(remindAt),
@@ -136,7 +140,7 @@ export default function CoachHomePage() {
     return [{
       id: game.id, title: gameTitle(game), when: [day, time].filter(Boolean).join(' · '),
       squad: coachSquad.squads.length >= 2 ? squadName(game.squad) : null,
-      reason: state === 'changes' ? `Changes not shared · ${changed} ${changed === 1 ? 'player' : 'players'}` : 'Plan not shared',
+      reason: state === 'changes' ? t('coachHome:changesNotShared', { count: changed }) : t('coachHome:planNotShared'),
       // TRAK-333 (Imad, 2 Nov): every match action is a split button, with the match's other pages behind its chevron.
       action: <MatchAction state={state} eventId={game.id} />,
     }]
@@ -145,13 +149,13 @@ export default function CoachHomePage() {
   // missed date stays due (urgent once its day has passed). Under All, the card picks its squad, as the others do.
   const evaluationEvents: OwedEvent[] = evaluations.list.filter(e => e.due.dueOn && (everySquad || coachSquad.inSquad(e.squad))).map(({ squad, due }) => ({
     id: `evaluation:${squad}`,
-    title: 'Evaluation due',
+    title: t('coachHome:evaluationDue'),
     when: evalDay(due.since!),
     squad: coachSquad.squads.length >= 2 ? squad : null,
-    reason: due.since! < evaluations.today ? `Due since ${evalDay(due.since!)}. Everyone starts where they were last time.`
-      : 'Everyone starts where they were last time. Change only who moved.',
+    reason: due.since! < evaluations.today ? t('coachHome:evaluationDueSince', { day: evalDay(due.since!) })
+      : t('coachHome:evaluationDueNow'),
     urgent: due.since! < evaluations.today,
-    action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad) coachSquad.pick(squad); navigate('/coach/evaluation') }}>Evaluate</Button></span>,
+    action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad) coachSquad.pick(squad); navigate('/coach/evaluation') }}>{t('coachHome:evaluate')}</Button></span>,
   }))
   // TRAK-352: where the season plan is on, one card per squad with consented players still to place. A newly
   // consented child has no position, so they join it.
@@ -159,11 +163,11 @@ export default function CoachHomePage() {
   const seasonPlanOn = useFeature('season_plan')
   const positionEvents: OwedEvent[] = !seasonPlanOn || !loaded ? [] : unplacedBySquad(roster.players, roster.consentPending).map(({ squad, count }) => ({
     id: `positions:${squad ?? ''}`,
-    title: `${count} ${count === 1 ? 'player needs' : 'players need'} a position`,
+    title: t('coachHome:needPosition', { count }),
     when: '',
     squad: coachSquad.squads.length >= 2 ? squad : null,
-    reason: 'A player needs a position before they get objectives.',
-    action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad && squad) coachSquad.pick(squad); navigate('/coach/season-plan/positions') }}>Place them</Button></span>,
+    reason: t('coachHome:needPositionWhy'),
+    action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad && squad) coachSquad.pick(squad); navigate('/coach/season-plan/positions') }}>{t('coachHome:placeThem')}</Button></span>,
   }))
   // TRAK-355: a watched player whose reminder is due comes back, one card each, opening the step where they were left.
   const watching = useWatchList(user?.id, roster, seasonPlanOn)
@@ -178,20 +182,20 @@ export default function CoachHomePage() {
     if (!player || !objective || (!everySquad && !coachSquad.inSquad(squad ?? ''))) return []
     return [{
       id: `stuck:${objective.id}`,
-      title: `${player.player_name.split(' ')[0]} is stuck on an objective`,
+      title: t('coachHome:stuckTitle', { name: player.player_name.split(' ')[0] }),
       when: '',
       squad: coachSquad.squads.length >= 2 ? squad : null,
-      reason: `“${objective.title}”: Not yet three times in a row.`,
-      action: <span className="arc"><Button size="sm" onClick={() => setStuckTarget({ objectiveId: objective.id, objective: objective.title, playerId: player.id, playerName: player.player_name })}>Choose</Button></span>,
+      reason: t('coachHome:stuckWhy', { objective: objective.title }),
+      action: <span className="arc"><Button size="sm" onClick={() => setStuckTarget({ objectiveId: objective.id, objective: objective.title, playerId: player.id, playerName: player.player_name })}>{t('coachHome:choose')}</Button></span>,
     }]
   })
   const watchEvents: OwedEvent[] = !seasonPlanOn ? [] : watching.list.filter(w => w.ready).map(w => ({
     id: `watch:${w.playerId}`,
-    title: `${w.why === '4 weeks, the latest' ? 'Watched 4 weeks' : w.why} · Set ${w.name.split(' ')[0]} up`,
+    title: t('coachHome:watchTitle', { why: w.why === '4 weeks, the latest' ? t('coachHome:watchedFourWeeks') : w.why, name: w.name.split(' ')[0] }),
     when: '',
     squad: coachSquad.squads.length >= 2 ? w.squad : null,
-    reason: w.step === 'positions' ? 'Give them a position, then objectives, or keep watching.' : 'Give them objectives, or keep watching.',
-    action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad && w.squad) coachSquad.pick(w.squad); navigate(`/coach/season-plan/${w.step}?player=${w.playerId}`) }}>Set up</Button></span>,
+    reason: w.step === 'positions' ? t('coachHome:watchPositions') : t('coachHome:watchObjectives'),
+    action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad && w.squad) coachSquad.pick(w.squad); navigate(`/coach/season-plan/${w.step}?player=${w.playerId}`) }}>{t('coachHome:setUp')}</Button></span>,
   }))
 
 
@@ -200,8 +204,8 @@ export default function CoachHomePage() {
       <div className="pt-3 pb-24">
         {/* TRAK-259: on a phone the avatar opens the menu and the calendar sits beside the bell; a laptop has both
             in the frame (the sidebar, the top bar). */}
-        {!wide && <HomeHeader calendarTo="/coach/schedule" left={<CoachMenuButton name={profile?.full_name || 'Coach'} />}
-          center={<HomeTitle>{profile?.full_name || 'Coach'}</HomeTitle>} right={user && <CoachAlertsBell coachId={user.id} />} />}
+        {!wide && <HomeHeader calendarTo="/coach/schedule" left={<CoachMenuButton name={profile?.full_name || t('nav:coach')} />}
+          center={<HomeTitle>{profile?.full_name || t('nav:coach')}</HomeTitle>} right={user && <CoachAlertsBell coachId={user.id} />} />}
 
         <div className={wide ? 'grid grid-cols-[minmax(0,7fr)_minmax(0,5fr)] items-start gap-6' : 'grid gap-5'}>
           {user && <CoachWeekStrip coachId={user.id} version={weekVersion} everySquad={everySquad} />}

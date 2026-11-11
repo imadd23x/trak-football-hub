@@ -3,6 +3,13 @@ import { LoadError } from '@/components/trak/LoadError'
 import { ATTRIBUTES } from '@/lib/squad/attributes'
 import type { squadShape } from '@/lib/squad/shape'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { useTranslation } from '@/lib/i18n'
+
+/** TRAK-407: each attribute's name in the language showing. */
+const ATTRIBUTE_WORD = {
+  work_rate: 'coachHome:attributeWorkRate', technical: 'coachHome:attributeTechnical', physical: 'coachHome:attributePhysical',
+  coachability: 'coachHome:attributeCoachability', attitude: 'coachHome:attributeAttitude', tactical: 'coachHome:attributeTactical',
+} as const
 
 /**
  * TRAK-262 (Imad, 22 Oct, the alternative he picked): Home's Squad shape. The squad's six-attribute average this
@@ -15,20 +22,21 @@ export function SquadShape({ squadLabel, shape, failed, onRetry }: {
   failed: boolean
   onRetry: () => void
 }) {
+  const { t } = useTranslation()
   const series = shape ? [
-    shape.thisMonth && { key: 'now', label: 'This month', values: shape.thisMonth },
-    shape.lastMonth && { key: 'before', label: 'Last month', values: shape.lastMonth },
+    shape.thisMonth && { key: 'now', label: t('coachHome:thisMonth'), values: shape.thisMonth },
+    shape.lastMonth && { key: 'before', label: t('coachHome:lastMonth'), values: shape.lastMonth },
   ].filter(entry => !!entry) : []
   return <section className="arc rounded-2xl border border-line bg-surface p-5" aria-labelledby="squad-shape-title">
     <div className="grid gap-0.5">
-      <h2 id="squad-shape-title" className="text-lg font-medium text-ink">Squad shape</h2>
+      <h2 id="squad-shape-title" className="text-lg font-medium text-ink">{t('coachHome:shapeTitle')}</h2>
       <p className="text-sm text-ink-3">{squadLabel}</p>
     </div>
-    {failed ? <div className="mt-4"><LoadError what="the squad's shape" onRetry={onRetry} /></div>
-      : !shape ? <LoadingSkeleton label="Loading the squad's shape" lines={5} rows={2} className="mt-4 h-[260px] content-start overflow-hidden" />
-      : series.length === 0 ? <p className="mt-4 text-sm text-ink-2">No assessments this month or last. Assess a player and the squad's shape shows here.</p>
-      : <RadarChart label="Squad average by attribute" size={260} rings={5} max={10}
-          axes={ATTRIBUTES.map(([key, label]) => ({ key, label }))}
+    {failed ? <div className="mt-4"><LoadError what={t('coachHome:shapeWhat')} onRetry={onRetry} /></div>
+      : !shape ? <LoadingSkeleton label={t('coachHome:shapeLoading')} lines={5} rows={2} className="mt-4 h-[260px] content-start overflow-hidden" />
+      : series.length === 0 ? <p className="mt-4 text-sm text-ink-2">{t('coachHome:shapeNone')}</p>
+      : <RadarChart label={t('coachHome:shapeChart')} size={260} rings={5} max={10}
+          axes={ATTRIBUTES.map(([key]) => ({ key, label: t(ATTRIBUTE_WORD[key]) }))}
           series={series} formatValue={value => value.toFixed(1)} />}
   </section>
 }

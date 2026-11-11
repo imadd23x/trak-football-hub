@@ -54,7 +54,7 @@ describe('TRAK-407: the coach\'s Home in Greek', () => {
       <SquadShape squadLabel="U14" shape={{ thisMonth: null, lastMonth: null } as never} failed={false} onRetry={() => {}} />
       <LoadError what={i18n.t('coachHome:weekWhat')} onRetry={() => {}} />
     </>)
-    expect(screen.getByRole('heading', { name: /Σας χρειάζονται/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Σε εκκρεμότητα/ })).toBeInTheDocument()
     expect(screen.getByText(/Όλα τα παρουσιολόγια και οι καταγραφές έχουν γίνει/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Εικόνα ομάδας' })).toBeInTheDocument()
     expect(screen.getByText('Δεν μπορέσαμε να φορτώσουμε αυτή την εβδομάδα αυτή τη στιγμή. Τα στοιχεία σας δεν άλλαξαν.')).toBeInTheDocument()

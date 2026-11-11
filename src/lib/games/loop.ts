@@ -2,6 +2,7 @@
    and the evaluation (TRAK-288, 289) add their own states. The clock is an instant (now, starts_at, ends_at), so
    the device's time zone never matters: the database sets both instants on the academy's clock (TRAK-175). */
 import { format } from 'date-fns'
+import { dateLocale, i18n } from '@/lib/i18n'
 
 export type GameEvent = { id: string; published: boolean; starts_at: string; ends_at: string | null }
 export type GameState = 'logistics' | 'plan' | 'planDraft' | 'scheduled' | 'shared' | 'changes' | 'locked' | 'fullTime' | 'evaluationDraft' | 'published'
@@ -77,7 +78,7 @@ export function gameState(game: GameEvent, now: number, plan: PlanProgress = {})
 export function gameStatus(game: GameEvent, now: number, plan: PlanProgress = {}) {
   const state = gameState(game, now, plan)
   return state === 'scheduled' && plan.sharedAt
-    ? { ...STATE.scheduled, label: `Shares ${format(new Date(plan.sharedAt), 'EEE HH:mm')}` }
+    ? { ...STATE.scheduled, label: i18n.t('coachMatches:sharesAt', { when: format(new Date(plan.sharedAt), 'EEE HH:mm', { locale: dateLocale() }) }) }
     : STATE[state]
 }
 

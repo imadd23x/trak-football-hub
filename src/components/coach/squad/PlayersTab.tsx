@@ -12,6 +12,8 @@ import { seasonAverages } from '@/lib/squad/season-profile'
 import { seasonWindow } from '@/lib/squad/season'
 import { seasonStartLabel, useSeasonPlan } from '@/lib/season-plan'
 import { isPosition } from '@/lib/positions'
+import { POSITION_WORD } from '@/lib/position-words'
+import { useTranslation } from '@/lib/i18n'
 import { localParts, localTodayISO } from '@/lib/event-time'
 import { PlayerProfile } from './PlayerProfile'
 import { WatchBadge } from '@/components/coach/season-plan/WatchFirst'
@@ -38,6 +40,7 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
   onBack?: () => void
 }) {
   const { user } = useAuth()
+  const { t } = useTranslation()
   const ids = useMemo(() => roster.players.map(p => p.id), [roster.players])
   const facts = usePlayerFacts(user?.id, ids)
   const moves = useMemo(() => bandMoves(roster.assessments), [roster.assessments])
@@ -73,7 +76,8 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
 
   // TRAK-352: where the season plan is on, a consented player the coach hasn't placed says so. Elsewhere Squad is as it was.
   const positionOf = (p: (typeof roster.players)[number]) =>
-    isPosition(p.position) || !seasonPlan.on || roster.consentPending.has(p.id) ? p.position ?? '' : 'No position yet'
+    isPosition(p.position) ? t(POSITION_WORD[p.position])
+      : !seasonPlan.on || roster.consentPending.has(p.id) ? p.position ?? '' : t('coachSquad:noPositionYet')
   const players: SquadPlayer[] = roster.players.map(p => {
     const move = moves.get(p.id)
     return {
@@ -82,8 +86,8 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
       waiting: roster.consentPending.has(p.id),
       trend: trends.get(p.id),
       flag: watchOf.has(p.id) ? <WatchBadge watch={watchOf.get(p.id)} />
-        : owed.get(p.id) === 'assess' ? <Badge tone="warning" size="sm">Assess</Badge>
-        : owed.get(p.id) === 'draft' ? <Badge tone="warning" size="sm">Draft</Badge> : undefined,
+        : owed.get(p.id) === 'assess' ? <Badge tone="warning" size="sm">{t('coachHome:assess')}</Badge>
+        : owed.get(p.id) === 'draft' ? <Badge tone="warning" size="sm">{t('coachHome:stateDraft')}</Badge> : undefined,
     }
   })
   const squadOf = new Map(roster.players.map(p => [p.id, p.age_group?.trim() || null]))
@@ -91,14 +95,14 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
   const open = openId == null ? undefined : players.find(player => player.id === openId)
   return <>
     <div hidden={openId != null}>
-      <SquadDirectory title={squadLabel ? `${squadLabel} players` : 'Players'} players={players} onOpen={player => onOpen(player.id)} />
+      <SquadDirectory title={squadLabel ? t('coachSquad:squadPlayers', { squad: squadLabel }) : t('coachSquad:tabPlayers')} players={players} onOpen={player => onOpen(player.id)} />
     </div>
     {openId != null && <div className="grid gap-4 pt-4">
-      <span className="arc"><Button variant="ghost" size="sm" onClick={onBack}><ChevronLeft size={16} aria-hidden="true" />Back</Button></span>
+      <span className="arc"><Button variant="ghost" size="sm" onClick={onBack}><ChevronLeft size={16} aria-hidden="true" />{t('common:back')}</Button></span>
       {open && <CoachTrail current={open.name} />}
       {/* TRAK-368: the page's title, as the older player page had it; the card's name is the visible one. */}
       {open && <h1 className="sr-only">{open.name}</h1>}
-      {open && user ? <article aria-label={`${open.name}, ${open.position || 'no position yet'}`} className="rounded-2xl border border-line bg-surface p-6">
+      {open && user ? <article aria-label={`${open.name}, ${open.position || t('coachSquad:noPositionYetLower')}`} className="rounded-2xl border border-line bg-surface p-6">
         <PlayerProfile player={open} squad={squadOf.get(open.id) ?? squadLabel} coachId={user.id}
           facts={facts.data?.get(open.id)} factsFailed={facts.isError} onRetryFacts={() => { void facts.refetch() }}
           season={season.players.get(open.id)} squadSeason={season.squad} since={seasonStartLabel(seasonFrom)}
@@ -106,8 +110,8 @@ export function PlayersTab({ roster, openId = null, onOpen = () => {}, onBack = 
           placement={seasonPlan.on ? { position: roster.players.find(p => p.id === open.id)?.position ?? null } : undefined} />
       </article> : !open && <p className="text-sm text-ink-2">{roster.squad == null || roster.squads.length <= 1
         // Every squad is in view, so the player isn't the coach's at all (TRAK-368: the older page's answer).
-        ? "We couldn't find that player. They may have been removed from your squad."
-        : "This player isn't in the squad you're looking at. Pick All at the top to see every squad."}</p>}
+        ? t('coachSquad:playerNotFound')
+        : t('coachSquad:playerOtherSquad')}</p>}
     </div>}
   </>
 }

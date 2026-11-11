@@ -1,10 +1,12 @@
 import { useId, type ReactNode } from 'react'
+import { useTranslation } from '@/lib/i18n'
 
 /* TRAK-250: small components the Squad tabs share. */
 
 /** A value that was never recorded: a dash on screen, words for a screen reader. Never 0. */
-export function Missing({ what = 'not recorded' }: { what?: string }) {
-  return <><span aria-hidden>—</span><span className="sr-only">{what}</span></>
+export function Missing({ what }: { what?: string }) {
+  const { t } = useTranslation()
+  return <><span aria-hidden>—</span><span className="sr-only">{what ?? t('coachSquad:notRecorded')}</span></>
 }
 
 /** A titled card; its title names the region. `muted` is for side notes. */

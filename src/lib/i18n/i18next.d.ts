@@ -1,4 +1,5 @@
 import 'i18next'
+import type coachHome from '@/locales/en/coachHome.json'
 import type common from '@/locales/en/common.json'
 import type nav from '@/locales/en/nav.json'
 import type settings from '@/locales/en/settings.json'
@@ -10,6 +11,7 @@ declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'common'
     resources: {
+      coachHome: typeof coachHome
       common: typeof common
       nav: typeof nav
       settings: typeof settings

@@ -2,6 +2,10 @@ import { draftClashes, isCancelled, type EventRow } from '@/lib/coach-events'
 import { hasStarted, registerProblem } from '@/lib/event-register'
 import { phoneEventTime } from '@/lib/event-time'
 import { fullTime } from '@/lib/games/loop'
+import { i18n } from '@/lib/i18n'
+
+/* TRAK-407: each note is written in the language showing, as the week is worked out. */
+const t = i18n.t.bind(i18n)
 
 /* TRAK-262 (Imad, 22 Oct): coach Home's week in Tarek's colour key (TRAK-255).
    The type is a colour; the state is a shape: a draft is dashed and only the
@@ -44,7 +48,7 @@ export interface WeekItem {
 }
 
 /** Imad, 24 Oct: which squad an event is for; no squad is the whole roster. */
-export const squadName = (squad: unknown) => typeof squad === 'string' && squad ? squad : 'All squads'
+export const squadName = (squad: unknown) => typeof squad === 'string' && squad ? squad : t('coachHome:allSquads')
 
 const kindOf = (type: string | null | undefined): WeekItem['kind'] =>
   type === 'match' || type === 'training' ? type : 'other'
@@ -76,19 +80,19 @@ export function coachWeek({ dates, events, sessions, inView, now = new Date(), e
     const { date, time } = phoneEventTime(row)
     const base = { id: row.id, date, kind, title: row.title, time, source: row, row }
     const clash = clashes.get(row.id)
-    if (isCancelled(row)) items.push({ ...base, state: 'cancelled', note: 'Cancelled', step: null })
-    else if (!row.published && clash) items.push({ ...base, state: 'clash', note: `Clashes with ${clash.title} ${clash.start}–${clash.end}`, step: null })
-    else if (!row.published) items.push({ ...base, state: 'draft', note: 'Draft · only you see it', step: 'publish' })
-    else if (!hasStarted(row, now)) items.push({ ...base, state: 'published', note: 'Published', step: 'share' })
+    if (isCancelled(row)) items.push({ ...base, state: 'cancelled', note: t('coachHome:noteCancelled'), step: null })
+    else if (!row.published && clash) items.push({ ...base, state: 'clash', note: t('coachHome:noteClash', { title: clash.title, start: clash.start, end: clash.end }), step: null })
+    else if (!row.published) items.push({ ...base, state: 'draft', note: t('coachHome:noteDraft'), step: 'publish' })
+    else if (!hasStarted(row, now)) items.push({ ...base, state: 'published', note: t('coachHome:notePublished'), step: 'share' })
     else if (kind === 'match' && evaluated) {
-      if (now.getTime() < fullTime({ ...row, ends_at: row.ends_at ?? null })) items.push({ ...base, state: 'published', note: 'Published', step: null })
-      else if (evaluated.has(row.id)) items.push({ ...base, state: 'needs-you', note: 'Evaluation draft', step: 'publish-evaluation' })
-      else items.push({ ...base, state: 'needs-you', note: 'Evaluate the match', step: 'evaluate' })
+      if (now.getTime() < fullTime({ ...row, ends_at: row.ends_at ?? null })) items.push({ ...base, state: 'published', note: t('coachHome:notePublished'), step: null })
+      else if (evaluated.has(row.id)) items.push({ ...base, state: 'needs-you', note: t('coachHome:noteEvaluationDraft'), step: 'publish-evaluation' })
+      else items.push({ ...base, state: 'needs-you', note: t('coachHome:noteEvaluate'), step: 'evaluate' })
     }
-    else if (kind === 'match') items.push({ ...base, state: 'needs-you', note: 'Log the match', step: 'log' })
-    else if (kind === 'training' && noted?.has(row.id)) items.push({ ...base, state: 'published', note: 'Closed', step: null })
-    else if (!registerProblem(row, now)) items.push({ ...base, state: 'needs-you', note: 'Take the register', step: 'register' })
-    else items.push({ ...base, state: 'published', note: 'Published', step: null })
+    else if (kind === 'match') items.push({ ...base, state: 'needs-you', note: t('coachHome:noteLog'), step: 'log' })
+    else if (kind === 'training' && noted?.has(row.id)) items.push({ ...base, state: 'published', note: t('coachHome:noteClosed'), step: null })
+    else if (!registerProblem(row, now)) items.push({ ...base, state: 'needs-you', note: t('coachHome:noteRegister'), step: 'register' })
+    else items.push({ ...base, state: 'published', note: t('coachHome:notePublished'), step: null })
   }
 
   for (const session of sessions) {
@@ -100,13 +104,13 @@ export function coachWeek({ dates, events, sessions, inView, now = new Date(), e
     const source = {
       ...(event && { start_time: event.start_time, starts_at: event.starts_at, kit: event.kit, kit_snapshot: event.kit_snapshot,
         opponent: event.opponent, home_away: event.home_away, venue: event.venue }),
-      id: `session:${session.id}`, published: true, title: session.title || 'Session', event_date: session.session_date, squad: session.squad,
+      id: `session:${session.id}`, published: true, title: session.title || t('coachHome:session'), event_date: session.session_date, squad: session.squad,
       ...(session.venue && { venue: session.venue }), event_type: kind,
     }
     const reviewed = !!session.event_id && !!published?.has(session.event_id)
     items.push({
       id: source.id, date: session.session_date, kind, title: source.title, time: event ? phoneEventTime(event).time : null,
-      state: 'logged', note: reviewed ? 'Published' : 'Logged', step: reviewed ? 'review' : 'view', source, sessionId: session.id,
+      state: 'logged', note: reviewed ? t('coachHome:notePublished') : t('coachHome:logged'), step: reviewed ? 'review' : 'view', source, sessionId: session.id,
       ...(reviewed && linked && { row: linked }),
     })
   }

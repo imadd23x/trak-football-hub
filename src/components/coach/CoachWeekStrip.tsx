@@ -25,6 +25,7 @@ import { shareableFromRow, squadLabelFrom, whatsAppShareText } from '@/lib/event
 import { eventHeading, toPlayerEvent } from '@/lib/player-events'
 import type { EventRow } from '@/lib/coach-events'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { dateLocale, i18n, useLanguage, useTranslation } from '@/lib/i18n'
 
 /**
  * TRAK-163: the coach's week on Home, drafts included, so the schedule is visible without hunting for it.
@@ -38,19 +39,21 @@ export function CoachWeekStrip({ coachId, version = 0, everySquad = false }: {
   /** TRAK-262: Home's All pill. */
   everySquad?: boolean
 }) {
+  const { t } = useTranslation()
   const eventsOn = useFeature('events')
   const games = useFeature('games')
   const { squad, squads, eventInSquad } = useCoachSquad(coachId)
   if (!eventsOn) return null
   // Another coach remounts, so a late answer for the last one never shows.
   return <CoachWeek key={coachId} coachId={coachId} version={version} games={games}
-    inView={everySquad ? () => true : eventInSquad} squadLabel={everySquad ? 'All squads' : squad}
+    inView={everySquad ? () => true : eventInSquad} squadLabel={everySquad ? t('coachHome:allSquads') : squad}
     squadOf={squads.length >= 2 ? squadName : null} labelEach={everySquad} />
 }
 
 
 const weekTitle = (offset: number, monday: string) =>
-  offset === 0 ? 'This week' : offset === 1 ? 'Next week' : offset === -1 ? 'Last week' : `Week of ${format(parseISO(monday), 'd MMMM')}`
+  offset === 0 ? i18n.t('coachHome:thisWeek') : offset === 1 ? i18n.t('coachHome:nextWeek') : offset === -1 ? i18n.t('coachHome:lastWeek')
+    : i18n.t('coachHome:weekOf', { day: format(parseISO(monday), 'd MMMM', { locale: dateLocale() }) })
 
 function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, labelEach }: {
   coachId: string
@@ -64,6 +67,9 @@ function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, label
   /** Home on All: each event in the week names its squad too. */
   labelEach: boolean
 }) {
+  // The week's words and day names follow the language showing.
+  const { t } = useLanguage()
+  const locale = dateLocale()
   const [offset, setOffset] = useState(0)
   const dates = useMemo(() => weekDays(addDays(new Date(), offset * 7)), [offset])
   const [week, setWeek] = useState<{ monday: string; events: EventRow[]; sessions: WeekSession[]; evaluated: Set<string> | null
@@ -91,9 +97,9 @@ function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, label
     return () => { cancelled = true }
   }, [coachId, dates, version, attempt, games])
 
-  if (failed) return <div className="mb-4"><LoadError what="this week" onRetry={() => setAttempt(n => n + 1)} /></div>
+  if (failed) return <div className="mb-4"><LoadError what={t('coachHome:weekWhat')} onRetry={() => setAttempt(n => n + 1)} /></div>
   if (!week || week.monday !== dates[0]) {
-    return <LoadingSkeleton label="Loading this week" lines={4} rows={2} className="h-[320px] content-start rounded-2xl border border-line bg-surface p-5" />
+    return <LoadingSkeleton label={t('coachHome:weekLoading')} lines={4} rows={2} className="h-[320px] content-start rounded-2xl border border-line bg-surface p-5" />
   }
 
   const refresh = () => setAttempt(n => n + 1)
@@ -106,9 +112,9 @@ function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, label
   const today = format(new Date(), 'yyyy-MM-dd')
   const days: WeekDay[] = dates.map(date => ({
     id: date,
-    short: format(parseISO(date), 'EEE'),
+    short: format(parseISO(date), 'EEE', { locale }),
     date: format(parseISO(date), 'd'),
-    full: format(parseISO(date), 'EEEE d MMMM'),
+    full: format(parseISO(date), 'EEEE d MMMM', { locale }),
     today: date === today,
     // A match reads "vs Rivals FC", as everywhere events show.
     events: (byDate.get(date) ?? []).filter(item => strips.has(item.id))
@@ -117,7 +123,7 @@ function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, label
   }))
 
   return <WeekPicker key={dates[0]} title={weekTitle(offset, dates[0])}
-    subtitle={[`${format(parseISO(dates[0]), 'd')}–${format(parseISO(dates[6]), 'd MMMM')}`, squadLabel].filter(Boolean).join(' · ')}
+    subtitle={[`${format(parseISO(dates[0]), 'd')}–${format(parseISO(dates[6]), 'd MMMM', { locale })}`, squadLabel].filter(Boolean).join(' · ')}
     days={days} onPrevWeek={() => setOffset(n => n - 1)} onNextWeek={() => setOffset(n => n + 1)}
     renderDetails={(id, trigger) => {
       const { event, item } = strips.get(id)!
@@ -126,10 +132,10 @@ function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, label
         {/* TRAK-289: a published evaluation is final; its review is on the game page, never in the log's editor. */}
         {item.step === 'review' && item.row
           ? <div className="grid gap-3">
-              <p className="text-[14px] text-ink-2">The evaluation is published, so the result is final.</p>
+              <p className="text-[14px] text-ink-2">{t('coachHome:resultFinal')}</p>
               <Link to={`/coach/matches/${item.row.id}?tab=evaluation`}
                 className="flex min-h-11 w-full items-center justify-center rounded-xl bg-raised text-[14px] font-medium text-ink focus-visible:ring-2 focus-visible:ring-primary">
-                Open the review</Link>
+                {t('coachHome:openReview')}</Link>
             </div>
           : event.sessionId
           ? <SessionLog sessionId={event.sessionId} coachId={coachId} />
@@ -147,31 +153,32 @@ export function NextStep({ item, coachId, roster, onChanged }: {
   onChanged: () => void
 }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [publishing, setPublishing] = useState(false)
   const row = item.row
   const go = (label: string, onClick: () => void, disabled = false) =>
     <Button size="sm" className="min-w-[128px]" disabled={disabled} onClick={onClick}>{label}</Button>
 
-  if (item.step === 'publish' && row) return go(publishing ? 'Publishing…' : 'Publish', () => {
+  if (item.step === 'publish' && row) return go(publishing ? t('coachHome:publishing') : t('coachHome:publish'), () => {
     if (row.series_id) return navigate(`/coach/schedule?publish=${row.id}`)
     setPublishing(true)
     publishEvent(row.id).then(
-      () => { toast.success('Published to the squad'); onChanged() },
+      () => { toast.success(t('coachHome:publishedToSquad')); onChanged() },
       (error: Error) => toast.error(error.message),
     ).finally(() => setPublishing(false))
   }, publishing)
   if (item.step === 'share' && row) {
     // As the sheet's Share: an event for one squad names that squad; null is the whole roster.
     const rows = roster?.filter(p => row.squad == null || p.age_group?.trim() === row.squad)
-    if (!rows) return go('Share with families', () => {}, true)
+    if (!rows) return go(t('coachHome:shareWithFamilies'), () => {}, true)
     return <ShareEventButton text={whatsAppShareText(shareableFromRow(row, squadLabelFrom(rows)), { childNames: rows.map(p => p.player_name ?? '').filter(Boolean) })}
       className="arc inline-flex h-9 min-w-[128px] items-center justify-center gap-2 rounded-full bg-brand px-4 text-[14px] font-medium text-on-brand focus-visible:ring-2 focus-visible:ring-primary">
-      <ShareIcon size={16} />Share with families
+      <ShareIcon size={16} />{t('coachHome:shareWithFamilies')}
     </ShareEventButton>
   }
   // Imad, 23 Oct: the register opens here. Schedule shows only the squad last picked, so an event of another squad
   // (Home on All) was never found there, and Schedule stayed on today.
-  if (item.step === 'register' && row) return <StepSheet label="Take register" title="Take register" description={item.title}>
+  if (item.step === 'register' && row) return <StepSheet label={t('coachHome:takeRegister')} title={t('coachHome:takeRegister')} description={item.title}>
     {close => <TakeRegister eventId={row.id} coachId={coachId} sessionId={null} squad={row.squad ?? null} onSaved={() => { close(); onChanged() }} />}
   </StepSheet>
   // TRAK-288: where Games is on, the match's evaluation on its game page: Evaluate, then Publish once a draft is saved.
@@ -180,14 +187,14 @@ export function NextStep({ item, coachId, roster, onChanged }: {
     return <MatchAction state={item.step === 'evaluate' ? 'fullTime' : 'evaluationDraft'} eventId={row.id} />
   }
   // TRAK-289: a published evaluation is final; it's read on the game page, never in the old log's editor.
-  if (item.step === 'review' && row) return go('View review', () => navigate(`/coach/matches/${row.id}?tab=evaluation`))
-  if (item.step === 'log' && row) return go('Log it', () => navigate('/coach/sessions/quick', {
+  if (item.step === 'review' && row) return go(t('coachHome:viewReview'), () => navigate(`/coach/matches/${row.id}?tab=evaluation`))
+  if (item.step === 'log' && row) return go(t('coachHome:logIt'), () => navigate('/coach/sessions/quick', {
     state: { fromEvent: { eventId: row.id, date: row.event_date, opponent: row.opponent, homeAway: row.home_away, squad: row.squad ?? null } },
   }))
   // Imad, 23 Oct: View log shows the log; editing is one tap further, inside it.
   if (item.step === 'view' && item.sessionId) {
     const sessionId = item.sessionId
-    return <StepSheet label="View log" title={item.title} description="Logged">{() => <SessionLog sessionId={sessionId} coachId={coachId} />}</StepSheet>
+    return <StepSheet label={t('coachHome:viewLog')} title={item.title} description={t('coachHome:logged')}>{() => <SessionLog sessionId={sessionId} coachId={coachId} />}</StepSheet>
   }
   return null
 }

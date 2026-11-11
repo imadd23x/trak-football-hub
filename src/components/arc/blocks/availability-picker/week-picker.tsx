@@ -9,6 +9,7 @@ import { Button } from "../../button/button";
 import { motionTokens } from "../../lib/motion-tokens";
 import { CANCELLED_COLOR, EVENT_COLOR } from "@/lib/coach-events";
 import type { WeekState } from "@/lib/coach-week";
+import { useTranslation } from "@/lib/i18n";
 import styles from "./week-picker.module.css";
 
 export interface WeekEvent {
@@ -32,7 +33,8 @@ export interface WeekDay {
   events: WeekEvent[];
 }
 
-const STATE_WORD: Record<WeekState, string> = { draft: "Draft", clash: "Clashes", published: "Published", "needs-you": "Needs you", logged: "Logged", cancelled: "Cancelled" };
+/* Trak (TRAK-407): each state's word in the language showing. */
+const STATE_WORD = { draft: "coachHome:stateDraft", clash: "coachHome:stateClash", published: "coachHome:notePublished", "needs-you": "coachHome:needsYouTitle", logged: "coachHome:logged", cancelled: "coachHome:noteCancelled" } as const satisfies Record<WeekState, string>;
 const color = (event: WeekEvent) => event.state === "cancelled" ? CANCELLED_COLOR : EVENT_COLOR[event.kind];
 const firstEvent = (day: WeekDay) => day.events.find(event => event.state !== "cancelled") ?? day.events[0];
 
@@ -59,14 +61,15 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
   renderDetails?: (eventId: string, trigger: ReactElement) => ReactNode;
 }) {
   const reduce = !!useReducedMotion();
+  const { t } = useTranslation();
   const id = useId();
   const [dayId, setDayId] = useState(days.find(day => day.today)?.id ?? days[0].id);
   const [direction, setDirection] = useState(1);
   const day = days.find(entry => entry.id === dayId) ?? days[0];
   const [eventId, setEventId] = useState(firstEvent(day)?.id ?? null);
   const event = day.events.find(entry => entry.id === eventId) ?? null;
-  const summary = event ? `${event.title}${event.time ? ` · ${event.time}` : ""}` : `Nothing planned on ${day.full.split(" ")[0]}`;
-  const selectionLabel = event ? event.note : "Use + to plan an event";
+  const summary = event ? `${event.title}${event.time ? ` · ${event.time}` : ""}` : t("coachHome:nothingPlannedOn", { day: day.full.split(" ")[0] });
+  const selectionLabel = event ? event.note : t("coachHome:usePlus");
 
   function selectDay(index: number) {
     const next = days[index];
@@ -89,8 +92,8 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
           <p>{subtitle}</p>
         </div>
         <div className={styles.weekNav}>
-          <button type="button" className={styles.navButton} aria-label="Previous week" onClick={onPrevWeek}><ChevronLeft size={18} strokeWidth={1.75} aria-hidden /></button>
-          <button type="button" className={styles.navButton} aria-label="Next week" onClick={onNextWeek}><ChevronRight size={18} strokeWidth={1.75} aria-hidden /></button>
+          <button type="button" className={styles.navButton} aria-label={t("coachHome:previousWeek")} onClick={onPrevWeek}><ChevronLeft size={18} strokeWidth={1.75} aria-hidden /></button>
+          <button type="button" className={styles.navButton} aria-label={t("coachHome:nextWeekButton")} onClick={onNextWeek}><ChevronRight size={18} strokeWidth={1.75} aria-hidden /></button>
         </div>
       </header>
 
@@ -100,7 +103,7 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
           const waiting = entry.events.some(item => item.state === "needs-you");
           return <button key={entry.id} type="button" className={styles.day} data-selected={selected || undefined} data-today={entry.today || undefined}
             data-needs-you={waiting || undefined} aria-pressed={selected}
-            aria-label={`${entry.full}${entry.today ? ", today" : ""}, ${entry.events.length ? `${entry.events.length} ${entry.events.length === 1 ? "event" : "events"}` : "nothing planned"}${waiting ? ", needs you" : ""}`}
+            aria-label={`${entry.full}${entry.today ? t("coachHome:dayToday") : ""}, ${entry.events.length ? t("coachHome:dayEvents", { count: entry.events.length }) : t("coachHome:dayNothing")}${waiting ? t("coachHome:dayNeedsYou") : ""}`}
             onClick={() => selectDay(index)}>
             {selected && <motion.span layoutId={`${id}-day`} className={styles.dayHighlight} transition={reduce ? { duration: 0 } : motionTokens.spring.snappy} />}
             <span className={styles.dayName}>{entry.short}</span>
@@ -118,28 +121,28 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
             </AnimatePresence>
           </span>
         </h3>
-        <span className={styles.legend}><i style={{ ["--dot" as string]: EVENT_COLOR.training }} aria-hidden="true" />Training<i style={{ ["--dot" as string]: EVENT_COLOR.match }} aria-hidden="true" />Match<i className={styles.needs} aria-hidden="true" />Needs you</span>
+        <span className={styles.legend}><i style={{ ["--dot" as string]: EVENT_COLOR.training }} aria-hidden="true" />{t("coachHome:legendTraining")}<i style={{ ["--dot" as string]: EVENT_COLOR.match }} aria-hidden="true" />{t("coachHome:legendMatch")}<i className={styles.needs} aria-hidden="true" />{t("coachHome:needsYouTitle")}</span>
       </div>
 
       <div className={styles.slotsStage}>
         <AnimatePresence mode="popLayout" initial={false} custom={direction}>
-          <motion.ul key={day.id} className={styles.slots} aria-label={`Events on ${day.full}`} custom={direction} variants={reduce ? fadeVariants : slideVariants}
+          <motion.ul key={day.id} className={styles.slots} aria-label={t("coachHome:eventsOn", { day: day.full })} custom={direction} variants={reduce ? fadeVariants : slideVariants}
             initial="enter" animate="center" exit="exit" transition={reduce ? { duration: motionTokens.duration.instant } : { x: motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.fast } }}>
-            {day.events.length === 0 && <li className={styles.empty}>Nothing planned</li>}
+            {day.events.length === 0 && <li className={styles.empty}>{t("coachHome:nothingPlanned")}</li>}
             {day.events.map(entry => {
               const selected = event?.id === entry.id;
               return <li key={entry.id}>
                 <button type="button" className={styles.slot} data-selected={selected || undefined} data-state={entry.state} aria-pressed={selected}
-                  aria-label={`${entry.title}, ${entry.time ?? "no time set"}, ${STATE_WORD[entry.state]}`} onClick={() => setEventId(entry.id)} style={{ ["--dot" as string]: color(entry) }}>
+                  aria-label={`${entry.title}, ${entry.time ?? t("coachHome:noTimeSet")}, ${t(STATE_WORD[entry.state])}`} onClick={() => setEventId(entry.id)} style={{ ["--dot" as string]: color(entry) }}>
                   <span className={styles.slotBar} aria-hidden="true" />
-                  <span className={styles.slotTime}>{entry.time ?? (entry.state === "logged" ? "Done" : "TBC")}</span>
+                  <span className={styles.slotTime}>{entry.time ?? (entry.state === "logged" ? t("coachHome:timeDone") : t("coachHome:timeTbc"))}</span>
                   <span className={styles.slotText}>
                     <span className={styles.slotTitle}>{entry.title}</span>
                     <span className={styles.slotMeta}>{entry.note}</span>
                   </span>
                   {/* Trak (TRAK-266): a badge in the colour key only where the coach is needed. */}
-                  {entry.state === "needs-you" && <Badge tone="warning" size="sm">Needs you</Badge>}
-                  {entry.state === "clash" && <Badge tone="danger" size="sm">Clashes</Badge>}
+                  {entry.state === "needs-you" && <Badge tone="warning" size="sm">{t("coachHome:needsYouTitle")}</Badge>}
+                  {entry.state === "clash" && <Badge tone="danger" size="sm">{t("coachHome:stateClash")}</Badge>}
                   <span className={styles.slotCheck} aria-hidden="true"><Check size={14} strokeWidth={2} /></span>
                 </button>
               </li>;
@@ -162,7 +165,7 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
           </span>
         </div>
         {event && <div className={styles.footerActions}>
-          {renderDetails?.(event.id, <Button variant="ghost" size="sm">Details</Button>)}
+          {renderDetails?.(event.id, <Button variant="ghost" size="sm">{t("coachHome:details")}</Button>)}
           {renderPrimary?.(event.id)}
         </div>}
       </footer>

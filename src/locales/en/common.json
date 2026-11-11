@@ -13,5 +13,12 @@
   "unsaved_other": " unsaved",
   "change_one": "change",
   "change_other": "changes",
-  "settingsSections": "Settings sections"
+  "settingsSections": "Settings sections",
+  "calendar": "Calendar",
+  "loadThis": "this",
+  "offline": "You're offline",
+  "couldntConnect": "Couldn't connect",
+  "loadOffline": "We can't load {{what}} without a connection. Nothing has been lost.",
+  "loadFailed": "We couldn't load {{what}} just now. This isn't a change to your record.",
+  "retrying": "Retrying…"
 }

@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from 'react'
 import { format, parseISO } from 'date-fns'
+import { dateLocale, i18n, useTranslation } from '@/lib/i18n'
 import { FileUp, Pencil, Trash2 } from 'lucide-react'
 import {
   FIXTURE_TEMPLATE_CSV,
@@ -28,19 +29,18 @@ interface FixtureImportProps {
 
 const MAX_FILE_BYTES = 512 * 1024
 const TEMPLATE_HREF = `data:text/csv;charset=utf-8,${encodeURIComponent(FIXTURE_TEMPLATE_CSV)}`
-const EDIT_FIELDS: { field: FixtureField; label: string; placeholder: string }[] = [
-  { field: 'date', label: 'Date', placeholder: 'YYYY-MM-DD' },
-  { field: 'kickoff', label: 'Kick-off', placeholder: '18:30' },
-  { field: 'meetTime', label: 'Meet time', placeholder: '17:45' },
-  { field: 'opponent', label: 'Opponent', placeholder: 'Empty for a training' },
-  { field: 'homeAway', label: 'Home or away', placeholder: 'Home or Away' },
-  { field: 'venue', label: 'Venue', placeholder: '' },
-  { field: 'kit', label: 'Kit', placeholder: '' },
-]
+/* TRAK-407: each label is a word key, read in the language showing. "Home or Away" stays as typed: it is what the file reads. */
+const EDIT_FIELDS = [
+  { field: 'date', label: 'coachSchedule:date', placeholder: 'YYYY-MM-DD' },
+  { field: 'kickoff', label: 'coachSchedule:fxKickoff', placeholder: '18:30' },
+  { field: 'meetTime', label: 'coachSchedule:fxMeetTime', placeholder: '17:45' },
+  { field: 'opponent', label: 'coachSchedule:opponent', placeholder: 'coachSchedule:fxEmptyForTraining' },
+  { field: 'homeAway', label: 'coachSchedule:homeOrAway', placeholder: 'Home or Away' },
+  { field: 'venue', label: 'coachSchedule:venue', placeholder: '' },
+  { field: 'kit', label: 'coachSchedule:kit', placeholder: '' },
+] as const satisfies readonly { field: FixtureField; label: string; placeholder: string }[]
 
 type Loaded = { rows: { line: number; values: FixtureValues }[]; monthFirstFile: boolean; warnings: string[] }
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 function readText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -57,14 +57,16 @@ function looksLikeCsv(file: File): boolean {
 }
 
 function summary(f: Fixture): string {
-  const day = format(parseISO(f.date), 'EEE d MMM')
+  const day = format(parseISO(f.date), 'EEE d MMM', { locale: dateLocale() })
+  const side = f.homeAway === 'home' ? i18n.t('coachSchedule:fxSideHome') : f.homeAway === 'away' ? i18n.t('coachSchedule:fxSideAway') : null
   const what = f.kind === 'match'
-    ? `Match vs ${f.opponent}${f.homeAway ? ` (${f.homeAway})` : ''}`
-    : 'Training'
-  return [day, f.kickoff ?? 'time to be confirmed', what].join(' · ')
+    ? `${i18n.t('coachSchedule:fxMatchVs', { opponent: f.opponent })}${side ? ` (${side})` : ''}`
+    : i18n.t('coachSchedule:kindTraining')
+  return [day, f.kickoff ?? i18n.t('coachSchedule:fxTimeTbc'), what].join(' · ')
 }
 
 export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
+  const { t } = useTranslation()
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [fileProblem, setFileProblem] = useState<string[] | null>(null)
   const [editing, setEditing] = useState<number | null>(null)
@@ -79,12 +81,12 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
     if (!file) return
     if (!looksLikeCsv(file)) {
       setLoaded(null)
-      setFileProblem(["That's not a CSV file. Save the fixtures as CSV, or copy them into the template."])
+      setFileProblem([t('coachSchedule:fxNotCsv')])
       return
     }
     if (file.size > MAX_FILE_BYTES) {
       setLoaded(null)
-      setFileProblem(['That file is too big for a fixture list. Split it into smaller files.'])
+      setFileProblem([t('coachSchedule:fxTooBig')])
       return
     }
     let text: string
@@ -92,7 +94,7 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
       text = await readText(file)
     } catch {
       setLoaded(null)
-      setFileProblem(["Couldn't read that file. Try choosing it again."])
+      setFileProblem([t('coachSchedule:fxCouldntRead')])
       return
     }
     const read = readFixturesCsv(text)
@@ -148,7 +150,7 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
       >
         <FileUp size={22} className="mx-auto text-ink-3" />
         <label className="mt-3 inline-block cursor-pointer rounded-[12px] bg-brand px-4 py-2 text-[13px] font-semibold text-on-brand">
-          Choose a CSV file
+          {t('coachSchedule:fxChoose')}
           <input
             type="file"
             accept=".csv,text/csv"
@@ -156,11 +158,11 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
             onChange={e => { void takeFile(e.target.files?.[0]); e.target.value = '' }}
           />
         </label>
-        <p className="mt-2 text-[12px] text-ink-3">or drop it here</p>
+        <p className="mt-2 text-[12px] text-ink-3">{t('coachSchedule:fxOrDrop')}</p>
         <p className="mt-3 text-[12px] text-ink-3">
-          CSV only. If your league sends a PDF, copy the fixtures into the template.{' '}
+          {t('coachSchedule:fxCsvOnly')}{' '}
           <a href={TEMPLATE_HREF} download="trak-fixtures-template.csv" className="text-brand underline">
-            Download the template
+            {t('coachSchedule:fxDownloadTemplate')}
           </a>
         </p>
       </div>
@@ -171,16 +173,16 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
         </div>
       )}
 
-      {added !== null && <p className="text-[13px] text-brand">Added {plural(added, 'fixture', 'fixtures')}.</p>}
+      {added !== null && <p className="text-[13px] text-brand">{t('coachSchedule:fxAdded', { count: added })}</p>}
 
       {loaded && (
         <>
           {loaded.warnings.map(w => <p key={w} className="text-[12px] text-ink-3">{w}</p>)}
           <p className="text-[12px] text-ink-2">
             {[
-              `${toAdd.length} to add`,
-              needFixing > 0 ? `${needFixing} ${needFixing === 1 ? 'needs' : 'need'} fixing` : null,
-              known > 0 ? `${known} already on your schedule` : null,
+              t('coachSchedule:fxToAdd', { count: toAdd.length }),
+              needFixing > 0 ? t('coachSchedule:fxNeedFixing', { count: needFixing }) : null,
+              known > 0 ? t('coachSchedule:fxKnown', { count: known }) : null,
             ].filter(Boolean).join(' · ')}
           </p>
 
@@ -190,23 +192,23 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
               return (
                 <li
                   key={row.line}
-                  aria-label={`Line ${row.line}`}
+                  aria-label={t('coachSchedule:fxLine', { line: row.line })}
                   className={`rounded-[14px] border px-4 py-3 ${row.fixture ? 'border-line' : 'border-destructive/60'}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[11px] text-ink-3">Line {row.line}</p>
+                      <p className="text-[11px] text-ink-3">{t('coachSchedule:fxLine', { line: row.line })}</p>
                       <p className="text-[13px] text-ink">
-                        {row.fixture ? summary(row.fixture) : (row.values.date || 'No date')}
+                        {row.fixture ? summary(row.fixture) : (row.values.date || t('coachSchedule:fxNoDate'))}
                       </p>
                       {row.fixture?.venue && <p className="text-[12px] text-ink-3">{row.fixture.venue}</p>}
-                      {knownRow && <p className="text-[12px] text-ink-3">Already on your schedule: not added again.</p>}
+                      {knownRow && <p className="text-[12px] text-ink-3">{t('coachSchedule:fxAlreadyOn')}</p>}
                       {row.problems.map(p => <p key={p} className="text-[12px] text-destructive">{p}</p>)}
                     </div>
                     <div className="flex shrink-0 gap-1">
                       <button
                         type="button"
-                        aria-label={`Edit line ${row.line}`}
+                        aria-label={t('coachSchedule:fxEditLine', { line: row.line })}
                         onClick={() => setEditing(editing === row.line ? null : row.line)}
                         className="rounded-full p-2 text-ink-2"
                       >
@@ -214,7 +216,7 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
                       </button>
                       <button
                         type="button"
-                        aria-label={`Remove line ${row.line}`}
+                        aria-label={t('coachSchedule:fxRemoveLine', { line: row.line })}
                         onClick={() => remove(row.line)}
                         className="rounded-full p-2 text-ink-2"
                       >
@@ -227,10 +229,10 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       {EDIT_FIELDS.map(({ field, label, placeholder }) => (
                         <label key={field} className="text-[11px] text-ink-3">
-                          {label}
+                          {t(label)}
                           <input
                             value={row.values[field]}
-                            placeholder={placeholder}
+                            placeholder={placeholder.startsWith('coachSchedule:') ? t(placeholder as 'coachSchedule:fxEmptyForTraining') : placeholder}
                             onChange={e => update(row.line, field, e.target.value)}
                             className="mt-1 w-full rounded-[10px] bg-raised px-2 py-1.5 text-[13px] text-ink outline-none"
                           />
@@ -245,12 +247,12 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
 
           {saveFailed && (
             <p role="alert" className="text-[13px] text-destructive">
-              Couldn't save the fixtures. Your rows are still here; try again.
+              {t('coachSchedule:fxSaveFailed')}
             </p>
           )}
 
           {toAdd.length === 0 && needFixing === 0 ? (
-            <p className="text-[13px] text-ink-2">Nothing new to add: every fixture is already on your schedule.</p>
+            <p className="text-[13px] text-ink-2">{t('coachSchedule:fxNothingNew')}</p>
           ) : (
             <button
               type="button"
@@ -258,7 +260,7 @@ export function FixtureImport({ onConfirm, existingKeys }: FixtureImportProps) {
               disabled={saving || needFixing > 0 || toAdd.length === 0}
               className="w-full rounded-[14px] bg-brand py-3 text-[14px] font-semibold text-on-brand disabled:opacity-40"
             >
-              {`Add ${plural(toAdd.length, 'fixture', 'fixtures')}`}
+              {t('coachSchedule:fxAdd', { count: toAdd.length })}
             </button>
           )}
         </>

@@ -33,6 +33,23 @@ describe('TRAK-407: the coach\'s Schedule in Greek', () => {
     expect(pastDateProblem('2026-11-01', '2026-11-11')).toBe('Η ημερομηνία πέρασε: κάντε καταγραφή')
   })
 
+  it('counts who is here and who cannot come, in Greek', async () => {
+    await showLanguage('el')
+    expect(i18n.t('coachSchedule:registerSaved', { count: 14 })).toBe('Οι παρουσίες αποθηκεύτηκαν: 14 παρόντες.')
+    expect(i18n.t('coachSchedule:cantMakeItNames', { count: 1, names: 'Άρης' })).toBe('1 δεν μπορεί: Άρης')
+    expect(i18n.t('coachSchedule:cantMakeItNames', { count: 2, names: 'Άρης, Νίκος' })).toBe('2 δεν μπορούν: Άρης, Νίκος')
+    expect(i18n.t('coachSchedule:fxAdd', { count: 1 })).toBe('Προσθήκη 1 αγώνα')
+    expect(i18n.t('coachSchedule:fxAdd', { count: 3 })).toBe('Προσθήκη 3 αγώνων')
+  })
+
+  it('keeps the pop-ups\' English as it was', () => {
+    expect(i18n.t('coachSchedule:registerSaved', { count: 14 })).toBe('Register saved: 14 present.')
+    expect(i18n.t('coachSchedule:goalCount', { count: 1 })).toBe('1 goal')
+    expect(i18n.t('coachSchedule:goalCount', { count: 2 })).toBe('2 goals')
+    expect(i18n.t('coachSchedule:fxNeedFixing', { count: 1 })).toBe('1 needs fixing')
+    expect(i18n.t('coachSchedule:fxAdded', { count: 2 })).toBe('Added 2 fixtures.')
+  })
+
   it('keeps English as it was', () => {
     expect(i18n.t('coachSchedule:savedDraft')).toBe('Saved as a draft. Tap Publish when it’s ready.')
     expect(i18n.t('coachSchedule:addedFixtures', { count: 2 })).toBe("Added 2 fixtures as drafts. Publish each when it's ready.")

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { i18n, showLanguage, SOURCE_LANGUAGE } from '@/lib/i18n'
-import { formatEventDay } from '@/lib/coach-events'
+import { blankForm, formProblem, formatEventDay, pastDateProblem, PAST_DATE_PROBLEM } from '@/lib/coach-events'
 
 /* TRAK-407 (Languages 2/8, Schedule): the day's name follows the language, and the words that count use Greek's forms. */
 
@@ -22,6 +22,15 @@ describe('TRAK-407: the coach\'s Schedule in Greek', () => {
     expect(i18n.t('coachSchedule:savedNotPublished', { count: 3, why: '' }).trim()).toBe('Αποθηκεύτηκαν ως πρόχειρα, δεν δημοσιεύτηκαν.')
     expect(i18n.t('coachSchedule:draftsRemoved', { count: 1 })).toBe(' Αφαιρέθηκε 1 πρόχειρο.')
     expect(i18n.t('coachSchedule:cancelTitle', { title: 'Προπόνηση' })).toBe('Ακύρωση: Προπόνηση;')
+  })
+
+  it('says what is wrong with the event form in the language showing', async () => {
+    const form = { ...blankForm('2026-11-12'), time: '' }
+    expect(formProblem(form)).toBe('Pick a start time')
+    expect(pastDateProblem('2026-11-01', '2026-11-11')).toBe(PAST_DATE_PROBLEM)
+    await showLanguage('el')
+    expect(formProblem(form)).toBe('Διαλέξτε ώρα έναρξης')
+    expect(pastDateProblem('2026-11-01', '2026-11-11')).toBe('Η ημερομηνία πέρασε: κάντε καταγραφή')
   })
 
   it('keeps English as it was', () => {

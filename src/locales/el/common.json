@@ -1,0 +1,17 @@
+{
+  "back": "Πίσω",
+  "retry": "Ξανά",
+  "loading": "Φόρτωση…",
+  "save": "Αποθήκευση",
+  "saveLong": " αλλαγών",
+  "saving": "Αποθήκευση",
+  "discard": "Ακύρωση",
+  "changesSaved": "Οι αλλαγές αποθηκεύτηκαν",
+  "saveStatus": "Κατάσταση αποθήκευσης",
+  "unsavedChanges": "Μη αποθηκευμένες αλλαγές",
+  "unsaved_one": " μη αποθηκευμένη",
+  "unsaved_other": " μη αποθηκευμένες",
+  "change_one": "αλλαγή",
+  "change_other": "αλλαγές",
+  "settingsSections": "Ενότητες ρυθμίσεων"
+}

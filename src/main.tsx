@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
 import { reloadForNewBuild } from "./lib/stale-build";
 import { sentryOptions } from "./lib/sentry-options";
+import { startLanguage } from "./lib/i18n";
 import "./index.css";
 // TRAK-163: Arc component tokens, scoped to .arc (see the file for why).
 import "./components/arc/arc-theme.css";
@@ -37,4 +38,8 @@ if (import.meta.env.DEV) {
   axe.default(React.default, ReactDOM.default, 1000);
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+// TRAK-406: the language last picked on this device is ready before the first screen, so nothing flashes in English.
+// startLanguage never fails (it stays English if the words can't load); `finally` makes sure Trak opens regardless.
+void startLanguage().finally(() => {
+  createRoot(document.getElementById("root")!).render(<App />);
+});

@@ -1,3 +1,5 @@
+import { i18n } from '@/lib/i18n'
+
 /* TRAK-259: where each coach page sits in the coach's frame (CoachFrame). */
 
 export type CoachScreen = 'home' | 'calendar' | 'squad' | 'games' | 'training' | 'library' | 'settings'
@@ -6,30 +8,34 @@ export const COACH_SCREEN_PATH: Record<CoachScreen, string> = {
   home: '/coach/home', calendar: '/coach/schedule', squad: '/coach/squad', games: '/coach/matches', training: '/coach/training', library: '/coach/trainings', settings: '/settings',
 }
 
-/** Which nav row a path belongs to, and the name in the laptop's top bar. */
-const PLACES: [prefix: string, screen: CoachScreen | null, title: string][] = [
-  ['/coach/home', 'home', 'Home'],
-  ['/coach/schedule', 'calendar', 'Schedule'], // TRAK-255
-  ['/coach/squad/player', 'squad', 'Player'], // TRAK-351: a player's own page, in Squad
-  ['/coach/squad', 'squad', 'Squad'],
-  ['/coach/matches', 'games', 'Matches'], // TRAK-283: Games home and each game's page
-  ['/coach/training/drills', 'training', 'Drills'], // TRAK-367: so a page opened from Drills doesn't read Training / Training
-  ['/coach/training', 'training', 'Training'], // TRAK-294: Training home, its drills and plans
-  ['/coach/trainings', 'library', 'Library'],
-  ['/settings', 'settings', 'Settings'],
-  ['/coach/profile', 'settings', 'Profile'],
-  ['/coach/manual', 'settings', 'How Trak works'],
-  ['/coach/feedback', null, 'Feedback'],
-  ['/coach/assess', null, 'Assess'],
+type PlaceName = 'home' | 'schedule' | 'player' | 'squad' | 'matches' | 'drills' | 'training' | 'library' | 'settings' | 'profile'
+  | 'howTrakWorks' | 'feedback' | 'assess' | 'evaluation' | 'log'
+
+/** Which nav row a path belongs to, and the name in the laptop's top bar (its word in nav.json, TRAK-406). */
+const PLACES: [prefix: string, screen: CoachScreen | null, title: PlaceName][] = [
+  ['/coach/home', 'home', 'home'],
+  ['/coach/schedule', 'calendar', 'schedule'], // TRAK-255
+  ['/coach/squad/player', 'squad', 'player'], // TRAK-351: a player's own page, in Squad
+  ['/coach/squad', 'squad', 'squad'],
+  ['/coach/matches', 'games', 'matches'], // TRAK-283: Games home and each game's page
+  ['/coach/training/drills', 'training', 'drills'], // TRAK-367: so a page opened from Drills doesn't read Training / Training
+  ['/coach/training', 'training', 'training'], // TRAK-294: Training home, its drills and plans
+  ['/coach/trainings', 'library', 'library'],
+  ['/settings', 'settings', 'settings'],
+  ['/coach/profile', 'settings', 'profile'],
+  ['/coach/manual', 'settings', 'howTrakWorks'],
+  ['/coach/feedback', null, 'feedback'],
+  ['/coach/assess', null, 'assess'],
   // TRAK-364: the squad's evaluation opens from Home's Needs you.
-  ['/coach/evaluation', 'home', 'Evaluation'],
+  ['/coach/evaluation', 'home', 'evaluation'],
   // TRAK-186: the log's pages open from Home, so Home stays marked on them.
-  ['/coach/sessions', 'home', 'Log'],
+  ['/coach/sessions', 'home', 'log'],
 ]
 
 export function placeOf(path: string): { screen: CoachScreen | null; title: string } {
   const hit = PLACES.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`))
-  return hit ? { screen: hit[1], title: hit[2] } : { screen: null, title: 'Trak' }
+  // In the language showing; a screen that shows it re-renders when the language changes (useTranslation).
+  return hit ? { screen: hit[1], title: i18n.t(`nav:${hit[2]}`) } : { screen: null, title: i18n.t('nav:trak') }
 }
 
 /** TRAK-334: the nav row a page sits under, as the first crumb of its trail when nothing came before it (a link from

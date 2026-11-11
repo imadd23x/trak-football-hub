@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, type NavigateOptions } from 'react-router-dom'
 import { ClipboardCheck, ClipboardPen, Plus, Swords, CalendarPlus, Dumbbell } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,6 +15,7 @@ import { TimePicker } from '@/components/arc/time-picker/time-picker'
 import { ActionMorph, type MorphRow } from '@/components/arc/action-morph/action-morph'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { useCreateSaved } from './coach-frame-context'
+import { useTranslation } from '@/lib/i18n'
 
 /* TRAK-182 part 8 (Imad, 15 Oct): the coach's "+" opens a menu, then the
    shortest form that makes a real record. Only "New event" finishes here (a
@@ -67,6 +68,7 @@ export function QuickAdd({ onSaved }: { onSaved?: () => void; corner?: 'top' | '
 /** The coach's "+". `bar`: round, in the phone's glass tab bar, growing upward. `top`: "+ Create" at a laptop's top right, growing down. */
 export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; onSaved?: () => void }) {
   const { user } = useAuth()
+  const { t } = useTranslation()
   // TRAK-176: a new event belongs to the squad picked; wait until the squads are known.
   const coachSquad = useCoachSquad(user?.id)
   const navigate = useNavigate()
@@ -217,11 +219,26 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
     <Button size="md" className="w-full" onClick={continueMatch}>Continue</Button>
   </div>
 
-  return <ActionMorph label={bar ? 'Quick add' : 'Create'} anchor={bar ? 'bottom' : 'top'} lift={bar ? keyboard : 0}
+  // TRAK-406: "+ Create" is as wide as its word in the language showing ("+ Δημιουργία" is wider), at least 104 px.
+  const topWidth = useTopButtonWidth(t('nav:create'))
+  return <ActionMorph label={bar ? t('nav:quickAdd') : t('nav:create')} anchor={bar ? 'bottom' : 'top'} lift={bar ? keyboard : 0}
     // At the top the root needs a size of its own: in the bar the slot gives it one.
-    className={bar ? undefined : 'arc'} style={bar ? undefined : { width: 104, height: 40 }} rows={rows} view={view} onViewChange={show} onSelect={choose}
+    className={bar ? undefined : 'arc'} style={bar ? undefined : { width: topWidth, height: 40 }} rows={rows} view={view} onViewChange={show} onSelect={choose}
     faces={[{ id: 'event', title: 'New event', content: eventFace }, { id: 'match', title: 'Log a match', content: matchFace }]}
     trigger={bar
       ? <Plus size={22} strokeWidth={2.2} aria-hidden="true" className="text-brand" />
-      : <><Plus size={16} strokeWidth={2.2} aria-hidden="true" className="text-brand" />Create</>} />
+      : <><Plus size={16} strokeWidth={2.2} aria-hidden="true" className="text-brand" />{t('nav:create')}</>} />
+}
+
+/** The laptop's "+ Create" needs a size of its own (ActionMorph morphs from it): its word, plus the "+" and padding. */
+function useTopButtonWidth(word: string) {
+  return useMemo(() => {
+    const MIN = 104, AROUND = 14 * 2 + 16 + 6 + 4 // padding, the "+", the gap, a little room
+    if (typeof document === 'undefined') return MIN
+    const context = document.createElement('canvas').getContext('2d')
+    if (!context) return MIN
+    const style = getComputedStyle(document.body)
+    context.font = `500 15px ${style.fontFamily}`
+    return Math.max(MIN, Math.ceil(context.measureText(word).width + AROUND))
+  }, [word])
 }

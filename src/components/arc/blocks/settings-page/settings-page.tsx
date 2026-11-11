@@ -11,6 +11,7 @@ import { Button } from "../../button/button";
 import { TextMorph } from "../../text-morph/text-morph";
 import { motionTokens } from "../../lib/motion-tokens";
 import styles from "./settings-page.module.css";
+import { useTranslation } from "@/lib/i18n";
 
 export interface SettingsSection {
   id: string;
@@ -34,6 +35,8 @@ const enterEase = [...motionTokens.ease.enter] as [number, number, number, numbe
 
 /** The bar grows out of a small puck, then its width and height follow whatever it holds, so saving shrinks it into a confirmation. */
 function SaveBar({ state, count, onDiscard, onSave, shake, barRef }: { state: "edit" | "saving" | "saved"; count: number; onDiscard: () => void; onSave: () => void; shake: MotionValue<number>; barRef: RefObject<HTMLDivElement> }) {
+  // TRAK-406: the bar's words in the language showing.
+  const { t } = useTranslation();
   const reduce = useReducedMotion();
   const content = useRef<HTMLDivElement>(null);
   const width = useMotionValue(52);
@@ -55,7 +58,7 @@ function SaveBar({ state, count, onDiscard, onSave, shake, barRef }: { state: "e
   }, [height, reduce, width]);
   const phase = reduce ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } } : { initial: { opacity: 0, scale: .96, filter: blur(motionTokens.blur.soft) }, animate: { opacity: 1, scale: 1, filter: blur(0) }, exit: { opacity: 0, scale: .96, filter: blur(motionTokens.blur.soft) } };
   const phaseTransition = { duration: reduce ? motionTokens.duration.instant : motionTokens.duration.standard, ease: enterEase };
-  return <motion.div ref={barRef} className={styles.bar} role="group" aria-label={state === "saved" ? "Save status" : "Unsaved changes"} style={{ width, height, x: shake }}
+  return <motion.div ref={barRef} className={styles.bar} role="group" aria-label={state === "saved" ? t("common:saveStatus") : t("common:unsavedChanges")} style={{ width, height, x: shake }}
     initial={reduce ? { opacity: 0 } : { opacity: 0, y: 28, filter: blur(motionTokens.blur.soft) }} animate={{ opacity: 1, y: 0, filter: blur(0) }}
     exit={reduce ? { opacity: 0, transition: { duration: motionTokens.duration.instant } } : { opacity: 0, y: 20, width: 52, height: 52, filter: blur(motionTokens.blur.soft), transition: { width: motionTokens.spring.smooth, height: motionTokens.spring.smooth, y: { ...motionTokens.spring.smooth, delay: .06 }, opacity: { duration: motionTokens.duration.exit, delay: .1 }, filter: { duration: motionTokens.duration.exit, delay: .1 } } }}
     transition={reduce ? { duration: motionTokens.duration.instant } : { y: motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.fast }, filter: { duration: motionTokens.duration.standard } }}>
@@ -64,12 +67,12 @@ function SaveBar({ state, count, onDiscard, onSave, shake, barRef }: { state: "e
         {state === "saved"
           ? <motion.div key="saved" className={styles.barSaved} {...phase} transition={phaseTransition}>
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><motion.path d="M5 12.5 9.5 17 19 7.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: reduce ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: reduce ? 0 : .34, delay: reduce ? 0 : .08, ease: enterEase }} /></svg>
-            <span>Changes saved</span>
+            <span>{t("common:changesSaved")}</span>
           </motion.div>
           : <motion.div key="edit" className={styles.barEdit} {...phase} transition={phaseTransition}>
-            <span className={styles.barCount}><span className={styles.inherit}><AnimatedCounter value={count} /></span><span className={styles.unsaved}>&nbsp;unsaved</span>&nbsp;<TextMorph>{count === 1 ? "change" : "changes"}</TextMorph></span>
-            <Button type="button" variant="ghost" size="sm" disabled={state === "saving"} onClick={onDiscard}>Discard</Button>
-            <Button type="button" size="sm" loading={state === "saving"} onClick={onSave}>{state === "saving" ? "Saving" : <span>Save<span className={styles.long}>&nbsp;changes</span></span>}</Button>
+            <span className={styles.barCount}><span className={styles.inherit}><AnimatedCounter value={count} /></span><span className={styles.unsaved}>{t("common:unsaved", { count }).replace(" ", "\u00a0")}</span>&nbsp;<TextMorph>{t("common:change", { count })}</TextMorph></span>
+            <Button type="button" variant="ghost" size="sm" disabled={state === "saving"} onClick={onDiscard}>{t("common:discard")}</Button>
+            <Button type="button" size="sm" loading={state === "saving"} onClick={onSave}>{state === "saving" ? t("common:saving") : <span>{t("common:save")}<span className={styles.long}>{t("common:saveLong").replace(" ", "\u00a0")}</span></span>}</Button>
           </motion.div>}
       </AnimatePresence>
     </div>
@@ -82,6 +85,7 @@ function SaveBar({ state, count, onDiscard, onSave, shake, barRef }: { state: "e
  * something changed.
  */
 export function SettingsPage({ title, sections, bar }: { title: string; sections: SettingsSection[]; bar?: SaveBarProps }) {
+  const { t } = useTranslation();
   const id = useId();
   const navGroup = useId();
   const reduce = useReducedMotion();
@@ -138,7 +142,7 @@ export function SettingsPage({ title, sections, bar }: { title: string; sections
             <h1 id={`${id}-title`} tabIndex={-1}>{title}</h1>
           </div>
           <LayoutGroup id={navGroup}>
-            <nav aria-label="Settings sections">
+            <nav aria-label={t("common:settingsSections")}>
               <ul className={styles.navList}>
                 {sections.map((item, index) => {
                   const Icon = item.icon, pending = item.pending ?? 0;

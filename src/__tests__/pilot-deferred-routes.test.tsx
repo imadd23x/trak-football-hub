@@ -5,7 +5,7 @@
  * that every action sends nothing are in parked-screens-coming-soon.test.tsx
  * and parked-feature-boundary.test.tsx. The backend stays closed (G7).
  */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import App from '@/App'
@@ -31,7 +31,6 @@ const stub = (name: string) => ({ default: function Stub() {
   return <h1>{name} screen{parked ? ' (parked)' : ''}</h1>
 } })
 vi.mock('@/pages/player/PlayerPassport', () => stub('Passport'))
-vi.mock('@/pages/player/PlayerEvolutionCard', () => stub('Evolution card'))
 vi.mock('@/pages/coach/CoachReviewFeedback', () => stub('Feedback review'))
 vi.mock('@/pages/coach/CoachAssistant', () => stub('Assistant'))
 vi.mock('@/pages/coach/CoachSchedule', () => stub('Schedule'))
@@ -50,7 +49,7 @@ const mount = (path: string) => { window.history.pushState({}, '', path); return
 
 describe('TRAK-85 parked routes', () => {
   it.each([
-    ['player', '/player/passport', 'Passport'], ['player', '/player/evolution', 'Evolution card'],
+    ['player', '/player/passport', 'Passport'],
     ['coach', '/coach/feedback/synthetic-assessment', 'Feedback review'], ['coach', '/coach/assistant', 'Assistant'],
     ['coach', '/coach/schedule', 'Schedule'], ['coach', '/coach/recognition', 'Recognition'], ['coach', '/coach/award', 'Award'],
     ['parent', '/parent/alerts', 'Alerts'],
@@ -63,6 +62,12 @@ describe('TRAK-85 parked routes', () => {
     expect(screen.getByRole('note', { name: 'This screen is coming soon' })).toHaveTextContent('Coming soon')
     // The full-page placeholder is gone.
     expect(screen.queryByRole('heading', { name: 'Coming soon' })).not.toBeInTheDocument()
+  })
+
+  // TRAK-440 (Imad, 11 Nov): Card left the bar for Profile, so its old address opens Profile.
+  it("the old Card address opens the player's Profile", async () => {
+    mount('/player/evolution')
+    await waitFor(() => expect(window.location.pathname).toBe('/player/profile'))
   })
 
   it('retains the anonymous route boundary', async () => {

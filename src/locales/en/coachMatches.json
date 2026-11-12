@@ -296,5 +296,7 @@
   "nobodyWouldRead": "Nobody is ticked as playing, so nobody would read it.",
   "previewAs": "Preview as",
   "asPlayer": "As the player",
-  "asParent": "As the parent"
+  "asParent": "As the parent",
+  "ownGoal": "Own goal",
+  "notApplicable": "N/A"
 }

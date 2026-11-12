@@ -6,6 +6,8 @@ import { dayMonth } from '@/lib/squad/format'
 import { Card, Missing } from './parts'
 import type { SquadRoster } from './useSquadRoster'
 import { useTranslation } from '@/lib/i18n'
+import { useFeature } from '@/components/trak/parked'
+import { DRILLS_PATH } from '@/lib/training/library/paths'
 import { ATTRIBUTE_WORD } from '@/lib/squad/attribute-words'
 
 /* TRAK-250: Squad > Attributes. The six assessment attributes averaged across the squad, week by week,
@@ -69,6 +71,7 @@ function Row({ row, focus }: { row: AttributeRow; focus: boolean }) {
 export function AttributesTab({ roster }: { roster: SquadRoster }) {
   const { assessments } = roster
   const { t } = useTranslation()
+  const drills = useFeature('training')
   const weeks = useMemo(() => weekStarts(localTodayISO(), WEEKS), [])
   const rows = useMemo(() => attributeHeatmap(assessments, weeks, dateOf), [assessments, weeks])
   const focus = useMemo(() => focusAttribute(rows), [rows])
@@ -114,10 +117,11 @@ export function AttributesTab({ roster }: { roster: SquadRoster }) {
               <p className="text-[12px] font-medium text-ink-3">{t('coachSquad:focusThisWeek')}</p>
               <h3 className="mt-1 text-[24px] font-medium tracking-[-0.01em] text-ink">{t(ATTRIBUTE_WORD[focus.row.key])}</h3>
               <p className="mt-1.5 text-[13px] text-ink-2">{focus.sentence}</p>
-              <Link to="/coach/trainings"
+              {/* TRAK-419: where Training is on, Drills is the one library. */}
+              <Link to={drills ? DRILLS_PATH : '/coach/trainings'}
                 className="mt-3.5 inline-flex min-h-11 w-full items-center justify-center rounded-[10px] px-3 text-[14px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 style={{ background: 'rgb(var(--t-brand))', color: 'rgb(var(--t-on-brand))' }}>
-                {t('coachSquad:openTrainings')}
+                {t(drills ? 'coachSquad:openDrills' : 'coachSquad:openTrainings')}
               </Link>
             </section>
             <Card title={t('coachSquad:howToReadRange')} muted>

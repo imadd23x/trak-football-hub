@@ -2165,6 +2165,7 @@ export type Database = {
       }
       revoke_my_calendar_link: { Args: never; Returns: boolean }
       feature_on: { Args: { p_feature: string }; Returns: boolean }
+      family_feature_on: { Args: { p_feature: string }; Returns: boolean }
       game_plan_changes: {
         Args: { p_event_ids: string[] }
         Returns: { event_id: string; squad_player_id: string }[]
@@ -2365,6 +2366,10 @@ export type Database = {
       stuck_player_objectives: {
         Args: never
         Returns: { player_objective_id: string; squad_player_id: string }[]
+      }
+      evaluation_progress: {
+        Args: { p_assessments: string[]; p_child?: string }
+        Returns: { assessment_id: string; due_on: string; objectives: Json }[]
       }
       season_plan_for_player: {
         Args: { p_child?: string }

@@ -49,7 +49,7 @@ for (const role of ['player', 'coach', 'club'] as const) {
       return json({ message: 'Unmocked request blocked' }, 500)
     })
 
-    const paths = role === 'player' ? ['/player/passport', '/player/evolution']
+    const paths = role === 'player' ? ['/player/passport']
       : role === 'club' ? ['/club/home', '/club/squads', '/club/coaches', '/club/profile', '/club/radar']
         : ['/coach/assistant', '/coach/feedback/synthetic-assessment', '/coach/schedule', '/coach/recognition', '/coach/award']
     // TRAK-85: each parked route shows its real screen with the "Coming soon" pill.

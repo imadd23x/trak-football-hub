@@ -39,6 +39,8 @@ async function backend(context: BrowserContext, role: Role, unexpected: string[]
     // Events on; Games (TRAK-283) and Training (TRAK-294) off, as for every academy until they are switched on, unless a
     // test switches them on.
     if (path === '/rest/v1/rpc/feature_on') return json(features.includes(req.postDataJSON()?.p_feature))
+    // TRAK-441: a player's or parent's switch (family_look) is read through family_feature_on.
+    if (path === '/rest/v1/rpc/family_feature_on') return json(features.includes(req.postDataJSON()?.p_feature))
     if (path.startsWith('/rest/v1/rpc/coach_squad_player_consent_required')) return json(false)
     // TRAK-250: the Squad tabs' reads. Two latest bands for three children, so Snapshot has columns to show.
     if (path === '/rest/v1/coach_assessments') return json(role === 'coach' ? [
@@ -149,6 +151,19 @@ test("a coach's Settings sits in the frame on a laptop; on a phone it keeps no b
   await page.screenshot({ path: testInfo.outputPath('coach-settings-390.png'), fullPage: true })
 })
 
+// TRAK-430: the side menu's rows sit at the same height on Settings as on Home (one squad: the picker's empty slot stays).
+test('TRAK-430: the side menu does not jump between Home and Settings on a laptop', async ({ page, context }) => {
+  const { unexpected, errors } = await open(page, context, 'coach', '/coach/home', 1440, 900)
+  const home = page.getByRole('navigation', { name: 'Your academy' }).getByRole('button', { name: /^Home/ })
+  await expect(home).toHaveAttribute('aria-current', 'page')
+  const top = (await home.boundingBox())!.y
+  await page.goto('/settings')
+  await expect(page.getByRole('navigation', { name: 'Your academy' }).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
+  expect((await home.boundingBox())!.y).toBe(top)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
+})
+
 // TRAK-261: a coach's Settings is Arc's settings page, its section menu beside the sections, in the wide column.
 test("a coach's Settings is Arc's settings page in the wide column on a laptop", async ({ page, context }, testInfo) => {
   const { unexpected } = await open(page, context, 'coach', '/settings', 1440, 900)
@@ -175,13 +190,31 @@ test("the Calendar's sheets stop at the Arc bottom sheet's width on a tablet", a
 
 test("a player's Home keeps the phone column on a laptop", async ({ page, context }) => {
   const { unexpected } = await open(page, context, 'player', '/player/home', 1440, 900)
-  await expect(page.locator('nav.trak-nav')).toBeVisible()
+  // TRAK-440: the bar is the coach's glass tab bar, floating 12 px above the bottom, centred under the column.
+  const bar = page.getByRole('navigation', { name: 'Player' })
+  await expect(bar.getByRole('tab', { name: 'Matches' })).toBeVisible()
   const shell = await box(page, '.trak-page')
   expect([Math.round(shell.width), Math.round(shell.x + shell.width / 2)]).toEqual([430, 720])
-  const nav = await box(page, 'nav.trak-nav')
-  expect([Math.round(nav.width), Math.round(nav.y + nav.height)]).toEqual([430, 900])
+  const nav = (await bar.boundingBox())!
+  expect([Math.round(nav.x + nav.width / 2), Math.round(nav.y + nav.height)]).toEqual([720, 888])
+  expect(nav.width).toBeLessThanOrEqual(406)
   expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBeUndefined()
   expect(unexpected).toEqual([])
+})
+
+// TRAK-441: with the academy's family_look on, a player on a laptop gets the coach's side menu and page widths.
+test("a player's laptop frame, with the academy's family_look on: the side menu, no glass bar", async ({ page, context }, testInfo) => {
+  const { unexpected, errors } = await open(page, context, 'player', '/player/matches', 1440, 900, ['events', 'family_look'])
+  const menu = page.getByRole('navigation', { name: 'Trak' })
+  await expect(menu.getByRole('button', { name: /^Matches/ })).toHaveAttribute('aria-current', 'page')
+  await expect(menu.getByRole('button', { name: /^Profile/ })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Player' })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBe('coach')
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: testInfo.outputPath('family-frame-1440.png') })
+  expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
 })
 
 // TRAK-250: Squad is a coach workspace of views. TRAK-263 (Imad, 22 Oct): Players (Arc's team
@@ -388,11 +421,12 @@ const MENU_PAGES = [
   ['Training', '/coach/training', ['events', 'games', 'training']], ['Drills', '/coach/training/drills', ['events', 'games', 'training']],
   ['Settings', '/settings', ['events', 'games', 'training']], ['Library', '/coach/trainings', ['events']], // Library: Training off
 ] as const
-for (const [label, width, height] of [['a phone', 390, 844], ['an upright tablet', 820, 1180], ['a laptop', 1440, 900], ['a big screen', 1920, 1080]] as const) {
+for (const [label, width, height] of [['a phone', 390, 844], ['an upright tablet', 820, 1180], ['a laptop', 1440, 900], ['a big screen', 1920, 1080], ['a 2,560 px monitor', 2560, 1440]] as const) {
   test(`TRAK-307: every page in the coach's menu takes the same width on ${label}`, async ({ browser }, testInfo) => {
     const rail = width >= 1024 ? 240 : 0
     const margin = width >= 768 ? 32 : 20
-    const column = Math.min(1280, width - rail)
+    // TRAK-463 (11 Nov walk-through): beside a laptop's sidebar the column fills the screen; a tablet keeps 1,280 px.
+    const column = rail ? width - rail : Math.min(1280, width)
     const start = rail + (width - rail - column) / 2
     const found: Record<string, string> = {}, wanted: Record<string, string> = {}
     for (const [name, path, features] of MENU_PAGES) {
@@ -423,3 +457,35 @@ for (const [label, width, height] of [['a phone', 390, 844], ['an upright tablet
     expect(found).toEqual(wanted)
   })
 }
+
+// TRAK-417: on a laptop every page's full-height wrapper (min-h-screen) sat under the frame's 60 px top bar, so even a
+// near-empty page scrolled 60 px, and Assess (a fixed full height) put Back and Next 60 px below the window. Their
+// lowest edge must be the window's; a phone keeps the whole window.
+for (const [width, height, label] of [[1440, 900, 'a laptop'], [390, 844, 'a phone']] as const) {
+  test(`TRAK-417: a short page does not scroll on ${label}`, async ({ page, context }) => {
+    const { unexpected, errors } = await open(page, context, 'coach', '/coach/schedule', width, height)
+    for (const path of ['/coach/schedule', '/coach/squad', '/settings', '/coach/assess']) {
+      if (path !== '/coach/schedule') await page.goto(path)
+      const wrapper = page.locator('.min-h-screen, .h-dvh').first()
+      await expect(wrapper).toBeVisible()
+      // Polled: a page's styles can land a moment after it shows.
+      const reach = () => wrapper.evaluate((el, laptop) => { const style = getComputedStyle(el), min = parseFloat(el.classList.contains('h-dvh') ? style.height : style.minHeight); return laptop ? el.getBoundingClientRect().top + scrollY + min : min }, width > 1024)
+      await expect.poll(reach, { message: path }).toBe(height)
+    }
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}
+
+// TRAK-463: on a wide monitor the page fills the screen, so Squad's rows flow into columns instead of 2,000 px rows.
+test('TRAK-463: Squad lists its players in columns on a 2,560 px monitor, one column on a laptop', async ({ page, context }) => {
+  const { unexpected, errors } = await open(page, context, 'coach', '/coach/squad', 2560, 1440)
+  const list = page.getByRole('list', { name: 'Players' })
+  await expect(list.getByRole('listitem').first()).toBeVisible()
+  const columns = () => list.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)
+  await expect.poll(columns).toBeGreaterThan(1)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await expect.poll(columns).toBe(1)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
+})

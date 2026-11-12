@@ -34,6 +34,8 @@
 /* Trak (TRAK-351): the list alone; a player opens as their own page. */
 .listPane { min-width: 0; padding: 8px; }
 .peopleList { position: relative; display: grid; gap: 2px; }
+/* Trak (TRAK-463): on a wide monitor the page fills the screen, so the rows flow into columns instead of stretching. */
+@container directory (min-width: 1400px) { .peopleList { grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); column-gap: 16px; } }
 .personRow { position: relative; isolation: isolate; display: flex; width: 100%; min-height: 56px; align-items: center; gap: 12px; border: 0; border-radius: 10px; padding: 8px 10px; background: transparent; color: var(--foreground); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color var(--duration-fast) var(--ease-standard); }
 @media (hover: hover) and (pointer: fine) { .personRow:hover { background: color-mix(in oklab, var(--surface-muted) 60%, transparent); } }
 .personText { display: grid; min-width: 0; flex: 1; gap: 1px; }

@@ -4,7 +4,7 @@ import { COMING_SOON, ParkedContext, useFeature, type Feature } from './parked'
 // TRAK-85: the pill and the wrapper for a parked route (see ./parked).
 export function ComingSoonPill() {
   return (
-    <span className="inline-flex h-6 items-center rounded-full border border-primary/40 bg-background/90 px-2.5 text-[11px] font-medium text-foreground shadow-sm backdrop-blur"
+    <span className="inline-flex h-6 items-center rounded-full border border-primary/40 bg-ground/90 px-2.5 text-[11px] font-medium text-ink shadow-sm backdrop-blur"
       style={{ fontFamily: 'var(--t-font-mono)' }}>
       {COMING_SOON}
     </span>

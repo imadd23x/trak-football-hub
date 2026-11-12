@@ -127,6 +127,8 @@ test.describe('TRAK-182 coach screens', () => {
     ['assess', '/coach/assess', 'Assessment'],
     // TRAK-368: the player's own page in Squad; the list behind it is hidden, so wait for the page's own section.
     ['player', '/coach/squad/player/sq-2', 'Season so far'],
+    // TRAK-418: the coach's own How Trak works, opened from Settings.
+    ['how-trak-works', '/coach/how-trak-works', 'Every week'],
   ] as const) {
     test(`coach ${name}`, async ({ page, context }, testInfo) => {
       const unexpected: string[] = [], errors: string[] = []
@@ -633,3 +635,21 @@ test.describe('TRAK-420 Log page header', () => {
     })
   }
 })
+
+// TRAK-415: below 1024 px the frame drew pages with no `.arc` around them, so a player's radar chart, band chip and
+// avatar lost Arc's colours and sizes. Any part from an Arc stylesheet must sit inside `.arc`.
+for (const width of [390, 820]) {
+  test(`TRAK-415 at ${width} px: a player's page keeps Arc's styling`, async ({ page, context }) => {
+    const unexpected: string[] = []
+    await page.setViewportSize({ width, height: 900 })
+    await coachBackend(context, unexpected)
+    await page.goto('/coach/squad/player/sq-2')
+    await expect(page.getByRole('heading', { name: 'Bukayo Saka', level: 1 })).toBeVisible()
+    await page.waitForLoadState('networkidle')
+    const outside = await page.evaluate(() => [...document.querySelectorAll('[class]')]
+      .filter(el => /(?:^|\s)_[A-Za-z]+_[a-z0-9]{4,6}_\d+/.test(el.getAttribute('class') ?? '') && !el.closest('.arc') && el.getBoundingClientRect().width > 0)
+      .map(el => `${el.getAttribute('class')} "${(el.textContent ?? '').trim().slice(0, 30)}"`))
+    expect(outside).toEqual([])
+    expect(unexpected).toEqual([])
+  })
+}

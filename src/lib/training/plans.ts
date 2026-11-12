@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 import type { Tables } from '@/integrations/supabase/types'
 import { libraryOf, sessionById } from '@/lib/library/library'
 import type { DrillDraft } from './sessions'
@@ -82,6 +83,6 @@ export function searchSessions<T extends { title: string; practices: { name: str
 
 /** "4 practices · 90 min · Rondos 4v1, Pressing zones, 8v8, Huddle". */
 export function sessionSummary(practices: Pick<Practice, 'name' | 'minutes'>[]): string {
-  const count = `${practices.length} ${practices.length === 1 ? 'practice' : 'practices'}`
-  return [count, `${plannedMinutes(practices)} min`, practices.map(p => p.name).join(', ')].join(' · ')
+  const count = i18n.t('coachTraining:practiceCount', { count: practices.length })
+  return [count, i18n.t('coachHome:minutes', { count: plannedMinutes(practices) }), practices.map(p => p.name).join(', ')].join(' · ')
 }

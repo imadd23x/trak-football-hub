@@ -9,7 +9,8 @@ import userEvent from '@testing-library/user-event'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
-import { table, rpc, rpcRows } from '../../../../tests/msw/supabase'
+import { http, HttpResponse } from 'msw'
+import { table, rpc, rpcRows, SUPABASE_URL } from '../../../../tests/msw/supabase'
 import { SIDE_MENU_QUERY } from '@/lib/side-menu-screen'
 
 const PLAYER = { id: 'family-frame-player' }
@@ -57,6 +58,35 @@ describe('TRAK-441: the family frame', () => {
     const menu = await screen.findByRole('navigation', { name: 'Trak' }, { timeout: 5000 })
     expect(within(menu).getByRole('button', { name: /^Matches/ })).toHaveAttribute('aria-current', 'page')
   })
+
+  it("a parent picks the child in the side menu, where the coach picks the squad (slice 2)", async () => {
+    const GUARDIAN = { id: 'family-frame-guardian' }, SOKRATIS = 'child-sokratis', KOSTAS = 'child-kostas'
+    signInAs(GUARDIAN)
+    const asked: string[] = []
+    server.use(
+      http.get(`${SUPABASE_URL}/rest/v1/profiles`, ({ request }) => {
+        if ((new URL(request.url).searchParams.get('user_id') ?? '').includes(GUARDIAN.id))
+          return HttpResponse.json({ id: 'g', user_id: GUARDIAN.id, role: 'parent', full_name: 'Eleni Seitaridi' })
+        return HttpResponse.json([{ user_id: SOKRATIS, full_name: 'Sokratis Papastathopoulos' }, { user_id: KOSTAS, full_name: 'Kostas Manolas' }])
+      }),
+      table('player_parent_links', [{ player_user_id: SOKRATIS }, { player_user_id: KOSTAS }]),
+      table('player_details', []), table('coach_assessments', []), table('recognition_awards', []), table('parental_consents', []),
+      table('game_for_family', []), table('game_review_for_family', []),
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/child_events`, async ({ request }) => {
+        asked.push(String(((await request.json()) as { p_child?: string }).p_child)); return HttpResponse.json([])
+      }),
+    )
+    screenIs(true)
+    renderApp('/parent/matches')
+    const menu = await screen.findByRole('navigation', { name: 'Trak' }, { timeout: 5000 })
+    expect(menu).toBeInTheDocument()
+    // The first child by name is picked first, as on every parent page.
+    await userEvent.click(await screen.findByRole('button', { name: /^Child: Kostas Manolas/ }))
+    const list = await screen.findByRole('listbox', { name: 'Children' })
+    await userEvent.click(within(list).getByRole('option', { name: /Sokratis Papastathopoulos/ }))
+    expect(await screen.findByRole('button', { name: /^Child: Sokratis Papastathopoulos/ })).toBeInTheDocument()
+    await waitFor(() => expect(asked).toContain(SOKRATIS))
+  }, 15_000)
 
   it('on a laptop with the switch off, and on a phone: the glass tab bar, no side menu', async () => {
     // Another player, so the switch is read afresh (its answer is kept between tests).

@@ -57,11 +57,10 @@ for (const hasMatches of [false, true]) {
     page.on('pageerror', error => errors.push(error.message))
     await playerBackend(context, hasMatches, unexpected)
     await page.goto('/player/home')
-    await expect(page.getByText('THIS SEASON')).toBeVisible()
-    if (hasMatches) {
-      await expect(page.getByText('Season bands', { exact: true })).toBeVisible()
-      await expect(page.getByText('3 more Good → Good season')).toBeVisible()
-    } else await expect(page.getByText('EXC', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Alerts/ })).toBeVisible()
+    // TRAK-435 (Imad, 12 Nov): no card built on match ratings, with rated matches or without.
+    await expect(page.getByText('THIS SEASON')).toHaveCount(0)
+    await expect(page.getByText('Season bands', { exact: true })).toHaveCount(0)
     await page.waitForLoadState('networkidle')
     await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') })
     const violations = await page.evaluate(async () => {

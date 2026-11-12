@@ -52,21 +52,10 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('TRAK-229: band colours on light cards, words in readable shades', () => {
-  it.each([false, true])('player Home season bands (has matches: %s)', async hasMatches => {
-    if (hasMatches) server.use(table('matches', [6.5, 6.5, 5.5].map((rating, i) => ({
-      id: `match-${i}`, user_id: PLAYER.id, opponent: 'Synthetic Rovers', competition: 'Friendly',
-      match_date: `2026-10-${12 - i}`, created_at: `2026-10-${12 - i}T10:00:00Z`,
-      team_score: 1, opponent_score: 0, computed_rating: rating, goals: 0, assists: 0,
-      minutes_played: null, card_received: 'None',
-    }))))
+  // TRAK-435 (12 Nov): Home has no season card built on match ratings; its assessment cards carry the bands.
+  it("player Home: the coach's assessment cards", async () => {
     renderApp('/player/home')
-    await screen.findByText('THIS SEASON')
-    if (hasMatches) {
-      await screen.findByText('Season bands')
-      expect(screen.getByText(/more Good → Good season/)).toBeInTheDocument()
-    } else {
-      expect(screen.getByText('EXC')).toBeInTheDocument()
-    }
+    await screen.findByRole('region', { name: 'Latest coach assessment' })
     const painted = bandPainted()
     expect(painted.length).toBeGreaterThan(0)
     onLight(painted)

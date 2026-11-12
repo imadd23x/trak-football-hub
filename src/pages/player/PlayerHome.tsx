@@ -2,11 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { MobileShell, NavBar, BandPill, MetadataLabel, LoadError } from '@/components/trak'
+import { MobileShell, NavBar, MetadataLabel, LoadError } from '@/components/trak'
 import { CardSkeleton, MatchCardSkeleton, Skeleton } from '@/components/trak'
-import { BANDS, type BandType, BAND_TEXT } from '@/lib/types'
-import { scoreToBand } from '@/lib/rating-engine'
-import { dedupeMatches } from '@/lib/match-dedupe'
 import { toPlayerEvent, upcomingEventsFilter, type PlayerEvent } from '@/lib/player-events'
 import { PlayerHomeBell, type PublishedAssessmentAlert } from '@/components/player/PlayerAlertsBell'
 import { HomeHeader, HomeTitle } from '@/components/trak/HomeHeader'
@@ -15,59 +12,17 @@ import { EventSheet } from '@/components/trak/EventSheet'
 import { CantMakeIt } from '@/components/parent/CantMakeIt'
 import { CalendarHomePrompt } from '@/components/trak/AddToCalendar'
 import { trackEvent } from '@/lib/telemetry'
-import CardRevealModal from '@/components/player/CardRevealModal'
 import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
 import { OwnConsentCard } from '@/components/player/OwnConsentCard'
 import { MySeasonCard } from '@/components/player/MySeasonCard'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
 import { progressSummary, useEvaluationProgress } from '@/lib/evaluation-progress'
 
-const QUOTES = [
-  { text: "The more difficult the victory, the greater the happiness in winning.", author: "Pelé" },
-  { text: "You have to fight to reach your dream. You have to sacrifice and work hard for it.", author: "Lionel Messi" },
-  { text: "I learned all about life with a ball at my feet.", author: "Ronaldinho" },
-  { text: "Talent without working hard is nothing.", author: "Cristiano Ronaldo" },
-  { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
-  { text: "The secret is to believe in your dreams; in your potential that you can be like your star.", author: "Zinedine Zidane" },
-  { text: "Set your goals high, and don't stop till you get there.", author: "Bo Jackson" },
-  { text: "If you fail to prepare, you prepare to fail.", author: "Roy Keane" },
-  { text: "Hard work beats talent when talent doesn't work hard.", author: "Tim Notke" },
-  { text: "Push yourself because no one else is going to do it for you.", author: "" },
-  { text: "Success is no accident. It is hard work, perseverance, learning, and sacrifice.", author: "Pelé" },
-  { text: "The difference between the impossible and the possible lies in determination.", author: "Tommy Lasorda" },
-  { text: "When you're not training, someone else is.", author: "" },
-  { text: "Every champion was once a contender that refused to give up.", author: "Rocky Balboa" },
-  { text: "I am not the best, but I'm giving everything to be the best.", author: "Kylian Mbappé" },
-  { text: "Great things never come from comfort zones.", author: "" },
-  { text: "Champions keep playing until they get it right.", author: "Billie Jean King" },
-  { text: "Pain is temporary. Glory is forever.", author: "" },
-  { text: "Be hungry, be humble, be the hardest worker in the room.", author: "" },
-  { text: "The only place success comes before work is in the dictionary.", author: "Vince Lombardi" },
-  { text: "Believe in yourself and all that you are.", author: "" },
-  { text: "Every session is a chance to get better.", author: "" },
-  { text: "Dream big. Work hard. Stay focused.", author: "" },
-  { text: "There is no substitute for hard work.", author: "Thomas Edison" },
-  { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
-  { text: "Small steps every day lead to big results.", author: "" },
-  { text: "Your only competition is who you were yesterday.", author: "" },
-  { text: "Leave everything on the pitch.", author: "" },
-  { text: "The best view comes after the hardest climb.", author: "" },
-  { text: "Winners are not people who never fail, but people who never quit.", author: "" },
-]
-
-function getDailyQuote() {
-  const now = new Date()
-  const dayOfYear = Math.floor(
-    (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000
-  )
-  return QUOTES[dayOfYear % QUOTES.length]
-}
 
 export default function PlayerHome() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [matches, setMatches] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [details, setDetails] = useState<any>(null)
   const [coachAssessment, setCoachAssessment] = useState<any>(null)
@@ -103,8 +58,6 @@ export default function PlayerHome() {
     return () => { cancelled = true }
   }, [user, consentReload])
 
-  const [showReveal, setShowReveal] = useState(false)
-  const [newMatchCount, setNewMatchCount] = useState(0)
   const [coachAssessmentNote, setCoachAssessmentNote] = useState<string | null>(null)
   const [assessmentAlert, setAssessmentAlert] = useState<PublishedAssessmentAlert | null>(null)
   // A failed feedback read must not look like "no feedback yet".
@@ -169,38 +122,6 @@ export default function PlayerHome() {
       setUpcomingEvents([])
     }
 
-    const matchesRequest = supabase.from('matches').select('*').eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (cancelled) return
-        // A failed read is not an empty season — without this the home screen
-        // showed a player with a full record the same blank card as a new one.
-        if (error) { fail(); return }
-
-        const deduped = dedupeMatches(data)
-        setMatches(deduped)
-
-        // Card reveal — show once when new matches have been logged since last visit. TRAK-289: only rated matches; a
-        // Games match has no number (Imad, 28 Oct).
-        const ratedCount = deduped.filter(m => m.computed_rating != null).length
-        try {
-          const storageKey = `trak_last_match_count_${user.id}`
-          const stored = localStorage.getItem(storageKey)
-          if (stored === null) {
-            // First ever open — record count silently, no reveal
-            localStorage.setItem(storageKey, String(ratedCount))
-          } else {
-            const lastSeen = parseInt(stored, 10)
-            if (ratedCount > lastSeen) {
-              setNewMatchCount(ratedCount - lastSeen)
-              setShowReveal(true)
-            }
-          }
-        } catch {
-          // Reveal bookkeeping is optional when browser storage is unavailable.
-          // It must not prevent the successful card reads from finishing.
-        }
-      })
     const detailsRequest = supabase.from('player_details').select('position, current_club, age_group').eq('user_id', user.id).maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return
@@ -321,7 +242,7 @@ export default function PlayerHome() {
     // clears loadFailed. A callback that throws, instead of resolving with
     // { error }, ends in the same retryable error rather than an endless
     // skeleton (Kostas and Imad, #133).
-    Promise.all([matchesRequest, detailsRequest, squadRequest]).then(() => {
+    Promise.all([detailsRequest, squadRequest]).then(() => {
       if (cancelled) return
       if (!failed) setLoadFailed(false)
       setLoading(false)
@@ -337,85 +258,6 @@ export default function PlayerHome() {
     return () => { cancelled = true }
   }, [user, reloadKey])
 
-  // TRAK-289: a Games match has no rating, so bands, streaks and trends read only the rated ones.
-  const rated = matches.filter((m): m is typeof m & { computed_rating: number } => m.computed_rating != null)
-  const getBandDistribution = () => {
-    const dist: Record<string, number> = {}
-    BANDS.forEach(b => { dist[b.word.toLowerCase()] = 0 })
-    rated.forEach(m => {
-      const band = scoreToBand(m.computed_rating)
-      dist[band] = (dist[band] || 0) + 1
-    })
-    return dist
-  }
-
-  const getSeasonBand = (): BandType => {
-    if (rated.length === 0) return 'steady'
-    const dist = getBandDistribution()
-    let maxBand: BandType = 'steady'
-    let maxCount = 0
-    Object.entries(dist).forEach(([band, count]) => {
-      if (count > maxCount) { maxCount = count; maxBand = band as BandType }
-    })
-    return maxBand
-  }
-
-  const seasonBand = getSeasonBand()
-  const distribution = getBandDistribution()
-
-  const seasonBandConfig = BANDS.find(b => b.word.toLowerCase() === seasonBand) ?? BANDS[3]
-
-  // Next milestone — how many more matches at the next band are needed to flip the season band
-  const nextMilestone = (() => {
-    const BAND_ORDER: BandType[] = ['difficult', 'developing', 'mixed', 'steady', 'good', 'standout', 'exceptional']
-    const currentIdx = BAND_ORDER.indexOf(seasonBand)
-    if (currentIdx >= BAND_ORDER.length - 1 || rated.length === 0) return null
-    const nextBand = BAND_ORDER[currentIdx + 1]
-    const currentCount = distribution[seasonBand] || 0
-    const nextCount = distribution[nextBand] || 0
-    const needed = Math.max(1, currentCount - nextCount + 1)
-    const nextConfig = BANDS.find(b => b.word.toLowerCase() === nextBand)!
-    return { needed, nextConfig }
-  })()
-
-  const handleRevealDismiss = () => {
-    if (!user) return
-    setShowReveal(false)
-    localStorage.setItem(`trak_last_match_count_${user.id}`, String(rated.length))
-  }
-
-  const totalGoals = matches.reduce((s, m) => s + (m.goals || 0), 0)
-  const totalAssists = matches.reduce((s, m) => s + (m.assists || 0), 0)
-
-  // Consistency streak — consecutive matches at Steady+ (≥ 6.0) from most recent
-  const streakCount = (() => {
-    let count = 0
-    for (const m of rated) {
-      if (m.computed_rating >= 6.0) count++
-      else break
-    }
-    return count
-  })()
-  const lastMatch = matches[0]
-
-  // Trend: calculate last 5 match ratings normalized to bar heights
-  const trendMatches = rated.slice(0, 5).reverse()
-  const trendHeights = trendMatches.map((m, i) => {
-    const r = m.computed_rating
-    return Math.max(20, Math.min(100, ((r - 4) / 6) * 100))
-  })
-  const isImproving = trendMatches.length >= 2 &&
-    trendMatches[trendMatches.length - 1].computed_rating > trendMatches[0].computed_rating
-
-  // Band summary abbreviations
-  const bandAbbrev = [
-    { key: 'exceptional', abbr: 'E', color: BAND_TEXT.Exceptional },
-    { key: 'standout', abbr: 'St', color: BAND_TEXT.Standout },
-    { key: 'good', abbr: 'G', color: BAND_TEXT.Good },
-    { key: 'steady', abbr: 'Sy', color: BAND_TEXT.Steady },
-    { key: 'mixed', abbr: 'M', color: BAND_TEXT.Mixed },
-    { key: 'developing', abbr: 'D', color: BAND_TEXT.Developing },
-  ]
 
   if (loading) return (
     <MobileShell>
@@ -495,185 +337,6 @@ export default function PlayerHome() {
         {/* TRAK-397: the season plan the coach shared; nothing here when there is none. */}
         {user && <MySeasonCard key={user.id} />}
 
-        {/* Hero Card: a light card like the rest; band words in their readable shades (TRAK-229) */}
-        <div className="relative rounded-[24px] p-5 mb-3.5 overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, rgb(var(--t-surface)) 0%, rgb(var(--t-surface)) 100%)', border: '1px solid rgb(var(--t-line))' }}>
-          <div className="absolute -bottom-[60px] -right-[60px] w-[200px] h-[200px] rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgb(var(--t-brand) / 0.08) 0%, transparent 70%)' }} />
-
-          <div className="flex items-start justify-between mb-4 relative z-10">
-            <div>
-              <MetadataLabel text="THIS SEASON" />
-              {rated.length > 0 ? (
-                <>
-                  <p className="text-[52px] leading-none mt-2" style={{
-                    fontFamily: 'var(--t-font)', fontWeight: 300, letterSpacing: '-0.04em',
-                    color: BANDS.find(b => b.word.toLowerCase() === seasonBand)?.text
-                  }}>
-                    {BANDS.find(b => b.word.toLowerCase() === seasonBand)?.word}
-                  </p>
-                  {lastMatch && (
-                    <p className="text-[9px] text-ink-3 mt-1.5 tracking-[0.04em]" style={{ fontFamily: 'var(--t-font-mono)' }}>
-                      Last match · {lastMatch.competition || 'Match'}
-                    </p>
-                  )}
-                </>
-              ) : (
-                /* ── Welcome state (no matches yet) ── */
-                <div className="mt-2">
-                  <p className="text-[34px] leading-tight text-ink-2"
-                    style={{ fontFamily: 'var(--t-font)', fontWeight: 300, letterSpacing: '-0.03em' }}>
-                    Your card<br />is ready.
-                  </p>
-                  <p className="text-[10px] text-ink-3 mt-2"
-                    style={{ fontFamily: 'var(--t-font)' }}>
-                    Play. Get assessed. Watch it evolve.
-                  </p>
-
-                  {/* Band journey — Difficult → Exceptional */}
-                  <div className="flex items-end gap-0 mt-4">
-                    {[...BANDS].reverse().map((band, i, arr) => {
-                      const isLast = i === arr.length - 1
-                      const abbrs = ['DIF','DEV','MIX','STY','GD','STO','EXC']
-                      return (
-                        <div key={band.word} className="flex items-center">
-                          <div className="flex flex-col items-center gap-1">
-                            <div className="w-2.5 h-2.5 rounded-full" style={{
-                              background: isLast ? band.color : 'rgb(var(--t-ink-3))',
-                              boxShadow: isLast ? `0 0 8px rgb(var(--t-brand) / 0.5)` : 'none',
-                            }} />
-                            <span className="text-[7px]" style={{
-                              fontFamily: 'var(--t-font-mono)',
-                              color: isLast ? band.text : 'rgb(var(--t-ink-3))',
-                            }}>{abbrs[i]}</span>
-                          </div>
-                          {!isLast && (
-                            <div className="w-3 h-px mb-3" style={{ background: 'rgb(var(--t-raised))' }} />
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* Coach connection */}
-                  <p className="text-[9px] text-ink-3 mt-3 tracking-[0.04em]"
-                    style={{ fontFamily: 'var(--t-font-mono)' }}>
-                    {coachName
-                      ? `↳ ${coachName} has you in their squad`
-                      : 'Your coach will log your first match soon.'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Trend mini-chart */}
-            {trendHeights.length > 0 && (
-              <div className="text-right">
-                <p className="text-[9px] font-medium tracking-[0.12em] uppercase text-ink-3 mb-2"
-                  style={{ fontFamily: 'var(--t-font-mono)' }}>Trend</p>
-                <div className="flex items-end gap-[3px] h-8 justify-end">
-                  {trendHeights.map((h, i) => (
-                    <div key={i} className="w-2.5 rounded-t" style={{
-                      height: `${h}%`,
-                      background: i >= trendHeights.length - 2
-                        ? (i === trendHeights.length - 1 ? 'rgb(var(--t-brand))' : 'rgb(var(--t-brand) / 0.35)')
-                        : 'rgb(var(--t-raised))',
-                    }} />
-                  ))}
-                </div>
-                {streakCount >= 3 ? (
-                  <p className="text-[10px] font-medium text-brand mt-1.5"
-                    style={{ fontFamily: 'var(--t-font-mono)' }}>{streakCount} in a row</p>
-                ) : isImproving ? (
-                  <p className="text-[10px] font-medium text-brand mt-1.5"
-                    style={{ fontFamily: 'var(--t-font-mono)' }}>↑ improving</p>
-                ) : null}
-              </div>
-            )}
-          </div>
-
-          {/* Band summary strip */}
-          {rated.length > 0 && (
-            <div className="flex items-center justify-between px-3 py-2.5 rounded-[10px] relative z-10"
-              style={{ background: 'rgb(var(--t-raised))' }}>
-              <div className="flex items-center gap-[7px]">
-                <div className="w-[5px] h-[5px] rounded-full bg-ink-3" />
-                <span className="text-[9px] font-medium tracking-[0.08em] uppercase text-ink-3"
-                  style={{ fontFamily: 'var(--t-font-mono)' }}>Season bands</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                {bandAbbrev.filter(b => distribution[b.key] > 0).map(b => (
-                  <span key={b.key} className="text-xs" style={{ fontFamily: 'var(--t-font)', color: b.color }}>
-                    {distribution[b.key]} {b.abbr}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Next milestone */}
-          {rated.length > 0 && (
-            <div className="flex items-center justify-between px-3 py-2 mt-1.5 rounded-[10px] relative z-10"
-              style={{ background: 'rgb(var(--t-raised))' }}>
-              <span className="text-[9px] tracking-[0.06em] text-ink-3"
-                style={{ fontFamily: 'var(--t-font-mono)' }}>
-                Next milestone
-              </span>
-              {nextMilestone ? (
-                <span className="text-[9px] font-medium tracking-[0.04em]"
-                  style={{ fontFamily: 'var(--t-font-mono)', color: nextMilestone.nextConfig.text }}>
-                  {nextMilestone.needed} more {nextMilestone.nextConfig.word} → {nextMilestone.nextConfig.word} season
-                </span>
-              ) : (
-                <span className="text-[9px] tracking-[0.04em] text-ink-3"
-                  style={{ fontFamily: 'var(--t-font-mono)' }}>
-                  Season high — Exceptional ✦
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Stats grid */}
-        {matches.length > 0 && (
-          <div className="grid grid-cols-3 gap-2 mt-3.5">
-            <div className="rounded-[10px] py-[11px] px-2 text-center" style={{ background: 'rgb(var(--t-raised))' }}>
-              <p className="text-[22px] font-normal text-ink leading-none" style={{ fontFamily: 'var(--t-font)', letterSpacing: '-0.02em' }}>{matches.length}</p>
-              <span className="text-[8px] font-medium tracking-[0.1em] uppercase text-ink-3 mt-[5px] block" style={{ fontFamily: 'var(--t-font-mono)' }}>Matches</span>
-            </div>
-            <div className="rounded-[10px] py-[11px] px-2 text-center" style={{ background: 'rgb(var(--t-raised))' }}>
-              <p className="text-[22px] font-normal text-ink leading-none" style={{ fontFamily: 'var(--t-font)', letterSpacing: '-0.02em' }}>{totalGoals}</p>
-              <span className="text-[8px] font-medium tracking-[0.1em] uppercase text-ink-3 mt-[5px] block" style={{ fontFamily: 'var(--t-font-mono)' }}>Goals</span>
-            </div>
-            <div className="rounded-[10px] py-[11px] px-2 text-center" style={{ background: 'rgb(var(--t-raised))' }}>
-              <p className="text-[22px] font-normal text-ink leading-none" style={{ fontFamily: 'var(--t-font)', letterSpacing: '-0.02em' }}>{totalAssists}</p>
-              <span className="text-[8px] font-medium tracking-[0.1em] uppercase text-ink-3 mt-[5px] block" style={{ fontFamily: 'var(--t-font-mono)' }}>Assists</span>
-            </div>
-          </div>
-        )}
-
-        {/* Daily Quote */}
-        {(() => {
-          const quote = getDailyQuote()
-          return (
-            <div className="mt-4 rounded-[18px] px-5 py-4"
-              style={{ background: 'rgb(var(--t-surface))', border: '1px solid rgb(var(--t-line))' }}>
-              <p className="text-[9px] tracking-[0.14em] uppercase text-ink-3 mb-3"
-                style={{ fontFamily: 'var(--t-font-mono)' }}>Today</p>
-              <p className="text-[15px] font-light leading-[1.5] text-ink"
-                style={{ fontFamily: 'var(--t-font)', letterSpacing: '-0.01em' }}>
-                "{quote.text}"
-              </p>
-              {quote.author ? (
-                <p className="text-[9px] text-ink-3 mt-2.5 tracking-[0.06em]"
-                  style={{ fontFamily: 'var(--t-font-mono)' }}>
-                  — {quote.author}
-                </p>
-              ) : null}
-            </div>
-          )
-        })()}
-
         {/* Coach assessments: the parent's swipe cards (TRAK-172, Imad 19 Oct), each opening
             that assessment; the coach's message on the latest stays below (TRAK-71). */}
         {coachAssessment && (
@@ -699,15 +362,6 @@ export default function PlayerHome() {
       </div>
       <NavBar role="player" activeTab={location.pathname} onNavigate={navigate} />
 
-      {showReveal && lastMatch && (
-        <CardRevealModal
-          bandWord={seasonBandConfig.word}
-          bandColor={seasonBandConfig.text}
-          newMatchCount={newMatchCount}
-          latestMatch={lastMatch}
-          onDismiss={handleRevealDismiss}
-        />
-      )}
     </MobileShell>
   )
 }

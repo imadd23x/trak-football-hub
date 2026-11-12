@@ -3,7 +3,9 @@ import { i18n, showLanguage, SOURCE_LANGUAGE } from '@/lib/i18n'
 import { LOOP_STEPS, loopNote, loopState } from '@/lib/training/loop'
 import { AGAIN, LOOP, loopSteps, trainingBadge } from '@/lib/training/next'
 import { sessionSummary } from '@/lib/training/plans'
-import { TRAINING_WORD } from '@/lib/training/words'
+import { TRAINING_WORD, partName, partNote } from '@/lib/training/words'
+import { fitLine, planProblem } from '@/lib/training/parts'
+import { PART_TYPES } from '@/lib/training/shelf'
 import { setupFor } from '@/lib/training/turnout'
 import { playersShort } from '@/lib/training/shelf'
 import { shown } from '@/lib/squad/trait-words'
@@ -54,5 +56,20 @@ describe('TRAK-408: Training in Greek', () => {
     expect(setupFor({ kind: 'pairs' }, 15)).toEqual({ ok: true, text: '6 ζευγάρια και 1 γκρουπ των 3' })
     expect(setupFor({ kind: 'teams', min: 8 }, 15)).toEqual({ ok: true, text: '7 v 7 + 1 τζόκερ' })
     expect(playersShort({ kind: 'pairs' })).toBe('Σε ζευγάρια')
+  })
+
+  it('names Trak\'s parts in the language showing, and keeps a coach\'s own part name as written', async () => {
+    for (const part of PART_TYPES) expect(partName(part.name)).toBe(part.name)
+    expect(partName('Pressing game')).toBe('Pressing game')
+    expect(fitLine(95, 90)).toBe('5 min over. That’s fine, it’s only a guide.')
+    expect(planProblem([])).toBe('Add a part first.')
+    await showLanguage('el')
+    for (const part of PART_TYPES) {
+      expect(partName(part.name)).not.toBe(part.name)
+      expect(partNote(part.key)).not.toBe(part.note)
+    }
+    expect(partName('Pressing game')).toBe('Pressing game')
+    expect(partName('Rondo')).toBe('Ρόντο')
+    expect(fitLine(80, 90)).toBe('10 λ. περισσεύουν.')
   })
 })

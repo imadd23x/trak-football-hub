@@ -148,7 +148,7 @@ const screens: [string, string, RegExp, RegExp[], ReturnType<typeof http.get>[]?
   ['coach', '/coach/feedback/a-1', /Review feedback/i, [/Draft feedback/]],
   ['coach', '/coach/feedback/a-1', /Review feedback/i, [/Send update|Send to/, /Draft again/], [savedDraft]],
   ['coach', '/coach/assistant', /TRY ASKING/i, [/./]],
-  ['coach', '/coach/schedule', /Schedule/, [/Add/, /Publish/, /Delete/]],
+  ['coach', '/coach/schedule', /Events/, [/Add/, /Publish/, /Delete/]],
   ['coach', '/coach/recognition', /Give Recognition/, [/Synthetic Player/]],
   ['coach', '/coach/award', /Give Award/, [/Player of the Week/, /Give Award/]],
   ['club', '/club/coaches', /Connected Coaches/, [/Remove|Synthetic Coach|TRK-SYN1/]],

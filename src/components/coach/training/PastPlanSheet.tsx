@@ -75,7 +75,7 @@ export function CopyTargetSheet({ plan, trainings, onClose }: { plan: PlanToCopy
     title={plan ? `Copy ${plan.title} into which training?` : 'Copy into which training?'}
     description="The planner opens with this plan filled in. Nothing is saved until you save it.">
     <div className="grid gap-4 pb-4">
-      {trainings.length === 0 ? <p className="text-[15px] text-ink-2">No training coming up. Add one in Schedule first.</p>
+      {trainings.length === 0 ? <p className="text-[15px] text-ink-2">No training coming up. Add one in Events first.</p>
         : <ul aria-label="Trainings coming up" className="divide-y divide-line rounded-2xl border border-line bg-surface px-4">
           {trainings.map(training => <li key={training.id} className="flex flex-wrap items-center justify-between gap-3 py-3.5">
             <div className="min-w-0 flex-1">

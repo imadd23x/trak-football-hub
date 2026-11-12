@@ -224,7 +224,7 @@ test.describe('TRAK-182 coach screens', () => {
     expect(listBox!.y).toBeGreaterThanOrEqual(0)
     await list.getByRole('option', { name: '5:00 PM' }).click()
     await form.getByRole('button', { name: 'Save draft' }).click()
-    await expect(page.getByText('Draft saved. Publish it from Schedule.')).toBeVisible()
+    await expect(page.getByText('Draft saved. Publish it from Events.')).toBeVisible()
     await page.waitForTimeout(300)
     await page.screenshot({ path: testInfo.outputPath('quick-add-4-check.png') })
     await expect(form).toHaveCount(0, { timeout: 3000 })

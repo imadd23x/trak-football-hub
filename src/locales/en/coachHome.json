@@ -53,7 +53,7 @@
   "todayWhat": "today’s plan",
   "todayLoading": "Loading today’s plan",
   "nextUp": "Next up",
-  "nothingAhead": "No training or match coming up. Add one in Schedule.",
+  "nothingAhead": "No training or match coming up. Add one in Events.",
   "trainingNamed": "Training, {{title}}",
   "trainingPlan": "Training plan",
   "planThisSession": "Plan this session",

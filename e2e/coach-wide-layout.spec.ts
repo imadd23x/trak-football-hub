@@ -94,7 +94,7 @@ for (const [label, width, height, pageWidth] of [
     expect(plus.x + plus.width).toBeLessThanOrEqual(width)
     // The avatar (top left) opens the side menu; the calendar sits beside the bell.
     await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Schedule' })).toBeVisible() // TRAK-255
+    await expect(page.getByRole('link', { name: 'Events' })).toBeVisible() // TRAK-255; TRAK-449
     await page.screenshot({ path: testInfo.outputPath(`coach-home-${width}.png`) })
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
@@ -109,7 +109,7 @@ test('coach Home on a laptop: the sidebar on the left, "+ Create" at the top rig
   // TRAK-259: Arc's sidebar rail. The club, then Home, Calendar, Squad, Library; Settings and the coach at the bottom.
   const sidebar = page.getByRole('navigation', { name: 'Your academy' })
   const rows = sidebar.getByRole('button')
-  await expect(rows).toHaveText(['Home', 'Schedule', 'Squad', 'Library', 'Settings']) // TRAK-255
+  await expect(rows).toHaveText(['Home', 'Events', 'Squad', 'Library', 'Settings']) // TRAK-255; TRAK-449
   const rail = await sidebar.evaluate(el => el.closest('[id$="-sidebar"]')!.getBoundingClientRect().toJSON() as DOMRect)
   expect([rail.x, rail.y, rail.width, rail.height].map(Math.round)).toEqual([0, 0, 240, 900])
   const [first, last] = [(await rows.first().boundingBox())!, (await rows.last().boundingBox())!]
@@ -365,7 +365,7 @@ test("a phone's sidebar sheet closes while a page's code is still on its way", a
 test("a laptop's breadcrumb names the page, one title after several moves", async ({ page, context }) => {
   const { errors } = await open(page, context, 'coach', '/coach/home', 1440, 900)
   const side = page.getByRole('navigation', { name: 'Your academy' })
-  for (const name of ['Squad', 'Schedule', 'Library', 'Home']) {
+  for (const name of ['Squad', 'Events', 'Library', 'Home']) {
     await side.getByRole('button', { name, exact: true }).click()
     await page.waitForTimeout(300)
   }

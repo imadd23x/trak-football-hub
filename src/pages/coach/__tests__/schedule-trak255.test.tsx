@@ -71,7 +71,7 @@ async function open() {
   await screen.findByText('vs AEK Athens U16', { selector: 'p' })
 }
 
-describe('TRAK-255: the coach\'s Schedule', { timeout: 20_000 }, () => {
+describe('TRAK-255: the coach\'s Events', { timeout: 20_000 }, () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 9, 22, 9, 0, 0))
@@ -80,9 +80,9 @@ describe('TRAK-255: the coach\'s Schedule', { timeout: 20_000 }, () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('is called Schedule, and its legend names Cancelled and Needs you', async () => {
+  it('is called Events, and its legend names Cancelled and Needs you', async () => {
     await open()
-    expect(screen.getByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Events' })).toBeInTheDocument()
     const key = screen.getByRole('group', { name: 'Colour key' })
     for (const label of ['Training', 'Match', 'Other', 'Cancelled', 'Needs you']) expect(within(key).getByText(label)).toBeInTheDocument()
   })
@@ -165,7 +165,7 @@ describe('TRAK-270: one add button, and needs you in yellow', { timeout: 20_000 
     expect(adds).toHaveLength(1)
     expect(adds[0]).toHaveAccessibleName('Add event')
     // The top "+" (beside the Schedule heading), not a button by the day's heading.
-    expect(adds[0].closest('div')?.parentElement?.querySelector('h1')).toHaveTextContent('Schedule')
+    expect(adds[0].closest('div')?.parentElement?.querySelector('h1')).toHaveTextContent('Events')
     await userEvent.click(cell('2026-10-21'))
     await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
     const sheet = screen.getByRole('dialog', { name: 'New event' })

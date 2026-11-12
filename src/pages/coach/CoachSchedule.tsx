@@ -555,7 +555,7 @@ export default function CoachSchedule() {
             <div className="laptop:hidden"><BackButton fallback="/coach/home" label={t('common:back')} /></div>
             <h1 className="text-[22px] font-light text-ink tracking-tight"
               style={{ ...font, letterSpacing: '-0.02em' }}>
-              {t('nav:schedule')}
+              {t('nav:events')}
             </h1>
           </div>
           <div className="flex items-center gap-2">

@@ -49,7 +49,7 @@ function WithTraining({ children, wide = false }: { children: (training: Trainin
               retrying={training.isFetching || plan.isFetching} /></div>
           : training.isPending || plan.isPending ? <LoadingSkeleton label="Loading the training…" lines={4} rows={2} className="pt-6" />
           : !training.data ? <div className="grid gap-3 pt-10">
-              <p className="text-[15px] text-ink-2">This training isn’t on your schedule.</p>
+              <p className="text-[15px] text-ink-2">This training isn’t in your events.</p>
               <Link to={TRAINING_PATH} className={linkClass}>Back to Training</Link>
             </div>
           // Keyed by training: a route that only changes :eventId must never carry one plan's typing into another's.
@@ -155,7 +155,7 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
             action={cancelled ? undefined : <Button onClick={planIt}>Plan session</Button>} />
         </div>
       </section>}
-    <Link to={`/coach/schedule?event=${training.id}`} className={`mt-4 inline-block ${linkClass}`}>Open in Schedule</Link>
+    <Link to={`/coach/schedule?event=${training.id}`} className={`mt-4 inline-block ${linkClass}`}>Open in Events</Link>
 
     <RegisterSheet training={training} sheet={sheet} sessionId={sessionId} onClose={() => setSheet(null)} />
   </>

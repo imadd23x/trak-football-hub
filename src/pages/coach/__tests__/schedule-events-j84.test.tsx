@@ -388,14 +388,14 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
     }))
     await open()
     expect(await screen.findByText('Recovery session')).toBeInTheDocument()
-    expect(screen.queryByText(/We couldn't load your schedule/)).toBeNull()
+    expect(screen.queryByText(/We couldn't load your events/)).toBeNull()
     expect(asked.length).toBeGreaterThan(0)
   })
 
   it('says the calendar failed to load instead of showing it empty', async () => {
     server.use(http.get(EVENTS, () => HttpResponse.json({ message: 'Synthetic failure' }, { status: 500 })))
     renderApp('/coach/schedule')
-    expect(await screen.findByText(/We couldn't load your schedule/)).toBeInTheDocument()
+    expect(await screen.findByText(/We couldn't load your events/)).toBeInTheDocument()
   })
 })
 

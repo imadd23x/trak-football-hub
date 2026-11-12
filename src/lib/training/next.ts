@@ -29,7 +29,7 @@ export function nextTraining<T extends TrainingEvent>(trainings: T[], now: numbe
 
 /** The card's loop: Logistics (from the schedule) → Plan → Who's here → Notes (optional). */
 export const LOOP = [
-  { id: 'logistics', label: 'Logistics', description: 'From the schedule' },
+  { id: 'logistics', label: 'Logistics', description: 'From Events' },
   { id: 'plan', label: 'Plan' },
   { id: 'here', label: 'Who’s here' },
   { id: 'notes', label: 'Notes', description: 'Optional' },

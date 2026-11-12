@@ -388,11 +388,12 @@ const MENU_PAGES = [
   ['Training', '/coach/training', ['events', 'games', 'training']], ['Drills', '/coach/training/drills', ['events', 'games', 'training']],
   ['Settings', '/settings', ['events', 'games', 'training']], ['Library', '/coach/trainings', ['events']], // Library: Training off
 ] as const
-for (const [label, width, height] of [['a phone', 390, 844], ['an upright tablet', 820, 1180], ['a laptop', 1440, 900], ['a big screen', 1920, 1080]] as const) {
+for (const [label, width, height] of [['a phone', 390, 844], ['an upright tablet', 820, 1180], ['a laptop', 1440, 900], ['a big screen', 1920, 1080], ['a 2,560 px monitor', 2560, 1440]] as const) {
   test(`TRAK-307: every page in the coach's menu takes the same width on ${label}`, async ({ browser }, testInfo) => {
     const rail = width >= 1024 ? 240 : 0
     const margin = width >= 768 ? 32 : 20
-    const column = Math.min(1280, width - rail)
+    // TRAK-463 (11 Nov walk-through): beside a laptop's sidebar the column fills the screen; a tablet keeps 1,280 px.
+    const column = rail ? width - rail : Math.min(1280, width)
     const start = rail + (width - rail - column) / 2
     const found: Record<string, string> = {}, wanted: Record<string, string> = {}
     for (const [name, path, features] of MENU_PAGES) {
@@ -442,3 +443,16 @@ for (const [width, height, label] of [[1440, 900, 'a laptop'], [390, 844, 'a pho
     expect(errors).toEqual([])
   })
 }
+
+// TRAK-463: on a wide monitor the page fills the screen, so Squad's rows flow into columns instead of 2,000 px rows.
+test('TRAK-463: Squad lists its players in columns on a 2,560 px monitor, one column on a laptop', async ({ page, context }) => {
+  const { unexpected, errors } = await open(page, context, 'coach', '/coach/squad', 2560, 1440)
+  const list = page.getByRole('list', { name: 'Players' })
+  await expect(list.getByRole('listitem').first()).toBeVisible()
+  const columns = () => list.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length)
+  await expect.poll(columns).toBeGreaterThan(1)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await expect.poll(columns).toBe(1)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
+})

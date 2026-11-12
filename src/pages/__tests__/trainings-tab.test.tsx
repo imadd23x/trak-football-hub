@@ -45,7 +45,8 @@ function player() {
   )
 }
 
-const navTab = (name: string) => within(screen.getByRole('navigation')).getByRole('button', { name: new RegExp(name, 'i') })
+// TRAK-440: the bottom bar is the coach's glass tab bar, its tabs marked by aria-selected.
+const navTab = (name: string) => within(screen.getByRole('tablist', { name: 'Player' })).getByRole('tab', { name: new RegExp(name, 'i') })
 
 describe.each([
   ['player', player, '/player/trainings'],
@@ -54,8 +55,8 @@ describe.each([
     signIn()
     renderApp(path)
     await screen.findByRole('heading', { name: 'Trainings' })
-    expect(navTab('Trainings')).toHaveAttribute('aria-current', 'page')
-    expect(navTab('Home')).not.toHaveAttribute('aria-current')
+    expect(navTab('Trainings')).toHaveAttribute('aria-selected', 'true')
+    expect(navTab('Home')).toHaveAttribute('aria-selected', 'false')
   }, 20_000)
 
   it('opens on the Coaching Session Catalogue and switches to Play It Right', async () => {

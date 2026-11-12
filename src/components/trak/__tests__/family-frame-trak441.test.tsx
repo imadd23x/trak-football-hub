@@ -32,6 +32,8 @@ beforeEach(() => {
     rpc('family_training_history', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),
     rpc('family_feature_on', ({ p_feature }) => switchOn && p_feature === 'family_look'),
+    // TRAK-441 slice 2: the child's academy, as family_academy gives it.
+    rpcRows('family_academy', [{ name: 'Rehearsal FC', logo_url: null }]),
   )
 })
 afterEach(() => { cleanup(); window.matchMedia = realMatchMedia; vi.restoreAllMocks(); delete document.documentElement.dataset.layout })
@@ -46,6 +48,8 @@ describe('TRAK-441: the family frame', () => {
     }
     expect(within(menu).getByRole('button', { name: /^Matches/ })).toHaveAttribute('aria-current', 'page')
     expect(screen.queryByRole('tablist', { name: 'Player' })).toBeNull()
+    // The academy's name where the coach's frame has his club's (slice 2).
+    expect(await screen.findByText('Rehearsal FC')).toBeInTheDocument()
     // The coach's page widths (src/index.css), as the mockup draws them.
     expect(document.documentElement.dataset.layout).toBe('coach')
     await userEvent.click(within(menu).getByRole('button', { name: /^Profile/ }))
@@ -105,5 +109,28 @@ describe('TRAK-441: the family frame', () => {
     renderApp('/player/matches')
     expect(await screen.findByRole('tablist', { name: 'Player' }, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Trak' })).toBeNull()
+  }, 15_000)
+
+  it("a parent's side menu names the academy of the child they follow (slice 2)", async () => {
+    const GUARDIAN = { id: 'family-frame-academy-guardian' }, CHILD = 'child-academy-giannis'
+    signInAs(GUARDIAN)
+    const asked: unknown[] = []
+    server.use(
+      http.get(`${SUPABASE_URL}/rest/v1/profiles`, ({ request }) =>
+        (new URL(request.url).searchParams.get('user_id') ?? '').includes(GUARDIAN.id)
+          ? HttpResponse.json({ id: 'g', user_id: GUARDIAN.id, role: 'parent', full_name: 'Eleni Goumas' })
+          : HttpResponse.json([{ user_id: CHILD, full_name: 'Giannis Goumas' }])),
+      table('player_parent_links', [{ player_user_id: CHILD }]),
+      table('player_details', []), table('coach_assessments', []), table('recognition_awards', []), table('parental_consents', []),
+      table('game_for_family', []), table('game_review_for_family', []),
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/family_academy`, async ({ request }) => {
+        asked.push(((await request.json()) as { p_child?: string }).p_child)
+        return HttpResponse.json({ name: 'Panathinaikos Academy', logo_url: null })
+      }),
+    )
+    screenIs(true)
+    renderApp('/parent/matches')
+    expect(await screen.findByText('Panathinaikos Academy', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(asked).toEqual([CHILD])
   }, 15_000)
 })

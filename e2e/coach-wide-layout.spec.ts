@@ -149,6 +149,19 @@ test("a coach's Settings sits in the frame on a laptop; on a phone it keeps no b
   await page.screenshot({ path: testInfo.outputPath('coach-settings-390.png'), fullPage: true })
 })
 
+// TRAK-430: the side menu's rows sit at the same height on Settings as on Home (one squad: the picker's empty slot stays).
+test('TRAK-430: the side menu does not jump between Home and Settings on a laptop', async ({ page, context }) => {
+  const { unexpected, errors } = await open(page, context, 'coach', '/coach/home', 1440, 900)
+  const home = page.getByRole('navigation', { name: 'Your academy' }).getByRole('button', { name: /^Home/ })
+  await expect(home).toHaveAttribute('aria-current', 'page')
+  const top = (await home.boundingBox())!.y
+  await page.goto('/settings')
+  await expect(page.getByRole('navigation', { name: 'Your academy' }).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
+  expect((await home.boundingBox())!.y).toBe(top)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
+})
+
 // TRAK-261: a coach's Settings is Arc's settings page, its section menu beside the sections, in the wide column.
 test("a coach's Settings is Arc's settings page in the wide column on a laptop", async ({ page, context }, testInfo) => {
   const { unexpected } = await open(page, context, 'coach', '/settings', 1440, 900)

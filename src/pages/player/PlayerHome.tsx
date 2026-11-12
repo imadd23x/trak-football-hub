@@ -8,7 +8,7 @@ import { BANDS, type BandType, BAND_TEXT } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
 import { dedupeMatches } from '@/lib/match-dedupe'
 import { toPlayerEvent, upcomingEventsFilter, type PlayerEvent } from '@/lib/player-events'
-import { PlayerAlertsBell, type PublishedAssessmentAlert } from '@/components/player/PlayerAlertsBell'
+import { PlayerHomeBell, type PublishedAssessmentAlert } from '@/components/player/PlayerAlertsBell'
 import { HomeHeader, HomeTitle } from '@/components/trak/HomeHeader'
 import { LoadedWeekStrip } from '@/components/trak/WeekStrip'
 import { EventSheet } from '@/components/trak/EventSheet'
@@ -444,7 +444,7 @@ export default function PlayerHome() {
       <div className="pt-3 pb-4">
         {/* TRAK-163: calendar, the player's name, the bell; then the next seven days. */}
         <HomeHeader calendarTo="/player/calendar" center={<HomeTitle>{profile?.full_name || 'Player'}</HomeTitle>}
-          right={user && <PlayerAlertsBell key={user.id} userId={user.id}
+          right={user && <PlayerHomeBell key={user.id} userId={user.id}
             events={loadedFor.current?.userId === user.id ? upcomingEvents : []}
             assessment={loadFailed ? null : assessmentAlert} assessmentLoadFailed={feedbackLoadFailed || loadFailed}
             onRetry={() => setReloadKey(k => k + 1)} />} />

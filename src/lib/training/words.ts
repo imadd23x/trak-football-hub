@@ -37,3 +37,12 @@ export const partName = (name: string) => {
 }
 
 export const partNote = (type: PartType) => i18n.t(`coachTraining:part_${type}_note` as 'coachTraining:part_own_note')
+
+/** registerProblem's reason (kept in English, it is compared) in the language showing. */
+const WHY: Record<string, string> = {
+  'Only a published event has a register': 'coachTraining:why_published',
+  'This event was cancelled, so it has no register': 'coachTraining:why_cancelled',
+  'A match is recorded in the match log, with its score and minutes': 'coachTraining:why_match',
+}
+export const whyWord = (why: string) => (WHY[why] ? i18n.t(WHY[why] as 'coachTraining:why_match') : why.toLowerCase())
+

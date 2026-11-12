@@ -6,6 +6,8 @@ import SessionPage, { ProgrammePage } from './SessionPage'
 import ProgrammesPage from './ProgrammesPage'
 import SearchPage from './SearchPage'
 import { LIBRARY_PATH } from '@/lib/library/library'
+import { useFeatureState } from '@/components/trak/parked'
+import { drillsLink } from '@/lib/training-theme'
 
 // TRAK-268: Play It Right's 180 moments load only when the coach opens it.
 const PlayItRight = lazy(() => import('./play-it-right/PlayItRightRoutes'))
@@ -20,6 +22,17 @@ export default function CoachLibrary() {
   useLayoutEffect(() => {
     if (navigation !== 'POP') (document.scrollingElement ?? document.documentElement).scrollTo(0, 0)
   }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps -- only a new page moves to the top
+
+  // TRAK-419 (11 Nov review): where Training is on, Drills is the one library, so an old Library address (a bookmark,
+  // an old link) opens Training › Drills; a theme's address opens that theme's drills. Nothing shows until the switch
+  // answers, so the old Library never flashes up first. Where Training is off, the Library works as before. Play It
+  // Right is not a drill library and Drills has no place for it, so its address keeps working.
+  const training = useFeatureState('training')
+  const first = pathname.slice(LIBRARY_PATH.length + 1).split('/')[0]
+  if (first !== 'play-it-right') {
+    if (!training.known) return null
+    if (training.on) return <Navigate to={drillsLink(first)} replace />
+  }
 
   return (
     <Routes>

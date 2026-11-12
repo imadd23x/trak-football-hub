@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderApp } from '../../../tests/support/render-app'
 import { signInAs } from '../../../tests/support/session'
@@ -21,12 +21,15 @@ afterEach(cleanup)
 const CATALOGUE = '/trainings/coaching-session-catalogue.html'
 const PLAY_IT_RIGHT = '/trainings/play-it-right.html'
 
-function coach() {
-  signInAs({ id: 'coach-trainings' })
+// TRAK-419: `training` is the academy's Training switch. Where it is on, the old Library's addresses open Drills.
+// A coach of their own, so the app's cache never carries one switch's answer into the other.
+function coach({ training = false } = {}) {
+  const id = training ? 'coach-trainings-on' : 'coach-trainings'
+  signInAs({ id })
   server.use(
-    table('profiles', [{ id: 'p', user_id: 'coach-trainings', role: 'coach', full_name: 'Synthetic Coach', invite_code: 'ABCD' }]),
+    table('profiles', [{ id: 'p', user_id: id, role: 'coach', full_name: 'Synthetic Coach', invite_code: 'ABCD' }]),
     table('coach_sessions', []), table('squad_players', []), table('coach_details', []),
-    rpc('feature_on', () => true),
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'training' || training),
   )
 }
 
@@ -193,6 +196,17 @@ describe('the catalogue opens on a theme from New event', () => {
     renderApp(`/coach/trainings?lib=${encodeURIComponent(DEFENDING)}`)
     expect(await screen.findByRole('heading', { level: 1, name: 'Defending' })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/coach/trainings/defending')
+  }, 20_000)
+
+  // TRAK-419 (11 Nov review): where Training is on, Drills is the one library; an old Library address opens it.
+  it('with Training on, the old Library address opens Training › Drills, and a theme its drills', async () => {
+    coach({ training: true })
+    renderApp('/coach/trainings')
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/training/drills'))
+    cleanup()
+    coach({ training: true })
+    renderApp('/coach/trainings/goalkeeping')
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/coach/training/drills/all?show=Goalkeeping'))
   }, 20_000)
 
   it('the catalogue selects that library', () => {

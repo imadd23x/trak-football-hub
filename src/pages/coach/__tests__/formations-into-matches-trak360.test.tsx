@@ -131,7 +131,7 @@ beforeEach(() => {
       { ...match('m-none', 'Nosquad', 'U16', 6 * DAY), squad: null },
     ]),
     http.get(`${SUPABASE_URL}/rest/v1/game_plan_players`, () => HttpResponse.json([{ event_id: 'm-beta' }])),
-    ...['use_formation_for_matches', 'set_default_formation'].map(name => http.post(`${SUPABASE_URL}/rest/v1/rpc/${name}`, async ({ request }) => {
+    ...['use_formation_for_matches', 'undo_formation_copy', 'set_default_formation'].map(name => http.post(`${SUPABASE_URL}/rest/v1/rpc/${name}`, async ({ request }) => {
       calls.push({ rpc: name, body: await request.json() as Record<string, unknown> })
       return HttpResponse.json([])
     })),
@@ -165,7 +165,9 @@ describe('TRAK-360 Squad › Formations into matches', () => {
     await u.click(screen.getByRole('button', { name: 'Replace and copy' }))
     await waitFor(() => expect(calls).toHaveLength(1))
     expect(calls[0]).toEqual({ rpc: 'use_formation_for_matches', body: { p_formation_id: 'f1', p_event_ids: ['m-alpha', 'm-beta'] } })
-    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/ copied to 2 matches\.$/)))
+    // TRAK-453: no timer, a close button, and an Undo.
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/ copied to 2 matches\.$/),
+      expect.objectContaining({ duration: Infinity, closeButton: true, action: expect.objectContaining({ label: 'Undo' }) })))
   }, 30_000)
 
   it('copying into a match with no saved line-up asks nothing', async () => {
@@ -176,7 +178,24 @@ describe('TRAK-360 Squad › Formations into matches', () => {
     await u.click(await screen.findByRole('checkbox', { name: /vs Alpha/ }))
     await u.click(screen.getByRole('button', { name: 'Copy to 1 match' }))
     await waitFor(() => expect(calls).toEqual([{ rpc: 'use_formation_for_matches', body: { p_formation_id: 'f1', p_event_ids: ['m-alpha'] } }]))
-    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/ copied to 1 match\.$/)))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/ copied to 1 match\.$/), expect.objectContaining({ duration: Infinity })))
+  }, 30_000)
+
+  // TRAK-453: the message has an Undo that sends the same matches back, and says it was undone.
+  it('Undo, from the message after a copy, sends the same matches to undo_formation_copy', async () => {
+    vi.mocked(toast).mockClear() // the earlier tests' messages belong to components that are gone
+    seeded()
+    const u = user()
+    await openFormations()
+    await u.click(await screen.findByRole('button', { name: 'Use for matches' }))
+    await u.click(await screen.findByRole('checkbox', { name: /vs Alpha/ }))
+    await u.click(screen.getByRole('button', { name: 'Copy to 1 match' }))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/ copied to 1 match\.$/), expect.anything()))
+    const options = vi.mocked(toast).mock.calls.find(call => /copied to 1 match/.test(String(call[0])))![1] as { action: { label: string; onClick: () => void } }
+    expect(options.action.label).toBe('Undo')
+    options.action.onClick()
+    await waitFor(() => expect(calls.at(-1)).toEqual({ rpc: 'undo_formation_copy', body: { p_formation_id: 'f1', p_event_ids: ['m-alpha'] } }))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/^Undone\. /)))
   }, 30_000)
 
   it('Make default sets it for the format', async () => {

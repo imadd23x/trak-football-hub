@@ -277,8 +277,6 @@
   "fmMakeDefault": "Make default for {{count}} a side",
   "fmDefaultBadge": "Default for {{count}} a side",
   "fmSaveFirst": "Save your changes first: a match gets the saved formation.",
-  "fmFormat": "Format",
-  "fmShape": "Shape",
   "fmSetMatchday": "Set for matchday",
   "fmNotCopied": "Not copied to a match yet. A copy never changes when this formation does.",
   "fmCopiedOn": "{{label}} · copied {{day}}",
@@ -337,5 +335,11 @@
   "fmReplaceBody": "Their starters change to this formation's. Each player's job, note and the instructions stay.",
   "fmReplaceCopy": "Replace and copy",
   "fmCopyTo_one": "Copy to {{count}} match",
-  "fmCopyTo_other": "Copy to {{count}} matches"
+  "fmCopyTo_other": "Copy to {{count}} matches",
+  "fmFormatAndShape": "Format and shape",
+  "fmUndoCopy": "Undo",
+  "fmUndoneCopy_one": "Undone. {{name}} is no longer copied into the match.",
+  "fmUndoneCopy_other": "Undone. {{name}} is no longer copied into those matches.",
+  "fmUndoCopyFailed": "Couldn't undo. Check your connection and try again.",
+  "fmUndoCopyLocked": "This can't be undone: a match has kicked off or its plan has been shared."
 }

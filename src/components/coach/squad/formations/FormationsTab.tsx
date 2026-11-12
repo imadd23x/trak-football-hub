@@ -6,11 +6,12 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Alert } from '@/components/arc/alert/alert'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
-import { Select } from '@/components/arc/select/select'
+import { MorphSelect } from '@/components/arc/morph-select/morph-select'
 import { LoadError } from '@/components/trak/LoadError'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { usePlayerRoles } from '@/components/coach/squad/usePlayerRoles'
 import { DEFAULT_FORMATION, FORMATIONS, FORMATS, type Format } from '@/lib/games/formations'
+import { shapeItems } from '@/lib/games/shape-items'
 import { isPosition } from '@/lib/positions'
 import { FORMATION_SEEDS, firstXI, reshapeXI, swapXI, type Spot } from '@/lib/squad/formation-board'
 import type { SquadRoster } from '../useSquadRoster'
@@ -153,9 +154,20 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
 
   const dirty = !!edit && !same(edit.draft, draftOf(saved))
   const copyTo = (eventIds: string[]) => writes.use.mutate({ id: saved.id, eventIds }, {
-    onSuccess: () => { setUsing(false); setUseProblem(null); toast(t('coachSquad:fmCopied', { name: saved.name, count: eventIds.length })) },
+    onSuccess: () => {
+      setUsing(false); setUseProblem(null)
+      // TRAK-453: no timer; it stays until the coach closes it, and Undo puts the matches back as they were.
+      toast(t('coachSquad:fmCopied', { name: saved.name, count: eventIds.length }), {
+        duration: Infinity, closeButton: true,
+        action: { label: t('coachSquad:fmUndoCopy'), onClick: () => undoCopy(saved.id, saved.name, eventIds) },
+      })
+    },
     onError: error => setUseProblem((error as { code?: string }).code === 'P0001' ? t('coachSquad:fmLocked')
       : t('coachSquad:fmCopyFailed')),
+  })
+  const undoCopy = (id: string, name: string, eventIds: string[]) => writes.undoCopy.mutate({ id, eventIds }, {
+    onSuccess: () => toast(t('coachSquad:fmUndoneCopy', { name, count: eventIds.length })),
+    onError: error => toast.error((error as { code?: string }).code === 'P0001' ? t('coachSquad:fmUndoCopyLocked') : t('coachSquad:fmUndoCopyFailed')),
   })
   const makeDefault = (on: boolean) => writes.setDefault.mutate({ id: saved.id, on }, {
     onSuccess: () => toast(on ? t('coachSquad:fmDefaultOn', { name: saved.name, count: saved.format }) : t('coachSquad:fmDefaultOff', { name: saved.name })),
@@ -227,19 +239,19 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" size="sm" disabled={dirty} onClick={() => { setUseProblem(null); setUsing(true) }}>{t('coachSquad:fmUse')}</Button>
-        <Button variant="ghost" size="sm" disabled={dirty} loading={writes.setDefault.isPending} onClick={() => makeDefault(!saved.isDefault)}>
+        <Button variant="secondary" size="sm" disabled={dirty} loading={writes.setDefault.isPending} onClick={() => makeDefault(!saved.isDefault)}>
           {saved.isDefault ? t('coachSquad:fmRemoveDefault') : t('coachSquad:fmMakeDefault', { count: saved.format })}</Button>
         {saved.isDefault && <Badge size="sm" tone="info">{t('coachSquad:fmDefaultBadge', { count: saved.format })}</Badge>}
         {dirty && <span className="text-sm text-ink-3">{t('coachSquad:fmSaveFirst')}</span>}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 tablet:max-w-sm">
-        <Select label={t('coachSquad:fmFormat')} options={formatOptions()} value={String(current.format)} onValueChange={value => {
-          const format = Number(value) as Format, shape = DEFAULT_FORMATION[format]
-          change(d => ({ ...d, format, shape, starters: reshapeXI(d.starters, d.shape, shape, format) }))
-        }} />
-        <Select label={t('coachSquad:fmShape')} options={FORMATIONS[current.format].map(s => ({ value: s, label: s }))} value={current.shape}
-          onValueChange={shape => change(d => ({ ...d, shape, starters: reshapeXI(d.starters, d.shape, shape, d.format) }))} />
+      {/* TRAK-453: one control for format and shape, the one a match's line-up has; a shape in another format switches the format. */}
+      <div className="tablet:max-w-sm">
+        <span className="arc"><MorphSelect label={t('coachSquad:fmFormatAndShape')} items={shapeItems()} value={current.shape} searchable={false} panelWidth={200}
+          onValueChange={shape => change(d => {
+            const format = FORMATS.find(size => FORMATIONS[size].includes(shape)) ?? d.format
+            return { ...d, format, shape, starters: reshapeXI(d.starters, d.shape, shape, format) }
+          })} /></span>
       </div>
 
       <FormationBoard title={current.name} shape={current.shape} format={current.format} starters={current.starters} players={boardPlayers} bench={bench}

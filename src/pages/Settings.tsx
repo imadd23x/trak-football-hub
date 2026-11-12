@@ -26,6 +26,7 @@ import { Input } from '@/components/arc/input/input'
 import { SettingsPage, SettingsRow, SettingsRows, type SettingsSection } from '@/components/arc/blocks/settings-page/settings-page'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { i18n, isLanguage, LANGUAGES, showLanguage, useLanguage, useTranslation } from '@/lib/i18n'
+import { COACH_HOW_PATH } from '@/lib/coach-places'
 
 // TRAK-406: the messages are words in settings.json, read when shown, so they are in the language showing.
 const nameSchema = z
@@ -284,7 +285,8 @@ function AccountSettings({ userId }: { userId: string }) {
     // TRAK-261 (Imad, 22 Oct): Arc's Billing becomes How Trak works, for everyone.
     {
       id: 'how', label: t('settings:howTrakWorks'), icon: BookOpen, description: t('settings:howDescription'),
-      content: <Link to="/how-it-works" className="text-sm font-medium text-brand">{t('settings:howLink')}</Link>,
+      // TRAK-418: a coach reads a page written for a coach; players and parents keep theirs.
+      content: <Link to={role === 'coach' ? COACH_HOW_PATH : '/how-it-works'} className="text-sm font-medium text-brand">{t('settings:howLink')}</Link>,
     },
     {
       id: 'account', label: t('settings:account'), icon: KeyRound, description: t('settings:accountDescription'),

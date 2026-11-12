@@ -127,6 +127,8 @@ test.describe('TRAK-182 coach screens', () => {
     ['assess', '/coach/assess', 'Assessment'],
     // TRAK-368: the player's own page in Squad; the list behind it is hidden, so wait for the page's own section.
     ['player', '/coach/squad/player/sq-2', 'Season so far'],
+    // TRAK-418: the coach's own How Trak works, opened from Settings.
+    ['how-trak-works', '/coach/how-trak-works', 'Every week'],
   ] as const) {
     test(`coach ${name}`, async ({ page, context }, testInfo) => {
       const unexpected: string[] = [], errors: string[] = []

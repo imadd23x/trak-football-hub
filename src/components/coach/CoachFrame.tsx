@@ -17,6 +17,7 @@ import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { BARLESS, COACH_SCREEN_PATH, placeOf, tabOf, type CoachScreen } from '@/lib/coach-places'
 import { CoachTrailProvider, TrailLink, type Trail } from '@/components/coach/CoachTrail'
 import { useTranslation } from '@/lib/i18n'
+import { FamilyFrame } from '@/components/trak/FamilyFrame'
 
 /* TRAK-259 (Imad, 22 Oct): the coach's frame, around every coach page.
    Laptop: Arc's sidebar rail (the club, Home, Calendar, Squads, Library, then
@@ -59,7 +60,8 @@ function useCoachIdentity(userId: string | undefined) {
 export function CoachFrame() {
   const { user, profile } = useAuth()
   const { t } = useTranslation()
-  if (profile?.role !== 'coach' || !user) return <Outlet />
+  // TRAK-441: Settings and How Trak works are shared; a player or parent gets them in the family frame.
+  if (profile?.role !== 'coach' || !user) return <FamilyFrame />
   return <Framed userId={user.id} name={profile.full_name || t('nav:coach')} />
 }
 

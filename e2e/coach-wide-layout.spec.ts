@@ -39,6 +39,8 @@ async function backend(context: BrowserContext, role: Role, unexpected: string[]
     // Events on; Games (TRAK-283) and Training (TRAK-294) off, as for every academy until they are switched on, unless a
     // test switches them on.
     if (path === '/rest/v1/rpc/feature_on') return json(features.includes(req.postDataJSON()?.p_feature))
+    // TRAK-441: a player's or parent's switch (family_look) is read through family_feature_on.
+    if (path === '/rest/v1/rpc/family_feature_on') return json(features.includes(req.postDataJSON()?.p_feature))
     if (path.startsWith('/rest/v1/rpc/coach_squad_player_consent_required')) return json(false)
     // TRAK-250: the Squad tabs' reads. Two latest bands for three children, so Snapshot has columns to show.
     if (path === '/rest/v1/coach_assessments') return json(role === 'coach' ? [
@@ -198,6 +200,21 @@ test("a player's Home keeps the phone column on a laptop", async ({ page, contex
   expect(nav.width).toBeLessThanOrEqual(406)
   expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBeUndefined()
   expect(unexpected).toEqual([])
+})
+
+// TRAK-441: with the academy's family_look on, a player on a laptop gets the coach's side menu and page widths.
+test("a player's laptop frame, with the academy's family_look on: the side menu, no glass bar", async ({ page, context }, testInfo) => {
+  const { unexpected, errors } = await open(page, context, 'player', '/player/matches', 1440, 900, ['events', 'family_look'])
+  const menu = page.getByRole('navigation', { name: 'Trak' })
+  await expect(menu.getByRole('button', { name: /^Matches/ })).toHaveAttribute('aria-current', 'page')
+  await expect(menu.getByRole('button', { name: /^Profile/ })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Player' })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBe('coach')
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: testInfo.outputPath('family-frame-1440.png') })
+  expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
 })
 
 // TRAK-250: Squad is a coach workspace of views. TRAK-263 (Imad, 22 Oct): Players (Arc's team

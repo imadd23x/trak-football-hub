@@ -2,12 +2,13 @@ import { KitAnnouncement } from '@/components/trak/kits/KitAnnouncement'
 import { describeEventKit } from '@/lib/kit-templates'
 import { TRAINING_THEMES } from '@/lib/training-theme'
 import { splitVenue } from '@/lib/venue-link'
-import { WEEKDAYS, eventTitle, formatEventDay, repeatProblem, type EventForm, type EventKind, type Repeat } from '@/lib/coach-events'
+import { eventTitle, formatEventDay, repeatProblem, type EventForm, type Repeat } from '@/lib/coach-events'
+import { KIND_WORD, THEME_WORD, WEEKDAY_WORD } from '@/lib/event-edit'
+import { useTranslation } from '@/lib/i18n'
 
 /* TRAK-283: Schedule's Review rows, in their own file so a game's Logistics (Games) shows the same rows without
    loading the Schedule page. */
 
-const KIND_LABEL: Record<EventKind, string> = { match: 'Match', training: 'Training', other: 'Other' }
 const font = { fontFamily: 'var(--t-font)' }
 
 /** Review: everything the save writes, in the order the steps asked for it. */
@@ -16,22 +17,25 @@ export function EventSummary({ form, repeat, noteProblem, squad }: {
   /** Imad, 24 Oct: for a coach with two squads or more, which squad it's for. */
   squad?: string
 }) {
+  const { t } = useTranslation()
+  const notSet = t('coachSchedule:notSet')
+  const themeKey = TRAINING_THEMES.find(option => option.key === form.theme)?.key
   const rows: [string, string][] = [
-    ...(squad ? [['Squad', squad] as [string, string]] : []),
-    ['Type', KIND_LABEL[form.kind]],
-    ...(form.kind === 'training' ? [['Theme', TRAINING_THEMES.find(t => t.key === form.theme)?.label ?? 'Not set'] as [string, string]] : []),
-    ...(form.kind === 'match' ? [['Opponent', form.opponent.trim() + (form.homeAway ? ` (${form.homeAway === 'home' ? 'Home' : 'Away'})` : '')] as [string, string]] : []),
-    ['Title', eventTitle(form)],
+    ...(squad ? [[t('nav:squad'), squad] as [string, string]] : []),
+    [t('coachSchedule:summaryType'), t(KIND_WORD[form.kind])],
+    ...(form.kind === 'training' ? [[t('coachSchedule:theme'), themeKey ? t(THEME_WORD[themeKey]) : notSet] as [string, string]] : []),
+    ...(form.kind === 'match' ? [[t('coachSchedule:opponent'), form.opponent.trim() + (form.homeAway ? ` (${form.homeAway === 'home' ? t('coachSchedule:home') : t('coachSchedule:away')})` : '')] as [string, string]] : []),
+    [t('coachSchedule:summaryTitle'), eventTitle(form)],
     // TRAK-255: the name, and whether it has a map link; never the link itself.
-    ['Venue', (() => { const v = splitVenue(form.venue); return (v.name.trim() || (v.link ? 'Unnamed place' : 'Not set')) + (v.link ? ' · on the map' : '') })()],
-    [repeat?.on ? 'First date' : 'Date', form.date ? formatEventDay(form.date) : 'Not set'],
-    [form.kind === 'match' ? 'Kickoff' : 'Start', form.time || 'Not set'],
-    ['Meet', form.meetTime || 'At the start'],
-    ['Length', `${form.duration} min`],
+    [t('coachSchedule:venue'), (() => { const v = splitVenue(form.venue); return (v.name.trim() || (v.link ? t('coachSchedule:unnamedPlace') : notSet)) + (v.link ? t('coachSchedule:onTheMap') : '') })()],
+    [repeat?.on ? t('coachSchedule:firstDate') : t('coachSchedule:date'), form.date ? formatEventDay(form.date) : notSet],
+    [form.kind === 'match' ? t('coachSchedule:kickoff') : t('coachSchedule:start'), form.time || notSet],
+    [t('coachSchedule:meet'), form.meetTime || t('coachSchedule:atTheStart')],
+    [t('coachSchedule:length'), t('coachSchedule:lengthMinutes', { count: form.duration })],
     ...(repeat?.on && form.kind !== 'match' && !repeatProblem(form, repeat)
-      ? [['Repeats', `${repeat.days.map(d => WEEKDAYS[d]).join(', ')} until ${formatEventDay(repeat.until)}`] as [string, string]] : []),
-    ['Kit', form.kitSnapshot ? describeEventKit(form.kitSnapshot) : form.kit.trim() || 'None'],
-    ['Message to players', form.familyNote.trim() || 'None'],
+      ? [[t('coachSchedule:repeats'), t('coachSchedule:repeatsUntil', { days: repeat.days.map(d => t(WEEKDAY_WORD[d])).join(', '), day: formatEventDay(repeat.until) })] as [string, string]] : []),
+    [t('coachSchedule:kit'), form.kitSnapshot ? describeEventKit(form.kitSnapshot) : form.kit.trim() || t('coachSchedule:none')],
+    [t('coachSchedule:messageToPlayers'), form.familyNote.trim() || t('coachSchedule:none')],
   ]
   return <>
     <dl className="rounded-[14px] border border-line divide-y divide-line" style={font}>
@@ -45,7 +49,7 @@ export function EventSummary({ form, repeat, noteProblem, squad }: {
     {form.kitSnapshot && <KitAnnouncement kit={form.kitSnapshot.design} slot={form.kitSnapshot.slot} animated={false} />}
     {noteProblem && (
       <p role="status" className="text-[11px] text-warning" style={font}>
-        Players and parents won't see this message: {noteProblem === 'link' ? 'it has a link' : 'it names a player'}.
+        {noteProblem === 'link' ? t('coachSchedule:messageHiddenLink') : t('coachSchedule:messageHiddenName')}
       </p>
     )}
   </>

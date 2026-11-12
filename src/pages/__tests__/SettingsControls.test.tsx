@@ -212,17 +212,19 @@ describe('settings controls reflect supported behavior', () => {
 // TRAK-261 (Imad, 22 Oct): Arc's settings page, each role exactly its sections; Billing became How Trak works.
 describe("Settings on Arc's settings page", () => {
   it.each<[Role, string[]]>([
-    ['coach', ['Profile', 'Club', 'Notifications', 'How Trak works', 'Account']],
-    ['parent', ['Profile', 'Family', 'Consent', 'Notifications', 'Calendar', 'How Trak works', 'Account']],
-    ['player', ['Profile', 'Notifications', 'Calendar', 'How Trak works', 'Account']],
-    ['club', ['Profile', 'Access', 'How Trak works', 'Account']],
+    // TRAK-406: everyone has Language, after Profile (and a coach's Club).
+    ['coach', ['Profile', 'Club', 'Language', 'Notifications', 'How Trak works', 'Account']],
+    ['parent', ['Profile', 'Language', 'Family', 'Consent', 'Notifications', 'Calendar', 'How Trak works', 'Account']],
+    ['player', ['Profile', 'Language', 'Notifications', 'Calendar', 'How Trak works', 'Account']],
+    ['club', ['Profile', 'Language', 'Access', 'How Trak works', 'Account']],
   ])('a %s sees exactly their sections', async (role, sections) => {
     state.role = role
     mount()
     const nav = await screen.findByRole('navigation', { name: 'Settings sections' })
     expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(sections)
     for (const name of sections) expect(screen.getByRole('heading', { name })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Read how Trak works' })).toHaveAttribute('href', '/how-it-works')
+    // TRAK-418: a coach reads their own page; everyone else the shared one.
+    expect(screen.getByRole('link', { name: 'Read how Trak works' })).toHaveAttribute('href', role === 'coach' ? '/coach/how-trak-works' : '/how-it-works')
   })
 
   it("a coach's switches each save their own column and nothing else", async () => {

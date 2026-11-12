@@ -8,6 +8,9 @@ import { LoadError } from '@/components/trak/LoadError'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { POSITIONS, ROLES, isPosition, ownRoles, pickMain, roleGroups, toggleAlso, type Position } from '@/lib/positions'
 import { usePlayerRoles, usePositionHistory, useSavePositionAndRoles, type PlayerRoles } from './usePlayerRoles'
+import { currentLanguage, useTranslation } from '@/lib/i18n'
+import { POSITION_WORD } from '@/lib/position-words'
+import { ROLE_HEADING_WORD, ROLE_WORD, shown } from '@/lib/squad/trait-words'
 
 /* TRAK-353 (Season plan 5/18, spec TRAK-348): one panel for a player's main position, roles and Can also play, opened
    from a name in the Positions step and from the player's page (Tarek, 5 Nov: a bottom sheet, like Edit profile).
@@ -21,11 +24,11 @@ const PRESETS = Object.values(ROLES).flat()
 const pill = (on: boolean) =>
   `min-h-10 rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? 'border-brand bg-brand text-on-brand' : 'border-line bg-surface text-ink'}`
 const same = (a: string[], b: string[]) => [...a].sort().join('|') === [...b].sort().join('|')
-const when = (at: string) => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+const when = (at: string) => new Date(at).toLocaleDateString(currentLanguage() === 'en' ? 'en-GB' : currentLanguage(), { day: 'numeric', month: 'short', year: 'numeric' })
 
 export type SheetPlayer = { id: string; name: string; position: string | null }
 
-export function PositionAndRolesSheet({ coachId, player, open, onOpenChange, saveLabel = 'Save', saveNeedsChange = false, quiet = false, onSaved, watch }: {
+export function PositionAndRolesSheet({ coachId, player, open, onOpenChange, saveLabel, saveNeedsChange = false, quiet = false, onSaved, watch }: {
   coachId: string
   player: SheetPlayer
   open: boolean
@@ -40,13 +43,14 @@ export function PositionAndRolesSheet({ coachId, player, open, onOpenChange, sav
   watch?: WatchAction
 }) {
   const roles = usePlayerRoles(coachId, open)
+  const { t } = useTranslation()
   const first = player.name.split(' ')[0]
-  return <BottomSheet className="arc" open={open} onOpenChange={onOpenChange} title={`${first}'s position and roles`} description="Only you see this." initialDetent={1}>
-    {roles.isError ? <LoadError what={`${first}'s roles`} onRetry={() => { void roles.refetch() }} />
-      : !roles.data ? <LoadingSkeleton label={`Loading ${first}'s roles…`} lines={3} />
+  return <BottomSheet className="arc" open={open} onOpenChange={onOpenChange} title={t('coachSquad:sheetTitle', { name: first })} description={t('coachSquad:onlyYou')} initialDetent={1}>
+    {roles.isError ? <LoadError what={t('coachSquad:rolesWhat', { name: first })} onRetry={() => { void roles.refetch() }} />
+      : !roles.data ? <LoadingSkeleton label={t('coachSquad:loadingRoles', { name: first })} lines={3} />
       // Keyed by player, so Save · next starts the next one fresh.
       : <Panel key={player.id} coachId={coachId} player={player} first={first} saved={roles.of(player.id)} own={ownRoles(roles.held)}
-        saveLabel={saveLabel} saveNeedsChange={saveNeedsChange} quiet={quiet} onSaved={onSaved} watch={watch} onCancel={() => onOpenChange(false)} />}
+        saveLabel={saveLabel ?? t('common:save')} saveNeedsChange={saveNeedsChange} quiet={quiet} onSaved={onSaved} watch={watch} onCancel={() => onOpenChange(false)} />}
   </BottomSheet>
 }
 
@@ -54,6 +58,7 @@ function Panel({ coachId, player, first, saved, own, saveLabel, saveNeedsChange,
   coachId: string; player: SheetPlayer; first: string; saved: PlayerRoles; own: string[]
   saveLabel: string; saveNeedsChange: boolean; quiet: boolean; onSaved: () => void; watch?: WatchAction; onCancel: () => void
 }) {
+  const { t } = useTranslation()
   const placed = isPosition(player.position) ? player.position : null
   const [main, setMain] = useState<Position | null>(placed)
   const [also, setAlso] = useState<Position[]>(saved.also)
@@ -83,75 +88,75 @@ function Panel({ coachId, player, first, saved, own, saveLabel, saveNeedsChange,
     if (!changed) { onSaved(); return }
     setFailed(false)
     save.mutate({ id: player.id, position: main, also, roles: chosen }, {
-      onSuccess: () => { if (!quiet) toast.success(`Saved ${first}'s position and roles`); onSaved() },
+      onSuccess: () => { if (!quiet) toast.success(t('coachSquad:savedPositionRoles', { name: first })); onSaved() },
       onError: () => setFailed(true),
     })
   }
 
   const createOwn = writing === null
-    ? <button type="button" onClick={() => setWriting('')} className={`${pill(false)} border-dashed text-brand`}>+ Create your own</button>
+    ? <button type="button" onClick={() => setWriting('')} className={`${pill(false)} border-dashed text-brand`}>{t('coachSquad:createOwn')}</button>
     : <span className="flex items-center gap-2">
       {/* It opens on the coach's own tap, to be typed in. */}
-      <input autoFocus aria-label="Your own role" maxLength={ROLE_LENGTH} value={writing} onChange={e => setWriting(e.target.value)} onKeyDown={onOwnKey}
-        placeholder="Your own role" className="min-h-10 w-48 rounded-full border border-line bg-surface px-3.5 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
-      <button type="button" onClick={addOwn} className={pill(false)}>Add</button>
+      <input autoFocus aria-label={t('coachSquad:yourOwnRole')} maxLength={ROLE_LENGTH} value={writing} onChange={e => setWriting(e.target.value)} onKeyDown={onOwnKey}
+        placeholder={t('coachSquad:yourOwnRole')} className="min-h-10 w-48 rounded-full border border-line bg-surface px-3.5 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+      <button type="button" onClick={addOwn} className={pill(false)}>{t('coachSquad:add')}</button>
     </span>
 
   return <form onSubmit={submit} className="grid gap-6 pb-4">
     <fieldset className="grid gap-2">
-      <legend className="mb-2 text-sm font-medium text-ink">Main position</legend>
+      <legend className="mb-2 text-sm font-medium text-ink">{t('coachSquad:mainPosition')}</legend>
       <div className="flex flex-wrap gap-2">
         {POSITIONS.map(p => <button key={p.value} type="button" aria-pressed={main === p.value} className={pill(main === p.value)}
-          onClick={() => { setMain(p.value); setAlso(list => pickMain(p.value, list)); setRefused(false) }}>{p.value}</button>)}
+          onClick={() => { setMain(p.value); setAlso(list => pickMain(p.value, list)); setRefused(false) }}>{t(POSITION_WORD[p.value])}</button>)}
       </div>
     </fieldset>
 
-    {!main ? <p className="text-sm text-ink-2">Pick {first}'s main position. Their roles and Can also play come after it.</p> : <>
+    {!main ? <p className="text-sm text-ink-2">{t('coachSquad:pickMainFirst', { name: first })}</p> : <>
       <fieldset className="grid gap-4">
-        <legend className="mb-1 text-sm font-medium text-ink">Player roles <span className="font-normal text-ink-3">{chosen.length} picked</span></legend>
-        <p className="-mt-2 text-sm text-ink-3">How they play for you. Pick any, or create your own.</p>
-        {groups.map((group, index) => <div key={group.heading} role="group" aria-label={group.heading} className="grid gap-2">
-          <p className="text-sm text-ink-3">{group.heading}</p>
+        <legend className="mb-1 text-sm font-medium text-ink">{t('coachSquad:playerRoles')} <span className="font-normal text-ink-3">{t('coachSquad:pickedCount', { count: chosen.length })}</span></legend>
+        <p className="-mt-2 text-sm text-ink-3">{t('coachSquad:howTheyPlay')}</p>
+        {groups.map((group, index) => <div key={group.heading} role="group" aria-label={shown(ROLE_HEADING_WORD, group.heading)} className="grid gap-2">
+          <p className="text-sm text-ink-3">{shown(ROLE_HEADING_WORD, group.heading)}</p>
           <div className="flex flex-wrap gap-2">
             {group.roles.map(role => <button key={role} type="button" aria-pressed={chosen.includes(role)} className={pill(chosen.includes(role))}
-              onClick={() => toggleRole(role)}>{role}</button>)}
+              onClick={() => toggleRole(role)}>{shown(ROLE_WORD, role)}</button>)}
             {index === groups.length - 1 && createOwn}
           </div>
         </div>)}
-        {tooMany && <p className="text-sm text-danger">Up to {ROLE_COUNT} roles. Untick some first.</p>}
+        {tooMany && <p className="text-sm text-danger">{t('coachSquad:upToRoles', { count: ROLE_COUNT })}</p>}
       </fieldset>
 
       <fieldset className="grid gap-2">
-        <legend className="mb-2 text-sm font-medium text-ink">Can also play <span className="font-normal text-ink-3">· up to 2</span></legend>
-        <p className="-mt-1 text-sm text-ink-3">Positions they can cover besides their main one.</p>
+        <legend className="mb-2 text-sm font-medium text-ink">{t('coachSquad:canAlsoPlay')} <span className="font-normal text-ink-3">{t('coachSquad:upTo2')}</span></legend>
+        <p className="-mt-1 text-sm text-ink-3">{t('coachSquad:coverNote')}</p>
         <div className="flex flex-wrap gap-2">
           {POSITIONS.filter(p => p.value !== main).map(p => {
             const on = also.includes(p.value), full = !on && also.length >= 2
             return <button key={p.value} type="button" aria-pressed={on} aria-disabled={full || undefined} className={`${pill(on)} ${full ? 'opacity-60' : ''}`}
-              onClick={() => { const next = toggleAlso(also, p.value, main); setAlso(next.also); setRefused(next.refused) }}>{p.value}</button>
+              onClick={() => { const next = toggleAlso(also, p.value, main); setAlso(next.also); setRefused(next.refused) }}>{t(POSITION_WORD[p.value])}</button>
           })}
         </div>
-        <p role="status" className="min-h-5 text-sm text-ink-2">{refused ? 'Up to two. Untick one first.' : ''}</p>
+        <p role="status" className="min-h-5 text-sm text-ink-2">{refused ? t('coachSquad:upToTwoRefused') : ''}</p>
       </fieldset>
     </>}
 
     <section aria-labelledby={`history-${player.id}`} className="grid gap-2 rounded-xl bg-raised p-4">
-      <h3 id={`history-${player.id}`} className="text-sm font-medium text-ink">Their position, over time</h3>
-      {history.isError ? <LoadError what={`${first}'s position history`} onRetry={() => { void history.refetch() }} />
-        : !history.data ? <LoadingSkeleton label={`Loading ${first}'s position history…`} lines={1} />
-        : history.data.length === 0 ? <p className="text-sm text-ink-3">No change recorded yet.</p>
+      <h3 id={`history-${player.id}`} className="text-sm font-medium text-ink">{t('coachSquad:positionOverTime')}</h3>
+      {history.isError ? <LoadError what={t('coachSquad:historyWhat', { name: first })} onRetry={() => { void history.refetch() }} />
+        : !history.data ? <LoadingSkeleton label={t('coachSquad:loadingHistory', { name: first })} lines={1} />
+        : history.data.length === 0 ? <p className="text-sm text-ink-3">{t('coachSquad:noChangeYet')}</p>
         : <ol className="m-0 grid list-none gap-2 p-0">
           {history.data.map((change, index) => <li key={`${change.at}-${index}`} className="flex flex-wrap items-baseline justify-between gap-x-3">
-            <span className="text-sm font-medium text-ink">{change.to}</span>
-            <span className="text-sm text-ink-3">{change.from ? `from ${change.from}` : 'first placed'} · {when(change.at)}</span>
+            <span className="text-sm font-medium text-ink">{isPosition(change.to) ? t(POSITION_WORD[change.to]) : change.to}</span>
+            <span className="text-sm text-ink-3">{change.from ? t('coachSquad:fromPosition', { position: isPosition(change.from) ? t(POSITION_WORD[change.from]) : change.from }) : t('coachSquad:firstPlaced')} · {when(change.at)}</span>
           </li>)}
         </ol>}
     </section>
 
-    {failed && <Alert tone="danger" title="Couldn't save. Check your connection and try again." />}
+    {failed && <Alert tone="danger" title={t('coachSquad:couldntSave')} />}
     <div className="flex flex-wrap items-center justify-end gap-3">
-      <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
-      {watch && <Button type="button" variant="secondary" loading={watch.pending} onClick={watch.onWatch}>{watch.label}</Button>}
+      <Button type="button" variant="ghost" onClick={onCancel}>{t('coachSchedule:cancel')}</Button>
+      {watch && <Button type="button" variant="secondary" loading={watch.pending} onClick={watch.onWatch}>{watch.label === 'Watch first' ? t('coachSquad:watchFirst') : t('coachSquad:keepWatching')}</Button>}
       <Button type="submit" disabled={!main || tooMany || (saveNeedsChange && !changed)} loading={save.isPending}>{saveLabel}</Button>
     </div>
   </form>

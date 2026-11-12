@@ -1,3 +1,4 @@
+import { currentLanguage, useTranslation } from '@/lib/i18n'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -15,6 +16,7 @@ export function GameHistory({ game, planCreatedAt, savedAt, publishedAt }: {
   planCreatedAt: string | null; savedAt: string | null; publishedAt: string | null
 }) {
   const { user } = useAuth()
+  const { t } = useTranslation()
   const shares = useQuery({
     queryKey: ['coach', user?.id, 'game-share-log', game.id],
     enabled: !!user,
@@ -24,18 +26,17 @@ export function GameHistory({ game, planCreatedAt, savedAt, publishedAt }: {
       return data ?? []
     },
   })
-  if (shares.error) return <LoadError what="this match’s history" onRetry={() => void shares.refetch()} />
-  if (shares.isPending) return <LoadingSkeleton label="Loading the history…" lines={2} rows={2} />
-  const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
+  if (shares.error) return <LoadError what={t('coachMatches:historyWhat')} onRetry={() => void shares.refetch()} />
+  if (shares.isPending) return <LoadingSkeleton label={t('coachMatches:loadingHistory')} lines={2} rows={2} />
   const events = [
-    game.created_at ? [{ id: 'created', at: game.created_at, title: 'Match created' }] : [],
-    planCreatedAt ? [{ id: 'plan', at: planCreatedAt, title: 'Plan drafted' }] : [],
+    game.created_at ? [{ id: 'created', at: game.created_at, title: t('coachMatches:histCreated') }] : [],
+    planCreatedAt ? [{ id: 'plan', at: planCreatedAt, title: t('coachMatches:histPlanDrafted') }] : [],
     shares.data.map((share, i) => ({ id: `share-${share.id}`, at: share.shared_at,
-      title: i === 0 ? `Plan shared with ${players(share.changed)}` : `Changes shared with ${players(share.changed)}` })),
-    [{ id: 'locked', at: game.starts_at, title: 'Locked at kick-off' }],
-    savedAt ? [{ id: 'draft', at: savedAt, title: 'Evaluation draft saved' }] : [],
-    publishedAt ? [{ id: 'published', at: publishedAt, title: 'Evaluation published. The loop is closed.', tone: 'success' as const }] : [],
+      title: t(i === 0 ? 'coachMatches:histPlanShared' : 'coachMatches:histChangesShared', { count: share.changed }) })),
+    [{ id: 'locked', at: game.starts_at, title: t('coachMatches:stateLocked') }],
+    savedAt ? [{ id: 'draft', at: savedAt, title: t('coachMatches:histDraftSaved') }] : [],
+    publishedAt ? [{ id: 'published', at: publishedAt, title: t('coachMatches:histPublished'), tone: 'success' as const }] : [],
   ].flat()
-  return <Timeline events={events} now={Date.now()} label="History" headingLevel={3} locale="en-GB"
+  return <Timeline events={events} now={Date.now()} label={t('coachMatches:history')} headingLevel={3} locale={currentLanguage() === 'en' ? 'en-GB' : currentLanguage()}
     timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone} />
 }

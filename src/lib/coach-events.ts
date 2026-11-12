@@ -10,6 +10,7 @@
 import { calendarFields, displayEventTime, toAcademyInstant, toInstant } from '@/lib/event-time'
 import { describeEventKit, readKitSnapshot, type EventKitSnapshot } from '@/lib/kit-templates'
 import { trainingThemeFrom, type TrainingTheme } from '@/lib/training-theme'
+import { currentLanguage, i18n } from '@/lib/i18n'
 import { splitVenue } from '@/lib/venue-link'
 
 export type EventKind = 'training' | 'match' | 'other'
@@ -114,21 +115,21 @@ const minutes = (hhmm: string) => {
 /** What the event is: a match's opponent, an "other" event's name. The Schedule
  *  form's first step checks only this (TRAK-182); formProblem() checks it too. */
 export function whatProblem(form: EventForm): string | null {
-  if (form.kind === 'match' && !form.opponent.trim()) return 'Add the opponent'
-  if (form.kind === 'other' && !form.title.trim()) return 'Say what the event is'
+  if (form.kind === 'match' && !form.opponent.trim()) return i18n.t('coachSchedule:problemOpponent')
+  if (form.kind === 'other' && !form.title.trim()) return i18n.t('coachSchedule:problemWhat')
   return null
 }
 
 /** What's wrong with the form in words the coach can act on, or null. */
 export function formProblem(form: EventForm): string | null {
-  if (!form.date || !toInstant(form.date, form.time || null)) return 'Pick a real date and time'
+  if (!form.date || !toInstant(form.date, form.time || null)) return i18n.t('coachSchedule:problemRealDate')
   // TRAK-157: every event has a start time (Imad, 12 Oct). The 11 Oct live run
   // saved 8 published trainings with none; the database refuses it too.
-  if (!form.time) return 'Pick a start time'
+  if (!form.time) return i18n.t('coachSchedule:pickStartTime')
   const what = whatProblem(form)
   if (what) return what
-  if (form.meetTime && minutes(form.meetTime) > minutes(form.time)) return 'Meet time must be before the start'
-  if (form.familyNote.trim().length > FAMILY_NOTE_MAX) return `Keep the note to ${FAMILY_NOTE_MAX} characters`
+  if (form.meetTime && minutes(form.meetTime) > minutes(form.time)) return i18n.t('coachSchedule:problemMeetBefore')
+  if (form.familyNote.trim().length > FAMILY_NOTE_MAX) return i18n.t('coachSchedule:problemNoteLength', { max: FAMILY_NOTE_MAX })
   return null
 }
 
@@ -138,7 +139,8 @@ export const PAST_DATE_PROBLEM = 'This date has passed: log it instead'
 
 /** `2026-10-31` -> `Saturday 31 October`, as Schedule's Review and sheets write a day. */
 export function formatEventDay(date: string) {
-  return new Date(date + 'T12:00:00').toLocaleDateString('en-GB', {
+  // TRAK-407: the day and month names in the language showing (English as before).
+  return new Date(date + 'T12:00:00').toLocaleDateString(currentLanguage() === 'en' ? 'en-GB' : currentLanguage(), {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 }
@@ -148,7 +150,8 @@ export function formatEventDay(date: string) {
 export function pastDateProblem(date: string, today: string, originalDate?: string | null): string | null {
   if (!date || date >= today) return null
   if (originalDate && originalDate === date) return null
-  return PAST_DATE_PROBLEM
+  // TRAK-407: in the language showing; PAST_DATE_PROBLEM is its English.
+  return i18n.t('coachSchedule:problemPastDate')
 }
 
 export function eventTitle(form: EventForm): string {
@@ -283,12 +286,12 @@ export function seriesDates(start: string, until: string, days: number[]): strin
 /** What's wrong with the repeat in words the coach can act on, or null. */
 export function repeatProblem(form: EventForm, repeat: Repeat): string | null {
   if (!repeat.on) return null
-  if (!repeat.days.length) return 'Pick at least one day of the week'
-  if (!repeat.until || !realDate(repeat.until)) return 'Pick the date the series ends'
-  if (repeat.until < form.date) return 'The series has to end on or after its first date'
+  if (!repeat.days.length) return i18n.t('coachSchedule:problemPickDay')
+  if (!repeat.until || !realDate(repeat.until)) return i18n.t('coachSchedule:problemSeriesEnd')
+  if (repeat.until < form.date) return i18n.t('coachSchedule:problemSeriesOrder')
   const count = seriesDates(form.date, repeat.until, repeat.days).length
-  if (!count) return 'None of those days fall between the start and end dates'
-  if (count > MAX_SERIES_EVENTS) return `That makes ${count} events. Keep a series to ${MAX_SERIES_EVENTS} or fewer.`
+  if (!count) return i18n.t('coachSchedule:problemNoDays')
+  if (count > MAX_SERIES_EVENTS) return i18n.t('coachSchedule:problemTooMany', { count, max: MAX_SERIES_EVENTS })
   return null
 }
 

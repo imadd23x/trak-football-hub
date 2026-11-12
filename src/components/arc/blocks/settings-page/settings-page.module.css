@@ -19,7 +19,8 @@
 }
 .navItem:not([aria-current]):focus-visible { background: color-mix(in oklab, var(--surface-muted) 70%, transparent); color: var(--foreground); }
 .highlight { position: absolute; z-index: -1; inset: 0; border: 1px solid var(--border); border-radius: inherit; background: var(--surface); box-shadow: var(--shadow-resting); }
-.navLabel { flex: 1; min-width: 0; white-space: nowrap; }
+/* TRAK-406: a longer name in another language ("Πώς λειτουργεί το Trak") wraps to a second line instead of being cut. */
+.navLabel { flex: 1; min-width: 0; overflow-wrap: anywhere; text-wrap: balance; }
 .navDot { flex: none; width: 6px; height: 6px; border-radius: var(--radius-pill); background: var(--accent); }
 
 /* Content: every section, one after another. */

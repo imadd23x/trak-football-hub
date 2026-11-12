@@ -1,3 +1,4 @@
+import { i18n, useTranslation } from '@/lib/i18n'
 import { useDefaultFormation, useFormationCopy } from './useDefaultFormation'
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -25,10 +26,8 @@ import { Stepper } from '@/components/arc/stepper/stepper'
    moves to the match's header, so the page holds the draft's saving and sharing (useGamePlanDraft); the bottom bar
    keeps Back, the draft line and Next. */
 
-const STEPS = [{ id: 'opponent', label: 'Tactics & analysis' }, { id: 'line-up', label: 'Line-up and jobs' }, { id: 'share', label: 'Review & share' }]
-const SAVE_FAILED = "Couldn't save the plan. Check your connection and try again; everything you typed is still here."
-const SHARE_FAILED = "Couldn't share the plan. Check your connection and try again; everything you typed is still here."
-const SCHEDULE_FAILED = "Couldn't schedule the plan. Check your connection and try again; everything you typed is still here."
+/* TRAK-407: read when shown, so the words follow the language. */
+const steps = () => [{ id: 'opponent', label: i18n.t('coachMatches:stepTactics') }, { id: 'line-up', label: i18n.t('coachMatches:stepLineUp') }, { id: 'share', label: i18n.t('coachMatches:reviewShare') }]
 
 /** The plan as a draft: what Save draft, Share and Schedule write, and what they said. `change` is the form's onChange. */
 export function useGamePlanDraft({ game, form, onFormChange, sharedAt, who, onSaved }: {
@@ -89,7 +88,7 @@ export function useGamePlanDraft({ game, form, onFormChange, sharedAt, who, onSa
       onSaved?.()
       void refresh(false)
     },
-    onError: () => setProblem(SAVE_FAILED),
+    onError: () => setProblem(i18n.t('coachMatches:planSaveFailed')),
   })
   const submit = () => save.mutate(draft())
 
@@ -105,7 +104,7 @@ export function useGamePlanDraft({ game, form, onFormChange, sharedAt, who, onSa
       if (sent.version === version.current) setSavedNow(true)
       await refresh(true)
     },
-    onError: (error: { code?: string; message?: string }) => setShareProblem(error.code === 'P0001' && error.message ? error.message : SHARE_FAILED),
+    onError: (error: { code?: string; message?: string }) => setShareProblem(error.code === 'P0001' && error.message ? error.message : i18n.t('coachMatches:planShareFailed')),
   })
   const shareNow = (talked: boolean) => {
     setShareProblem(null)
@@ -123,7 +122,7 @@ export function useGamePlanDraft({ game, form, onFormChange, sharedAt, who, onSa
       if (sent.version === version.current) setSavedNow(true)
       await refresh(true)
     },
-    onError: (error: { code?: string; message?: string }) => setShareProblem(error.code === 'P0001' && error.message ? error.message : SCHEDULE_FAILED),
+    onError: (error: { code?: string; message?: string }) => setShareProblem(error.code === 'P0001' && error.message ? error.message : i18n.t('coachMatches:planScheduleFailed')),
   })
   const scheduleAt = (at: string, talked: boolean) => {
     setShareProblem(null)
@@ -146,22 +145,23 @@ export function GamePlan({ game, form, draft, who, step, onStep, sharedAt, chang
   picking: boolean; onPicking: (open: boolean) => void
 }) {
   const { change, shareNow, scheduleAt, sharing, shareProblem } = draft
+  const { t } = useTranslation()
   // TRAK-360: opening the line-up of a match that has none loads the squad's default formation for its format.
   useDefaultFormation({ eventId: game.id, form, onForm: change, enabled: step === 1 && !locked })
   const copy = useFormationCopy(game.id).data ?? null
   return (
     <div className="grid gap-5 pt-4">
       {/* TRAK-346 (Imad, 3 Nov): any step opens from here, ahead as well as back, so an Edit never means walking back. */}
-      <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Game plan" jumpAhead />
+      <Stepper steps={steps()} current={step} onStepSelect={onStep} label={t('coachHome:gamePlan')} jumpAhead />
       {step === 0 ? <TacticsAndAnalysis eventId={game.id} opponent={game.opponent ?? null} squad={game.squad ?? null} form={form} onFormChange={change} locked={locked} />
         : step === 1 ? <LineUpAndJobs form={form} onFormChange={change} who={who} locked={locked} copy={copy} />
         : <ShareStep game={game} form={form} who={who} sharedAt={sharedAt} changes={changes} onShare={shareNow} onSchedule={scheduleAt}
             sharing={sharing} problem={shareProblem} locked={locked} onStep={onStep} onEditLogistics={onEditLogistics} picking={picking} onPicking={onPicking} />}
       <div className="flex flex-wrap items-center gap-3">
-        {step > 0 && <Button variant="ghost" onClick={() => onStep(step - 1)}>Back</Button>}
+        {step > 0 && <Button variant="ghost" onClick={() => onStep(step - 1)}>{t('common:back')}</Button>}
         {/* Imad, 6 Nov: Evaluation's Draft badge, with no "only you see it". */}
-        {!locked && <span className="arc ml-auto"><Badge>Draft</Badge></span>}
-        {step < 2 && <Button className={locked ? 'ml-auto' : undefined} onClick={() => onStep(step + 1)}>{step === 0 ? 'Next: Line-up and jobs' : 'Next: Review & share'}</Button>}
+        {!locked && <span className="arc ml-auto"><Badge>{t('coachHome:stateDraft')}</Badge></span>}
+        {step < 2 && <Button className={locked ? 'ml-auto' : undefined} onClick={() => onStep(step + 1)}>{step === 0 ? t('coachMatches:nextLineUp') : t('coachMatches:nextReview')}</Button>}
       </div>
     </div>
   )

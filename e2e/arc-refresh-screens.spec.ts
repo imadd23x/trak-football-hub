@@ -127,6 +127,8 @@ test.describe('TRAK-182 coach screens', () => {
     ['assess', '/coach/assess', 'Assessment'],
     // TRAK-368: the player's own page in Squad; the list behind it is hidden, so wait for the page's own section.
     ['player', '/coach/squad/player/sq-2', 'Season so far'],
+    // TRAK-418: the coach's own How Trak works, opened from Settings.
+    ['how-trak-works', '/coach/how-trak-works', 'Every week'],
   ] as const) {
     test(`coach ${name}`, async ({ page, context }, testInfo) => {
       const unexpected: string[] = [], errors: string[] = []
@@ -592,4 +594,41 @@ test.describe('The "+" form\'s pickers on a phone', () => {
     expect(times.inside, JSON.stringify(times)).toBe(true)
     expect(unexpected).toEqual([])
   })
+})
+
+// TRAK-420 (11 Nov review): on a phone the Log page squeezed the trail, "What are you logging?" and History onto one
+// line. The trail gets its own line, the title sits under it, and History touches neither. A laptop shows the trail in
+// its top bar, so the page itself shows only the title and History, on one line.
+test.describe('TRAK-420 Log page header', () => {
+  test.use({ timezoneId: 'Asia/Dubai' })
+  const overlap = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+
+  for (const [name, width, height] of [['phone', 390, 844], ['laptop', 1440, 900]] as const) {
+    test(`on a ${name}, the trail, the title and History do not touch`, async ({ page, context }, testInfo) => {
+      const unexpected: string[] = [], errors: string[] = []
+      page.on('pageerror', error => errors.push(error.message))
+      await page.setViewportSize({ width, height })
+      await coachBackend(context, unexpected)
+      await page.goto('/coach/sessions')
+      const title = page.getByRole('heading', { name: 'What are you logging?' })
+      const history = page.getByRole('button', { name: 'History' })
+      await expect(title).toBeVisible()
+      const titleBox = (await title.boundingBox())!, historyBox = (await history.boundingBox())!
+      expect(overlap(titleBox, historyBox), 'title and History overlap').toBe(false)
+      if (name === 'phone') {
+        // On a phone the page's own trail is the only one.
+        const trail = page.getByRole('navigation', { name: 'Breadcrumb' })
+        await expect(trail).toBeVisible()
+        const trailBox = (await trail.boundingBox())!
+        // Its own line: the trail ends above the title and above History.
+        expect(trailBox.y + trailBox.height, 'the trail must sit above the title').toBeLessThanOrEqual(titleBox.y)
+        expect(trailBox.y + trailBox.height, 'the trail must sit above History').toBeLessThanOrEqual(historyBox.y)
+      }
+      await page.waitForTimeout(300)
+      await page.screenshot({ path: testInfo.outputPath(`coach-log-header-${name}.png`) })
+      expect(unexpected).toEqual([])
+      expect(errors).toEqual([])
+    })
+  }
 })

@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { playerAttention } from '@/lib/player-attention'
+import { dateLocale, i18n } from '@/lib/i18n'
 
 export interface NeedsYouItem {
   /** The squad row. */
@@ -44,10 +45,10 @@ export function needsYou({ players, waitingForParent, assessments, now, evaluate
     drafts.set(a.squad_player_id, [...(drafts.get(a.squad_player_id) ?? []), a.created_at])
   }
   const draft = [...drafts].map(([id, dates]): NeedsYouItem => {
-    const latest = format(new Date(dates.sort().at(-1)!), 'd MMM')
+    const latest = format(new Date(dates.sort().at(-1)!), 'd MMM', { locale: dateLocale() })
     return {
       playerId: id, name: byId.get(id)!.player_name, detail: detail(byId.get(id)!), kind: 'draft', urgent: false,
-      reason: dates.length === 1 ? `Draft from ${latest}: families can't see it yet` : `${dates.length} drafts, the latest from ${latest}: families can't see them yet`,
+      reason: dates.length === 1 ? i18n.t('coachHome:draftFrom', { day: latest }) : i18n.t('coachHome:draftsFrom', { count: dates.length, day: latest }),
     }
   }).sort((a, b) => a.name.localeCompare(b.name))
 

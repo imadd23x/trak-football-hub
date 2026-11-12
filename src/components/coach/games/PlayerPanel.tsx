@@ -1,3 +1,6 @@
+import { i18n, useTranslation } from '@/lib/i18n'
+import { optionWords } from '@/lib/games/match-words'
+import { lineWord } from '@/lib/position-words'
 import { lineName } from '@/lib/games/formations'
 import {
   CONTEXT, EXPECTATIONS, PLAYER_LIMITS, place, playerPlan, setContext, setRole, takeOff,
@@ -21,7 +24,8 @@ import { LockedValue } from './LockedValue'
 
 export type Target = { kind: 'slot'; slot: number } | { kind: 'player'; id: string }
 
-const ROLES = [{ value: 'bench', label: 'Bench' }, { value: 'not_selected', label: 'Not selected' }, { value: 'not_attending', label: 'Not attending' }]
+/* TRAK-407: read when shown, so the words follow the language. */
+const roleOptions = () => [{ value: 'bench', label: i18n.t('coachSquad:fmBench') }, { value: 'not_selected', label: i18n.t('coachMatches:notSelected') }, { value: 'not_attending', label: i18n.t('coachMatches:notAttending') }]
 const rank = (player: Candidate) => player.absent ? 2 : player.confirmed ? 0 : 1
 const firstName = (name: string) => name.split(/\s+/)[0] ?? name
 
@@ -34,61 +38,62 @@ export function PlayerPanel({ target, players, onPlayers, candidates, shape, onT
   onTarget: (target: Target) => void
   locked?: boolean
 }) {
-  if (target.kind === 'slot' && locked) return <p className="text-sm text-ink-2">Nobody was placed here before kick-off.</p>
+  const { t } = useTranslation()
+  if (target.kind === 'slot' && locked) return <p className="text-sm text-ink-2">{t('coachMatches:nobodyPlaced')}</p>
   if (target.kind === 'slot') {
     const options = [...candidates].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name)).map(player => {
       const plan = playerPlan(players, player.id)
-      const tags = [player.absent ? "can't make it" : player.confirmed ? '' : 'not confirmed', plan.role === 'starter' ? 'on the pitch' : '']
+      const tags = [player.absent ? t('coachMatches:cantMakeItWord') : player.confirmed ? '' : t('coachMatches:tagNotConfirmed'), plan.role === 'starter' ? t('coachMatches:tagOnPitch') : '']
       return { value: player.id, label: [player.name, ...tags.filter(Boolean)].join(' · '), disabled: player.absent }
     })
     return <div className="grid gap-3">
-      <Combobox label="Who plays here?" placeholder="Search the squad" options={options} value=""
-        emptyMessage="Nobody in this match's squad by that name"
+      <Combobox label={t('coachMatches:whoPlaysHere')} placeholder={t('coachMatches:searchSquad')} options={options} value=""
+        emptyMessage={t('coachMatches:nobodyByName')}
         onValueChange={id => { if (!id) return; onPlayers(place(players, id, target.slot)); onTarget({ kind: 'player', id }) }} />
-      <p className="text-sm text-ink-3">Confirmed players first. Anyone whose family said they can't make it can't be picked.</p>
+      <p className="text-sm text-ink-3">{t('coachMatches:confirmedFirst')}</p>
     </div>
   }
 
   const player = candidates.find(candidate => candidate.id === target.id)
-  if (!player) return <p className="text-sm text-ink-2">This player is no longer in the match's squad.</p>
+  if (!player) return <p className="text-sm text-ink-2">{t('coachMatches:noLongerInSquad')}</p>
   const plan = playerPlan(players, player.id)
   const first = firstName(player.name)
   const set = (next: Partial<PlayerPlan>) => onPlayers({ ...players, [player.id]: { ...plan, ...next } })
 
   return <div className="grid gap-4">
-    <p className="text-sm text-ink-2">{plan.role === 'starter' && plan.slot != null ? `${lineName(shape, plan.slot)}, slot ${plan.slot}` : plan.role === 'bench' ? 'Bench' : plan.role === 'not_attending' ? 'Not attending' : 'Not selected'}</p>
-    {player.absent && <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-ink">{first}'s family says {first} can't make it.</p>}
+    <p className="text-sm text-ink-2">{plan.role === 'starter' && plan.slot != null ? t('coachMatches:slotTitle', { line: lineWord(lineName(shape, plan.slot)), slot: plan.slot }) : plan.role === 'bench' ? t('coachSquad:fmBench') : plan.role === 'not_attending' ? t('coachMatches:notAttending') : t('coachMatches:notSelected')}</p>
+    {player.absent && <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-ink">{t('coachMatches:familySaysCant', { name: first })}</p>}
     {locked ? null : plan.role === 'starter'
-      ? <span><Button variant="secondary" size="sm" onClick={() => onPlayers(takeOff(players, player.id))}>Move to bench</Button></span>
+      ? <span><Button variant="secondary" size="sm" onClick={() => onPlayers(takeOff(players, player.id))}>{t('coachMatches:moveToBench')}</Button></span>
       : plan.role === 'not_attending' && player.absent
-        ? <p className="text-sm text-ink-3">{first} stays in Not attending until {first}'s family undoes it.</p>
-        : <RadioGroup label="Bench, not selected or not attending" name={`role-${player.id}`} options={ROLES} value={plan.role}
+        ? <p className="text-sm text-ink-3">{t('coachMatches:staysNotAttending', { name: first })}</p>
+        : <RadioGroup label={t('coachMatches:roleGroupLabel')} name={`role-${player.id}`} options={roleOptions()} value={plan.role}
             onValueChange={role => onPlayers(setRole(players, player.id, role as 'bench' | 'not_selected' | 'not_attending'))} />}
-    {plan.role === 'not_attending' ? <p className="text-sm text-ink-3">{first}'s family sees “Not in the squad this week”.</p>
+    {plan.role === 'not_attending' ? <p className="text-sm text-ink-3">{t('coachMatches:familySeesNotInSquad', { name: first })}</p>
     : plan.role === 'not_selected' ? <>
-      {locked ? <LockedValue label={`Note to ${first} · only ${first} sees it`} value={plan.note.trim() || 'No note.'} />
-        : <Textarea label={`Note to ${first} · only ${first} sees it`} rows={3} value={plan.note} maxLength={PLAYER_LIMITS.note}
+      {locked ? <LockedValue label={t('coachMatches:noteTo', { name: first })} value={plan.note.trim() || t('coachMatches:noNote')} />
+        : <Textarea label={t('coachMatches:noteTo', { name: first })} rows={3} value={plan.note} maxLength={PLAYER_LIMITS.note}
             onChange={event => set({ note: event.target.value })} />}
-      <p className="text-sm text-ink-3">{first}'s family sees “Not in the squad this week”.</p>
+      <p className="text-sm text-ink-3">{t('coachMatches:familySeesNotInSquad', { name: first })}</p>
     </> : <>
-      {locked ? <LockedValue label={`Job · only ${first} sees it`} value={plan.job.trim() || 'No job.'} />
-        : <Textarea label={`Job · only ${first} sees it`} rows={3} value={plan.job} maxLength={PLAYER_LIMITS.job}
-            placeholder="e.g. Stay goal-side of their number 10 and win the second balls."
+      {locked ? <LockedValue label={t('coachMatches:jobLabel', { name: first })} value={plan.job.trim() || t('coachMatches:noJob')} />
+        : <Textarea label={t('coachMatches:jobLabel', { name: first })} rows={3} value={plan.job} maxLength={PLAYER_LIMITS.job}
+            placeholder={t('coachMatches:jobExample')}
             onChange={event => set({ job: event.target.value })} />}
       {locked ? <>
-        <LockedValue label="Context · only you" value={CONTEXT.filter(tag => plan.context.includes(tag.value)).map(tag => tag.label).join(', ') || 'None'} />
-        <LockedValue label="Expectation · only you" value={EXPECTATIONS.find(level => level.value === plan.expectation)?.label ?? 'Usual'} />
+        <LockedValue label={t('coachMatches:contextOnlyYou')} value={optionWords('context', CONTEXT).filter(tag => plan.context.includes(tag.value)).map(tag => tag.label).join(', ') || t('coachSchedule:none')} />
+        <LockedValue label={t('coachMatches:expectationOnlyYou')} value={optionWords('expectation', EXPECTATIONS).find(level => level.value === plan.expectation)?.label ?? t('coachMatches:expectation_usual')} />
       </> : <>
         <div className="grid gap-2">
-          <p className="text-sm font-medium text-ink">Context · only you</p>
+          <p className="text-sm font-medium text-ink">{t('coachMatches:contextOnlyYou')}</p>
           {/* TRAK-358: Out of position ticked or unticked here is the coach's, so moving the player leaves it be. */}
-          <ChipGroup label="Context" options={CONTEXT} value={plan.context}
+          <ChipGroup label={t('coachMatches:keyContext')} options={optionWords('context', CONTEXT)} value={plan.context}
             onValueChange={context => onPlayers({ ...players, [player.id]: setContext(plan, context) })} />
         </div>
-        <RadioGroup label="Expectation · only you" name={`expectation-${player.id}`} options={EXPECTATIONS} value={plan.expectation}
+        <RadioGroup label={t('coachMatches:expectationOnlyYou')} name={`expectation-${player.id}`} options={optionWords('expectation', EXPECTATIONS)} value={plan.expectation}
           onValueChange={value => set({ expectation: value as Expectation })} />
       </>}
-      <p className="text-sm text-ink-3">{first}'s family sees whether {first} starts or is on the bench, never the job. The expectation shows only with the published evaluation.</p>
+      <p className="text-sm text-ink-3">{t('coachMatches:familySeesStarts', { name: first })}</p>
     </>}
   </div>
 }

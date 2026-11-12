@@ -1,3 +1,5 @@
+import { useTranslation } from '@/lib/i18n'
+import { optionWords } from '@/lib/games/match-words'
 import { AGAINST, DID_JOB, EVALUATION_LIMITS, answerOf, summary, type Against, type Answer, type DidJob, type EvaluationForm } from '@/lib/games/evaluation'
 import { CONTEXT, EXPECTATIONS, EXPECTATION_COLOR, playerPlan, type PlayerPlans } from '@/lib/games/lineup'
 import { Badge } from '@/components/arc/badge/badge'
@@ -18,13 +20,16 @@ export function PlayersStep({ eventId, form, onFormChange, played, plans }: {
   eventId: string; form: EvaluationForm; onFormChange: (form: EvaluationForm) => void
   played: { id: string; name: string }[]; plans: PlayerPlans
 }) {
+  const { t } = useTranslation()
+  const contexts = optionWords('context', CONTEXT)
+  const expectations = optionWords('expectation', EXPECTATIONS)
   const set = (id: string, next: Partial<Answer>) =>
     onFormChange({ ...form, answers: { ...form.answers, [id]: { ...answerOf(form, id), ...next } } })
   return (
     <section aria-labelledby="evaluation-players" className="grid min-w-0 content-start gap-4">
       <div>
-        <h2 id="evaluation-players" className="text-lg font-medium text-ink">Against what you expected</h2>
-        {!played.length && <p className="mt-1 text-sm text-ink-3">Nobody is ticked as playing. Tick who played in Result first.</p>}
+        <h2 id="evaluation-players" className="text-lg font-medium text-ink">{t('coachMatches:againstExpected')}</h2>
+        {!played.length && <p className="mt-1 text-sm text-ink-3">{t('coachMatches:nobodyTicked')}</p>}
       </div>
       <ul className="grid gap-3">
         {played.map(player => {
@@ -33,18 +38,18 @@ export function PlayersStep({ eventId, form, onFormChange, played, plans }: {
           const name = first(player.name)
           return <li key={player.id}>
             <ExpandableCard title={player.name} description={summary(answer)} badges={<>
-              {plan.context.map(value => <Badge key={value} size="sm" color="amber">{CONTEXT.find(c => c.value === value)?.label ?? value}</Badge>)}
+              {plan.context.map(value => <Badge key={value} size="sm" color="amber">{contexts.find(c => c.value === value)?.label ?? value}</Badge>)}
               <Badge size="sm" color={EXPECTATION_COLOR[plan.expectation]}>
-                {`Expected: ${EXPECTATIONS.find(e => e.value === plan.expectation)!.label}`}</Badge>
+                {t('coachMatches:expectedLabel', { level: expectations.find(e => e.value === plan.expectation)!.label })}</Badge>
             </>}>
               <div className="grid gap-4 p-4 tablet:grid-cols-2">
-                <div className="tablet:col-span-2"><LockedValue label="Job" value={plan.job.trim() || 'No job.'} /></div>
-                <RadioGroup label="Did the job?" name={`did-job-${eventId}-${player.id}`} options={DID_JOB} value={answer.didJob}
+                <div className="tablet:col-span-2"><LockedValue label={t('coachMatches:job')} value={plan.job.trim() || t('coachMatches:noJob')} /></div>
+                <RadioGroup label={t('coachMatches:didTheJob')} name={`did-job-${eventId}-${player.id}`} options={optionWords('didJob', DID_JOB)} value={answer.didJob}
                   onValueChange={value => set(player.id, { didJob: value as DidJob })} />
-                <RadioGroup label="Against expectation" name={`against-${eventId}-${player.id}`} options={AGAINST} value={answer.against}
+                <RadioGroup label={t('coachMatches:againstExpectation')} name={`against-${eventId}-${player.id}`} options={optionWords('against', AGAINST)} value={answer.against}
                   onValueChange={value => set(player.id, { against: value as Against })} />
                 <div className="tablet:col-span-2">
-                  <Input label={`Note to ${name}`} placeholder="e.g. Your runs in behind stretched them all game. Next time, look up before you cross." value={answer.note}
+                  <Input label={t('coachMatches:noteToName', { name })} placeholder={t('coachMatches:noteExample')} value={answer.note}
                     maxLength={EVALUATION_LIMITS.note} onChange={event => set(player.id, { note: event.target.value })} />
                 </div>
               </div>

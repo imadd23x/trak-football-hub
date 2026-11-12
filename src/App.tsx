@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AccountLanguage } from "@/components/trak/AccountLanguage";
 import { ParentChildrenProvider } from "@/contexts/ParentChildrenContext";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PlayerConsentWatcher } from "@/components/player/PlayerConsentWatcher";
@@ -12,6 +13,7 @@ import { PlayerSessionWatcher } from "@/components/player/PlayerSessionWatcher";
 import { ParentConsentWatcher } from "@/components/parent/ParentConsentWatcher";
 import { CoachLayout } from "@/components/coach/CoachLayout";
 import { CoachFrame } from "@/components/coach/CoachFrame";
+import { COACH_HOW_PATH } from "@/lib/coach-places";
 import { ErrorBoundary } from "@/components/trak/ErrorBoundary";
 import { ParkedScreen } from "@/components/trak/ParkedScreen";
 
@@ -64,8 +66,7 @@ const CoachSessionsPage = lazy(() => import("./pages/coach/CoachSessionsPage"));
 const CoachAddSession = lazy(() => import("./pages/coach/CoachAddSession"));
 const CoachSessionsChooser = lazy(() => import("./pages/coach/CoachSessionsChooser"));
 const CoachSessionEdit = lazy(() => import("./pages/coach/CoachSessionEdit"));
-const CoachProfilePage = lazy(() => import("./pages/coach/CoachProfilePage"));
-const CoachManual = lazy(() => import("./pages/coach/CoachManual"));
+const CoachHowTrakWorks = lazy(() => import("./pages/coach/CoachHowTrakWorks"));
 const TrainingsPage = lazy(() => import("./pages/TrainingsPage"));
 const CoachLibrary = lazy(() => import("./pages/coach/library/CoachLibrary"));
 
@@ -130,6 +131,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ParentChildrenProvider>
+          {/* TRAK-406: Trak shows the language saved on the signed-in account. */}
+          <AccountLanguage />
           {/* G6: an open player or guardian session drops coach content on withdrawal (TRAK-13, TRAK-88). */}
           <PlayerConsentWatcher />
           {/* TRAK-104: signs out an open app whose session a password reset ended. */}
@@ -190,10 +193,13 @@ const App = () => (
             <Route path="/coach/sessions/add" element={<RouteGuard allowedRole="coach"><CoachAddSession /></RouteGuard>} />
             {/* TRAK-102: a history row opens its session; training and other are editable. */}
             <Route path="/coach/sessions/:id" element={<RouteGuard allowedRole="coach"><CoachSessionEdit /></RouteGuard>} />
-            <Route path="/coach/profile" element={<RouteGuard allowedRole="coach"><CoachProfilePage /></RouteGuard>} />
+            {/* TRAK-418: the old Profile and the old coach manual are gone; old links and bookmarks land on Settings and
+                on the coach's How Trak works. */}
+            <Route path="/coach/profile" element={<Navigate to="/settings" replace />} />
             {/* TRAK-264: the coach's Library (the frame's Library tab) and the pages it opens. */}
             <Route path="/coach/trainings/*" element={<RouteGuard allowedRole="coach"><CoachLibrary /></RouteGuard>} />
-            <Route path="/coach/manual" element={<CoachManual />} />
+            <Route path="/coach/manual" element={<Navigate to={COACH_HOW_PATH} replace />} />
+            <Route path={COACH_HOW_PATH} element={<RouteGuard allowedRole="coach"><CoachHowTrakWorks /></RouteGuard>} />
             <Route path="/coach/quick-assess" element={<RouteGuard allowedRole="coach"><Navigate to="/coach/assess" replace /></RouteGuard>} />
             {/* TRAK-368: a player's page is in Squad now, with their whole history; old links and bookmarks land there. */}
             <Route path="/coach/player/:id" element={<PlayerPageMoved />} />

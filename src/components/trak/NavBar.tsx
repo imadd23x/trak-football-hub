@@ -1,5 +1,6 @@
 import { forwardRef } from 'react'
 import type { Role } from '@/lib/types'
+import { useTranslation } from '@/lib/i18n'
 import {
   IconHome,
   IconLog,
@@ -15,23 +16,24 @@ import {
 type IconComponent = (props: { size?: number; color?: string }) => JSX.Element
 
 interface NavItem {
-  label: string
+  /** Its word in nav.json (TRAK-406). */
+  label: 'home' | 'sessions' | 'trainings' | 'card' | 'profile' | 'events'
   path: string
   Icon: IconComponent
 }
 
 function getNavItems(role: Role): NavItem[] {
   if (role === 'player') return [
-    { label: 'Home', path: '/player/home', Icon: IconHome },
-    { label: 'Sessions', path: '/player/matches', Icon: IconMatch },  // TRAK-112: matches and training
-    { label: 'Trainings', path: '/player/trainings', Icon: IconTraining },
-    { label: 'Card', path: '/player/evolution', Icon: IconRecognition },
-    { label: 'Profile', path: '/player/profile', Icon: IconProfile },
+    { label: 'home', path: '/player/home', Icon: IconHome },
+    { label: 'sessions', path: '/player/matches', Icon: IconMatch },  // TRAK-112: matches and training
+    { label: 'trainings', path: '/player/trainings', Icon: IconTraining },
+    { label: 'card', path: '/player/evolution', Icon: IconRecognition },
+    { label: 'profile', path: '/player/profile', Icon: IconProfile },
   ]
   return [
-    { label: 'Home',    path: '/parent/home',    Icon: IconHome },
-    { label: 'Events',  path: '/parent/matches', Icon: IconMatch },
-    { label: 'Profile', path: '/parent/profile', Icon: IconProfile },
+    { label: 'home',    path: '/parent/home',    Icon: IconHome },
+    { label: 'events',  path: '/parent/matches', Icon: IconMatch },
+    { label: 'profile', path: '/parent/profile', Icon: IconProfile },
   ]
 }
 
@@ -45,6 +47,7 @@ interface NavBarProps {
 
 export const NavBar = forwardRef<HTMLElement, NavBarProps>(
   function NavBar({ role, activeTab, onNavigate }, ref) {
+    const { t } = useTranslation()
     // TRAK-259: a coach's nav is the frame's (CoachFrame: the sidebar on a laptop, the glass tab bar on a phone).
     if (role === 'coach') return null
     const items = getNavItems(role)
@@ -76,7 +79,7 @@ export const NavBar = forwardRef<HTMLElement, NavBarProps>(
           >
             <Icon size={20} color={isActive ? ACTIVE_COLOR : DEFAULT_COLOR} />
             <span className="trak-nav-label" style={{ color: isActive ? 'rgb(var(--t-brand))' : 'rgb(var(--t-ink-3))' }}>
-              {item.label}
+              {t(`nav:${item.label}`)}
             </span>
             {isActive && (
               <span

@@ -1432,6 +1432,7 @@ export type Database = {
           full_name: string
           id: string
           invite_code: string | null
+          language: string | null
           nationality: string | null
           role: Database["public"]["Enums"]["user_role"]
           user_id: string
@@ -1442,6 +1443,7 @@ export type Database = {
           full_name: string
           id?: string
           invite_code?: string | null
+          language?: string | null
           nationality?: string | null
           role: Database["public"]["Enums"]["user_role"]
           user_id: string
@@ -1452,6 +1454,7 @@ export type Database = {
           full_name?: string
           id?: string
           invite_code?: string | null
+          language?: string | null
           nationality?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           user_id?: string

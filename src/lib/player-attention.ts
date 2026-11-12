@@ -21,6 +21,8 @@
  * theirs, and they can't be assessed either, so they're left out entirely).
  */
 
+import { i18n } from '@/lib/i18n'
+
 export type AttentionLevel = 'urgent' | 'warning' | 'on-track'
 
 export interface AttentionRow {
@@ -55,7 +57,8 @@ const parse = (iso: string | null) => {
 }
 const days = (ms: number) => Math.floor(ms / DAY)
 const weeks = (ms: number) => Math.floor(ms / (7 * DAY))
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+/* TRAK-407: the reasons are written in the language showing. */
+const t = i18n.t.bind(i18n)
 
 export function playerAttention(input: AttentionInput): AttentionRow[] {
   const { roster, waitingForParent, assessments, present, absenceReasons, now } = input
@@ -86,32 +89,32 @@ export function playerAttention(input: AttentionInput): AttentionRow[] {
     const missed = counted.filter(t => !present.get(t.id)!.has(p.id))
     const lastMissed = counted.length > 0 && missed[0] === counted[0]
     const cantMakeIt = lastMissed && counted[0].event_id ? absenceReasons.get(counted[0].event_id)?.get(p.id) : undefined
-    const why = cantMakeIt === undefined ? '' : cantMakeIt ? ` (Can't make it: ${cantMakeIt})` : " (Can't make it)"
+    const why = cantMakeIt === undefined ? '' : cantMakeIt ? t('coachHome:cantMakeItReason', { reason: cantMakeIt }) : t('coachHome:cantMakeIt')
     if (squadHasFour && missed.length >= 3) {
-      reasons.push({ level: 'urgent', text: `Missed ${missed.length} of the last ${counted.length} trainings${why}`, weight: 100 + missed.length })
+      reasons.push({ level: 'urgent', text: t('coachHome:missedOf', { missed: missed.length, counted: counted.length, why }), weight: 100 + missed.length })
     } else if (missed.length >= 2) {
-      reasons.push({ level: 'warning', text: `Missed ${missed.length} of the last ${counted.length} trainings${why}`, weight: 50 + missed.length })
+      reasons.push({ level: 'warning', text: t('coachHome:missedOf', { missed: missed.length, counted: counted.length, why }), weight: 50 + missed.length })
     } else if (lastMissed) {
-      reasons.push({ level: 'warning', text: `Missed the last training${why}`, weight: 50 })
+      reasons.push({ level: 'warning', text: t('coachHome:missedLast', { why }), weight: 50 })
     }
 
     // ── Assessments ──
     const assessed = lastAssessed.get(p.id)
     if (assessed !== undefined) {
       const since = now - assessed
-      if (since >= 28 * DAY) reasons.push({ level: 'urgent', text: `No assessment for ${weeks(since)} weeks`, weight: 100 + days(since) / 100 })
-      else if (since >= 14 * DAY) reasons.push({ level: 'warning', text: `No assessment for ${weeks(since)} weeks`, weight: 50 + days(since) / 100 })
+      if (since >= 28 * DAY) reasons.push({ level: 'urgent', text: t('coachHome:noAssessmentFor', { count: weeks(since) }), weight: 100 + days(since) / 100 })
+      else if (since >= 14 * DAY) reasons.push({ level: 'warning', text: t('coachHome:noAssessmentFor', { count: weeks(since) }), weight: 50 + days(since) / 100 })
     } else if (joined !== null) {
       const inSquad = now - joined
-      if (inSquad >= 21 * DAY) reasons.push({ level: 'urgent', text: `Never assessed, ${weeks(inSquad)} weeks in the squad`, weight: 100 + days(inSquad) / 100 })
-      else if (inSquad >= 14 * DAY) reasons.push({ level: 'warning', text: `Never assessed, ${weeks(inSquad)} weeks in the squad`, weight: 50 + days(inSquad) / 100 })
+      if (inSquad >= 21 * DAY) reasons.push({ level: 'urgent', text: t('coachHome:neverAssessed', { count: weeks(inSquad) }), weight: 100 + days(inSquad) / 100 })
+      else if (inSquad >= 14 * DAY) reasons.push({ level: 'warning', text: t('coachHome:neverAssessed', { count: weeks(inSquad) }), weight: 50 + days(inSquad) / 100 })
     }
 
     reasons.sort((a, b) => RANK[a.level] - RANK[b.level] || b.weight - a.weight)
     const level = reasons[0]?.level ?? 'on-track'
     // The level's own word says "On track"; the line says what it rests on.
-    const onTrack = assessed === undefined ? 'Not assessed yet'
-      : `Assessed ${days(now - assessed) === 0 ? 'today' : `${plural(days(now - assessed), 'day')} ago`}`
+    const onTrack = assessed === undefined ? t('coachHome:notAssessedYet')
+      : days(now - assessed) === 0 ? t('coachHome:assessedToday') : t('coachHome:assessedAgo', { count: days(now - assessed) })
     rows.push({
       playerId: p.id,
       name: p.player_name,

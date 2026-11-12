@@ -8,6 +8,7 @@ import { AnimatePresence, LayoutGroup, motion, useMotionValue, useReducedMotion,
 import { ChevronRight, X, type LucideIcon } from "lucide-react";
 import { motionTokens } from "../../lib/motion-tokens";
 import styles from "./sidebar-rail.module.css";
+import { useTranslation } from "@/lib/i18n";
 
 const FULL = 240;
 const RAIL = 64;
@@ -97,7 +98,8 @@ function NavRow({ entry, nested, current, lit, expanded, turned, controls, colla
   const Icon = entry.icon;
   const fade = labelTiming(collapsed, reduce);
   const mark = markTiming(collapsed, reduce);
-  return <RailTip enabled={tips} label={entry.label} note={entry.count ? `${entry.count} need you` : undefined}>
+  const { t } = useTranslation();
+  return <RailTip enabled={tips} label={entry.label} note={entry.count ? t("nav:needYou", { count: entry.count }) : undefined}>
     <button type="button" className={[styles.item, nested ? styles.nested : "", lit ? styles.lit : ""].join(" ")} aria-current={current ? "page" : undefined} aria-expanded={expanded} aria-controls={controls} onClick={onClick}>
       {lit && <motion.span layoutId={layoutId} className={styles.highlight} style={{ borderRadius: 8 }} transition={reduce ? instant : motionTokens.spring.morph} />}
       {Icon && <Icon className={styles.icon} size={16} strokeWidth={1.75} aria-hidden="true" />}
@@ -162,7 +164,9 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
   const [floating, setFloating] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>(defaultOpen);
   const [frame, setFrame] = useState<HTMLElement | null>(null);
-  const [status, setStatus] = useState("");
+  // TRAK-406: the word for what just happened, read out in the language showing.
+  const [status, setStatus] = useState<"" | "sidebarExpanded" | "sidebarCollapsed">("");
+  const { t } = useTranslation();
   const sheet = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const closeTimer = useRef(0);
@@ -178,7 +182,7 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
       event.preventDefault();
       if (narrow) { onSheetOpenChange?.(!sheetOpen); return; }
       setCollapsed(value => !value);
-      setStatus(collapsed ? "Sidebar expanded" : "Sidebar collapsed");
+      setStatus(collapsed ? "sidebarExpanded" : "sidebarCollapsed");
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -209,7 +213,7 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
 
   function toggleRail() {
     setCollapsed(!collapsed);
-    setStatus(collapsed ? "Sidebar expanded" : "Sidebar collapsed");
+    setStatus(collapsed ? "sidebarExpanded" : "sidebarCollapsed");
   }
 
   const overlaid = floating && !collapsed;
@@ -218,7 +222,7 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
 
   function fold() {
     setCollapsed(true);
-    setStatus("Sidebar collapsed");
+    setStatus("sidebarCollapsed");
   }
 
   function select(id: string, fromSheet = false) {
@@ -236,7 +240,7 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
     if (collapsed && !fromSheet) {
       setCollapsed(false);
       setOpen(current => ({ ...current, [id]: true }));
-      setStatus("Sidebar expanded");
+      setStatus("sidebarExpanded");
       return;
     }
     setOpen(current => ({ ...current, [id]: !current[id] }));
@@ -266,7 +270,7 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
               <Dialog.Title className={styles.srOnly}>Menu</Dialog.Title>
               <div className={styles.sheetHead}>
                 <Identity className={styles.brand} mark={brand.logo} name={brand.name} detail={brand.detail} collapsed={false} reduce={reduce} />
-                <Dialog.Close asChild><button type="button" className={styles.iconButton} aria-label="Close menu"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button></Dialog.Close>
+                <Dialog.Close asChild><button type="button" className={styles.iconButton} aria-label={t("nav:closeMenu")}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button></Dialog.Close>
               </div>
               {afterBrand && <div className={styles.afterBrand}>{afterBrand}</div>}
               <Navigation variant="sheet" collapsed={false} onSelect={id => select(id, true)} onGroup={id => toggleGroup(id, true)} {...navShared} />
@@ -298,8 +302,8 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
 
         <div className={styles.main}>
           <header className={styles.topbar}>
-            <button type="button" className={styles.iconButton} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} title={collapsed ? "Expand sidebar  [" : "Collapse sidebar  ["} aria-expanded={!collapsed} aria-controls={sidebarId} aria-keyshortcuts="[" onClick={toggleRail}><PanelGlyph collapsed={collapsed} reduce={reduce} /></button>
-            <nav className={styles.crumbs} aria-label="Breadcrumb">
+            <button type="button" className={styles.iconButton} aria-label={collapsed ? t("nav:expandSidebar") : t("nav:collapseSidebar")} title={`${collapsed ? t("nav:expandSidebar") : t("nav:collapseSidebar")}  [`} aria-expanded={!collapsed} aria-controls={sidebarId} aria-keyshortcuts="[" onClick={toggleRail}><PanelGlyph collapsed={collapsed} reduce={reduce} /></button>
+            <nav className={styles.crumbs} aria-label={t("nav:breadcrumb")}>
               <ol>
                 {trail?.map((crumb, index) => <li key={index}>{crumb}</li>)}
                 {/* Trak: the new title rises in; the old one leaves at once. A lazy page's suspense interrupted the exit, so old titles stayed. */}
@@ -309,7 +313,7 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
             {actions && <div className={styles.actions}>{actions}</div>}
           </header>
           <div className={styles.content}>{children}</div>
-          <p className={styles.srOnly} role="status" aria-live="polite">{status}</p>
+          <p className={styles.srOnly} role="status" aria-live="polite">{status && t(`nav:${status}`)}</p>
         </div>
       </section>
     </TooltipPrimitive.Provider>

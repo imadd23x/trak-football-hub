@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 /* TRAK-285 (Games 3/8): the line-up as the coach builds it, before it's saved to game_plan_players. A slot holds one
    player and a player one slot. Someone who can come and isn't on the pitch is on the bench until the coach says
    otherwise (Imad, 28 Oct); a player left out keeps only their note. TRAK-359 (spec TRAK-348): and one who isn't
@@ -133,8 +134,11 @@ export function markersOf(plan: PlayerPlan) {
 /** The markers in words, for the face's accessible name, so colour is never the only signal. */
 export function markerWords(plan: PlayerPlan): string[] {
   const { done, context, ring } = markersOf(plan)
-  const labels = plan.context.map(tag => (CONTEXT.find(item => item.value === tag)?.label ?? tag).toLowerCase())
-  return [ring ?? '', done ? (plan.role === 'not_selected' ? 'has a note' : 'has a job') : '', context ? `context: ${labels.join(' and ')}` : '']
+  // TRAK-407: said in the language showing (English as it was).
+  const labels = plan.context.map(tag => (CONTEXT.some(item => item.value === tag) ? i18n.t(`coachMatches:context_${tag}` as 'coachMatches:saved') : tag).toLocaleLowerCase())
+  return [ring === 'stretch' ? i18n.t('coachMatches:markStretch') : ring === 'lead' ? i18n.t('coachMatches:markLead') : '',
+    done ? (plan.role === 'not_selected' ? i18n.t('coachMatches:markNote') : i18n.t('coachMatches:markJob')) : '',
+    context ? i18n.t('coachMatches:markContext', { labels: labels.join(i18n.t('coachSquad:fmAnd')) }) : '']
     .filter(Boolean)
 }
 

@@ -23,7 +23,7 @@ import { QuickAdd } from '@/components/coach/QuickAdd'
 import { useGameEvaluations } from '@/components/coach/games/useGames'
 import { useFeature, useParked } from '@/components/trak/parked'
 import {
-  CANCELLED_COLOR, COMPETITIONS, DURATIONS, clashMessage, draftClashes, EVENT_COLOR, lockedMessage, STARTED_LOCKED, startedLocked, EVENT_KINDS, FAMILY_NOTE_MAX, NO_TIME_COLOR, WEEKDAYS, blankForm, blankRepeat, canDelete, cancelPatch, dateAsDay, dayAsDate, formatEventDay, formProblem, formToRow, newDraftFields,
+  CANCELLED_COLOR, COMPETITIONS, DURATIONS, clashMessage, draftClashes, EVENT_COLOR, lockedMessage, startedLocked, EVENT_KINDS, FAMILY_NOTE_MAX, NO_TIME_COLOR, WEEKDAYS, blankForm, blankRepeat, canDelete, cancelPatch, dateAsDay, dayAsDate, formatEventDay, formProblem, formToRow, newDraftFields,
   isCancelled, pastDateProblem, repeatProblem, rowToForm, savedVenues, seriesDates, seriesRows, thisAndFollowing, whatProblem,
   type Clash, type EventForm, type EventKind, type EventRow, type Repeat,
 } from '@/lib/coach-events'
@@ -48,10 +48,11 @@ import { describeEventKit } from '@/lib/kit-templates'
 import { withAlpha } from '@/lib/with-alpha'
 import { Chip, EventEditSheet, Field, ScopeChoice } from '@/components/coach/EventEditSheet'
 import {
-  KIND_LABEL, SAVE_FAILED, competitionProblem, failed, font, inSeries, inputClass, mono, pastProblem, type EditSheet, type Scope, NOTE_STEP,
+  KIND_LABEL, competitionProblem, failed, font, inSeries, inputClass, mono, pastProblem, type EditSheet, type Scope, NOTE_STEP,
 } from '@/lib/event-edit'
 import { useNotedTrainings } from '@/components/coach/training/useTraining'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { currentLanguage, i18n, useLanguage } from '@/lib/i18n'
 
 /* TRAK-127 (J8.4): the coach creates, edits and cancels events. A save is a
    draft only the coach sees; Publish sends it to families (Imad, 9 Oct). Once
@@ -90,10 +91,10 @@ const TYPE_COLOR: Record<ShownType, string> = EVENT_COLOR
 const NEEDS_YOU_COLOR = 'rgb(var(--t-attention))' // TRAK-270: a clear yellow, never text
 
 const TYPE_LABEL: Record<ShownType, string> = { ...KIND_LABEL, tournament: 'Tournament' }
+/** TRAK-407: each type's word in the language showing. */
+const TYPE_WORD = { match: 'coachSchedule:kindMatch', training: 'coachSchedule:kindTraining', other: 'coachSchedule:kindOther', tournament: 'coachSchedule:kindTournament' } as const satisfies Record<ShownType, string>
 
 // ── Calendar helpers ─────────────────────────────────────────────────────────
-
-const DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 
 function toDateStr(d: Date) {
   // Use LOCAL date parts — toISOString() converts to UTC, which shifts the
@@ -127,16 +128,20 @@ function clashingWeeks(ids: string[], rows: EventRow[]): ClashingWeek[] {
     .sort((a, b) => a.event_date!.localeCompare(b.event_date!))
     .map(r => ({ date: r.event_date!, clash: clashes.get(r.id)! }))
 }
-const overlapLine = ({ date, clash }: ClashingWeek) => `${formatEventDay(date)} overlaps ${clash.title}, ${clash.start}–${clash.end}.`
+const overlapLine = ({ date, clash }: ClashingWeek) => i18n.t('coachSchedule:overlapLine', { day: formatEventDay(date), title: clash.title, start: clash.start, end: clash.end })
 /** What to fix: the week's time, or the event it clashes with. */
 function fixLine(weeks: ClashingWeek[]) {
   const titles = [...new Set(weeks.map(w => w.clash.title))]
-  return `Change ${weeks.length > 1 ? 'those weeks’ times' : 'that week’s time'}, or cancel ${titles.length === 1 ? titles[0] : 'what they overlap'}`
+  return i18n.t(weeks.length > 1 ? 'coachSchedule:fixMany' : 'coachSchedule:fixOne', { what: titles.length === 1 ? titles[0] : i18n.t('coachSchedule:whatTheyOverlap') })
 }
 
 export default function CoachSchedule() {
   // TRAK-85: parked, so actions say "Coming soon" and send nothing.
   const { parked, comingSoon } = useParked()
+  // TRAK-407: the words, in the language showing.
+  const { t } = useLanguage()
+  /** The database's refusals, said in the language showing where Trak knows them. */
+  const locked = (error: unknown) => lockedMessage(error) && t('coachSchedule:startedLocked')
   const games = useFeature('games')
   // TRAK-289: a published evaluation is final, so its match opens the review, never the match log's editor.
   const evaluations = useGameEvaluations(games)
@@ -199,7 +204,7 @@ export default function CoachSchedule() {
   // and its children's names, so coach-typed text naming one stays out.
   // Optional: a failed read leaves "Squad" and no reason, and never blocks
   // the calendar.
-  const [squad, setSquad] = useState<{ label: string, childNames: string[] | null }>({ label: 'Squad', childNames: null })
+  const [squad, setSquad] = useState<{ label: string, childNames: string[] | null }>({ label: t('nav:squad'), childNames: null })
   useEffect(() => {
     if (!user) return
     let cancelled = false
@@ -238,7 +243,7 @@ export default function CoachSchedule() {
       if (s.event_id && calEvents.some(e => e.id === s.event_id)) continue
       ev.push({
         id:       s.id,
-        title:    s.title || (s.session_type === 'match' ? 'Match' : 'Training'),
+        title:    s.title || (s.session_type === 'match' ? t('coachSchedule:kindMatch') : t('coachSchedule:kindTraining')),
         type:     (s.session_type === 'match' ? 'match' : s.session_type === 'training' ? 'training' : 'other') as ShownType,
         date:     s.session_date ?? '',
         source:   'session',
@@ -247,7 +252,7 @@ export default function CoachSchedule() {
       })
     }
     return ev.filter(e => e.date)
-  }, [calEvents, sessions])
+  }, [calEvents, sessions, t])
 
   // TRAK-138: the completed session each event's register made, by event.
   const registerSession = useMemo(() => new Map<string, string>(
@@ -305,7 +310,7 @@ export default function CoachSchedule() {
     // This and following weeks: each week keeps its own date and takes the rest.
     if (editing && scope === 'following' && inSeries(editing)) {
       if (form.date !== rowToForm(editing).date) {
-        setSheet({ ...sheet, error: 'To move the day, change only this week.' })
+        setSheet({ ...sheet, error: t('coachSchedule:moveDayOnlyThisWeek') })
         return
       }
       const targets = thisAndFollowing(calEvents, editing)
@@ -321,13 +326,13 @@ export default function CoachSchedule() {
       if (saved < targets.length) {
         // Saving again rewrites every week the same way, so it is safe to retry;
         // a week refused for a clash needs the time changed first.
-        const clash = results.map(r => clashMessage(r.error) ?? lockedMessage(r.error)).find(Boolean)
-        setSheet({ ...sheet, error: `Saved ${saved} of ${targets.length} weeks. ${clash ?? 'Check your connection and save again.'}` })
+        const clash = results.map(r => clashMessage(r.error) ?? locked(r.error)).find(Boolean)
+        setSheet({ ...sheet, error: t('coachSchedule:savedSomeWeeks', { saved, total: targets.length, why: clash || t('coachSchedule:checkAndSave') }) })
         return
       }
       setSheet({ kind: 'closed' })
       if (publishNow) return publishSaved(targets.filter(t => !t.published && t.status === 'scheduled').map(t => t.id))
-      toast.success(`Saved ${saved} weeks.${targets.some(t => t.published) ? ' Families see the change.' : ''}`)
+      toast.success(t('coachSchedule:savedWeeks', { count: saved }) + (targets.some(week => week.published) ? t('coachSchedule:familiesSeeSuffix') : ''))
       return
     }
 
@@ -346,21 +351,21 @@ export default function CoachSchedule() {
     setSaving(false)
     // Errors keep what was typed and say what failed (the J4 standard). A
     // series is one insert, so it saves whole or not at all.
-    if (failed(error, data) || (!editing && data!.length !== rows.length)) { setSheet({ ...sheet, error: clashMessage(error) ?? lockedMessage(error) ?? SAVE_FAILED }); return }
+    if (failed(error, data) || (!editing && data!.length !== rows.length)) { setSheet({ ...sheet, error: clashMessage(error) ?? (locked(error) || t('coachSchedule:saveFailed')) }); return }
     setSheet({ kind: 'closed' })
     setSelected(form.date)
     if (publishNow && !editing?.published) return publishSaved(editing ? [editing.id] : data!.map(r => r.id), form.kind, evaluate)
     loadData()
     if (editing?.published) askToEmailFamilies()
     toast.success(editing
-      ? editing.published ? 'Saved. Families see the change.' : 'Draft saved'
-      : series ? `Saved ${rows.length} events as drafts. Tap Publish when they’re ready.`
-        : 'Saved as a draft. Tap Publish when it’s ready.')
+      ? editing.published ? t('coachSchedule:savedFamiliesSee') : t('coachSchedule:draftSaved')
+      : series ? t('coachSchedule:savedSeriesDrafts', { count: rows.length })
+        : t('coachSchedule:savedDraft'))
   }
 
   /** TRAK-283: with Games on, a match just published offers its next step, which opens its game page. */
   const publishedToast = (text: string, matchId?: string) => toast.success(text, games && matchId
-    ? { duration: 10_000, action: { label: 'Write the game plan', onClick: () => navigate(`/coach/matches/${matchId}?tab=plan`) } }
+    ? { duration: 10_000, action: { label: t('coachHome:writeGamePlan'), onClick: () => navigate(`/coach/matches/${matchId}?tab=plan`) } }
     : undefined)
 
   /** Review's Publish: what was just saved goes out, as the list's Publish does.
@@ -377,13 +382,13 @@ export default function CoachSchedule() {
       return
     }
     if (failed(error, data)) {
-      toast.error(`Saved as ${ids.length > 1 ? 'drafts' : 'a draft'}, not published. ${clashMessage(error) ?? 'Tap Publish on the event to try again.'}`)
+      toast.error(t('coachSchedule:savedNotPublished', { count: ids.length, why: clashMessage(error) ?? t('coachSchedule:tapPublishAgain') }))
       return
     }
     askToEmailFamilies() // TRAK-135: publishing emails families too; never for one that has started
     // TRAK-288: a game with an empty plan, straight to its evaluation.
     if (evaluate) return navigate(`/coach/matches/${ids[0]}?tab=evaluation`)
-    publishedToast(ids.length > 1 ? `Published ${ids.length} events to the squad` : 'Published to the squad', ids.length === 1 && kind === 'match' ? ids[0] : undefined)
+    publishedToast(ids.length > 1 ? t('coachSchedule:publishedMany', { count: ids.length }) : t('coachHome:publishedToSquad'), ids.length === 1 && kind === 'match' ? ids[0] : undefined)
   }
 
   const publish = async (row: EventRow) => {
@@ -391,10 +396,10 @@ export default function CoachSchedule() {
     if (inSeries(row)) { setSheet({ kind: 'series', action: 'publish', row, error: null }); return }
     const { data, error } = await supabase.from('coach_calendar_events')
       .update({ published: true }).eq('id', row.id).select('id')
-    if (failed(error, data)) { toast.error(clashMessage(error) ?? `Couldn't publish "${row.title}". Try again.`); return }
+    if (failed(error, data)) { toast.error(clashMessage(error) ?? t('coachSchedule:couldntPublish', { title: row.title })); return }
     askToEmailFamilies() // TRAK-135
     loadData()
-    publishedToast('Published to the squad', row.event_type === 'match' ? row.id : undefined)
+    publishedToast(t('coachHome:publishedToSquad'), row.event_type === 'match' ? row.id : undefined)
   }
 
   // TRAK-182 part 8: the quick-add's "More details" opens a new event here
@@ -424,7 +429,7 @@ export default function CoachSchedule() {
       setViewYear(y); setViewMonth(m - 1); setSelected(row.event_date)
     }
     // TRAK-230: a started event isn't edited or cancelled, whatever the link says.
-    if ((action === 'edit' || action === 'cancel') && startedLocked(row)) toast.error(STARTED_LOCKED)
+    if ((action === 'edit' || action === 'cancel') && startedLocked(row)) toast.error(t('coachSchedule:startedLocked'))
     // TRAK-367: Training's message line opens the form at the note (?step=).
     else if (action === 'edit') openEdit(row, params.get('step') === String(NOTE_STEP) ? NOTE_STEP : 0)
     else if (action === 'cancel') setSheet({ kind: 'cancel', row, reason: '', scope: 'one', error: null })
@@ -449,7 +454,7 @@ export default function CoachSchedule() {
       : await update.eq('id', row.id).select('id')
     if (failed(error, data)) {
       setSaving(false)
-      setSheet({ ...sheet, error: lockedMessage(error) ?? "Couldn't cancel the event. Check your connection and try again." })
+      setSheet({ ...sheet, error: locked(error) || t('coachSchedule:couldntCancel') })
       return
     }
     // Zero drafts is normal here, so only an error counts as a failure.
@@ -463,14 +468,14 @@ export default function CoachSchedule() {
     // following" may reach published weeks after a draft one.
     if (row.published || following) askToEmailFamilies()
     if (draftError) {
-      setSheet({ ...sheet, error: `Cancelled ${data!.length} published events, but couldn't remove the unpublished drafts after them. Delete them from the schedule.` })
+      setSheet({ ...sheet, error: t('coachSchedule:cancelledButDrafts', { count: data!.length }) })
       return
     }
     const removed = removedDrafts?.length ?? 0
     const note = (data!.length > 1
-      ? `${data!.length} events cancelled. They stay on the schedule as Cancelled.`
-      : 'Event cancelled. It stays on the schedule as Cancelled.')
-      + (removed ? ` ${removed} unpublished draft${removed > 1 ? 's' : ''} removed.` : '')
+      ? t('coachSchedule:cancelledMany', { count: data!.length })
+      : t('coachSchedule:cancelledOne'))
+      + (removed ? t('coachSchedule:draftsRemoved', { count: removed }) : '')
     // TRAK-168 (Imad, 17 and 18 Oct): after cancelling, the coach tells the team
     // group, so the cancelled published event is offered straight to share.
     // "This and following" shares this week's event only; later weeks get no message.
@@ -501,8 +506,8 @@ export default function CoachSchedule() {
         && !r.published && r.status === 'scheduled')
       const weeks = scope === 'following' && clashMessage(error) ? clashingWeeks(drafts.map(r => r.id), coachEvents) : []
       setSheet({ ...sheet, error: weeks.length
-        ? `None of the ${drafts.length} drafts went out: ${weeks.map(overlapLine).join(' ')} ${fixLine(weeks)}, then publish again.`
-        : clashMessage(error) ?? `Couldn't ${action} "${row.title}". Check your connection and try again.` })
+        ? t('coachSchedule:noneDraftsWentOut', { count: drafts.length, weeks: weeks.map(overlapLine).join(' '), fix: fixLine(weeks) + t('coachSchedule:thenPublishAgain') })
+        : clashMessage(error) ?? t(action === 'publish' ? 'coachSchedule:couldntPublishCheck' : 'coachSchedule:couldntDeleteCheck', { title: row.title }) })
       return
     }
     setSheet({ kind: 'closed' })
@@ -510,8 +515,8 @@ export default function CoachSchedule() {
     loadData()
     const n = data!.length
     toast.success(action === 'publish'
-      ? n > 1 ? `Published ${n} events to the squad` : 'Published to the squad'
-      : n > 1 ? `Deleted ${n} drafts` : 'Draft deleted')
+      ? n > 1 ? t('coachSchedule:publishedMany', { count: n }) : t('coachHome:publishedToSquad')
+      : n > 1 ? t('coachSchedule:deletedMany', { count: n }) : t('coachSchedule:draftDeleted'))
   }
 
   const deleteDraft = async (row: EventRow) => {
@@ -519,21 +524,21 @@ export default function CoachSchedule() {
     if (!canDelete(row)) return
     if (inSeries(row)) { setSheet({ kind: 'series', action: 'delete', row, error: null }); return }
     const { data, error } = await supabase.from('coach_calendar_events').delete().eq('id', row.id).select('id')
-    if (failed(error, data)) { toast.error(`Couldn't delete "${row.title}". Try again.`); return }
+    if (failed(error, data)) { toast.error(t('coachSchedule:couldntDelete', { title: row.title })); return }
     if (sheet.kind === 'edit' && sheet.row?.id === row.id) setSheet({ kind: 'closed' })
     loadData()
-    toast.success('Draft deleted')
+    toast.success(t('coachSchedule:draftDeleted'))
   }
 
   // TRAK-129 (J8.6): one insert for the whole file, so it saves whole or not
   // at all. FixtureImport keeps every row and says so if this throws.
   const importFixtures = async (fixtures: Fixture[]) => {
-    if (!user) throw new Error('Not signed in')
+    if (!user) throw new Error(t('coachSchedule:notSignedIn'))
     if (!coachSquad.ready) throw new Error(coachSquad.retry())
     const rows = fixtureInsertRows(fixtures, user.id).map(row => ({ ...row, squad: coachSquad.squad }))
     const { data, error } = await supabase.from('coach_calendar_events').insert(rows).select('id')
-    if (error || (data?.length ?? 0) !== rows.length) throw new Error("Couldn't save the fixtures")
-    toast.success(`Added ${rows.length} ${rows.length === 1 ? 'fixture' : 'fixtures'} as drafts. Publish each when it's ready.`)
+    if (error || (data?.length ?? 0) !== rows.length) throw new Error(t('coachSchedule:couldntSaveFixtures'))
+    toast.success(t('coachSchedule:addedFixtures', { count: rows.length }))
     await loadData()
   }
 
@@ -545,12 +550,12 @@ export default function CoachSchedule() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
-            <CoachMenuButton name={profile?.full_name || 'Coach'} />
+            <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
             {/* TRAK-272: a phone has no Schedule tab, so a Back (where the coach came from, else Home). A laptop has the sidebar. */}
-            <div className="laptop:hidden"><BackButton fallback="/coach/home" label="Back" /></div>
+            <div className="laptop:hidden"><BackButton fallback="/coach/home" label={t('common:back')} /></div>
             <h1 className="text-[22px] font-light text-ink tracking-tight"
               style={{ ...font, letterSpacing: '-0.02em' }}>
-              Schedule
+              {t('nav:schedule')}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -559,20 +564,20 @@ export default function CoachSchedule() {
               onClick={() => (parked ? comingSoon() : setSheet({ kind: 'import' }))}
               className="flex items-center justify-center w-8 h-8 rounded-full"
               style={{ background: 'rgb(var(--t-raised))' }}
-              aria-label="Import fixtures">
+              aria-label={t('coachSchedule:importFixtures')}>
               <FileUp size={15} color="rgb(var(--t-ink))" />
             </button>}
             {/* TRAK-270 (Tarek, 23 Oct): the one add button. It opens New event on the chosen day. */}
             <button
               onClick={() => openNew(selected)}
               className="flex items-center justify-center w-8 h-8 rounded-full bg-brand"
-              aria-label="Add event">
+              aria-label={t('coachSchedule:addEvent')}>
               <Plus size={16} color="rgb(var(--t-on-brand))" strokeWidth={2.5} />
             </button>
           </div>
         </div>
 
-        {loadFailed && <LoadError what="your schedule" onRetry={retry} retrying={retrying} />}
+        {loadFailed && <LoadError what={t('coachSchedule:scheduleWhat')} onRetry={retry} retrying={retrying} />}
 
         {/* TRAK-252: on a coach's laptop the month and the chosen day stand side by side. */}
         <div className="space-y-4 laptop:grid laptop:grid-cols-2 laptop:gap-6 laptop:items-start laptop:space-y-0">
@@ -581,7 +586,7 @@ export default function CoachSchedule() {
           {/* TRAK-271: room between the last row of days and the legend's line. */}
           <div className="flex justify-center px-2 pt-2 pb-4">
             {/* TRAK-252 (option A): on a laptop the same Arc calendar fills its column. */}
-            <Calendar locale="en-GB" showToday className="laptop:!w-full"
+            <Calendar locale={currentLanguage() === 'en' ? 'en-GB' : currentLanguage()} showToday className="laptop:!w-full"
               value={new Date(`${selected}T12:00:00`)} onChange={date => setSelected(toDateStr(date))}
               month={new Date(viewYear, viewMonth, 1)}
               onMonthChange={month => { setViewYear(month.getFullYear()); setViewMonth(month.getMonth()) }}
@@ -590,25 +595,25 @@ export default function CoachSchedule() {
           </div>
 
           {/* Legend. TRAK-255: Cancelled (the hollow ring the month draws) and Needs you (the amber corner). */}
-          <div role="group" aria-label="Colour key" className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5 border-t border-line">
+          <div role="group" aria-label={t('coachSchedule:colourKey')} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5 border-t border-line">
             {EVENT_KINDS.map(type => (
               <div key={type} className="flex items-center gap-1.5">
                 <div className="w-[7px] h-[7px] rounded-full" style={{ background: TYPE_COLOR[type] }} />
                 <span className="text-[10px] uppercase tracking-[0.08em]" style={{ ...mono, color: 'rgb(var(--t-ink-3))' }}>
-                  {TYPE_LABEL[type]}
+                  {t(TYPE_WORD[type])}
                 </span>
               </div>
             ))}
             <div className="flex items-center gap-1.5">
               <div className="w-[8px] h-[8px] rounded-full box-border" style={{ border: `1.5px solid ${CANCELLED_COLOR}` }} />
-              <span className="text-[10px] uppercase tracking-[0.08em]" style={{ ...mono, color: 'rgb(var(--t-ink-3))' }}>Cancelled</span>
+              <span className="text-[10px] uppercase tracking-[0.08em]" style={{ ...mono, color: 'rgb(var(--t-ink-3))' }}>{t('coachHome:noteCancelled')}</span>
             </div>
             <div className="flex items-center gap-1.5">
               {/* Coach Home's corner (TRAK-270), as the month draws it. */}
               <div className="w-[8px] h-[8px]" style={{ filter: 'drop-shadow(0 0 .6px rgb(var(--t-warning)))' }}>
                 <div className="w-full h-full" style={{ background: NEEDS_YOU_COLOR, clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
               </div>
-              <span className="text-[10px] uppercase tracking-[0.08em]" style={{ ...mono, color: 'rgb(var(--t-ink-3))' }}>Needs you</span>
+              <span className="text-[10px] uppercase tracking-[0.08em]" style={{ ...mono, color: 'rgb(var(--t-ink-3))' }}>{t('coachHome:needsYouTitle')}</span>
             </div>
           </div>
         </div>
@@ -622,11 +627,11 @@ export default function CoachSchedule() {
 
           </div>
 
-          {!loaded && !loadFailed ? <LoadingSkeleton label="Loading your schedule…" lines={2} rows={2} />
+          {!loaded && !loadFailed ? <LoadingSkeleton label={t('coachSchedule:scheduleLoading')} lines={2} rows={2} />
           : selectedEvents.length === 0 ? (
             <div className="rounded-[14px] border border-line px-4 py-5 text-center"
               style={{ background: 'rgb(var(--t-surface))' }}>
-              <p className="text-[12px] text-ink-3">Nothing planned. Tap + to schedule an event.</p>
+              <p className="text-[12px] text-ink-3">{t('coachSchedule:nothingPlannedTap')}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -636,10 +641,10 @@ export default function CoachSchedule() {
                 // TRAK-255: the state in words and colour; a draft is a dashed card only the coach sees.
                 const state = !row ? null
                   // TRAK-271: the word is the danger red; the event colour is too light for text, so it is the chip's edge.
-                  : cancelled ? { text: 'Cancelled', color: undefined, edge: CANCELLED_COLOR, fill: 'transparent' }
-                  : !row.published ? { text: 'Draft · only you see this', color: 'rgb(var(--t-ink-3))', fill: 'transparent' }
-                  : startedLocked(row) ? { text: 'Started · details fixed', color: 'rgb(var(--t-ink-2))', fill: 'rgb(var(--t-raised))' }
-                  : { text: 'Published', color: 'rgb(var(--t-brand))', fill: 'transparent' }
+                  : cancelled ? { text: t('coachHome:noteCancelled'), color: undefined, edge: CANCELLED_COLOR, fill: 'transparent' }
+                  : !row.published ? { text: t('coachSchedule:draftOnlyYou'), color: 'rgb(var(--t-ink-3))', fill: 'transparent' }
+                  : startedLocked(row) ? { text: t('coachSchedule:startedFixed'), color: 'rgb(var(--t-ink-2))', fill: 'rgb(var(--t-raised))' }
+                  : { text: t('coachHome:notePublished'), color: 'rgb(var(--t-brand))', fill: 'transparent' }
                 const place = ev.venue ? venueParts(ev.venue) : null
                 const sessionId = row ? registerSession.get(row.id) : undefined
                 const started = !!row && hasStarted(row)
@@ -652,27 +657,27 @@ export default function CoachSchedule() {
                 // the words. Each keeps its full name ("Publish Shooting") as its accessible name and tooltip.
                 const items: ButtonGroupItem[] = []
                 if (!row) {
-                  items.push({ id: 'edit', label: `Edit ${ev.title}`, content: 'Edit', icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${ev.id}`) })
+                  items.push({ id: 'edit', label: t('coachSchedule:editNamed', { title: ev.title }), content: t('coachSchedule:edit'), icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${ev.id}`) })
                 } else {
-                  if (!row.published && !cancelled) items.push({ id: 'publish', label: `Publish ${row.title}`, content: 'Publish', icon: <Send />, onSelect: () => publish(row) })
-                  if (!registerProblem(row)) items.push({ id: 'register', label: `${sessionId ? 'Edit register' : 'Take register'} for ${row.title}`,
-                    content: sessionId ? 'Edit register' : 'Take register', icon: <ClipboardCheck />, onSelect: guarded(() => setSheet({ kind: 'register', row })) })
+                  if (!row.published && !cancelled) items.push({ id: 'publish', label: t('coachSchedule:publishNamed', { title: row.title }), content: t('coachHome:publish'), icon: <Send />, onSelect: () => publish(row) })
+                  if (!registerProblem(row)) items.push({ id: 'register', label: t('coachSchedule:registerFor', { action: sessionId ? t('coachSchedule:editRegister') : t('coachHome:takeRegister'), title: row.title }),
+                    content: sessionId ? t('coachSchedule:editRegister') : t('coachHome:takeRegister'), icon: <ClipboardCheck />, onSelect: guarded(() => setSheet({ kind: 'register', row })) })
                   if (row.event_type === 'match' && row.published && !cancelled && started) items.push(games && evaluations.data?.get(row.id)?.publishedAt
-                    ? { id: 'match', label: `View review of ${row.title}`, content: 'View review', icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
+                    ? { id: 'match', label: t('coachSchedule:viewReviewOf', { title: row.title }), content: t('coachHome:viewReview'), icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
                     : sessionId
-                    ? { id: 'match', label: `Edit match for ${row.title}`, content: 'Edit match', icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${sessionId}`) }
+                    ? { id: 'match', label: t('coachSchedule:editMatchFor', { title: row.title }), content: t('coachSchedule:editMatch'), icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${sessionId}`) }
                     // TRAK-288: where Games is on, the match's evaluation replaces the match log.
-                    : games ? { id: 'match', label: `Evaluate ${row.title}`, content: 'Evaluate', icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
-                    : { id: 'match', label: `Log match for ${row.title}`, content: 'Log match', icon: <ClipboardList />, onSelect: guarded(() => navigate('/coach/sessions/quick', {
+                    : games ? { id: 'match', label: t('coachSchedule:evaluateNamed', { title: row.title }), content: t('coachHome:evaluate'), icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
+                    : { id: 'match', label: t('coachSchedule:logMatchFor', { title: row.title }), content: t('coachSchedule:logMatch'), icon: <ClipboardList />, onSelect: guarded(() => navigate('/coach/sessions/quick', {
                         state: { fromEvent: { eventId: row.id, date: row.event_date, opponent: row.opponent, homeAway: row.home_away, squad: row.squad ?? null } },
                       })) })
                   // TRAK-139, TRAK-168: the phone's share sheet (Viber or WhatsApp; WhatsApp's link without one). Trak sends nothing.
-                  if (shareText) items.push({ id: 'share', label: `Share ${row.title}`, content: 'Share', icon: <ShareIcon size={16} tight />, onSelect: guarded(() => shareEventText(shareText)) })
+                  if (shareText) items.push({ id: 'share', label: t('coachSchedule:shareNamed', { title: row.title }), content: t('coachSchedule:share'), icon: <ShareIcon size={16} tight />, onSelect: guarded(() => shareEventText(shareText)) })
                   // TRAK-230: once started, what families were told is fixed.
-                  if (!cancelled && !startedLocked(row)) items.push({ id: 'edit', label: `Edit ${row.title}`, content: 'Edit', icon: <Pencil />, onSelect: () => openEdit(row) })
-                  if (!cancelled && canDelete(row)) items.push({ id: 'delete', label: `Delete ${row.title}`, content: 'Delete',
+                  if (!cancelled && !startedLocked(row)) items.push({ id: 'edit', label: t('coachSchedule:editNamed', { title: row.title }), content: t('coachSchedule:edit'), icon: <Pencil />, onSelect: () => openEdit(row) })
+                  if (!cancelled && canDelete(row)) items.push({ id: 'delete', label: t('coachSchedule:deleteNamed', { title: row.title }), content: t('coachSchedule:delete'),
                     icon: <Trash2 color="rgb(var(--t-danger))" />, onSelect: () => void deleteDraft(row) })
-                  else if (!cancelled && !startedLocked(row)) items.push({ id: 'cancel', label: `Cancel ${row.title}`, content: 'Cancel',
+                  else if (!cancelled && !startedLocked(row)) items.push({ id: 'cancel', label: t('coachSchedule:cancelNamed', { title: row.title }), content: t('coachSchedule:cancel'),
                     icon: <Ban color="rgb(var(--t-danger))" />, onSelect: () => setSheet({ kind: 'cancel', row, reason: '', scope: 'one', error: null }) })
                 }
                 // TRAK-275: icons alone on a phone (content would show the word, so it goes too).
@@ -710,7 +715,7 @@ export default function CoachSchedule() {
                             ? <>
                                 <Link to={`/coach/sessions/${sheetEvent.sessionId}`}
                                   className="flex min-h-11 w-full items-center justify-center rounded-xl bg-raised text-[14px] font-medium text-ink focus-visible:ring-2 focus-visible:ring-primary">
-                                  Open session
+                                  {t('coachSchedule:openSession')}
                                 </Link>
                                 {user && <LoggedAttendance sessionId={sheetEvent.sessionId} coachId={user.id} />}
                               </>
@@ -721,20 +726,20 @@ export default function CoachSchedule() {
                         {/* TRAK-159: a scheduled event says its time, or that it has none. */}
                         {ev.time
                           ? <><span className="text-[11px] font-medium" style={{ color: 'rgb(var(--t-ink))' }}>{ev.time}</span>{' · '}</>
-                          : row && <><span className="text-[10px] font-medium" style={{ color: NO_TIME_COLOR }}>No time set</span>{' · '}</>}
-                        {/* TRAK-271: the type's colour is a dot; the word stays dark. */}<span className="inline-flex items-center gap-1 font-medium text-ink-2"><span aria-hidden="true" className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: TYPE_COLOR[ev.type] }} />{TYPE_LABEL[ev.type]}</span>{everySquad ? ` · ${squadName(ev.squad)}` : ''}{row?.series_id ? ' · Weekly' : ''}
-                        {row?.meet_time ? ` · meet ${phoneClock(row, row.meet_time)}` : ''}
-                        {row?.home_away ? ` · ${row.home_away === 'home' ? 'Home' : 'Away'}` : ''}
+                          : row && <><span className="text-[10px] font-medium" style={{ color: NO_TIME_COLOR }}>{t('coachSchedule:noTimeSet')}</span>{' · '}</>}
+                        {/* TRAK-271: the type's colour is a dot; the word stays dark. */}<span className="inline-flex items-center gap-1 font-medium text-ink-2"><span aria-hidden="true" className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: TYPE_COLOR[ev.type] }} />{t(TYPE_WORD[ev.type])}</span>{everySquad ? ` · ${squadName(ev.squad)}` : ''}{row?.series_id ? t('coachSchedule:weeklySuffix') : ''}
+                        {row?.meet_time ? t('coachSchedule:meetSuffix', { time: phoneClock(row, row.meet_time) }) : ''}
+                        {row?.home_away ? ` · ${row.home_away === 'home' ? t('coachSchedule:home') : t('coachSchedule:away')}` : ''}
                         {place?.text ? ` · ${place.text}` : ''}
                       </p>
                       {row?.kit && (
-                        <p className="text-[9px] mt-0.5" style={{ ...mono, color: 'rgb(var(--t-ink-3))' }}>Kit: {row.kit}</p>
+                        <p className="text-[9px] mt-0.5" style={{ ...mono, color: 'rgb(var(--t-ink-3))' }}>{t('coachSchedule:kitLine', { kit: row.kit })}</p>
                       )}
                       {/* TRAK-255 (TRAK-225's link): the venue opens in Maps from the coach's day too. */}
                       {place && (
                         <a href={place.mapsUrl} target="_blank" rel="noopener noreferrer"
                           className="mt-1 flex w-fit items-center gap-1 min-h-8 text-[12px] font-medium text-brand underline" style={font}>
-                          <MapPin size={13} aria-hidden="true" />Open in Maps
+                          <MapPin size={13} aria-hidden="true" />{t('coachSchedule:openInMaps')}
                         </a>
                       )}
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -745,21 +750,21 @@ export default function CoachSchedule() {
                           </span>
                         )}
                         {!row && (
-                          <span className="block w-fit rounded-full px-2 py-[1px] text-[11px] font-medium text-ink-2 bg-raised" style={font}>Logged</span>
+                          <span className="block w-fit rounded-full px-2 py-[1px] text-[11px] font-medium text-ink-2 bg-raised" style={font}>{t('coachHome:logged')}</span>
                         )}
                         {row && row.event_type === 'match' && sessionId && (
-                          <span className="block w-fit rounded-full px-2 py-[1px] text-[11px] font-medium text-ink-2 bg-raised" style={font}>Match logged</span>
+                          <span className="block w-fit rounded-full px-2 py-[1px] text-[11px] font-medium text-ink-2 bg-raised" style={font}>{t('coachSchedule:matchLogged')}</span>
                         )}
                         {/* TRAK-270: the yellow of needs you; its word stays dark for contrast. */}
                         {waiting && (
                           <span className="block w-fit rounded-full px-2 py-[1px] text-[11px] font-medium"
-                            style={{ ...font, color: 'rgb(var(--t-warning))', background: 'rgb(var(--t-attention) / 0.22)', border: `1.5px solid ${NEEDS_YOU_COLOR}` }}>Needs you</span>
+                            style={{ ...font, color: 'rgb(var(--t-warning))', background: 'rgb(var(--t-attention) / 0.22)', border: `1.5px solid ${NEEDS_YOU_COLOR}` }}>{t('coachHome:needsYouTitle')}</span>
                         )}
                       </div>
                       {row && !cancelled && clashes.has(row.id) && (() => {
                         const c = clashes.get(row.id)!
                         return <p className="text-[11px] mt-0.5 text-warning" style={font}>
-                          {`Clashes with ${c.title}, ${c.start}–${c.end}. Change the time to publish it.`}
+                          {t('coachSchedule:clashLine', { title: c.title, start: c.start, end: c.end })}
                         </p>
                       })()}
                       {row?.published && !cancelled && user && <EventAbsences coachId={user.id} eventId={row.id} />}
@@ -770,7 +775,7 @@ export default function CoachSchedule() {
                     {/* TRAK-275: outline always; a draft or a waiting register is never a black block. */}
                     {items.length > 0 && (
                       <div className="arc flex-shrink-0">
-                        <ButtonGroup label={`Actions for ${ev.title}`} items={groupItems} variant="outline" size="md" />
+                        <ButtonGroup label={t('coachSchedule:actionsFor', { title: ev.title })} items={groupItems} variant="outline" size="md" />
                       </div>
                     )}
                   </div>
@@ -793,31 +798,31 @@ export default function CoachSchedule() {
         <div className="fixed inset-0 z-[70] flex items-end justify-center"
           style={{ background: 'rgb(var(--t-scrim) / 0.75)' }}
           onClick={e => { if (e.target === e.currentTarget) setSheet({ kind: 'closed' }) }}>
-          <div role="dialog" aria-label="Cancel event"
+          <div role="dialog" aria-label={t('coachSchedule:cancelEvent')}
             className="w-full max-w-sheet rounded-t-[24px] p-5 space-y-3"
             style={{ background: 'rgb(var(--t-raised))', border: '1px solid rgb(var(--t-line))', marginBottom: 64 }}>
-            <span className="text-[16px] font-medium text-ink block" style={font}>Cancel {sheet.row.title}?</span>
+            <span className="text-[16px] font-medium text-ink block" style={font}>{t('coachSchedule:cancelTitle', { title: sheet.row.title })}</span>
             <p className="text-[12px] text-ink-2" style={font}>
-              It stays on everyone's schedule, marked Cancelled.
+              {t('coachSchedule:staysCancelled')}
             </p>
             {inSeries(sheet.row) && (
               <ScopeChoice scope={sheet.scope}
                 onChange={scope => setSheet(s => s.kind === 'cancel' ? { ...s, scope, error: null } : s)} />
             )}
-            <Field label="Reason (optional)">
+            <Field label={t('coachSchedule:reasonOptional')}>
               <input value={sheet.reason}
                 onChange={e => setSheet(s => s.kind === 'cancel' ? { ...s, reason: e.target.value, error: null } : s)}
-                placeholder="e.g. Pitch waterlogged" className={inputClass} style={font} />
+                placeholder={t('coachSchedule:reasonExample')} className={inputClass} style={font} />
             </Field>
             {sheet.error && <p role="alert" className="text-[12px] text-danger" style={font}>{sheet.error}</p>}
             <button onClick={confirmCancel} disabled={saving}
               className="w-full py-3.5 rounded-[12px] text-[14px] font-medium"
               style={{ background: 'rgb(var(--t-danger))', color: 'rgb(var(--t-on-brand))', opacity: saving ? 0.6 : 1 }}>
-              {saving ? 'Cancelling…' : 'Cancel event'}
+              {saving ? t('coachSchedule:cancelling') : t('coachSchedule:cancelEvent')}
             </button>
             <button onClick={() => setSheet({ kind: 'closed' })}
               className="w-full py-2 text-[13px] text-ink-2" style={font}>
-              Keep event
+              {t('coachSchedule:keepEvent')}
             </button>
           </div>
         </div>
@@ -828,21 +833,21 @@ export default function CoachSchedule() {
         <div className="fixed inset-0 z-[70] flex items-end justify-center"
           style={{ background: 'rgb(var(--t-scrim) / 0.75)' }}
           onClick={e => { if (e.target === e.currentTarget) setSheet({ kind: 'closed' }) }}>
-          <div role="dialog" aria-label="Event cancelled"
+          <div role="dialog" aria-label={t('coachSchedule:eventCancelled')}
             className="w-full max-w-sheet rounded-t-[24px] p-5 space-y-3"
             style={{ background: 'rgb(var(--t-raised))', border: '1px solid rgb(var(--t-line))', marginBottom: 64 }}>
-            <span className="text-[16px] font-medium text-ink block" style={font}>Event cancelled</span>
+            <span className="text-[16px] font-medium text-ink block" style={font}>{t('coachSchedule:eventCancelled')}</span>
             <p className="text-[12px] text-ink-2" style={font}>
-              {sheet.note} Let the team group know.
+              {t('coachSchedule:letGroupKnow', { note: sheet.note })}
             </p>
             {/* Nothing is sent until the coach picks a chat (the phone's share sheet, or WhatsApp's link). */}
             <ShareEventButton text={whatsAppShareText(shareableFromRow(sheet.row, sheet.row.squad ?? squad.label), { childNames: squad.childNames })}
               className="w-full py-3.5 rounded-[12px] text-[14px] font-medium flex items-center justify-center gap-2 bg-brand text-on-brand">
-              <ShareIcon size={18} />Share
+              <ShareIcon size={18} />{t('coachSchedule:share')}
             </ShareEventButton>
             <button onClick={() => setSheet({ kind: 'closed' })}
               className="w-full py-2 text-[13px] text-ink-2" style={font}>
-              Done
+              {t('coachSchedule:done')}
             </button>
           </div>
         </div>
@@ -853,17 +858,17 @@ export default function CoachSchedule() {
         <div className="fixed inset-0 z-[70] flex items-end justify-center"
           style={{ background: 'rgb(var(--t-scrim) / 0.75)' }}
           onClick={e => { if (e.target === e.currentTarget) setSheet({ kind: 'closed' }) }}>
-          <div role="dialog" aria-label="Import fixtures"
+          <div role="dialog" aria-label={t('coachSchedule:importFixtures')}
             className="w-full max-w-sheet max-h-[85vh] overflow-y-auto rounded-t-[24px] p-5 space-y-3"
             style={{ background: 'rgb(var(--t-raised))', border: '1px solid rgb(var(--t-line))', marginBottom: 64 }}>
             <div className="flex items-center justify-between">
-              <span className="text-[16px] font-medium text-ink" style={font}>Import fixtures</span>
-              <button onClick={() => setSheet({ kind: 'closed' })} aria-label="Close">
+              <span className="text-[16px] font-medium text-ink" style={font}>{t('coachSchedule:importFixtures')}</span>
+              <button onClick={() => setSheet({ kind: 'closed' })} aria-label={t('coachSchedule:close')}>
                 <X size={18} className="text-ink-2" />
               </button>
             </div>
             <p className="text-[12px] text-ink-2" style={font}>
-              Fixtures arrive as drafts. Families see each one once you publish it.
+              {t('coachSchedule:fixturesArrive')}
             </p>
             <FixtureImport existingKeys={fixtureKeys} onConfirm={importFixtures} />
           </div>
@@ -875,19 +880,19 @@ export default function CoachSchedule() {
         <div className="fixed inset-0 z-[70] flex items-end justify-center"
           style={{ background: 'rgb(var(--t-scrim) / 0.75)' }}
           onClick={e => { if (e.target === e.currentTarget) setSheet({ kind: 'closed' }) }}>
-          <div role="dialog" aria-label="Take register"
+          <div role="dialog" aria-label={t('coachHome:takeRegister')}
             className="w-full max-w-sheet max-h-[85vh] overflow-y-auto rounded-t-[24px] p-5 space-y-3"
             style={{ background: 'rgb(var(--t-raised))', border: '1px solid rgb(var(--t-line))', marginBottom: 64 }}>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[16px] font-medium text-ink" style={font}>
-                {`Register: ${sheet.row.title}, ${formatEventDay(displayEventTime(sheet.row).date)}`}
+                {t('coachSchedule:registerTitle', { title: sheet.row.title, day: formatEventDay(displayEventTime(sheet.row).date) })}
               </span>
-              <button onClick={() => setSheet({ kind: 'closed' })} aria-label="Close">
+              <button onClick={() => setSheet({ kind: 'closed' })} aria-label={t('coachSchedule:close')}>
                 <X size={18} className="text-ink-2" />
               </button>
             </div>
             <p className="text-[12px] text-ink-2" style={font}>
-              Tap anyone who didn't come. Saving makes this the completed session; saving again updates it.
+              {t('coachSchedule:registerHelp')}
             </p>
             <TakeRegister eventId={sheet.row.id} coachId={user.id} sessionId={registerSession.get(sheet.row.id) ?? null} squad={sheet.row.squad ?? null}
               onSaved={() => { setSheet({ kind: 'closed' }); loadData() }} />
@@ -900,31 +905,31 @@ export default function CoachSchedule() {
         <div className="fixed inset-0 z-[70] flex items-end justify-center"
           style={{ background: 'rgb(var(--t-scrim) / 0.75)' }}
           onClick={e => { if (e.target === e.currentTarget) setSheet({ kind: 'closed' }) }}>
-          <div role="dialog" aria-label={sheet.action === 'publish' ? 'Publish event' : 'Delete draft'}
+          <div role="dialog" aria-label={sheet.action === 'publish' ? t('coachSchedule:publishEvent') : t('coachSchedule:deleteDraft')}
             className="w-full max-w-sheet rounded-t-[24px] p-5 space-y-3"
             style={{ background: 'rgb(var(--t-raised))', border: '1px solid rgb(var(--t-line))', marginBottom: 64 }}>
             <span className="text-[16px] font-medium text-ink block" style={font}>
-              {sheet.action === 'publish' ? 'Publish' : 'Delete'} {sheet.row.title}, {formatEventDay(sheet.row.event_date!)}
+              {t(sheet.action === 'publish' ? 'coachSchedule:publishTitle' : 'coachSchedule:deleteTitle', { title: sheet.row.title, day: formatEventDay(sheet.row.event_date!) })}
             </span>
             <p className="text-[12px] text-ink-2" style={font}>
               {sheet.action === 'publish'
-                ? 'This week is part of a weekly series. Families see what you publish.'
-                : 'This week is part of a weekly series. Only drafts are deleted; published weeks stay.'}
+                ? t('coachSchedule:seriesPublishHelp')
+                : t('coachSchedule:seriesDeleteHelp')}
             </p>
             {sheet.error && <p role="alert" className="text-[12px] text-danger" style={font}>{sheet.error}</p>}
             <button onClick={() => seriesAction('one')}
               className="w-full py-3 rounded-[12px] text-[14px] font-medium"
               style={{ background: sheet.action === 'publish' ? 'rgb(var(--t-brand))' : 'rgb(var(--t-raised))', color: sheet.action === 'publish' ? 'rgb(var(--t-on-brand))' : 'rgb(var(--t-ink))' }}>
-              Only this week
+              {t('coachSchedule:onlyThisWeek')}
             </button>
             <button onClick={() => seriesAction('following')}
               className="w-full py-3 rounded-[12px] text-[14px] font-medium"
               style={{ background: sheet.action === 'publish' ? 'rgb(var(--t-brand))' : 'rgb(var(--t-raised))', color: sheet.action === 'publish' ? 'rgb(var(--t-on-brand))' : 'rgb(var(--t-ink))' }}>
-              This and following weeks
+              {t('coachSchedule:thisAndFollowing')}
             </button>
             <button onClick={() => setSheet({ kind: 'closed' })}
               className="w-full py-2 text-[13px] text-ink-2" style={font}>
-              Not now
+              {t('coachSchedule:notNow')}
             </button>
           </div>
         </div>
@@ -934,19 +939,19 @@ export default function CoachSchedule() {
       {sheet.kind === 'notPublished' && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center"
           style={{ background: 'rgb(var(--t-scrim) / 0.75)' }}>
-          <div role="dialog" aria-label="Not published"
+          <div role="dialog" aria-label={t('coachSchedule:notPublished')}
             className="w-full max-w-sheet rounded-t-[24px] p-5 space-y-3"
             style={{ background: 'rgb(var(--t-raised))', border: '1px solid rgb(var(--t-line))', marginBottom: 64 }}>
-            <span className="text-[16px] font-medium text-ink block" style={font}>Not published</span>
+            <span className="text-[16px] font-medium text-ink block" style={font}>{t('coachSchedule:notPublished')}</span>
             <p className="text-[12px] text-ink-2" style={font}>
-              None of the {sheet.count} events went out. They’re saved as drafts only you can see.
+              {t('coachSchedule:noneEventsWentOut', { count: sheet.count })}
             </p>
             {sheet.weeks.length ? <>
               <ul role="alert" className="space-y-1">
                 {sheet.weeks.map(w => <li key={w.date} className="text-[12px] text-danger" style={font}>{overlapLine(w)}</li>)}
               </ul>
               <p className="text-[12px] text-ink-2" style={font}>
-                {fixLine(sheet.weeks)}. Then tap Publish on the first week and choose This and following weeks.
+                {fixLine(sheet.weeks)}{t('coachSchedule:thenTapPublish')}
               </p>
             </> : <p role="alert" className="text-[12px] text-danger" style={font}>{sheet.refusal}</p>}
             {sheet.weeks[0] && (
@@ -958,12 +963,12 @@ export default function CoachSchedule() {
               }}
                 className="w-full py-3 rounded-[12px] text-[14px] font-medium"
                 style={{ background: 'rgb(var(--t-brand))', color: 'rgb(var(--t-on-brand))' }}>
-                Show {formatEventDay(sheet.weeks[0].date)}
+                {t('coachSchedule:showDay', { day: formatEventDay(sheet.weeks[0].date) })}
               </button>
             )}
             <button onClick={() => setSheet({ kind: 'closed' })}
               className="w-full py-2 text-[13px] text-ink-2" style={font}>
-              Close
+              {t('coachSchedule:close')}
             </button>
           </div>
         </div>

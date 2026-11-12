@@ -71,39 +71,28 @@ describe('TRAK-72 coach Home', () => {
   })
 })
 
-describe('TRAK-72 coach Profile', () => {
-  it('shows role and age group, "How Trak works", and no invite code', async () => {
+// TRAK-418 (12 Nov): the old Profile and the old coach manual are gone. Their addresses land on Settings and on the
+// coach's own How Trak works, which still never mention an invite code and write nothing.
+describe('TRAK-72 / TRAK-418 the old Profile and manual addresses', () => {
+  it('the old Profile opens Settings, with role and age group, no invite code, and no write', async () => {
     signedInCoach()
     const writes = profileWrites()
     renderApp('/coach/profile')
-    expect(await screen.findByText('Head Coach')).toBeInTheDocument()
+    await waitFor(() => expect(window.location.pathname).toBe('/settings'))
+    // Settings shows the role twice (the header line and the Club section), and the age group once.
+    expect((await screen.findAllByText('Head Coach')).length).toBeGreaterThan(0)
     expect(await screen.findByText('U15s')).toBeInTheDocument()
-    expect(screen.getByText('HOW TRAK WORKS')).toBeInTheDocument()
-    expect(screen.queryByText(/coach manual/i)).toBeNull()
     expect(screen.queryByText(/invite code/i)).toBeNull()
     await new Promise(resolve => setTimeout(resolve, 50))
     expect(writes).toEqual([])
   })
-})
 
-describe('TRAK-72 How Trak works', () => {
-  it('never tells the coach to share an invite code, in any section', async () => {
+  it("the old manual opens the coach's How Trak works, which never tells the coach to share an invite code", async () => {
     signedInCoach()
     renderApp('/coach/manual')
-    await screen.findByText('How Trak works')
-    expect(screen.queryByText(/invite code/i)).toBeNull()
-    // Sections render their body only while open, and one opens at a time,
-    // so open each in turn and check what it shows.
-    const titles = ['What is TRAK?', 'Building Your Squad', 'Logging Matches', 'Logging Training',
-      'Assessing Players', 'The Rating System', 'Recognition & Awards', 'Parent Connections',
-      'The calendar', 'Tips for Getting Started']
-    for (const title of titles) {
-      const header = screen.getByText(title)
-      if (!header.closest('button')!.nextElementSibling) await userEvent.click(header)
-      expect(header.closest('button')!.nextElementSibling).not.toBeNull()
-      expect(screen.queryByText(/TRK-/)).toBeNull()
-      expect(screen.queryByText(/invite code|your code/i)).toBeNull()
-    }
+    await waitFor(() => expect(window.location.pathname).toBe('/coach/how-trak-works'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'How Trak works' })).toBeInTheDocument()
+    expect(screen.queryByText(/invite code|your code|TRK-/i)).toBeNull()
   })
 })
 
@@ -203,9 +192,10 @@ describe('TRAK-72 item 11: the club comes from the academy', () => {
     )
   }
 
-  it('Profile names the academy and never shows a stale typed club', async () => {
+  // TRAK-418: Settings is the coach's profile now (the old Profile page is gone).
+  it('Settings names the academy and never shows a stale typed club', async () => {
     coachInAcademy('Old Typed Club')
-    renderApp('/coach/profile')
+    renderApp('/settings')
     expect(await screen.findByText('Synthetic Academy FC')).toBeInTheDocument()
     expect(screen.getByText('U15s')).toBeInTheDocument()
     expect(screen.queryByText('Old Typed Club')).toBeNull()

@@ -10,6 +10,8 @@ import { Sparkline } from "../../sparkline/sparkline";
 import { motionTokens } from "../../lib/motion-tokens";
 import { BANDS } from "@/lib/types";
 import styles from "./squad-directory.module.css";
+import { useTranslation } from "@/lib/i18n";
+import { bandWord } from "@/lib/band-words";
 
 export type PositionGroup = "GK" | "DEF" | "MID" | "ATT";
 
@@ -34,16 +36,18 @@ export interface SquadPlayer {
 }
 
 const FILTERS = ["All", "GK", "DEF", "MID", "ATT"] as const;
+const FILTER_WORD = { All: "coachSquad:filterAll", GK: "coachSquad:filterGK", DEF: "coachSquad:filterDEF", MID: "coachSquad:filterMID", ATT: "coachSquad:filterATT" } as const;
 type Filter = (typeof FILTERS)[number];
 
 export function BandChip({ band, move = 0, waiting = false }: { band: string | null; move?: -1 | 0 | 1; waiting?: boolean }) {
+  const { t } = useTranslation();
   const config = BANDS.find(entry => entry.word === band);
-  if (waiting) return <span className={styles.chip} data-empty="">Waiting for consent</span>;
-  if (!config) return <span className={styles.chip} data-empty="">Not assessed</span>;
+  if (waiting) return <span className={styles.chip} data-empty="">{t("coachSquad:waitingForConsent")}</span>;
+  if (!config) return <span className={styles.chip} data-empty="">{t("coachSquad:notAssessed")}</span>;
   return <span className={styles.chip} style={{ background: config.bg, borderColor: config.border, color: config.text }}>
-    {config.word}
-    {move === 1 && <ArrowUp size={12} strokeWidth={2.2} aria-label="up" />}
-    {move === -1 && <ArrowDown size={12} strokeWidth={2.2} aria-label="down" />}
+    {bandWord(config.word)}
+    {move === 1 && <ArrowUp size={12} strokeWidth={2.2} aria-label={t("coachSquad:up")} />}
+    {move === -1 && <ArrowDown size={12} strokeWidth={2.2} aria-label={t("coachSquad:down")} />}
   </span>;
 }
 
@@ -60,6 +64,7 @@ export function SquadDirectory({ title, players, summary, onOpen }: {
   onOpen: (player: SquadPlayer) => void;
 }) {
   const uid = useId();
+  const { t } = useTranslation();
   const reduce = useReducedMotion();
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -81,22 +86,22 @@ export function SquadDirectory({ title, players, summary, onOpen }: {
       <h2 id={`${uid}-title`}>{title} <span className={styles.count}>{players.length}</span></h2>
       <label className={styles.search}>
         <Search size={16} strokeWidth={1.75} aria-hidden="true" />
-        <span className={styles.srOnly}>Search players</span>
-        <input ref={searchRef} type="search" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Escape" && query) { event.preventDefault(); setQuery(""); } }} placeholder="Search name or number" />
-        <span className={styles.clearSlot}>{query && <button type="button" onClick={() => { setQuery(""); searchRef.current?.focus(); }} aria-label="Clear search"><X size={14} strokeWidth={1.75} aria-hidden="true" /></button>}</span>
+        <span className={styles.srOnly}>{t("coachSquad:searchPlayers")}</span>
+        <input ref={searchRef} type="search" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Escape" && query) { event.preventDefault(); setQuery(""); } }} placeholder={t("coachSquad:searchPlaceholder")} />
+        <span className={styles.clearSlot}>{query && <button type="button" onClick={() => { setQuery(""); searchRef.current?.focus(); }} aria-label={t("coachSquad:clearSearch")}><X size={14} strokeWidth={1.75} aria-hidden="true" /></button>}</span>
       </label>
     </header>
 
     {/* Trak (TRAK-266, Imad, 22 Oct): the position filters as they were before #420, on Arc's glass segmented control. */}
     <div className={styles.filters}>
-      <GlassSegmented label="Filter by position" size="sm" fullWidth value={filter} onValueChange={value => setFilter(value as Filter)}
-        options={FILTERS.map(item => ({ value: item, label: item }))} />
+      <GlassSegmented label={t("coachSquad:filterByPosition")} size="sm" fullWidth value={filter} onValueChange={value => setFilter(value as Filter)}
+        options={FILTERS.map(item => ({ value: item, label: t(FILTER_WORD[item]) }))} />
     </div>
     {summary && <div className={styles.summary}>{summary}</div>}
 
     <div className={styles.body}>
       <div className={styles.listPane}>
-        <ul className={styles.peopleList} aria-label="Players">
+        <ul className={styles.peopleList} aria-label={t("coachSquad:tabPlayers")}>
           <AnimatePresence mode="popLayout" initial={false}>
             {visible.map(player => {
               return <motion.li key={player.id} layout={reduce ? false : "position"} initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }}
@@ -109,7 +114,7 @@ export function SquadDirectory({ title, players, summary, onOpen }: {
                   {/* Trak (Imad, 23 Oct): a sparkline of the player's ratings in place of the band chip; under two there's no line. */}
                   {player.waiting ? <BandChip band={null} waiting />
                     : player.trend && player.trend.length >= 2 ? <span className={styles.trend}>
-                      <Sparkline data={player.trend} label={`${player.name}'s last ${player.trend.length} ratings`}
+                      <Sparkline data={player.trend} label={t("coachSquad:lastRatings", { name: player.name, count: player.trend.length })}
                         value={player.trend.map(score => score.toFixed(1)).join(", ")} width={64} height={24} area={false} interactive={false} />
                     </span> : null}
                 </button>
@@ -118,8 +123,8 @@ export function SquadDirectory({ title, players, summary, onOpen }: {
           </AnimatePresence>
         </ul>
         {visible.length === 0 && <div className={styles.empty}>
-          <p>No one matches{needle ? ` “${query.trim()}”` : ""}</p>
-          <button type="button" onClick={reset}>Clear filters</button>
+          <p>{needle ? t("coachSquad:noOneMatchesQuery", { query: query.trim() }) : t("coachSquad:noOneMatches")}</p>
+          <button type="button" onClick={reset}>{t("coachSquad:clearFilters")}</button>
         </div>}
       </div>
     </div>

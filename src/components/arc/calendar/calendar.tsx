@@ -8,6 +8,7 @@ import type { AnimationPlaybackControls, MotionValue, Variants } from "motion/re
 import { motionTokens } from "../lib/motion-tokens";
 import { useToday } from "../lib/use-today";
 import styles from "./calendar.module.css";
+import { useTranslation } from "@/lib/i18n";
 
 export type CalendarDateMatcher = (date: Date) => boolean;
 
@@ -129,6 +130,7 @@ export function Calendar({
 }: CalendarProps) {
   const titleId = useId();
   const today = useToday();
+  const { t } = useTranslation();
   // Motion preference only counts after hydration, so server and client markup agree.
   const hydrated = useSyncExternalStore(subscribeNothing, clientSnapshot, serverSnapshot);
   const reducedMotion = (useReducedMotion() ?? false) && hydrated;
@@ -346,7 +348,7 @@ export function Calendar({
         </h2>
         <span className={styles.srOnly} aria-live="polite">{direction ? monthLabel : ""}</span>
         <div className={styles.navigation}>
-          {showToday && <button type="button" className={styles.todayButton} aria-disabled={todayIdle || undefined} aria-label={today ? `Today, ${today.toLocaleDateString(locale, { dateStyle: "full" })}` : "Today"} onClick={goToToday}>Today</button>}
+          {showToday && <button type="button" className={styles.todayButton} aria-disabled={todayIdle || undefined} aria-label={today ? `${t("coachHome:today")}, ${today.toLocaleDateString(locale, { dateStyle: "full" })}` : t("coachHome:today")} onClick={goToToday}>{t("coachHome:today")}</button>}
           {picking !== null ? <>
             <button type="button" className={styles.navButton} aria-label="Earlier months" onClick={() => setPicking(picking - 12)}><ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" /></button>
             <button type="button" className={styles.navButton} aria-label="Later months" onClick={() => setPicking(picking + 12)}><ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" /></button>

@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
@@ -22,7 +23,7 @@ export function useFormationCopy(eventId: string) {
         .eq('event_id', eventId).order('copied_at', { ascending: false }).limit(1)
       if (error) throw error
       const row = data?.[0]
-      return row ? { name: row.formations?.name ?? 'a formation', format: row.formations?.format ?? null, notComing: row.not_coming, skipped: row.skipped, byDefault: row.by_default } : null
+      return row ? { name: row.formations?.name ?? i18n.t('coachMatches:aFormation'), format: row.formations?.format ?? null, notComing: row.not_coming, skipped: row.skipped, byDefault: row.by_default } : null
     },
   })
 }

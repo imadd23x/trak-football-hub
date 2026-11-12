@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, type NavigateOptions } from 'react-router-dom'
 import { ClipboardCheck, ClipboardPen, Plus, Swords, CalendarPlus, Dumbbell } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,6 +15,7 @@ import { TimePicker } from '@/components/arc/time-picker/time-picker'
 import { ActionMorph, type MorphRow } from '@/components/arc/action-morph/action-morph'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { useCreateSaved } from './coach-frame-context'
+import { currentLanguage, useTranslation } from '@/lib/i18n'
 
 /* TRAK-182 part 8 (Imad, 15 Oct): the coach's "+" opens a menu, then the
    shortest form that makes a real record. Only "New event" finishes here (a
@@ -32,11 +33,12 @@ const field = 'w-full rounded-[12px] border border-line bg-ground px-3 py-2.5 te
 /** Home or away as two pressed buttons: it starts unanswered, as on Schedule,
  *  so a fixture is never saved as Home because nobody chose (Tarek, #319). */
 function HomeAway({ value, onChange }: { value: '' | 'home' | 'away'; onChange: (v: 'home' | 'away') => void }) {
+  const { t } = useTranslation()
   return (
-    <div role="group" aria-label="Home or away" className="grid grid-cols-2 gap-2">
+    <div role="group" aria-label={t('coachSchedule:homeOrAway')} className="grid grid-cols-2 gap-2">
       {(['home', 'away'] as const).map(v => (
         <Button key={v} size="sm" variant={value === v ? 'primary' : 'secondary'} aria-pressed={value === v} onClick={() => onChange(v)}>
-          {v === 'home' ? 'Home' : 'Away'}
+          {v === 'home' ? t('coachSchedule:home') : t('coachSchedule:away')}
         </Button>
       ))}
     </div>
@@ -67,6 +69,7 @@ export function QuickAdd({ onSaved }: { onSaved?: () => void; corner?: 'top' | '
 /** The coach's "+". `bar`: round, in the phone's glass tab bar, growing upward. `top`: "+ Create" at a laptop's top right, growing down. */
 export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; onSaved?: () => void }) {
   const { user } = useAuth()
+  const { t } = useTranslation()
   // TRAK-176: a new event belongs to the squad picked; wait until the squads are known.
   const coachSquad = useCoachSquad(user?.id)
   const navigate = useNavigate()
@@ -110,6 +113,8 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
   }, [view, user, eventsOn])
 
   const datePassed = pastDateProblem(date, localTodayISO())
+  // TRAK-407: the date pickers name days and months in the language showing (English as before).
+  const dates = currentLanguage() === 'en' ? 'en-GB' : currentLanguage()
   const eventForm = (): EventForm => ({ ...blankForm(date), kind, time, opponent: kind === 'match' ? opponent : '', homeAway: kind === 'match' ? homeAway : '', squad })
   const saveDraft = async () => {
     if (!user || saving) return
@@ -122,11 +127,11 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
     const { data, error: failed } = await supabase.from('coach_calendar_events')
       .insert([{ ...formToRow(draft), ...newDraftFields(user.id, squad) }]).select('id')
     setSaving(false)
-    if (failed || !data?.length) { setError(clashMessage(failed) ?? "Couldn't save the draft. Check your connection and try again."); return }
+    if (failed || !data?.length) { setError(clashMessage(failed) ?? t('coachSchedule:couldntSaveDraft')); return }
     setTime(''); setOpponent(''); setHomeAway('')
     onSaved?.()
     close()
-    toast.success('Draft saved. Publish it from Schedule.')
+    toast.success(t('coachSchedule:draftSavedPublish'))
   }
   // Leaving closes the shape first: on Schedule itself nothing remounts, so it
   // would otherwise stay open over the sheet it hands to (Tarek, #319).
@@ -134,9 +139,9 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
   const moreDetails = () => go('/coach/schedule', { state: { quickEvent: eventForm() } })
   const logMatch = () => games ? go('/coach/schedule', { state: { quickEvent: { ...eventForm(), kind: 'match' } } }) : show('match')
   const continueMatch = () => {
-    if (!opponent.trim() || scoreUs === '' || scoreThem === '') { setError('Add the opponent and the score.'); return }
-    if (!homeAway) { setError('Say whether it was home or away.'); return }
-    if (date > localTodayISO()) { setError("A match can't be logged before it's played."); return }
+    if (!opponent.trim() || scoreUs === '' || scoreThem === '') { setError(t('coachSchedule:addOpponentScore')); return }
+    if (!homeAway) { setError(t('coachSchedule:sayHomeAway')); return }
+    if (date > localTodayISO()) { setError(t('coachSchedule:matchNotPlayed')); return }
     go('/coach/sessions/add', { state: { quickMatch: { opponent: opponent.trim(), venue: homeAway === 'home' ? 'Home' : 'Away', scoreUs, scoreThem, date } } })
   }
 
@@ -149,12 +154,12 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
     else if (id === 'event') { if (eventsOn) show('event'); else { close(); comingSoon() } }
   }
   const rows: MorphRow[] = [
-    ...(register ? [{ id: 'register', label: `Take register · ${register.title}`, icon: <ClipboardCheck /> }] : []),
-    { id: 'training', label: 'Log training', icon: <Dumbbell /> },
-    { id: 'match', label: 'Log match', icon: <Swords /> },
+    ...(register ? [{ id: 'register', label: t('coachSchedule:takeRegisterNamed', { title: register.title }), icon: <ClipboardCheck /> }] : []),
+    { id: 'training', label: t('coachSchedule:logTraining'), icon: <Dumbbell /> },
+    { id: 'match', label: t('coachSchedule:logMatch'), icon: <Swords /> },
     // Imad, 16 Oct (Kostas's item 9): assessing is one of the coach's quick actions.
-    { id: 'assess', label: 'Assess player', icon: <ClipboardPen /> },
-    { id: 'event', label: 'New event', icon: <CalendarPlus /> },
+    { id: 'assess', label: t('coachSchedule:assessPlayer'), icon: <ClipboardPen /> },
+    { id: 'event', label: t('coachSchedule:newEvent'), icon: <CalendarPlus /> },
   ]
 
   // In the tab bar the pickers open upward: opening down ran off the screen (Imad, 16 Oct).
@@ -163,65 +168,80 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
     [&_[aria-label$=calendar]]:bg-raised [&_[role=listbox]]:bg-raised`
 
   const eventFace = <div className={pickers}>
-    <SegmentedControl label="Event type" value={kind} onValueChange={v => { setKind(v as 'training' | 'match'); setError(null) }}
-      options={[{ value: 'training', label: 'Training' }, { value: 'match', label: 'Match' }]} />
+    <SegmentedControl label={t('coachSchedule:eventType')} value={kind} onValueChange={v => { setKind(v as 'training' | 'match'); setError(null) }}
+      options={[{ value: 'training', label: t('coachSchedule:kindTraining') }, { value: 'match', label: t('coachSchedule:kindMatch') }]} />
     {/* Its own row, labelled like Date and Start, so it never reads as part of Training / Match. */}
     {coachSquad.squads.length >= 2 && <div className="arc-trak-field grid gap-1.5">
-      <span aria-hidden="true">Squad</span>
-      <SegmentedControl label="Squad" value={squad ?? ''} onValueChange={v => setSquadPick(v || null)}
-        options={[...coachSquad.squads.map(s => ({ value: s, label: s })), { value: '', label: 'All squads' }]} />
+      <span aria-hidden="true">{t('nav:squad')}</span>
+      <SegmentedControl label={t('nav:squad')} value={squad ?? ''} onValueChange={v => setSquadPick(v || null)}
+        options={[...coachSquad.squads.map(s => ({ value: s, label: s })), { value: '', label: t('coachHome:allSquads') }]} />
     </div>}
     {kind === 'match' && <>
-      <input aria-label="Opponent" value={opponent} onChange={e => { setOpponent(e.target.value); setError(null) }}
-        placeholder="Opponent" className={field} />
+      <input aria-label={t('coachSchedule:opponent')} value={opponent} onChange={e => { setOpponent(e.target.value); setError(null) }}
+        placeholder={t('coachSchedule:opponent')} className={field} />
       <HomeAway value={homeAway} onChange={v => { setHomeAway(v); setError(null) }} />
     </>}
     {/* One per row: each picker's panel opens across the form's full width. */}
-    <DatePicker label="Date" className="arc-trak-field" value={dayAsDate(date)} clearable={false}
-      onChange={d => { if (d) { setDate(dateAsDay(d)); setError(null) } }} placeholder="Pick a date"
-      format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale="en-GB" />
-    <TimePicker label={kind === 'match' ? 'Kickoff' : 'Start'} className="arc-trak-field" value={time}
-      onChange={t => { setTime(t); setError(null) }} minuteStep={5} format="12h" placeholder="Pick a time" emptyAt="17:00" />
+    <DatePicker label={t('coachSchedule:date')} className="arc-trak-field" value={dayAsDate(date)} clearable={false}
+      onChange={d => { if (d) { setDate(dateAsDay(d)); setError(null) } }} placeholder={t('coachSchedule:pickDate')}
+      format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale={dates} />
+    <TimePicker label={kind === 'match' ? t('coachSchedule:kickoff') : t('coachSchedule:start')} className="arc-trak-field" value={time}
+      onChange={picked => { setTime(picked); setError(null) }} minuteStep={5} format="12h" placeholder={t('coachSchedule:pickTime')} emptyAt="17:00" />
     {/* TRAK-127: New event is for what's coming; a past day offers the logs. */}
     {datePassed ? (
       <div role="alert" className="space-y-2">
         <p className="text-[12px] text-danger">{datePassed}</p>
         <div className="flex gap-2">
-          <Button size="md" variant="secondary" className="flex-1" onClick={logMatch}>Log match</Button>
-          <Button size="md" variant="secondary" className="flex-1" onClick={() => go('/coach/sessions/add', { state: { logDate: date } })}>Log training</Button>
+          <Button size="md" variant="secondary" className="flex-1" onClick={logMatch}>{t('coachSchedule:logMatch')}</Button>
+          <Button size="md" variant="secondary" className="flex-1" onClick={() => go('/coach/sessions/add', { state: { logDate: date } })}>{t('coachSchedule:logTraining')}</Button>
         </div>
       </div>
     ) : error && <p role="alert" className="text-[12px] text-danger">{error}</p>}
     <div className="flex gap-2">
-      <Button size="md" variant="ghost" className="flex-1" onClick={moreDetails}>More details</Button>
-      <Button size="md" className="flex-1" loading={saving} disabled={!!datePassed} onClick={() => void saveDraft()}>Save draft</Button>
+      <Button size="md" variant="ghost" className="flex-1" onClick={moreDetails}>{t('coachSchedule:moreDetails')}</Button>
+      <Button size="md" className="flex-1" loading={saving} disabled={!!datePassed} onClick={() => void saveDraft()}>{t('coachSchedule:saveDraft')}</Button>
     </div>
   </div>
 
   const matchFace = <div className={pickers}>
-    <input aria-label="Opponent" value={opponent} onChange={e => { setOpponent(e.target.value); setError(null) }}
-      placeholder="Opponent" className={field} />
+    <input aria-label={t('coachSchedule:opponent')} value={opponent} onChange={e => { setOpponent(e.target.value); setError(null) }}
+      placeholder={t('coachSchedule:opponent')} className={field} />
     <HomeAway value={homeAway} onChange={v => { setHomeAway(v); setError(null) }} />
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-      <input aria-label="Our score" inputMode="numeric" value={scoreUs} placeholder="Us"
+      <input aria-label={t('coachSchedule:ourScore')} inputMode="numeric" value={scoreUs} placeholder={t('coachSchedule:us')}
         onChange={e => { setScoreUs(e.target.value.replace(/\D/g, '').slice(0, 2)); setError(null) }} className={`${field} text-center`} />
       <span aria-hidden="true" className="text-ink-3">–</span>
-      <input aria-label="Their score" inputMode="numeric" value={scoreThem} placeholder="Them"
+      <input aria-label={t('coachSchedule:theirScore')} inputMode="numeric" value={scoreThem} placeholder={t('coachSchedule:them')}
         onChange={e => { setScoreThem(e.target.value.replace(/\D/g, '').slice(0, 2)); setError(null) }} className={`${field} text-center`} />
     </div>
-    <DatePicker label="Date" className="arc-trak-field" value={dayAsDate(date)} clearable={false}
-      onChange={d => { if (d) { setDate(dateAsDay(d)); setError(null) } }} placeholder="Pick a date"
-      format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale="en-GB" />
+    <DatePicker label={t('coachSchedule:date')} className="arc-trak-field" value={dayAsDate(date)} clearable={false}
+      onChange={d => { if (d) { setDate(dateAsDay(d)); setError(null) } }} placeholder={t('coachSchedule:pickDate')}
+      format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale={dates} />
     {error && <p role="alert" className="text-[12px] text-danger">{error}</p>}
-    <p className="text-[12px] text-ink-3">Next: who played, their goals and assists.</p>
-    <Button size="md" className="w-full" onClick={continueMatch}>Continue</Button>
+    <p className="text-[12px] text-ink-3">{t('coachSchedule:nextWhoPlayed')}</p>
+    <Button size="md" className="w-full" onClick={continueMatch}>{t('coachSchedule:continue')}</Button>
   </div>
 
-  return <ActionMorph label={bar ? 'Quick add' : 'Create'} anchor={bar ? 'bottom' : 'top'} lift={bar ? keyboard : 0}
+  // TRAK-406: "+ Create" is as wide as its word in the language showing ("+ Δημιουργία" is wider), at least 104 px.
+  const topWidth = useTopButtonWidth(t('nav:create'))
+  return <ActionMorph label={bar ? t('nav:quickAdd') : t('nav:create')} anchor={bar ? 'bottom' : 'top'} lift={bar ? keyboard : 0}
     // At the top the root needs a size of its own: in the bar the slot gives it one.
-    className={bar ? undefined : 'arc'} style={bar ? undefined : { width: 104, height: 40 }} rows={rows} view={view} onViewChange={show} onSelect={choose}
-    faces={[{ id: 'event', title: 'New event', content: eventFace }, { id: 'match', title: 'Log a match', content: matchFace }]}
+    className={bar ? undefined : 'arc'} style={bar ? undefined : { width: topWidth, height: 40 }} rows={rows} view={view} onViewChange={show} onSelect={choose}
+    faces={[{ id: 'event', title: t('coachSchedule:newEvent'), content: eventFace }, { id: 'match', title: t('coachSchedule:logAMatch'), content: matchFace }]}
     trigger={bar
       ? <Plus size={22} strokeWidth={2.2} aria-hidden="true" className="text-brand" />
-      : <><Plus size={16} strokeWidth={2.2} aria-hidden="true" className="text-brand" />Create</>} />
+      : <><Plus size={16} strokeWidth={2.2} aria-hidden="true" className="text-brand" />{t('nav:create')}</>} />
+}
+
+/** The laptop's "+ Create" needs a size of its own (ActionMorph morphs from it): its word, plus the "+" and padding. */
+function useTopButtonWidth(word: string) {
+  return useMemo(() => {
+    const MIN = 104, AROUND = 14 * 2 + 16 + 6 + 4 // padding, the "+", the gap, a little room
+    if (typeof document === 'undefined') return MIN
+    const context = document.createElement('canvas').getContext('2d')
+    if (!context) return MIN
+    const style = getComputedStyle(document.body)
+    context.font = `500 15px ${style.fontFamily}`
+    return Math.max(MIN, Math.ceil(context.measureText(word).width + AROUND))
+  }, [word])
 }

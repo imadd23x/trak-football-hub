@@ -13,6 +13,9 @@ import { SquadLoadError } from './SquadLoadError'
 import type { SquadRoster } from './useSquadRoster'
 import { absentKey, confirmedKey as confirmedKeyFor, loadConfirmed, loadReportedAbsent } from './availability-reads'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { isPosition } from '@/lib/positions'
+import { POSITION_WORD } from '@/lib/position-words'
+import { useTranslation } from '@/lib/i18n'
 
 /* TRAK-250: Squad > Availability. Families confirm in the squad's WhatsApp group; the coach reads it
    and ticks each child Confirmed here. Everyone else is Not confirmed, and a guardian's "Can't make it"
@@ -59,6 +62,7 @@ function ChildRow({ child, pressed, busy, onToggle }: {
   busy: boolean
   onToggle: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <li>
       {/* aria-disabled, not disabled, while a toggle is pending: a disabled button would drop keyboard focus. */}
@@ -66,14 +70,14 @@ function ChildRow({ child, pressed, busy, onToggle }: {
         onClick={() => { if (!busy) onToggle() }}
         className="flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left transition-colors hover:bg-raised aria-disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
         <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-raised text-[12px] font-medium text-ink">
-          {child.shirt ?? <Missing what="no shirt number" />}
+          {child.shirt ?? <Missing what={t('coachSquad:noShirt')} />}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14px] font-medium text-ink">{child.name}</span>
-          <span className="block truncate text-[11px] text-ink-3">{child.position ?? 'Position not set'}</span>
+          <span className="block truncate text-[11px] text-ink-3">{isPosition(child.position) ? t(POSITION_WORD[child.position]) : child.position ?? t('coachSquad:positionNotSet')}</span>
           {child.absent && (
             <span className="mt-1 inline-block rounded-[8px] px-2 py-0.5 text-[11px] font-medium text-ink"
-              style={{ background: 'rgb(var(--t-warning) / 0.18)' }}>Reported can't make it</span>
+              style={{ background: 'rgb(var(--t-warning) / 0.18)' }}>{t('coachSquad:reportedCantMakeIt')}</span>
           )}
         </span>
         {pressed
@@ -84,7 +88,9 @@ function ChildRow({ child, pressed, busy, onToggle }: {
   )
 }
 
-function Column({ title, note, rows, pressed, busy, onToggle }: {
+function Column({ slug, title, note, rows, pressed, busy, onToggle }: {
+  /** The column's id, the same in every language. */
+  slug: string
   title: string
   note: string
   rows: Row[]
@@ -92,7 +98,8 @@ function Column({ title, note, rows, pressed, busy, onToggle }: {
   busy: boolean
   onToggle: (child: Row) => void
 }) {
-  const id = `availability-${title.toLowerCase().replace(/\s+/g, '-')}`
+  const { t } = useTranslation()
+  const id = `availability-${slug}`
   return (
     <section aria-labelledby={id} className="min-w-0 overflow-hidden rounded-[14px] border border-line bg-surface">
       <div className="flex items-center justify-between gap-2 px-4 pt-4">
@@ -100,7 +107,7 @@ function Column({ title, note, rows, pressed, busy, onToggle }: {
         <Chip>{rows.length}</Chip>
       </div>
       <p className="px-4 pt-1 text-[12px] text-ink-3">{note}</p>
-      {rows.length === 0 ? <p className="px-4 py-5 text-[13px] text-ink-3">No one here.</p> : (
+      {rows.length === 0 ? <p className="px-4 py-5 text-[13px] text-ink-3">{t('coachSquad:noOneHere')}</p> : (
         <ul className="py-2">
           {rows.map(row => (
             <ChildRow key={row.id} child={row} pressed={pressed} busy={busy} onToggle={() => onToggle(row)} />
@@ -114,6 +121,7 @@ function Column({ title, note, rows, pressed, busy, onToggle }: {
 export function AvailabilityTab({ roster }: { roster: SquadRoster }) {
   const { user } = useAuth()
   const userId = user?.id
+  const { t } = useTranslation()
   const client = useQueryClient()
   const { players, consentPending, squad } = roster
   const [pick, setPick] = useState<string | null>(null)
@@ -153,7 +161,7 @@ export function AvailabilityTab({ roster }: { roster: SquadRoster }) {
     // The row only moves once the confirmations have been read again; a refusal leaves it where it was.
     onSuccess: async (_data, vars) => {
       await client.invalidateQueries({ queryKey: confirmedKeyFor(userId, vars.eventId) })
-      setMoved({ childId: vars.childId, text: `${vars.name} ${vars.confirm ? 'confirmed' : 'not confirmed'}` })
+      setMoved({ childId: vars.childId, text: t(vars.confirm ? 'coachSquad:movedConfirmed' : 'coachSquad:movedNotConfirmed', { name: vars.name }) })
     },
   })
   useEffect(() => {
@@ -176,18 +184,18 @@ export function AvailabilityTab({ roster }: { roster: SquadRoster }) {
 
   const isMatch = event?.event_type === 'match'
 
-  if (events.error) return <SquadLoadError onRetry={() => { void events.refetch() }} title="Couldn't load upcoming events" />
-  if (events.isPending) return <LoadingSkeleton label="Loading upcoming events…" lines={2} rows={3} className="pt-6" />
+  if (events.error) return <SquadLoadError onRetry={() => { void events.refetch() }} title={t('coachSquad:couldntLoadUpcoming')} />
+  if (events.isPending) return <LoadingSkeleton label={t('coachSquad:loadingUpcoming')} lines={2} rows={3} className="pt-6" />
   if (!event) {
     return (
       <div className="pt-2">
-        <h2 className="text-[20px] font-medium tracking-[-0.01em] text-ink">Availability</h2>
+        <h2 className="text-[20px] font-medium tracking-[-0.01em] text-ink">{t('coachSquad:tabAvailability')}</h2>
         <div className="mt-5 rounded-[14px] border border-line bg-surface p-5">
-          <p className="text-[15px] font-medium text-ink-2">No upcoming events</p>
-          <p className="mt-1 text-[12px] text-ink-3">Publish a match or training and its confirmations appear here.</p>
+          <p className="text-[15px] font-medium text-ink-2">{t('coachSquad:noUpcoming')}</p>
+          <p className="mt-1 text-[12px] text-ink-3">{t('coachSquad:publishToSee')}</p>
           <Link to="/coach/schedule"
             className="mt-4 inline-flex min-h-11 items-center rounded-[10px] border border-line-strong px-4 text-[13px] font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-            Open schedule
+            {t('coachSquad:openSchedule')}
           </Link>
         </div>
       </div>
@@ -195,11 +203,11 @@ export function AvailabilityTab({ roster }: { roster: SquadRoster }) {
   }
 
   const { date, time } = phoneEventTime(event)
-  const what = isMatch ? (event.opponent ? `vs ${event.opponent}` : event.title) : event.title
+  const what = isMatch ? (event.opponent ? t('coachSchedule:vsOpponent', { opponent: event.opponent }) : event.title) : event.title
   const heading = [dayLabel(date), what].filter(Boolean).join(' · ')
   const details = [
-    time ? `${isMatch ? 'Kick-off' : 'Starts'} ${time}` : '',
-    event.home_away === 'home' ? 'Home' : event.home_away === 'away' ? 'Away' : '',
+    time ? t(isMatch ? 'coachSquad:kickOffAt' : 'coachSquad:startsAt', { time }) : '',
+    event.home_away === 'home' ? t('coachSchedule:home') : event.home_away === 'away' ? t('coachSchedule:away') : '',
     event.venue ?? '',
   ].filter(Boolean).join(' · ')
 
@@ -216,15 +224,15 @@ export function AvailabilityTab({ roster }: { roster: SquadRoster }) {
     <div className="pt-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <Chip tone="brand">{isMatch ? 'Match' : event.event_type === 'training' ? 'Training' : 'Event'}</Chip>
+          <Chip tone="brand">{isMatch ? t('coachSchedule:kindMatch') : event.event_type === 'training' ? t('coachSchedule:kindTraining') : t('coachSquad:chipEvent')}</Chip>
           <h2 className="text-[20px] font-medium tracking-[-0.01em] text-ink">{heading}</h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[12px] text-ink-3">{at + 1} of {upcoming.length}</span>
-          <button type="button" aria-label="Previous event" disabled={at === 0} onClick={() => step(-1)} className={stepButton}>
+          <span className="text-[12px] text-ink-3">{t('coachSquad:ofCount', { at: at + 1, total: upcoming.length })}</span>
+          <button type="button" aria-label={t('coachSquad:previousEvent')} disabled={at === 0} onClick={() => step(-1)} className={stepButton}>
             <ChevronLeft aria-hidden size={18} />
           </button>
-          <button type="button" aria-label="Next event" disabled={at >= upcoming.length - 1} onClick={() => step(1)} className={stepButton}>
+          <button type="button" aria-label={t('coachSquad:nextEvent')} disabled={at >= upcoming.length - 1} onClick={() => step(1)} className={stepButton}>
             <ChevronRight aria-hidden size={18} />
           </button>
         </div>
@@ -235,44 +243,44 @@ export function AvailabilityTab({ roster }: { roster: SquadRoster }) {
       {toggle.error && (
         <p role="alert" className="mt-3.5 rounded-[12px] px-4 py-3 text-[13px] text-ink"
           style={{ background: 'rgb(var(--t-danger) / 0.1)', border: '1px solid rgb(var(--t-danger) / 0.35)' }}>
-          {toggle.error.message || "Couldn't update this confirmation. Try again."}
+          {toggle.error.message || t('coachSquad:couldntUpdateConfirmation')}
         </p>
       )}
 
-      {readError ? <SquadLoadError onRetry={retry} title="Couldn't load confirmations" />
+      {readError ? <SquadLoadError onRetry={retry} title={t('coachSquad:couldntLoadConfirmations')} />
         : confirmedQuery.isPending || absentQuery.isPending
-          ? <LoadingSkeleton label="Loading confirmations…" lines={1} avatar rows={4} className="pt-6" />
+          ? <LoadingSkeleton label={t('coachSquad:loadingConfirmations')} lines={1} avatar rows={4} className="pt-6" />
           : (
             <div className="mt-4 flex flex-col gap-4 laptop:flex-row laptop:items-start">
               <div className="min-w-0 flex-1">
                 <div className="grid gap-3.5 tablet:grid-cols-2">
-                  <Column title="Confirmed" note="You marked these children as coming."
+                  <Column slug="confirmed" title={t('coachSquad:confirmed')} note={t('coachSquad:confirmedNote')}
                     rows={split.confirmed} pressed busy={toggle.isPending} onToggle={toggleChild} />
-                  <Column title="Not confirmed" note="Not marked as coming yet."
+                  <Column slug="not-confirmed" title={t('coachSquad:notConfirmed')} note={t('coachSquad:notConfirmedNote')}
                     rows={split.notConfirmed} pressed={false} busy={toggle.isPending} onToggle={toggleChild} />
                 </div>
                 {split.notEligible.length > 0 && (
                   <div className="mt-3.5 rounded-[12px] px-4 py-3 text-[13px] text-ink"
                     style={{ background: 'rgb(var(--t-warning) / 0.12)', border: '1px solid rgb(var(--t-warning) / 0.35)' }}>
-                    <b className="font-medium">Not eligible:</b>{' '}
-                    {split.notEligible.map(p => p.name).join(', ')} — consent pending, so {split.notEligible.length === 1 ? 'the family' : 'the families'} can't see or answer events yet.
+                    <b className="font-medium">{t('coachSquad:notEligibleLabel')}</b>{' '}
+                    {split.notEligible.map(p => p.name).join(', ')}{t('coachSquad:notEligibleWhy', { count: split.notEligible.length })}
                   </div>
                 )}
               </div>
 
               <aside className="flex w-full flex-col gap-3.5 laptop:w-[300px] laptop:shrink-0">
-                <Card title="Squad for this event" muted>
-                  <p className="text-[18px] font-medium text-ink">{split.confirmed.length} confirmed · {split.notConfirmed.length} not confirmed</p>
+                <Card title={t('coachSquad:squadForEvent')} muted>
+                  <p className="text-[18px] font-medium text-ink">{t('coachSquad:confirmedSummary', { confirmed: split.confirmed.length, notConfirmed: split.notConfirmed.length })}</p>
                   {split.goalkeepers.length > 0 ? (
-                    <p className="mt-2 text-[13px] text-ink">Goalkeepers: {split.goalkeepers.map(g => g.name).join(', ')}</p>
+                    <p className="mt-2 text-[13px] text-ink">{t('coachSquad:goalkeepersLine', { names: split.goalkeepers.map(g => g.name).join(', ') })}</p>
                   ) : (
                     <p className="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-ink">
-                      <TriangleAlert aria-hidden size={15} className="shrink-0 text-warning" />No goalkeeper confirmed
+                      <TriangleAlert aria-hidden size={15} className="shrink-0 text-warning" />{t('coachSquad:noGoalkeeper')}
                     </p>
                   )}
                 </Card>
                 <p className="rounded-[12px] border border-line bg-raised px-4 py-3 text-[13px] text-ink-2">
-                  Confirmations come from your WhatsApp group; families don't see them in Trak.
+                  {t('coachSquad:whatsappNote')}
                 </p>
               </aside>
             </div>

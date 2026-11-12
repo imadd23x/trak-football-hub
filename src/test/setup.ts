@@ -2,9 +2,12 @@ import "@testing-library/jest-dom";
 import { configure } from "@testing-library/react";
 import { afterEach } from "vitest";
 import { forgetScreens } from "@/lib/screen-memory";
+import { i18n, SOURCE_LANGUAGE } from "@/lib/i18n";
 
 // TRAK-180: no test starts from the screens another test left in memory.
 afterEach(() => forgetScreens());
+// TRAK-406: every test reads Trak in English unless it picks another language itself.
+afterEach(async () => { if (i18n.language !== SOURCE_LANGUAGE) await i18n.changeLanguage(SOURCE_LANGUAGE) });
 
 
 // TRAK-114: findBy/waitFor wait 1 s by default, and GitHub's runners can take longer than

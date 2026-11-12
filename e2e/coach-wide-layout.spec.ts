@@ -158,7 +158,7 @@ test("a coach's Settings is Arc's settings page in the wide column on a laptop",
   const menu = (await page.getByRole('navigation', { name: 'Settings sections' }).boundingBox())!
   const profile = (await page.getByRole('heading', { name: 'Profile', exact: true }).boundingBox())!
   expect(profile.x).toBeGreaterThan(menu.x + menu.width)
-  await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button')).toHaveText(['Profile', 'Club', 'Notifications', 'How Trak works', 'Account'])
+  await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button')).toHaveText(['Profile', 'Club', 'Language', 'Notifications', 'How Trak works', 'Account'])  // TRAK-406: Language
   await page.screenshot({ path: testInfo.outputPath('coach-settings-1440.png') })
   expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
   expect(unexpected).toEqual([])

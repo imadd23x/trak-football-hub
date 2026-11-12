@@ -52,6 +52,8 @@ interface Profile {
   full_name: string;
   nationality: string | null;
   avatar_url?: string | null;
+  /** TRAK-406: the language they picked (a tag such as 'el'); null if never. */
+  language?: string | null;
 }
 
 interface AuthContextType {

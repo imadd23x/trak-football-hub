@@ -279,8 +279,12 @@ export default function PlayerHome() {
             const published = sharedRow as { body?: string; published_at?: string } | null
             const body = published?.body?.trim()
             setCoachAssessmentNote(body || null)
-            setAssessmentAlert(body && published?.published_at && Number.isFinite(Date.parse(published.published_at))
-              ? { id: latest.id, userId: user.id, publishedAt: published.published_at, coachName: cp?.full_name ?? '' } : null)
+            // TRAK-401: an evaluation exists only once published, with or without a note, so
+            // it alerts at its own time like the parent's bell. A session assessment still
+            // waits for its published message (TRAK-171).
+            const publishedAt = body && published?.published_at ? published.published_at : latest.evaluation_id ? latest.created_at : null
+            setAssessmentAlert(publishedAt && Number.isFinite(Date.parse(publishedAt))
+              ? { id: latest.id, userId: user.id, publishedAt, hasMessage: !!body, coachName: cp?.full_name ?? '' } : null)
           }
         }
 

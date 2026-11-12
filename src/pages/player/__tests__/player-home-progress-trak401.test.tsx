@@ -1,4 +1,5 @@
 import { cleanup, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
@@ -45,5 +46,22 @@ describe('TRAK-401: the Progress line on the player Home assessment card', () =>
     expect(await within(first).findByText('Progress: 1 on track, 1 some progress')).toBeInTheDocument()
     expect(within(section).getAllByText(/^Progress:/)).toHaveLength(1)
     expect(asked).toEqual([['as-eval']])
+  })
+
+  // Imad's review of #562: the parent's bell announced a note-less evaluation and the player's stayed silent.
+  it("rings the player's bell for an evaluation published without a note", async () => {
+    server.use(http.get(`${SUPABASE_URL}/rest/v1/coach_assessments`, ({ request }) => {
+      const id = new URL(request.url).searchParams.get('id')?.replace('eq.', '')
+      const rows = [row('as-eval', '15', 'eval-1'), row('as-session', '08', null)]
+      return HttpResponse.json(id ? rows.filter(item => item.id === id) : rows)
+    }))
+    renderApp('/player/home')
+    await screen.findByRole('region', { name: 'Latest coach assessment' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Alerts, 1 unread' }))
+    const panel = await screen.findByRole('dialog', { name: 'Alerts' })
+    await userEvent.click(within(panel).getByRole('button', { name: /New assessment from / }))
+    expect(within(panel).getByText('Your ratings to read.')).toBeInTheDocument()
+    await userEvent.click(within(panel).getByRole('button', { name: 'Open assessment' }))
+    expect(await screen.findByRole('heading', { name: 'Evaluation' })).toBeInTheDocument()
   })
 })

@@ -6,7 +6,8 @@ export async function openNewEvent(page: Page) {
   await page.getByRole('button', { name: /^(Quick add|Create)$/ }).click()
   await page.getByRole('menuitem', { name: 'New event' }).click()
   await page.getByRole('button', { name: 'More details' }).click()
-  // The quick form closes as the sheet opens; both are named "New event".
+  // The quick form animates out as the sheet opens; both are named "New event", so wait until the quick form's button is gone.
+  await expect(page.getByRole('button', { name: 'More details' })).toHaveCount(0)
   await expect(page.getByRole('dialog', { name: 'New event' })).toHaveCount(1)
   await expect(page.locator('[aria-label="Event steps"]')).toBeVisible()
 }

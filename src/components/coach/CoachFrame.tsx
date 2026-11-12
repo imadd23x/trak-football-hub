@@ -104,6 +104,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
   const club = identity?.club || t('nav:yourAcademy')
   const barred = BARLESS.test(pathname)
   // TRAK-324: the squad switcher sits in the sidebar, not in the top bar. TRAK-376: on a phone, in the sidebar's sheet.
+  // TRAK-430: on every page, the barless ones too, or the rows under it jump (8 px with one squad, 64 px with two).
   const switcher = <SquadSwitcher coachId={userId} />
 
   return <CoachFrameContext.Provider value={frame}><CoachTrailProvider tabs={tabs} topBar={wide ? setTrail : null}>
@@ -113,7 +114,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
       items={items} footerItem={{ id: 'settings', label: t('nav:settings'), icon: Settings }}
       profile={{ name, detail: identity?.role ?? undefined, avatar: <Avatar name={name} size="sm" /> }}
       active={screen ?? ''} onSelect={select}
-      afterBrand={!barred && switcher}
+      afterBrand={switcher}
       actions={<><CoachAlertsBell coachId={userId} /><CoachCreate placement="top" onSaved={saved} /></>}>
       <Suspense fallback={<div className="min-h-screen bg-ground" />}><Outlet /></Suspense>
     </SidebarRail>

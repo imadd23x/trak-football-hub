@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 import type { Tables } from '@/integrations/supabase/types'
 import { playerPlan, type PlayerPlans } from './lineup'
 import type { Review } from './reviews'
@@ -41,7 +42,7 @@ const MET: Answer = { didJob: 'yes', against: 'met', note: '' }
 export const answerOf = (form: EvaluationForm, id: string): Answer => form.answers[id] ?? MET
 export const hasPlayed = (form: EvaluationForm, id: string, starter: boolean) => form.played[id] ?? starter
 export const summary = (answer: Answer) =>
-  `${DID_JOB.find(d => d.value === answer.didJob)!.summary} · ${AGAINST.find(a => a.value === answer.against)!.label}`
+  `${i18n.t(`coachMatches:didJob_${answer.didJob}_sum` as 'coachMatches:saved')} · ${i18n.t(`coachMatches:against_${answer.against}` as 'coachMatches:saved')}`
 
 /** Who the evaluation lists: the starters by slot, then everyone else who can be recorded and wasn't left out. */
 export function lineUpAtKickOff<P extends { id: string }>(plans: PlayerPlans, eligible: P[]) {

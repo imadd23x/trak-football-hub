@@ -1,3 +1,4 @@
+import { i18n, useTranslation } from '@/lib/i18n'
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ClipboardCheck } from 'lucide-react'
@@ -29,10 +30,9 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    6 Nov): Save draft moves to the match's header, so the page holds the draft's saving and publishing
    (useEvaluationDraft); the bottom bar keeps Back, the Draft badge and Next. */
 
-const STEPS = [{ id: 'result', label: 'Result' }, { id: 'players', label: 'Player evaluation' }, { id: 'publish', label: 'Publish' }]
-const NEXT = ['Next: Player evaluation', 'Next: Publish']
-const SAVE_FAILED = "Couldn't save the evaluation. Check your connection and try again; everything you entered is still here."
-const PUBLISH_FAILED = "Couldn't publish the evaluation. Check your connection and try again; everything you entered is still here."
+/* TRAK-407: read when shown, so the words follow the language. */
+const steps = () => [{ id: 'result', label: i18n.t('coachMatches:evStepResult') }, { id: 'players', label: i18n.t('coachMatches:evStepPlayers') }, { id: 'publish', label: i18n.t('coachHome:publish') }]
+const next = (step: number) => (step === 0 ? i18n.t('coachMatches:nextPlayers') : i18n.t('coachMatches:nextPublish'))
 // The database says why it refused: not full time yet, published, a missing answer, or a child who can't be recorded.
 const said = (error: { code?: string; message?: string }, otherwise: string) =>
   (error.code === 'P0001' || error.code === '42501') && error.message ? error.message : otherwise
@@ -83,7 +83,7 @@ export function useEvaluationDraft({ game, form, onFormChange, listed, onSaved }
       onSaved?.()
       void refresh()
     },
-    onError: (error: { code?: string; message?: string }) => setProblem(said(error, SAVE_FAILED)),
+    onError: (error: { code?: string; message?: string }) => setProblem(said(error, i18n.t('coachMatches:evSaveFailed'))),
   })
 
   // What's on screen is saved first, so what goes out is what the coach sees.
@@ -101,7 +101,7 @@ export function useEvaluationDraft({ game, form, onFormChange, listed, onSaved }
       setPublished({ reviews: result.reviews, skipped: result.skipped.length })
       await Promise.all([refresh(), client.invalidateQueries({ queryKey: ['coach', user?.id, 'game-share-log', game.id] })])
     },
-    onError: (error: { code?: string; message?: string }) => setPublishProblem(said(error, PUBLISH_FAILED)),
+    onError: (error: { code?: string; message?: string }) => setPublishProblem(said(error, i18n.t('coachMatches:evPublishFailed'))),
   })
 
   return {
@@ -125,13 +125,14 @@ export function Evaluation({ game, opensAt, who, plans, planGoals, form, draft, 
   planCreatedAt: string | null
 }) {
   const { profile } = useAuth()
+  const { t } = useTranslation()
   const { change, published } = draft
   if (opensAt !== null) {
-    return <div className="pt-4"><EmptyState icon={<ClipboardCheck size={24} strokeWidth={1.5} />} title={`Opens at full time, ${opensAt}`}
-      description="The result, whether the plan worked, and each player against what you expected. Only you see it until you publish it." /></div>
+    return <div className="pt-4"><EmptyState icon={<ClipboardCheck size={24} strokeWidth={1.5} />} title={t('coachMatches:opensAtFullTime', { when: opensAt })}
+      description={t('coachMatches:opensBody')} /></div>
   }
-  if (who.error) return <div className="pt-4"><LoadError what="who played" onRetry={who.retry} /></div>
-  if (who.isPending) return <LoadingSkeleton label="Loading who played…" lines={1} avatar rows={4} className="pt-6" />
+  if (who.error) return <div className="pt-4"><LoadError what={t('coachMatches:whoPlayedWhat')} onRetry={who.retry} /></div>
+  if (who.isPending) return <LoadingSkeleton label={t('coachMatches:loadingWhoPlayed')} lines={1} avatar rows={4} className="pt-6" />
 
   const { starters, bench, listed } = evaluationLineUp(plans, who.players)
   const named = (players: typeof starters) => players.map(p => ({ id: p.id, name: p.name }))
@@ -142,13 +143,13 @@ export function Evaluation({ game, opensAt, who, plans, planGoals, form, draft, 
     const reached = published?.reviews ?? publishSummary(form, listed).players
     return (
       <div className="grid gap-5 pt-4">
-        <Alert tone="success" title={`Published to ${reached} ${reached === 1 ? 'player' : 'players'} and their families. The loop is closed.`}>
-          {published?.skipped ? `${published.skipped} ${published.skipped === 1 ? 'player is' : 'players are'} no longer on your roster or waiting for a parent, so they got nothing.` : 'Published is final.'}
+        <Alert tone="success" title={t('coachMatches:publishedTo', { count: reached })}>
+          {published?.skipped ? t('coachMatches:skippedGotNothing', { count: published.skipped }) : t('coachMatches:publishedFinal')}
         </Alert>
         <div className="grid gap-4 tablet:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] tablet:items-start">
           {/* A div, not a section: the timeline is the History region itself. */}
           <div className="grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5">
-            <h2 className="text-lg font-medium text-ink">History</h2>
+            <h2 className="text-lg font-medium text-ink">{t('coachMatches:history')}</h2>
             <GameHistory game={game} planCreatedAt={planCreatedAt} savedAt={savedAt} publishedAt={publishedAt} />
           </div>
           <ReviewPreview eventId={game.id} form={form} listed={listed} plans={plans} coachName={coachName} />
@@ -159,16 +160,16 @@ export function Evaluation({ game, opensAt, who, plans, planGoals, form, draft, 
 
   return (
     <div className="grid gap-5 pt-4">
-      <Stepper steps={STEPS} current={step} onStepSelect={onStep} label="Evaluation" jumpAhead />
+      <Stepper steps={steps()} current={step} onStepSelect={onStep} label={t('nav:evaluation')} jumpAhead />
       {step === 0 ? <ResultStep eventId={game.id} form={form} onFormChange={change} starters={named(starters)} bench={named(bench)} goals={planGoals} />
         : step === 1 ? <PlayersStep eventId={game.id} form={form} onFormChange={change} played={named(played)} plans={plans} />
         : <PublishStep eventId={game.id} form={form} listed={listed} goals={planGoals.length} onStep={onStep}
             askCompetition={!game.competition} askHomeAway={game.home_away !== 'home' && game.home_away !== 'away'}
             onPublish={draft.publish} publishing={draft.publishing} problem={draft.publishProblem} />}
       <div className="flex flex-wrap items-center gap-3">
-        {step > 0 && <Button variant="ghost" onClick={() => onStep(step - 1)}>Back</Button>}
-        <span className="arc ml-auto"><Badge>Draft</Badge></span>
-        {step < 2 && <Button onClick={() => onStep(step + 1)}>{NEXT[step]}</Button>}
+        {step > 0 && <Button variant="ghost" onClick={() => onStep(step - 1)}>{t('common:back')}</Button>}
+        <span className="arc ml-auto"><Badge>{t('coachHome:stateDraft')}</Badge></span>
+        {step < 2 && <Button onClick={() => onStep(step + 1)}>{next(step)}</Button>}
       </div>
     </div>
   )

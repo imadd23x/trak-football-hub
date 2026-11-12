@@ -71,7 +71,7 @@ await context.route('**/*',async route=>{
  await expect(following.getByRole('button',{name:'Zara Example'})).toBeVisible();
  await expect(page.getByText('Midfielder · Zara Academy · U15',{exact:true})).toBeVisible();
  await expect(page.getByText('Midfielder · Alex Academy · U15',{exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Events',exact:true}).click();
+ await page.getByRole('tab',{name:'Events',exact:true}).click();
  await expect(page.getByRole('combobox')).toHaveValue(zara);
  // TRAK-181: Trak draws the picker and its chevron, so Safari can't swap in its own grey bar.
  await expect(page.getByRole('combobox')).toHaveCSS('appearance','none');
@@ -89,7 +89,7 @@ await context.route('**/*',async route=>{
  await expect(page.getByText('Alex Opposition',{exact:true})).toBeVisible();
  await page.getByRole('combobox').selectOption(zara);
  // TRAK-74: alerts are a bell on Home and show only the selected child's activity.
- await page.getByRole('button',{name:'Home',exact:true}).click();
+ await page.getByRole('tab',{name:'Home',exact:true}).click();
  await page.getByRole('button',{name:/^Alerts/}).click();
  const alertsSheet=page.getByRole('dialog',{name:'Alerts'});
  await expect(alertsSheet.getByText(/vs Zara Opposition/).first()).toBeVisible();
@@ -101,7 +101,7 @@ await context.route('**/*',async route=>{
  await expect(following.getByRole('button',{name:'Zara Example'})).toBeVisible();
  await expect(page.getByText('Midfielder · Zara Academy · U15',{exact:true})).toBeVisible();
  await expect(page.getByText('Midfielder · Alex Academy · U15',{exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Profile',exact:true}).click();
+ await page.getByRole('tab',{name:'Profile',exact:true}).click();
  await expect(page.getByText('Parent account · 2 children linked',{exact:true})).toBeVisible();
  // TRAK-181: no "Following" picker on Profile; each child has a consent line.
  await expect(page.getByRole('combobox',{name:'Following'})).toHaveCount(0);
@@ -226,7 +226,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         await page.getByRole('link', { name: /Sibling training/ }).click()
         await expect(page.getByRole('heading', { name: 'Sibling training' })).toBeVisible()
         // The page's own Back, first on the page; the tab bar has an Events button too (TRAK-171, live run 3).
-        await page.getByRole('button', { name: 'Events', exact: true }).first().click()
+        await page.getByRole('tab', { name: 'Events', exact: true }).first().click()
         await expect(page.getByRole('heading', { name: 'Events', exact: true })).toBeVisible()
       } else if (role === 'player') {
         await expect(page.getByRole('link', { name: 'Calendar' })).toHaveAttribute('href', '/player/calendar')

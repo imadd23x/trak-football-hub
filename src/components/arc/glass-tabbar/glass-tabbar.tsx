@@ -29,6 +29,8 @@ export interface GlassTabBarProps {
   /** Initial active tab when uncontrolled. Defaults to the first item. */
   defaultValue?: string;
   onValueChange?: (value: string) => void;
+  /** Trak (TRAK-440): the tab already selected is pressed again, such as from a page under it. */
+  onReselect?: (value: string) => void;
   /** A separate round glass tab beside the bar, such as search. Selecting it moves the selection out of the bar. */
   action?: GlassTabBarItem;
   /** Trak: any control in the round slot beside the bar instead of a tab, such as the "+" menu. It takes the bar's height. */
@@ -121,7 +123,7 @@ function Tab({ item, index, selected, focusable, slot, height, pos, lift, presen
   </motion.button>;
 }
 
-export function GlassTabBar({ items, value: valueProp, defaultValue, onValueChange, action, actionNode, compact: compactProp, defaultCompact = false, onCompactChange, scrollRef, collapseOnScroll = true, label = "Tabs", className, style }: GlassTabBarProps) {
+export function GlassTabBar({ items, value: valueProp, defaultValue, onValueChange, onReselect, action, actionNode, compact: compactProp, defaultCompact = false, onCompactChange, scrollRef, collapseOnScroll = true, label = "Tabs", className, style }: GlassTabBarProps) {
   const reduced = !!useReducedMotion();
   const [innerValue, setInnerValue] = useState(defaultValue ?? items[0]?.value ?? "");
   const [innerCompact, setInnerCompact] = useState(defaultCompact);
@@ -228,7 +230,7 @@ export function GlassTabBar({ items, value: valueProp, defaultValue, onValueChan
 
   const select = (next: string) => {
     if (compact) setCompact(false);
-    if (next !== value) setValue(next);
+    if (next !== value) setValue(next); else onReselect?.(next);
   };
 
   // Drag the lens: past a few pixels it follows the pointer, and letting go lands it on the nearest tab.

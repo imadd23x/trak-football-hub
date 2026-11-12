@@ -188,11 +188,14 @@ test("the Calendar's sheets stop at the Arc bottom sheet's width on a tablet", a
 
 test("a player's Home keeps the phone column on a laptop", async ({ page, context }) => {
   const { unexpected } = await open(page, context, 'player', '/player/home', 1440, 900)
-  await expect(page.locator('nav.trak-nav')).toBeVisible()
+  // TRAK-440: the bar is the coach's glass tab bar, floating 12 px above the bottom, centred under the column.
+  const bar = page.getByRole('navigation', { name: 'Player' })
+  await expect(bar.getByRole('tab', { name: 'Matches' })).toBeVisible()
   const shell = await box(page, '.trak-page')
   expect([Math.round(shell.width), Math.round(shell.x + shell.width / 2)]).toEqual([430, 720])
-  const nav = await box(page, 'nav.trak-nav')
-  expect([Math.round(nav.width), Math.round(nav.y + nav.height)]).toEqual([430, 900])
+  const nav = (await bar.boundingBox())!
+  expect([Math.round(nav.x + nav.width / 2), Math.round(nav.y + nav.height)]).toEqual([720, 888])
+  expect(nav.width).toBeLessThanOrEqual(406)
   expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBeUndefined()
   expect(unexpected).toEqual([])
 })

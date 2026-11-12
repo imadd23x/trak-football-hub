@@ -360,7 +360,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   await expect(page.getByText(homeLine(zara), { exact: true })).toBeVisible();
   await expect(page.getByText(homeLine(alex), { exact: true })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Events', exact: true }).click();
+  await page.getByRole('tab', { name: 'Events', exact: true }).click();
   await expect(page.getByRole('combobox')).toHaveValue(zaraId);
   await expect(page.getByText(zara.opponent, { exact: true })).toBeVisible();
   await page.getByRole('combobox').selectOption(alexId);
@@ -369,7 +369,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   await page.getByRole('combobox').selectOption(zaraId);
 
   // TRAK-74: alerts are a bell on Home and show only the selected child's activity.
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await page.getByRole('tab', { name: 'Home', exact: true }).click();
   await page.getByRole('button', { name: /^Alerts/ }).click();
   const alertsSheet = page.getByRole('dialog', { name: 'Alerts' });
   await expect(alertsSheet.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
@@ -384,7 +384,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   await expect(page.getByText(homeLine(zara), { exact: true })).toBeVisible();
   await expect(page.getByText(homeLine(alex), { exact: true })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('tab', { name: 'Profile', exact: true }).click();
   await expect(page.getByText('Parent account · 2 children linked', { exact: true })).toBeVisible();
   // TRAK-181: no "Following" picker on Profile; each child has a consent line.
   await expect(page.getByRole('combobox', { name: 'Following' })).toHaveCount(0);
@@ -392,7 +392,7 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   const connections = page.getByRole('list', { name: 'Linked children', exact: true });
   await expect(connections.getByText(alex.name, { exact: true })).toHaveCount(1);
   await expect(connections.getByText(zara.name, { exact: true })).toHaveCount(1);
-  await page.getByRole('button', { name: 'Events', exact: true }).click();
+  await page.getByRole('tab', { name: 'Events', exact: true }).click();
   await page.reload();
   await expect(page.getByRole('option')).toHaveCount(2);
   await page.getByRole('combobox').selectOption(zaraId);

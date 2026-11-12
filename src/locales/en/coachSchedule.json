@@ -115,6 +115,8 @@
   "themeCount_other": "{{sessions}} sessions · {{count}} topics",
   "findThemeSessions": "Find {{theme}} sessions in the Trainings Catalogue",
   "browseAllSessions": "Browse all sessions in the Trainings Catalogue",
+  "findThemeDrills": "Find {{theme}} drills in Training › Drills",
+  "browseAllDrills": "Browse all drills in Training › Drills",
   "whichWeeks": "Which weeks",
   "editEvent": "Edit event",
   "newEvent": "New event",

@@ -173,7 +173,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
   })
 
   it('keeps the phone bar off pages that had none: their own actions sit at the bottom', async () => {
-    for (const path of ['/settings', '/coach/manual', '/coach/squad/player/sp-1', '/coach/sessions/add', '/coach/sessions/quick', '/coach/sessions/abc'])
+    for (const path of ['/settings', '/coach/how-trak-works', '/coach/squad/player/sp-1', '/coach/sessions/add', '/coach/sessions/quick', '/coach/sessions/abc'])
       expect(BARLESS.test(path)).toBe(true)
     for (const path of ['/coach/home', '/coach/sessions', '/coach/sessions/list', '/coach/assess', '/coach/squad', '/coach/trainings'])
       expect(BARLESS.test(path)).toBe(false)

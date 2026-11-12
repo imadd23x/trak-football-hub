@@ -60,7 +60,7 @@ export const plannedMinutes = (practices: Pick<Practice, 'minutes'>[]) => practi
  *  coach can keep it; this says so plainly. Null when it fits or the training has no length. */
 export function overTime(planned: number, length: number | null): string | null {
   if (!length || planned <= length) return null
-  return `You set this training for ${length} min. The plan runs ${planned - length} min over. You can keep it, or change the training's time in Schedule.`
+  return `You set this training for ${length} min. The plan runs ${planned - length} min over. You can keep it, or change the training's time in Events.`
 }
 
 /** TRAK-367: a practice on one line: its part, then its drill ("Rondo · Rondo 4 v 2 with a target"). Only the name when

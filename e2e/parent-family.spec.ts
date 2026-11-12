@@ -92,8 +92,9 @@ await context.route('**/*',async route=>{
  await page.getByRole('tab',{name:'Home',exact:true}).click();
  await page.getByRole('button',{name:/^Alerts/}).click();
  const alertsSheet=page.getByRole('dialog',{name:'Alerts'});
- await expect(alertsSheet.getByText(/vs Zara Opposition/).first()).toBeVisible();
- await expect(alertsSheet.getByText(/vs Alex Opposition/)).toHaveCount(0);
+ // TRAK-436: a match reaches the bell as the coach's review, not "Match logged" (per-child scoping: unit tests).
+ await expect(alertsSheet.getByText(/^New assessment from /).first()).toBeVisible();
+ await expect(alertsSheet.getByText(/Opposition/)).toHaveCount(0);
  // TRAK-122: Escape during the sheet's opening animation can be ignored; wait for it first.
  await alertsSheet.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
  await page.keyboard.press('Escape');

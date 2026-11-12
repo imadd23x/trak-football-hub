@@ -43,10 +43,22 @@ const assessment = (child: string) => ({
   work_rate: 0, tactical: 0, attitude: 0, technical: 0, physical: 0, coachability: 0,
 })
 
+/** TRAK-436: the coach's review of a match for this child, and the match through child_events. */
+const review = (child: string, publishedAt: string) => [
+  http.get(endpoint('game_review_for_family'), ({ request }) => HttpResponse.json(
+    (new URL(request.url).searchParams.get('squad_player_id') ?? '').includes(`squad-${child}`)
+      ? [{ event_id: `game-${child}`, published_at: publishedAt, our_score: 2, their_score: 1, coach_name: 'Otto Rehhagel' }] : [])),
+  http.post(endpoint('rpc/child_events'), ({ request }) => HttpResponse.json(
+    (new URL(request.url).searchParams.get('id') ?? '').includes(`game-${child}`)
+      ? [{ id: `game-${child}`, event_type: 'match', title: 'League', opponent: 'Rivals FC', home_away: 'home', event_date: '2026-11-08',
+        start_time: '11:00:00', status: 'scheduled', sequence: 1 }] : [])),
+]
+
 function installFamily() {
   server.use(
     // TRAK-286: no shared game plan.
     http.get(endpoint('game_for_family'), () => HttpResponse.json([])),
+    http.get(endpoint('game_review_for_family'), () => HttpResponse.json([])),
     http.get(endpoint('game_for_player'), () => HttpResponse.json([])),
     http.get(endpoint('player_parent_links'), ({ request }) => {
       const parent = new URL(request.url).searchParams.get('parent_user_id')
@@ -140,8 +152,9 @@ describe('parent family navigation', () => {
     await user.click(screen.getByRole('tab', { name: 'Home' }))
     await user.click(await screen.findByRole('button', { name: /^Alerts/ }))
     const alertsSheet = await screen.findByRole('dialog', { name: 'Alerts' })
-    expect(await within(alertsSheet).findByText('vs Zara opposition · 0–0')).toBeInTheDocument()
-    expect(within(alertsSheet).queryByText(/vs Alex opposition/)).not.toBeInTheDocument()
+    // TRAK-436: no "Match logged" in the bell; the child's own assessment says whose bell it is.
+    expect(await within(alertsSheet).findByText('New assessment from Coach coach-Zara')).toBeInTheDocument()
+    expect(within(alertsSheet).queryByText(/coach-Alex/)).not.toBeInTheDocument()
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await user.click(screen.getByRole('tab', { name: 'Profile' }))
@@ -232,44 +245,46 @@ describe('parent alerts bell', () => {
     return screen.findByRole('dialog', { name: 'Alerts' })
   }
 
-  it("counts the selected child's unseen alerts, lists matches and assessments but no awards, and Mark all read clears the count", async () => {
+  // TRAK-436: a match reaches the bell as the coach's review, so there is no "Match logged".
+  it("counts the selected child's unseen alerts, lists assessments but no awards or logged matches, and Mark all read clears the count", async () => {
     renderFamily()
     expect(await screen.findByRole('region', { name: 'Recorded matches summary' })).toBeInTheDocument() // TRAK-194: Home's match readout
     expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull()
-    expect(await screen.findByRole('button', { name: 'Alerts, 2 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Alerts, 1 unread' })).toBeInTheDocument()
     const sheet = await openAlerts()
-    expect(within(sheet).getByText('vs Alex opposition · 0–0')).toBeInTheDocument()
+    expect(within(sheet).queryByText('Match logged')).toBeNull()
     expect(within(sheet).getByText(/^New assessment from /)).toBeInTheDocument()
     expect(within(sheet).queryByText('Player Of Week')).toBeNull()
     expect(within(sheet).queryByText(/teamwork/)).toBeNull()
     // TRAK-163: Arc's notification center. Closing keeps the count; Mark all read clears it.
     await userEvent.keyboard('{Escape}')
-    expect(await screen.findByRole('button', { name: 'Alerts, 2 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Alerts, 1 unread' })).toBeInTheDocument()
     await userEvent.click(within(await openAlerts()).getByRole('button', { name: 'Mark all read' }))
     await userEvent.keyboard('{Escape}')
     expect(await screen.findByRole('button', { name: 'Alerts' })).toBeInTheDocument()
 
     await followChild('Zara')
-    expect(await screen.findByRole('button', { name: 'Alerts, 2 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Alerts, 1 unread' })).toBeInTheDocument()
     const zaraSheet = await openAlerts()
-    expect(within(zaraSheet).getByText('vs Zara opposition · 0–0')).toBeInTheDocument()
-    expect(within(zaraSheet).queryByText(/Alex opposition/)).toBeNull()
+    expect(within(zaraSheet).getByText('New assessment from Coach coach-Zara')).toBeInTheDocument()
+    expect(within(zaraSheet).queryByText(/coach-Alex/)).toBeNull()
   })
 
   it('after Mark all read, counts only what arrives later', async () => {
     const { client } = renderFamily()
-    expect(await screen.findByRole('button', { name: 'Alerts, 2 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Alerts, 1 unread' })).toBeInTheDocument()
     await userEvent.click(within(await openAlerts()).getByRole('button', { name: 'Mark all read' }))
     await userEvent.keyboard('{Escape}')
     expect(await screen.findByRole('button', { name: 'Alerts' })).toBeInTheDocument()
-    server.use(http.get(endpoint('matches'), () => HttpResponse.json([
-      match('Alex'), { ...match('Later'), created_at: new Date(Date.now() + 60_000).toISOString() },
-    ])))
-    await act(async () => { await client.invalidateQueries({ queryKey: ['parent', 'parent-a', 'Alex', 'matches'] }) })
+    // TRAK-436: the coach publishes his review of a match.
+    server.use(...review('Alex', new Date(Date.now() + 60_000).toISOString()))
+    await act(async () => { await client.invalidateQueries({ queryKey: ['family-news'] }) })
     expect(await screen.findByRole('button', { name: 'Alerts, 1 unread' })).toBeInTheDocument()
+    expect(within(await openAlerts()).getByText('How Alex’s match went')).toBeInTheDocument()
   })
 
-  it('a match alert opens that match; an assessment alert shows its bands', async () => {
+  it("the coach's review opens the match page at the review; an assessment alert shows its bands", async () => {
+    server.use(...review('Alex', new Date().toISOString()))
     renderFamily()
     const sheet = await openAlerts()
     await userEvent.click(within(sheet).getByRole('button', { name: /New assessment from / }))
@@ -277,14 +292,15 @@ describe('parent alerts bell', () => {
     for (const label of ['Work Rate', 'Tactical', 'Attitude', 'Technical', 'Physical', 'Coachability']) {
       expect(within(bands).getByText(label)).toBeInTheDocument()
     }
-    // TRAK-163: a row opens its details; "Open match" goes to the match.
-    await userEvent.click(within(sheet).getByRole('button', { name: /Match logged/ }))
-    await userEvent.click(await within(sheet).findByRole('button', { name: 'Open match' }))
-    expect(await screen.findByText('Match detail match-Alex')).toBeInTheDocument()
+    // TRAK-436: a row opens its details; "Read review" goes to the match's page, at the review.
+    await userEvent.click(await within(sheet).findByRole('button', { name: /How Alex’s match went/ }))
+    expect(within(sheet).getByText('Match vs Rivals FC (home) · won 2–1')).toBeInTheDocument()
+    await userEvent.click(await within(sheet).findByRole('button', { name: 'Read review' }))
+    expect(await screen.findByText('Event page game-Alex')).toBeInTheDocument()
   })
 
   it('shows a failed read as an error, never as no alerts', async () => {
-    server.use(http.get(endpoint('matches'), fail))
+    server.use(http.get(endpoint('coach_assessments'), fail))
     renderFamily()
     // Home shows the failure; the bell claims no count from the half that loaded.
     expect(await screen.findByRole('alert')).toBeInTheDocument()
@@ -319,7 +335,7 @@ describe('J8.11 events in the parent alerts bell', () => {
 
   it('counts a newly published event and says what it is', async () => {
     renderFamily()
-    expect(await screen.findByRole('button', { name: 'Alerts, 3 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Alerts, 2 unread' })).toBeInTheDocument()
     const sheet = await openAlerts()
     expect(within(sheet).getByText('New: Training')).toBeInTheDocument()
     expect(within(sheet).getByText('Mon 16 Nov, 18:00 · Main pitch')).toBeInTheDocument()
@@ -327,7 +343,7 @@ describe('J8.11 events in the parent alerts bell', () => {
 
   it('the coach moves it: one more on the next load, saying "Changed" and the new time; Mark all read clears it', async () => {
     const { client } = renderFamily()
-    expect(await screen.findByRole('button', { name: 'Alerts, 3 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Alerts, 2 unread' })).toBeInTheDocument()
     await userEvent.click(within(await openAlerts()).getByRole('button', { name: 'Mark all read' }))
     await userEvent.keyboard('{Escape}')
     expect(await screen.findByRole('button', { name: 'Alerts' })).toBeInTheDocument()
@@ -369,12 +385,12 @@ describe('J8.11 events in the parent alerts bell', () => {
   it('marking all read for one child leaves the same event unread for the sibling', async () => {
     eventsFor = { Alex: [eventRow('Alex', { id: 'event-shared' })], Zara: [eventRow('Zara', { id: 'event-shared' })] }
     renderFamily()
-    expect(await screen.findByRole('button', { name: 'Alerts, 3 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Alerts, 2 unread' })).toBeInTheDocument()
     await userEvent.click(within(await openAlerts()).getByRole('button', { name: 'Mark all read' }))
     await userEvent.keyboard('{Escape}')
     expect(await screen.findByRole('button', { name: 'Alerts' })).toBeInTheDocument()
     await followChild('Zara')
-    expect(await screen.findByRole('button', { name: 'Alerts, 3 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Alerts, 2 unread' })).toBeInTheDocument()
     expect(within(await openAlerts()).getByText('New: Training')).toBeInTheDocument()
   })
 
@@ -388,7 +404,7 @@ describe('J8.11 events in the parent alerts bell', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     await followChild('Zara')
-    expect(await screen.findByRole('button', { name: 'Alerts, 3 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Alerts, 2 unread' })).toBeInTheDocument()
     const zaraSheet = await openAlerts()
     expect(within(zaraSheet).getByText('New: Fitness')).toBeInTheDocument()
     expect(within(zaraSheet).queryByText(/Finishing/)).toBeNull()

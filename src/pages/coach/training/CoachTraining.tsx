@@ -170,7 +170,7 @@ function SessionsView() {
             onClosed={() => setClosed(next.training.title)} />
             : <div className="arc">
               <EmptyState icon={<TrafficCone size={24} strokeWidth={1.5} />} title="No training coming up"
-                description="Add a training in Schedule. You’ll plan it here."
+                description="Add a training in Events. You’ll plan it here."
                 action={<Button onClick={() => navigate('/coach/schedule', { state: ADD_TRAINING })}>Add a training</Button>} />
             </div>}
           <OpenDrafts drafts={upcoming.filter(t => drafts.data?.has(t.id) && !planned.data?.has(t.id)).map(t => ({ training: t, draft: drafts.data!.get(t.id)! }))} />

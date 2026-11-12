@@ -16,6 +16,8 @@ export interface PublishedAssessmentAlert {
   publishedAt: string
   /** TRAK-202: the coach who wrote it, for "New assessment from Coach <name>". */
   coachName?: string
+  /** False for an evaluation published without a note. */
+  hasMessage?: boolean
 }
 
 export function PlayerAlertsBell({ userId, events, assessment, assessmentLoadFailed, onRetry }: {
@@ -41,7 +43,7 @@ export function PlayerAlertsBell({ userId, events, assessment, assessmentLoadFai
   if (!assessmentLoadFailed && assessment?.userId === userId) alerts.push({
     id: `assessment-${assessment.id}`, title: assessmentAlertTitle(assessment.coachName),
     // TRAK-226: the title already says who and what; this line says what's in it.
-    description: 'Your ratings and a message to read.', date: assessment.publishedAt,
+    description: assessment.hasMessage === false ? 'Your ratings to read.' : 'Your ratings and a message to read.', date: assessment.publishedAt,
     action: { label: 'Open assessment', onSelect: () => navigate(`/player/feedback/${assessment.id}`) },
   })
   alerts.sort((a, b) => (Date.parse(b.date ?? '') || 0) - (Date.parse(a.date ?? '') || 0))

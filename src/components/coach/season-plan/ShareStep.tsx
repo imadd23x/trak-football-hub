@@ -65,7 +65,7 @@ export function ShareStep({ coachId, squad, plan, seasonObjectives, onBack, onSe
 
   return (
     <div className="arc grid gap-5">
-      <p className="text-sm text-ink-2">Check what goes out, then share it. Players and families don’t see the season plan in the app yet, so tell them face to face.</p>
+      <p className="text-sm text-ink-2">Check what goes out, then share it.</p>
 
       <section aria-labelledby="share-what" className="grid gap-4 rounded-2xl border border-line bg-surface p-5">
         <h2 id="share-what" className="text-lg font-medium text-ink">What goes out</h2>
@@ -96,10 +96,6 @@ export function ShareStep({ coachId, squad, plan, seasonObjectives, onBack, onSe
           <div className="grid gap-0.5 tablet:grid-cols-[12rem_1fr]">
             <dt className="text-sm text-ink-3">Player objectives</dt>
             <dd className="m-0 text-sm text-ink">{withSome} of {players(placed.length)} {withSome === 1 ? 'has' : 'have'} one or two</dd>
-          </div>
-          <div className="grid gap-0.5 tablet:grid-cols-[12rem_1fr]">
-            <dt className="text-sm text-ink-3">Who sees it</dt>
-            <dd className="m-0 text-sm text-ink">Only you, for now. Players and families don’t see the season plan in the app yet.</dd>
           </div>
         </dl>
       </section>

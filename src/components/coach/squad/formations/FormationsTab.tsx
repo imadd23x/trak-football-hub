@@ -64,6 +64,8 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
   const [problem, setProblem] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [using, setUsing] = useState(false)
+  // TRAK-453: the last copy into matches, shown on the page with an Undo until the coach closes it (no timer).
+  const [copied, setCopied] = useState<{ id: string; name: string; eventIds: string[] } | null>(null)
   const [useProblem, setUseProblem] = useState<string | null>(null)
   const started = useRef(false)
 
@@ -154,21 +156,15 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
 
   const dirty = !!edit && !same(edit.draft, draftOf(saved))
   const copyTo = (eventIds: string[]) => writes.use.mutate({ id: saved.id, eventIds }, {
-    onSuccess: () => {
-      setUsing(false); setUseProblem(null)
-      // TRAK-453: no timer; it stays until the coach closes it, and Undo puts the matches back as they were.
-      toast(t('coachSquad:fmCopied', { name: saved.name, count: eventIds.length }), {
-        duration: Infinity, closeButton: true,
-        action: { label: t('coachSquad:fmUndoCopy'), onClick: () => undoCopy(saved.id, saved.name, eventIds) },
-      })
-    },
+    onSuccess: () => { setUsing(false); setUseProblem(null); setCopied({ id: saved.id, name: saved.name, eventIds }) },
     onError: error => setUseProblem((error as { code?: string }).code === 'P0001' ? t('coachSquad:fmLocked')
       : t('coachSquad:fmCopyFailed')),
   })
-  const undoCopy = (id: string, name: string, eventIds: string[]) => writes.undoCopy.mutate({ id, eventIds }, {
-    onSuccess: () => toast(t('coachSquad:fmUndoneCopy', { name, count: eventIds.length })),
-    onError: error => toast.error((error as { code?: string }).code === 'P0001' ? t('coachSquad:fmUndoCopyLocked') : t('coachSquad:fmUndoCopyFailed')),
-  })
+  // Undo puts each match back to what it held before the copy; the saved formation is not touched.
+  const undoCopy = () => { if (copied) writes.undoCopy.mutate({ id: copied.id, eventIds: copied.eventIds }, {
+    onSuccess: () => { toast(t('coachSquad:fmUndoneCopy', { name: copied.name, count: copied.eventIds.length })); setCopied(null) },
+    onError: error => setProblem((error as { code?: string }).code === 'P0001' ? t('coachSquad:fmUndoCopyLocked') : t('coachSquad:fmUndoCopyFailed')),
+  }) }
   const makeDefault = (on: boolean) => writes.setDefault.mutate({ id: saved.id, on }, {
     onSuccess: () => toast(on ? t('coachSquad:fmDefaultOn', { name: saved.name, count: saved.format }) : t('coachSquad:fmDefaultOff', { name: saved.name })),
     onError: () => setProblem(t('coachSquad:fmDefaultFailed')),
@@ -235,6 +231,9 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
           <Button onClick={save} disabled={!dirty} loading={writes.save.isPending && !naming}>{t('coachSchedule:saveChanges')}</Button>
         </div>
       </div>
+      {copied && <Alert open tone="success" title={t('coachSquad:fmCopied', { name: copied.name, count: copied.eventIds.length })} onDismiss={() => setCopied(null)}>
+        <Button size="sm" variant="secondary" loading={writes.undoCopy.isPending} onClick={undoCopy}>{t('coachSquad:fmUndoCopy')}</Button>
+      </Alert>}
       {problem && <Alert tone="danger" title={problem} />}
 
       <div className="flex flex-wrap items-center gap-2">

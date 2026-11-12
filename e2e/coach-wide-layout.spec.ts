@@ -359,7 +359,9 @@ test("a phone's sidebar sheet takes a tap: the row opens its page and the sheet 
 test("a phone's sidebar sheet closes while a page's code is still on its way", async ({ page, context }) => {
   const { unexpected, errors } = await open(page, context, 'coach', '/coach/home', 390, 844)
   await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
-  await page.route(/\/assets\/.+\.js$/, async route => { await new Promise(done => setTimeout(done, 1500)); await route.continue() })
+  // A held request can finish another way while it waits (the context's catch-all, or the page moving on): CI saw "Route is
+  // already handled!" from this continue on 11 and 12 Nov, which failed the test though the menu behaved. Only the delay matters.
+  await page.route(/\/assets\/.+\.js$/, async route => { await new Promise(done => setTimeout(done, 1500)); await route.continue().catch(() => {}) })
   await page.getByRole('button', { name: 'Open menu' }).click()
   const sheet = page.getByRole('navigation', { name: 'Your academy' })
   await sheet.getByRole('button', { name: 'Squad', exact: true }).click()

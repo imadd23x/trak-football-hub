@@ -13,6 +13,7 @@ import { ParentChildrenProvider } from '@/contexts/ParentChildrenContext'
 import { ParentUpcomingEvents } from '@/components/parent/ParentEvents'
 import { GameReviewSection } from '@/components/player/GameReviewSection'
 import { evaluationToForm, previewReview } from '@/lib/games/evaluation'
+import { unopened } from '@/lib/games/news'
 import ParentEvent from '../ParentEvent'
 import { server } from '../../../../tests/msw/server'
 import { SUPABASE_URL } from '../../../../tests/msw/supabase'
@@ -89,6 +90,16 @@ describe('TRAK-289: After the match on a guardian\'s event page', () => {
     const plans = { zagorakis: { role: 'starter' as const, slot: 4, job: 'Stay tight to their winger.', note: '', context: ['out_of_position'], expectation: 'stretch' as const } }
     render(<GameReviewSection as="parent" childName="Theodoros" review={previewReview(form, 'zagorakis', plans, 'Otto Rehhagel', 'parent')} />)
     expect(screen.getByRole('region', { name: 'After the match' }).textContent).toBe(page)
+  })
+
+  it('TRAK-441: once the page shows the review, it is no longer new for this guardian, for this child', async () => {
+    localStorage.clear()
+    const news = [{ kind: 'review' as const, eventId: 'g1', at: new Date(Date.now() - 3_600_000).toISOString() }]
+    expect(unopened('dellas', 'zagorakis', news)).toHaveLength(1)
+    renderParent(<ParentEvent />)
+    await screen.findByRole('region', { name: 'After the match' })
+    expect(unopened('dellas', 'zagorakis', news)).toEqual([])
+    expect(unopened('dellas', 'another-child', news)).toHaveLength(1)
   })
 
   it('the event card says Coach\'s review', async () => {

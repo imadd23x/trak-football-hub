@@ -1,4 +1,5 @@
 import { planBadge, useSharedPlan } from '@/lib/games/shared-plans'
+import { useMarkOpened } from '@/lib/games/news'
 import type { PlayerEvent } from '@/lib/player-events'
 import { GamePlanSection } from './GamePlanSection'
 
@@ -7,6 +8,8 @@ export function SharedGamePlan({ event, childId, childName, as }: {
   event: PlayerEvent; childId: string; childName: string; as: 'player' | 'parent'
 }) {
   const query = useSharedPlan(event, childId, as === 'player')
+  // TRAK-441: shown here, so no longer new in For you or the bell.
+  useMarkOpened(childId, 'plan', event.id, !!query.data)
   if (query.isError) {
     return <p className="text-[13px] text-ink-2">Couldn’t load the game plan.{' '}
       <button type="button" onClick={() => void query.refetch()}

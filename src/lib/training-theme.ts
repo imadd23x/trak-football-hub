@@ -1,3 +1,5 @@
+import { ALL_DRILLS_PATH, DRILLS_PATH, allDrillsPath } from '@/lib/training/library/paths'
+
 // A training's theme: one of the Coaching Session Catalogue's seven libraries,
 // picked on New event so the coach can find sessions for it in the catalogue.
 //
@@ -25,4 +27,21 @@ export function trainingThemeFrom(value: string | null | undefined): TrainingThe
 /** The coach's Library, opened on a theme's library when there is one (TRAK-264: a theme's key is its library's address). */
 export function catalogueLink(theme: TrainingTheme | '' | null | undefined): string {
   return TRAINING_THEMES.some(t => t.key === theme) ? `/coach/trainings/${theme}` : '/coach/trainings'
+}
+
+/* TRAK-419 (11 Nov review): where Training is on, Drills is the one library, so a theme's link opens Training › Drills,
+   filtered as near to the theme as Drills can: Technical and Goalkeeping are filters of All drills; Attacking,
+   Defending and Transition are searches (the address keeps them, so Back returns to them). Drills has no physical or
+   psychological filter, so those, and no theme, open plain Drills. */
+const THEME_DRILLS: Partial<Record<TrainingTheme, string>> = {
+  technical: allDrillsPath('Technical'),
+  goalkeeping: allDrillsPath('Goalkeeping'),
+  attacking: `${ALL_DRILLS_PATH}?q=attack`,
+  defending: `${ALL_DRILLS_PATH}?q=defend`,
+  transition: `${ALL_DRILLS_PATH}?q=transition`,
+}
+
+/** Training › Drills, opened on a theme's drills where Drills can show them. */
+export function drillsLink(theme: string | null | undefined): string {
+  return THEME_DRILLS[trainingThemeFrom(theme) as TrainingTheme] ?? DRILLS_PATH
 }

@@ -15,7 +15,7 @@ import {
 } from '@/lib/event-edit'
 import { familyNoteProblem } from '@/lib/event-share'
 import { isMapsUrl, joinVenue, splitVenue } from '@/lib/venue-link'
-import { TRAINING_THEMES, catalogueLink, type TrainingTheme } from '@/lib/training-theme'
+import { TRAINING_THEMES, catalogueLink, drillsLink, type TrainingTheme } from '@/lib/training-theme'
 import { describeEventKit } from '@/lib/kit-templates'
 import { withAlpha } from '@/lib/with-alpha'
 import { EventKitField } from '@/components/trak/kits/EventKitField'
@@ -59,6 +59,10 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 function ThemeChoice({ theme, onChange }: { theme: TrainingTheme | ''; onChange: (theme: TrainingTheme) => void }) {
   const { t } = useTranslation()
   const picked = TRAINING_THEMES.find(option => option.key === theme)
+  // TRAK-419: where Training is on, the link opens Training › Drills, and the old catalogue's counts go (they are not
+  // Drills' counts). Where it is off, the old Library, as before.
+  const drills = useFeature('training')
+  const themeName = picked ? t(THEME_WORD[picked.key]) : ''
   return (
     <div className="space-y-2">
       <span id="training-theme" className="block text-[9px] tracking-[0.1em] uppercase text-ink-3" style={mono}>{t('coachSchedule:theme')}</span>
@@ -76,16 +80,18 @@ function ThemeChoice({ theme, onChange }: { theme: TrainingTheme | ''; onChange:
                 className="mt-[2px] w-3.5 h-3.5 shrink-0" style={{ accentColor: EVENT_COLOR.training }} />
               <span className="min-w-0">
                 <span className={`block text-[13px] leading-tight text-ink ${on ? 'font-medium' : ''}`}>{t(THEME_WORD[option.key])}</span>
-                <span className="block text-[11px] text-ink-3 mt-0.5 whitespace-nowrap">{t('coachSchedule:themeCount', { sessions: option.sessions, count: option.topics })}</span>
+                {!drills && <span className="block text-[11px] text-ink-3 mt-0.5 whitespace-nowrap">{t('coachSchedule:themeCount', { sessions: option.sessions, count: option.topics })}</span>}
               </span>
             </label>
           )
         })}
       </div>
       {/* A new tab, so the event being set up stays as it is. */}
-      <a href={catalogueLink(theme)} target="_blank" rel="noopener"
+      <a href={drills ? drillsLink(theme) : catalogueLink(theme)} target="_blank" rel="noopener"
         className="inline-flex items-center gap-1.5 text-[12px] text-brand" style={font}>
-        {picked ? t('coachSchedule:findThemeSessions', { theme: t(THEME_WORD[picked.key]) }) : t('coachSchedule:browseAllSessions')}
+        {drills
+          ? picked ? t('coachSchedule:findThemeDrills', { theme: themeName }) : t('coachSchedule:browseAllDrills')
+          : picked ? t('coachSchedule:findThemeSessions', { theme: themeName }) : t('coachSchedule:browseAllSessions')}
         <ExternalLink size={12} aria-hidden />
       </a>
     </div>

@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 import type { Json } from '@/integrations/supabase/types'
 import { DRILL_LIMITS, blankDrill, type DrillDraft } from './sessions'
 import { PART_TYPES, STANDARD, partInfo, playersShort, shelfDrill, type PartType, type Players, type ShelfDrill } from './shelf'
@@ -277,7 +278,7 @@ export function moveTo<T>(list: T[], from: number, to: number): T[] {
 export function playersLine(drill: Pick<PlanDrill, 'source' | 'trak_drill' | 'players_kind' | 'group_size'>): string | null {
   const shelf = drill.source === 'trak' ? shelfDrill(drill.trak_drill) : undefined
   if (shelf) return playersShort(shelf.players)
-  if (drill.players_kind === 'groups') return drill.group_size ? `Groups of ${drill.group_size}` : 'In groups'
+  if (drill.players_kind === 'groups') return drill.group_size ? i18n.t('coachTraining:groupsOf', { g: drill.group_size }) : i18n.t('coachTraining:inGroups')
   return drill.players_kind ? playersShort({ kind: drill.players_kind } as Players) : null
 }
 

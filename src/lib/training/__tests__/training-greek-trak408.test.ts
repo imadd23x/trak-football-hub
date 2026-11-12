@@ -4,6 +4,8 @@ import { LOOP_STEPS, loopNote, loopState } from '@/lib/training/loop'
 import { AGAIN, LOOP, loopSteps, trainingBadge } from '@/lib/training/next'
 import { sessionSummary } from '@/lib/training/plans'
 import { TRAINING_WORD } from '@/lib/training/words'
+import { setupFor } from '@/lib/training/turnout'
+import { playersShort } from '@/lib/training/shelf'
 import { shown } from '@/lib/squad/trait-words'
 
 /* TRAK-408 (Languages 3/8, Training): every fixed label of the Training loop has a word; counts follow the language. */
@@ -40,5 +42,17 @@ describe('TRAK-408: Training in Greek', () => {
     await showLanguage('el')
     expect(trainingBadge({ phase: 'after', planned: true, here: 14 }).label).toBe('14 παρόντες')
     expect(sessionSummary([{ name: 'Rondos', minutes: 15 }])).toBe('1 άσκηση · 15 λ. · Rondos')
+  })
+
+  it('says how a drill sets up for the players who came, in the language showing', async () => {
+    const rondo = { kind: 'groups' as const, g: 6, lo: 4, hi: 7, unit: 'grid', labels: { 5: '4 v 1', 6: '4 v 2' } }
+    expect(setupFor(rondo, 18)).toEqual({ ok: true, text: '3 grids of 6 (4 v 2)' })
+    expect(setupFor({ kind: 'pairs' }, 15)).toEqual({ ok: true, text: '6 pairs and 1 group of 3' })
+    expect(playersShort({ kind: 'pairs' })).toBe('In pairs')
+    await showLanguage('el')
+    expect(setupFor(rondo, 18)).toEqual({ ok: true, text: '3 πλαίσια των 6 (4 v 2)' })
+    expect(setupFor({ kind: 'pairs' }, 15)).toEqual({ ok: true, text: '6 ζευγάρια και 1 γκρουπ των 3' })
+    expect(setupFor({ kind: 'teams', min: 8 }, 15)).toEqual({ ok: true, text: '7 v 7 + 1 τζόκερ' })
+    expect(playersShort({ kind: 'pairs' })).toBe('Σε ζευγάρια')
   })
 })

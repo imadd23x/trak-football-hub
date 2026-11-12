@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Pencil, Send, Trash2, Ban, X, FileUp, ExternalLink, MapPin, ClipboardCheck, ClipboardList } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Send, Trash2, Ban, X, FileUp, ExternalLink, MapPin, ClipboardCheck, ClipboardList, CalendarDays } from 'lucide-react'
+import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { ButtonGroup, type ButtonGroupItem } from '@/components/arc/button-group/button-group'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { EventSheet } from '@/components/trak/EventSheet'
@@ -621,9 +622,10 @@ export default function CoachSchedule() {
 
           {!loaded && !loadFailed ? <LoadingSkeleton label={t('coachSchedule:scheduleLoading')} lines={2} rows={2} />
           : selectedEvents.length === 0 ? (
-            <div className="rounded-[14px] border border-line px-4 py-5 text-center"
-              style={{ background: 'rgb(var(--t-surface))' }}>
-              <p className="text-[12px] text-ink-3">{t('coachSchedule:nothingPlannedTap')}</p>
+            // TRAK-432: Arc's empty state; the frame's "+" is the button, named as this screen shows it.
+            <div className="arc">
+              <EmptyState icon={<CalendarDays size={24} strokeWidth={1.5} />} title={t('coachSchedule:nothingPlanned')}
+                description={t(wide ? 'coachSchedule:addWithCreate' : 'coachSchedule:addWithPlus')} />
             </div>
           ) : (
             <div className="space-y-2">

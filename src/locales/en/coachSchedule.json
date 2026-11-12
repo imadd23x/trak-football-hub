@@ -45,7 +45,6 @@
   "scheduleWhat": "your events",
   "scheduleLoading": "Loading your events…",
   "colourKey": "Colour key",
-  "nothingPlannedTap": "Nothing planned. Tap + to schedule an event.",
   "draftOnlyYou": "Draft · only you see this",
   "startedFixed": "Started · details fixed",
   "edit": "Edit",
@@ -302,5 +301,8 @@
   "fxMeetTime": "Meet time",
   "fxEmptyForTraining": "Empty for a training",
   "fxSideHome": "home",
-  "fxSideAway": "away"
+  "fxSideAway": "away",
+  "nothingPlanned": "Nothing planned",
+  "addWithPlus": "Use + to add an event.",
+  "addWithCreate": "Use Create to add an event."
 }

@@ -70,9 +70,9 @@ function fixtures(start: Record<string, unknown>[]) {
   )
 }
 
-async function open(text: string) {
+async function open(text: string, selector = 'p') {
   renderApp('/coach/schedule')
-  await screen.findByText(text, { selector: 'p' })
+  await screen.findByText(text, { selector })
   await waitFor(() => expect(screen.queryByRole('note', { name: 'This screen is coming soon' })).toBeNull())
 }
 
@@ -91,7 +91,7 @@ describe('TRAK-218: a series refused for an overlap', { timeout: 30_000 }, () =>
 
   it('Publish from Review, refused: it stays on screen, names the week, and says nothing went out', async () => {
     fixtures([game(shift(MONDAY, 7))])
-    await open('Nothing planned. Tap + to schedule an event.')
+    await open('Nothing planned', 'span')
     await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await eventStep(sheet, 'When')

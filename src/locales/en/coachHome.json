@@ -126,5 +126,6 @@
   "assessedAgo_one": "Assessed {{count}} day ago",
   "assessedAgo_other": "Assessed {{count}} days ago",
   "draftFrom": "Draft from {{day}}: families can't see it yet",
-  "draftsFrom": "{{count}} drafts, the latest from {{day}}: families can't see them yet"
+  "draftsFrom": "{{count}} drafts, the latest from {{day}}: families can't see them yet",
+  "useCreate": "Use Create to plan an event"
 }

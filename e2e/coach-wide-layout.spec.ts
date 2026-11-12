@@ -290,7 +290,7 @@ for (const [label, width, height, beside] of [['an upright tablet', 820, 1180, f
   test(`the Calendar on ${label}: the chosen day ${beside ? 'beside' : 'under'} the month`, async ({ page, context }) => {
     const { unexpected } = await open(page, context, 'coach', '/coach/schedule', width, height)
     const month = (await page.getByRole('grid').boundingBox())!
-    const day = (await page.getByText('Nothing planned. Tap + to schedule an event.').boundingBox())!
+    const day = (await page.getByText('Nothing planned', { exact: true }).boundingBox())!
     if (beside) {
       expect(day.x).toBeGreaterThan(month.x + month.width)
       expect(day.y).toBeLessThan(month.y + month.height)

@@ -10,6 +10,7 @@ import { motionTokens } from "../../lib/motion-tokens";
 import { CANCELLED_COLOR, EVENT_COLOR } from "@/lib/coach-events";
 import type { WeekState } from "@/lib/coach-week";
 import { useTranslation } from "@/lib/i18n";
+import { useSideMenuScreen } from "@/lib/side-menu-screen";
 import styles from "./week-picker.module.css";
 
 export interface WeekEvent {
@@ -62,6 +63,7 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
 }) {
   const reduce = !!useReducedMotion();
   const { t } = useTranslation();
+  const laptop = useSideMenuScreen(); // TRAK-432: a laptop has no "+", its button says Create.
   const id = useId();
   const [dayId, setDayId] = useState(days.find(day => day.today)?.id ?? days[0].id);
   const [direction, setDirection] = useState(1);
@@ -69,7 +71,7 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
   const [eventId, setEventId] = useState(firstEvent(day)?.id ?? null);
   const event = day.events.find(entry => entry.id === eventId) ?? null;
   const summary = event ? `${event.title}${event.time ? ` · ${event.time}` : ""}` : t("coachHome:nothingPlannedOn", { day: day.full.split(" ")[0] });
-  const selectionLabel = event ? event.note : t("coachHome:usePlus");
+  const selectionLabel = event ? event.note : t(laptop ? "coachHome:useCreate" : "coachHome:usePlus");
 
   function selectDay(index: number) {
     const next = days[index];

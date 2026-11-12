@@ -84,7 +84,6 @@ const ParentConsent = lazy(() => import("./pages/parent/ParentConsent"));
 // TRAK-85: parked screens show as designed, inside ParkedScreen ("Coming soon"
 // pill; actions say so and send nothing). Their backend writes stay closed (G7).
 const PlayerPassport = lazy(() => import("./pages/player/PlayerPassport"));
-const PlayerEvolutionCard = lazy(() => import("./pages/player/PlayerEvolutionCard"));
 const CoachReviewFeedback = lazy(() => import("./pages/coach/CoachReviewFeedback"));
 const CoachAssistant = lazy(() => import("./pages/coach/CoachAssistant"));
 const CoachSchedule = lazy(() => import("./pages/coach/CoachSchedule"));
@@ -167,7 +166,8 @@ const App = () => (
             {/* TRAK-398: the player's My season page, opened from the Home card. */}
             <Route path="/player/season" element={<RouteGuard allowedRole="player"><PlayerSeason /></RouteGuard>} />
             <Route path="/player/passport" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerPassport /></ParkedScreen></RouteGuard>} />
-            <Route path="/player/evolution" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerEvolutionCard /></ParkedScreen></RouteGuard>} />
+            {/* TRAK-440 (Imad, 11 Nov): Card left the bar; it becomes part of Profile (TRAK-441, slice 6). The parked card (TRAK-30) has no address. */}
+            <Route path="/player/evolution" element={<Navigate to="/player/profile" replace />} />
             <Route path="/player/feedback/:assessmentId" element={<RouteGuard allowedRole="player"><PlayerFeedback /></RouteGuard>} />
             <Route path="/player/trainings" element={<RouteGuard allowedRole="player"><TrainingsPage role="player" /></RouteGuard>} />
             </Route>

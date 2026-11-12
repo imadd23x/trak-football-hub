@@ -42,7 +42,6 @@
   "addedFixtures_one": "Added {{count}} fixture as drafts. Publish each when it's ready.",
   "addedFixtures_other": "Added {{count}} fixtures as drafts. Publish each when it's ready.",
   "importFixtures": "Import fixtures",
-  "addEvent": "Add event",
   "scheduleWhat": "your events",
   "scheduleLoading": "Loading your events…",
   "colourKey": "Colour key",

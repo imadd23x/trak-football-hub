@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
+import { openNewEvent } from './new-event'
 
 // TRAK-199 (team decision, 21 Oct): a coach's screens use a tablet's or a laptop's
 // width; a phone, upright or sideways, keeps today's layout, and so does every
@@ -181,7 +182,7 @@ test("a coach's Settings is Arc's settings page in the wide column on a laptop",
 
 test("the Calendar's sheets stop at the Arc bottom sheet's width on a tablet", async ({ page, context }) => {
   const { unexpected } = await open(page, context, 'coach', '/coach/schedule', 820, 1180)
-  await page.getByRole('button', { name: 'Add event' }).click()
+  await openNewEvent(page)
   const sheet = (await page.getByRole('dialog', { name: 'New event' }).boundingBox())!
   expect(Math.round(sheet.width)).toBe(576)
   expect(Math.round(sheet.x + sheet.width / 2)).toBe(410)

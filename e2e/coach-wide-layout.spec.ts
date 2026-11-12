@@ -423,3 +423,22 @@ for (const [label, width, height] of [['a phone', 390, 844], ['an upright tablet
     expect(found).toEqual(wanted)
   })
 }
+
+// TRAK-417: on a laptop every page's full-height wrapper (min-h-screen) sat under the frame's 60 px top bar, so even a
+// near-empty page scrolled 60 px, and Assess (a fixed full height) put Back and Next 60 px below the window. Their
+// lowest edge must be the window's; a phone keeps the whole window.
+for (const [width, height, label] of [[1440, 900, 'a laptop'], [390, 844, 'a phone']] as const) {
+  test(`TRAK-417: a short page does not scroll on ${label}`, async ({ page, context }) => {
+    const { unexpected, errors } = await open(page, context, 'coach', '/coach/schedule', width, height)
+    for (const path of ['/coach/schedule', '/coach/squad', '/settings', '/coach/assess']) {
+      if (path !== '/coach/schedule') await page.goto(path)
+      const wrapper = page.locator('.min-h-screen, .h-dvh').first()
+      await expect(wrapper).toBeVisible()
+      // Polled: a page's styles can land a moment after it shows.
+      const reach = () => wrapper.evaluate((el, laptop) => { const style = getComputedStyle(el), min = parseFloat(el.classList.contains('h-dvh') ? style.height : style.minHeight); return laptop ? el.getBoundingClientRect().top + scrollY + min : min }, width > 1024)
+      await expect.poll(reach, { message: path }).toBe(height)
+    }
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}

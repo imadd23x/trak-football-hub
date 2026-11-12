@@ -24,8 +24,10 @@ export function useParked() {
    deploy (public.academy_features). The database enforces it; this only
    decides whether the screen shows the pill. Loading, a failed read or no
    feature all count as off. TRAK-283: Games is switched on the same way, and
-   TRAK-294 Training, and TRAK-350 the season plan. */
-export type Feature = 'events' | 'games' | 'training' | 'season_plan'
+   TRAK-294 Training, and TRAK-350 the season plan. TRAK-441: family_look is
+   the family app in the coach's look, read for a player or parent through
+   family_feature_on (feature_on knows only a coach's academy). */
+export type Feature = 'events' | 'games' | 'training' | 'season_plan' | 'family_look'
 
 export function useFeature(feature?: Feature): boolean {
   return useFeatureState(feature).on
@@ -38,7 +40,7 @@ export function useFeatureState(feature?: Feature): { on: boolean; known: boolea
   const { data, isSuccess, isError } = useQuery({
     queryKey: ['feature', user?.id, feature],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('feature_on', { p_feature: feature! })
+      const { data, error } = await supabase.rpc(feature === 'family_look' ? 'family_feature_on' : 'feature_on', { p_feature: feature! })
       if (error) throw error
       return data === true
     },

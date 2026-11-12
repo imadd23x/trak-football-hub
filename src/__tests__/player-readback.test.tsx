@@ -30,9 +30,8 @@ const match = (id: string, owner = account) => ({
   team_score: 2, opponent_score: 1, minutes_played: 60, goals: 1, assists: 0,
   position: 'Defender', age_group: 'U15',
 })
-// TRAK-194: player Home shows no match list; its season card names the last match's
-// competition, and one line under the header holds position, club and age group.
-const homeMatch = (id: string) => `Last match · ${id} league`
+// TRAK-194: one line under Home's header holds position, club and age group. TRAK-435 (12 Nov): Home reads no matches
+// (no card built on match ratings), so this line is how these tests see a Home load finish.
 const homeLine = (club: string) => `Defender · ${club} · U15`
 const event = { id: 'event-a', coach_user_id: 'coach-a', title: 'Team training', event_type: 'training', published: true, event_date: '2026-09-28', starts_at: '2026-09-28T17:00:00Z', time_known: true }
 const assessment = {
@@ -164,17 +163,17 @@ describe('player readback through authenticated routes', () => {
     expect(await screen.findByText(WORDS, { exact: false })).toBeInTheDocument()
   })
 
-  it('preserves a failed details read when the independent matches read finishes later', async () => {
+  it('preserves a failed details read when the independent squad read finishes later', async () => {
     const pending = deferred()
     let denied = false
     server.use(
-      http.get(endpoint('matches'), async () => { await pending.promise; return HttpResponse.json([match('recent')]) }),
+      http.get(endpoint('squad_players'), async () => { await pending.promise; return HttpResponse.json([{ id: 'squad-a', coach_user_id: 'coach-a', linked_player_id: account }]) }),
       http.get(endpoint('player_details'), () => { denied = true; return failure() }),
     )
     renderApp('/player/home')
     try {
       await waitFor(() => expect(denied).toBe(true))
-      await releaseResponse(pending, 'matches')
+      await releaseResponse(pending, 'squad_players')
       await waitFor(() => expect(Boolean(screen.queryByRole('alert')) || screen.queryAllByText('Audit Player').length > 0).toBe(true))
       expect(screen.queryByRole('alert')).not.toBeNull()
       expect(screen.getByRole('button', { name: /retry/i })).toBeEnabled()
@@ -194,7 +193,7 @@ describe('player readback through authenticated routes', () => {
       server.use(http.get(endpoint(name), () => { checked = true; return HttpResponse.json([]) }))
       await refresh()
       await waitFor(() => expect(checked).toBe(true))
-      await screen.findByText(homeMatch('recent'))
+      await screen.findByText(homeLine('Audit Academy'))
       await waitFor(() => expect(screen.queryByText(WORDS, { exact: false })).toBeNull())
       expect(screen.queryByRole('region', { name: 'Latest coach assessment' })).toBeNull()
       expect(screen.queryByText('Coach Audit')).toBeNull()
@@ -210,7 +209,7 @@ describe('player readback through authenticated routes', () => {
     await screen.findByText(WORDS, { exact: false })
     server.use(table('coach_shared_feedback', []))
     await refresh()
-    await screen.findByText(homeMatch('recent'))
+    await screen.findByText(homeLine('Audit Academy'))
     await waitFor(() => expect(screen.queryByText(WORDS, { exact: false })).toBeNull())
   })
 
@@ -321,7 +320,7 @@ describe('player readback through authenticated routes', () => {
     } finally { pending.resolve() }
   })
 
-  it('preserves a details failure when matches finishes first', async () => {
+  it('preserves a details failure when the squad read finishes first', async () => {
     const pending = deferred()
     let requested = false
     server.use(http.get(endpoint('player_details'), async () => {
@@ -329,11 +328,11 @@ describe('player readback through authenticated routes', () => {
       await pending.promise
       return failure()
     }))
-    const matchesResponded = nextResponse('matches')
+    const squadResponded = nextResponse('squad_players')
     renderApp('/player/home')
     try {
       await waitFor(() => expect(requested).toBe(true))
-      await act(async () => { await matchesResponded })
+      await act(async () => { await squadResponded })
       await releaseResponse(pending, 'player_details')
       expect(await screen.findByRole('alert')).toBeInTheDocument()
     } finally { pending.resolve() }
@@ -350,13 +349,12 @@ describe('player readback through authenticated routes', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it.each(['matches', 'player_details', 'squad_players', 'coach_assessments', 'profiles', 'coach_shared_feedback', 'rpc/child_events'])(
+  it.each(['player_details', 'squad_players', 'coach_assessments', 'profiles', 'coach_shared_feedback', 'rpc/child_events'])(
     'ignores a late superseded Home %s response', async name => {
       const pending = deferred()
       let requested = false
       let fresh = false
       const staleRows: Record<string, Record<string, unknown>[]> = {
-        matches: [match('stale'), match('stale-second')],
         player_details: [{ position: 'Defender', current_club: 'Stale Academy', age_group: 'U15' }],
         squad_players: [{ id: 'squad-a', coach_user_id: 'coach-a', linked_player_id: account }],
         coach_assessments: [assessment],
@@ -365,7 +363,6 @@ describe('player readback through authenticated routes', () => {
         'rpc/child_events': [event],
       }
       server.use(
-        http.get(endpoint('matches'), () => HttpResponse.json([match(fresh ? 'current' : 'recent')])),
         http.get(endpoint('player_details'), () => HttpResponse.json([{ position: 'Defender', current_club: fresh ? 'Current Academy' : 'Audit Academy', age_group: 'U15' }])),
         http.get(endpoint('squad_players'), () => HttpResponse.json(fresh ? [] : staleRows.squad_players)),
       )
@@ -382,13 +379,10 @@ describe('player readback through authenticated routes', () => {
         await waitFor(() => expect(requested).toBe(true))
         fresh = true
         await refresh()
-        await screen.findByText(homeMatch('current'))
         await screen.findByText(homeLine('Current Academy'))
         await releaseResponse(pending, name)
         expect(screen.queryByRole('alert')).toBeNull()
-        expect(screen.getByText(homeMatch('current'))).toBeInTheDocument()
         expect(screen.getByText(homeLine('Current Academy'))).toBeInTheDocument()
-        expect(screen.queryByText(homeMatch('stale'))).toBeNull()
         expect(screen.queryByText(homeLine('Stale Academy'))).toBeNull()
         expect(screen.queryByText('Stale Coach')).toBeNull()
         expect(screen.queryByRole('region', { name: 'Latest coach assessment' })).toBeNull()
@@ -396,8 +390,6 @@ describe('player readback through authenticated routes', () => {
         await userEvent.click(screen.getByRole('button', { name: /^Alerts/ }))
         expect(within(await screen.findByRole('dialog', { name: 'Alerts' })).queryByText('New: Team training')).toBeNull()
         await userEvent.keyboard('{Escape}')
-        expect(screen.queryByText('YOUR CARD HAS BEEN UPDATED')).toBeNull()
-        expect(localStorage.getItem(`trak_last_match_count_${account}`)).toBe('1')
       } finally { pending.resolve() }
     },
   )
@@ -430,17 +422,6 @@ describe('player readback through authenticated routes', () => {
   })
 
 
-  it('records the first match count silently and reveals newly logged matches after refresh', async () => {
-    renderApp('/player/home')
-    await screen.findByText(WORDS, { exact: false })
-    expect(localStorage.getItem(`trak_last_match_count_${account}`)).toBe('1')
-    expect(screen.queryByText('YOUR CARD HAS BEEN UPDATED')).toBeNull()
-    server.use(table('matches', [match('recent'), match('second')]))
-    await refresh()
-    expect(await screen.findByText('YOUR CARD HAS BEEN UPDATED')).toBeInTheDocument()
-    expect(localStorage.getItem(`trak_last_match_count_${account}`)).toBe('1')
-  })
-
   it('ignores an older consent response after a refreshed Home load', async () => {
     const pending = deferred()
     let requests = 0
@@ -463,43 +444,21 @@ describe('player readback through authenticated routes', () => {
   })
 
 
-  it.each(['getItem', 'setItem'] as const)(
-    'renders a successful Home load when optional card-reveal storage %s throws', async method => {
-      const read = Storage.prototype.getItem
-      const write = Storage.prototype.setItem
-      const storage = method === 'getItem'
-        ? vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
-          if (key.startsWith('trak_last_match_count_')) throw new DOMException('Storage unavailable', 'SecurityError')
-          return read.call(this, key)
-        })
-        : vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
-          if (key.startsWith('trak_last_match_count_')) throw new DOMException('Storage unavailable', 'SecurityError')
-          write.call(this, key, value)
-        })
-      try {
-        renderApp('/player/home')
-        expect(await screen.findByText(homeMatch('recent'))).toBeInTheDocument()
-        expect(await screen.findByText(WORDS, { exact: false })).toBeInTheDocument()
-        expect(screen.queryByRole('alert')).toBeNull()
-        expect(screen.queryByText('YOUR CARD HAS BEEN UPDATED')).toBeNull()
-      } finally { storage.mockRestore() }
-    },
-  )
 
   // Kostas's #133 review (P2): AuthContext hands out a new user object on every
   // same-account token refresh (hourly, and on returning to the tab), so this
   // load re-runs. A re-run must refresh what is on screen, not blank it.
-  it('keeps the home card and the coach message on screen while a same-account refresh reloads', async () => {
+  it('keeps the details line and the coach message on screen while a same-account refresh reloads', async () => {
     renderApp('/player/home')
     await screen.findByText(WORDS, { exact: false })
     const pending = deferred()
-    server.use(http.get(endpoint('matches'), async () => { await pending.promise; return HttpResponse.json([match('recent')]) }))
+    server.use(http.get(endpoint('player_details'), async () => { await pending.promise; return HttpResponse.json([{ position: 'Defender', current_club: 'Audit Academy', age_group: 'U15' }]) }))
     try {
       await refresh()
-      const cardShown = screen.queryAllByText(homeMatch('recent')).length > 0
+      const lineShown = screen.queryAllByText(homeLine('Audit Academy')).length > 0
       const messageShown = screen.queryByText(WORDS, { exact: false }) !== null
-      await releaseResponse(pending, 'matches')
-      expect(cardShown, 'match list stays visible during a same-account refresh').toBe(true)
+      await releaseResponse(pending, 'player_details')
+      expect(lineShown, 'the details line stays visible during a same-account refresh').toBe(true)
       expect(messageShown, "the coach's message stays visible during a same-account refresh").toBe(true)
     } finally { pending.resolve() }
   })
@@ -507,7 +466,8 @@ describe('player readback through authenticated routes', () => {
   // Kostas and Imad (P3): if a callback throws instead of resolving with
   // { error }, Promise.all rejected and loading never ended.
   it('ends in a retryable error, not an endless skeleton, when a Home callback throws', async () => {
-    server.use(http.get(endpoint('matches'), () => HttpResponse.json({ unexpected: 'shape' })))
+    // A squad answer with no list: its callback throws on .map.
+    server.use(http.get(endpoint('squad_players'), () => HttpResponse.json({ length: 1 })))
     renderApp('/player/home')
     expect(await screen.findByRole('button', { name: /retry/i })).toBeEnabled()
   })

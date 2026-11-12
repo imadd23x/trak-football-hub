@@ -14,26 +14,30 @@ export default function CoachSessionsChooser() {
 
   return (
     <MobileShell>
-      {/* Topbar — mirrors PlayerLogChoose */}
-      <div className="flex items-center justify-between pt-3 pb-2 border-b border-line">
+      {/* TRAK-420: on a phone the trail, the title and History were squeezed onto one line. Now the trail has its own
+          line (a phone only: a laptop shows it in the top bar), and the title sits under it with History at its right,
+          the way Past trainings lays out its header. */}
+      <header className="grid gap-3 pt-5 pb-4 border-b border-line">
         {/* TRAK-334: the trail, in place of Back. */}
         <CoachTrail current="Log" />
-        <span
-          className="text-[16px] font-medium text-ink tracking-tight"
-          style={{ fontFamily: 'var(--t-font)' }}
-        >
-          What are you logging?
-        </span>
-        {/* TRAK-193: a button you can see (Kostas missed the old grey caps), 44 px tall. */}
-        <button
-          onClick={() => navigate('/coach/sessions/list')}
-          className="min-h-11 flex items-center gap-1.5 px-3 rounded-[10px] bg-raised border border-line text-[13px] font-medium text-ink active:scale-[0.97] transition-transform"
-          style={{ fontFamily: 'var(--t-font)' }}
-        >
-          <History size={14} aria-hidden="true" className="text-ink-2" />
-          History
-        </button>
-      </div>
+        <div className="flex items-center justify-between gap-3">
+          <h1
+            className="min-w-0 text-[22px] font-medium tracking-[-0.01em] text-ink"
+            style={{ fontFamily: 'var(--t-font)' }}
+          >
+            What are you logging?
+          </h1>
+          {/* TRAK-193: a button you can see (Kostas missed the old grey caps), 44 px tall. */}
+          <button
+            onClick={() => navigate('/coach/sessions/list')}
+            className="shrink-0 min-h-11 flex items-center gap-1.5 px-3 rounded-[10px] bg-raised border border-line text-[13px] font-medium text-ink active:scale-[0.97] transition-transform"
+            style={{ fontFamily: 'var(--t-font)' }}
+          >
+            <History size={14} aria-hidden="true" className="text-ink-2" />
+            History
+          </button>
+        </div>
+      </header>
 
       {/* Centered choices */}
       {/* TRAK-252: side by side on a coach's tablet or laptop. */}

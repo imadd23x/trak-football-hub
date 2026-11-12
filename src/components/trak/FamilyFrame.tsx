@@ -7,6 +7,7 @@ import { SidebarRail } from '@/components/arc/blocks/sidebar-rail/sidebar-rail'
 import { Avatar } from '@/components/arc/avatar/avatar'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { useTranslation } from '@/lib/i18n'
+import { ChildSwitcher } from '@/components/parent/ParentFamily'
 
 /** Pages under no tab of their own, and the tab they sit under (the one their NavBar marks). */
 const UNDER: [RegExp, string][] = [
@@ -55,7 +56,7 @@ function Framed({ who, name }: { who: 'player' | 'parent'; name: string }) {
       brand={{ name: brand, logo: <Avatar name={brand} size="sm" /> }}
       items={tabs.slice(0, -1)} footerItem={tabs[tabs.length - 1]}
       profile={{ name, detail: t(`nav:${who}`), avatar: <Avatar name={name} size="sm" /> }}
-      active={active} onSelect={id => navigate(id)}>
+      active={active} onSelect={id => navigate(id)} afterBrand={who === 'parent' ? <ChildSwitcher /> : undefined}>
       <Suspense fallback={<div className="min-h-screen bg-ground" />}><Outlet /></Suspense>
     </SidebarRail>
   </FamilyFramed.Provider>

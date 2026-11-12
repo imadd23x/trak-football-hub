@@ -35,11 +35,12 @@ const matchShown = () => screen.queryByText('vs Synthetic United')
 const trainingShown = () => screen.queryByRole('region', { name: 'Training' })
 
 describe('TRAK-112: the player Sessions tab', () => {
-  it('is called Sessions, in the nav and the heading', async () => {
+  // TRAK-440 (Imad, 12 Nov): the tab is Matches; the page keeps its heading until its own slice (TRAK-441, 4).
+  it('is the Matches tab, marked as the open tab', async () => {
     renderApp('/player/matches')
     expect(await screen.findByRole('heading', { name: 'Sessions' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sessions' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Matches' })).toBeNull()
+    expect(screen.getByRole('tab', { name: 'Matches' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: 'Sessions' })).toBeNull()
   })
 
   it('All shows matches and training; League only matches; Training only training', async () => {

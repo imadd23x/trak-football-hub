@@ -133,18 +133,18 @@ describe('parent family navigation', () => {
     expect(screen.getByText('Zara teamwork')).toBeInTheDocument()
     expect(screen.queryByText('Alex teamwork')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Events' }))
+    await user.click(screen.getByRole('tab', { name: 'Events' }))
     expect(await screen.findByText('Zara opposition')).toBeInTheDocument()
     expect(screen.getByRole('combobox')).toHaveValue('Zara')
     // TRAK-74: alerts are a bell on Home, not a tab.
-    await user.click(screen.getByRole('button', { name: 'Home' }))
+    await user.click(screen.getByRole('tab', { name: 'Home' }))
     await user.click(await screen.findByRole('button', { name: /^Alerts/ }))
     const alertsSheet = await screen.findByRole('dialog', { name: 'Alerts' })
     expect(await within(alertsSheet).findByText('vs Zara opposition · 0–0')).toBeInTheDocument()
     expect(within(alertsSheet).queryByText(/vs Alex opposition/)).not.toBeInTheDocument()
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    await user.click(screen.getByRole('button', { name: 'Profile' }))
+    await user.click(screen.getByRole('tab', { name: 'Profile' }))
     // TRAK-73: the header counts the linked children. TRAK-181: Profile has no
     // "Following" picker; each child has its own line below.
     expect(await screen.findByText('Parent account · 2 children linked')).toBeInTheDocument()
@@ -211,12 +211,12 @@ describe('parent family navigation', () => {
     expect(await screen.findByText('Alex opposition')).toBeInTheDocument()
     expect(screen.getAllByRole('option')).toHaveLength(1)
     installFamily()
-    await userEvent.click(screen.getByRole('button', { name: 'Profile' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Profile' }))
     // TRAK-181: Profile lists the new child; the picker for following them is on the other tabs.
     const connections = await screen.findByRole('list', { name: 'Linked children' })
     expect(await within(connections).findByText('Zara')).toBeInTheDocument()
     expect(screen.getByText('Parent account · 2 children linked')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Events' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Events' }))
     expect(await screen.findByRole('option', { name: 'Zara' })).toBeInTheDocument()
     await userEvent.selectOptions(screen.getByRole('combobox'), 'Zara')
     expect(screen.getByRole('combobox')).toHaveValue('Zara')
@@ -536,7 +536,7 @@ describe('truthful parent ratings', () => {
     expect(cachedMatches?.map(row => row.id)).toEqual([
       ...historicalMatches.map(row => row.id), 'match-Backfilled',
     ])
-    await userEvent.click(screen.getByRole('button', { name: 'Events' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Events' }))
     expect((await screen.findAllByText(/opposition/))[0]).toHaveTextContent('Fixture 1 opposition')
   })
 

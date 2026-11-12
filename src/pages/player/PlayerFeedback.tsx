@@ -6,11 +6,24 @@ import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell } from '@/components/trak'
 import { trackEvent } from '@/lib/telemetry'
 import { AssessmentBands, type AssessmentScores } from '@/components/player/AssessmentBands'
+import { EvaluationProgressCard } from '@/components/player/EvaluationProgressCard'
+import { useEvaluationProgress } from '@/lib/evaluation-progress'
 
+// TRAK-401: evaluation is set when this assessment closed a season evaluation (published with no session).
 type FeedbackState =
   | { status: 'loading' | 'error' }
-  | { status: 'empty'; scores: AssessmentScores | null }
-  | { status: 'ready'; body: string; scores: AssessmentScores | null }
+  | { status: 'empty'; scores: AssessmentScores | null; evaluation: boolean }
+  | { status: 'ready'; body: string; scores: AssessmentScores | null; evaluation: boolean }
+
+/** Mounted only for an evaluation's assessment, so a session assessment makes no progress request. */
+function EvaluationProgress({ assessmentId }: { assessmentId: string }) {
+  const progress = useEvaluationProgress([assessmentId])
+  if (progress.isError) return <div role="alert" className="space-y-3">
+    <p className="text-muted-foreground">Couldn't load your progress. Please try again.</p>
+    <button onClick={() => void progress.refetch()} className="min-h-11 rounded-xl bg-primary px-5 text-primary-foreground">Retry</button>
+  </div>
+  return <EvaluationProgressCard objectives={progress.data?.get(assessmentId)?.objectives ?? []} />
+}
 
 export default function PlayerFeedback() {
   const { assessmentId } = useParams<{ assessmentId: string }>()
@@ -42,16 +55,17 @@ function FeedbackMessage({ account, assessmentId }: { account: { id: string } | 
             .select('body').eq('assessment_id', assessmentId)
             .not('published_at', 'is', null).abortSignal(controller.signal).returns<{ body: unknown }[]>().maybeSingle(),
           supabase.from('coach_assessments')
-            .select('work_rate, tactical, attitude, technical, physical, coachability')
+            .select('work_rate, tactical, attitude, technical, physical, coachability, evaluation_id')
             .eq('id', assessmentId).abortSignal(controller.signal).maybeSingle(),
         ])
         if (!current) return
         if (error) throw error
         if (bands.error) throw bands.error
         const scores = (bands.data as AssessmentScores | null) ?? null
-        if (!data) setState({ status: 'empty', scores })
+        const evaluation = !!bands.data?.evaluation_id
+        if (!data) setState({ status: 'empty', scores, evaluation })
         else if (typeof data.body !== 'string' || !data.body.trim()) setState({ status: 'error' })
-        else setState({ status: 'ready', body: data.body, scores })
+        else setState({ status: 'ready', body: data.body, scores, evaluation })
       } catch {
         if (current) setState({ status: 'error' })
       }
@@ -65,21 +79,29 @@ function FeedbackMessage({ account, assessmentId }: { account: { id: string } | 
     if (state.status === 'ready' && assessmentId) trackEvent('feedback_opened', { assessment_id: assessmentId })
   }, [state, assessmentId])
 
+  const evaluation = (state.status === 'ready' || state.status === 'empty') && state.evaluation
   return (
     <MobileShell>
       <main className="py-6 space-y-6">
         <Link to="/player/home" className="inline-flex min-h-11 items-center text-sm text-muted-foreground">Back to home</Link>
-        <h1 className="text-2xl font-semibold text-foreground">Coach feedback</h1>
+        <h1 className="text-2xl font-semibold text-foreground">{evaluation ? 'Evaluation' : 'Coach feedback'}</h1>
         {state.status === 'loading' && <p role="status" className="text-muted-foreground">Loading feedback…</p>}
         {state.status === 'error' && <div role="alert" className="space-y-3">
           <p className="text-muted-foreground">Couldn't load feedback. Please try again.</p>
           <button onClick={() => setAttempt(value => value + 1)} className="min-h-11 rounded-xl bg-primary px-5 text-primary-foreground">Retry</button>
         </div>}
-        {state.status === 'empty' && <p className="text-muted-foreground">Your coach is still writing your feedback.</p>}
-        {state.status === 'ready' && <p className="whitespace-pre-wrap break-words rounded-2xl border border-border bg-card p-5 leading-relaxed text-foreground">{state.body}</p>}
+        {/* An evaluation's note is optional, so no note is not "still writing". */}
+        {state.status === 'empty' && !state.evaluation && <p className="text-muted-foreground">Your coach is still writing your feedback.</p>}
+        {state.status === 'ready' && !state.evaluation && <p className="whitespace-pre-wrap break-words rounded-2xl border border-border bg-card p-5 leading-relaxed text-foreground">{state.body}</p>}
         {(state.status === 'ready' || state.status === 'empty') && state.scores &&
           // TRAK-229: a light card like the rest; the bands carry their own colours.
           <section className="rounded-2xl border border-border bg-card p-5"><AssessmentBands scores={state.scores} /></section>}
+        {/* TRAK-401: the evaluation reads bands, then Progress, then the coach's note, which only the player sees. */}
+        {evaluation && assessmentId && <EvaluationProgress assessmentId={assessmentId} />}
+        {state.status === 'ready' && state.evaluation && <section aria-label="From your coach" className="grid gap-1 rounded-2xl bg-brand/[0.12] p-4">
+          <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-ink-3">From your coach, only you see this</p>
+          <p className="whitespace-pre-wrap break-words text-[16px] leading-relaxed text-foreground">{state.body}</p>
+        </section>}
       </main>
     </MobileShell>
   )

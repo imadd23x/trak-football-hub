@@ -566,7 +566,7 @@ function CoachAssessmentForm() {
 
   /* ---- render ---- */
   return (
-    <div className="flex flex-col mx-auto trak-read bg-ground" style={{ height: '100dvh' }}>
+    <div className="flex flex-col mx-auto trak-read bg-ground h-dvh">
       {/* ---- header: always visible, never scrolls ---- */}
       <div className="flex items-center gap-3 px-5 py-3 shrink-0"
         style={{ borderBottom: '1px solid rgb(var(--t-line))' }}>

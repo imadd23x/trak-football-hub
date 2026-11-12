@@ -1,4 +1,5 @@
 import 'i18next'
+import type coachAssess from '@/locales/en/coachAssess.json'
 import type coachHome from '@/locales/en/coachHome.json'
 import type coachMatches from '@/locales/en/coachMatches.json'
 import type coachSchedule from '@/locales/en/coachSchedule.json'
@@ -14,6 +15,7 @@ declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'common'
     resources: {
+      coachAssess: typeof coachAssess
       coachHome: typeof coachHome
       coachMatches: typeof coachMatches
       coachSchedule: typeof coachSchedule

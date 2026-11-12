@@ -11,6 +11,7 @@ import { motionTokens } from "../../lib/motion-tokens";
 import { BANDS } from "@/lib/types";
 import styles from "./squad-directory.module.css";
 import { useTranslation } from "@/lib/i18n";
+import { bandWord } from "@/lib/band-words";
 
 export type PositionGroup = "GK" | "DEF" | "MID" | "ATT";
 
@@ -44,7 +45,7 @@ export function BandChip({ band, move = 0, waiting = false }: { band: string | n
   if (waiting) return <span className={styles.chip} data-empty="">{t("coachSquad:waitingForConsent")}</span>;
   if (!config) return <span className={styles.chip} data-empty="">{t("coachSquad:notAssessed")}</span>;
   return <span className={styles.chip} style={{ background: config.bg, borderColor: config.border, color: config.text }}>
-    {config.word}
+    {bandWord(config.word)}
     {move === 1 && <ArrowUp size={12} strokeWidth={2.2} aria-label={t("coachSquad:up")} />}
     {move === -1 && <ArrowDown size={12} strokeWidth={2.2} aria-label={t("coachSquad:down")} />}
   </span>;

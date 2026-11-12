@@ -3,7 +3,9 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 // TRAK-199 (team decision, 21 Oct): a coach's screens use a tablet's or a laptop's
 // width; a phone, upright or sideways, keeps today's layout, and so does every
 // player and parent screen. Layout only. Production build, synthetic intercepted backend.
-const ids = { coach: '97199000-0000-4000-8000-000000000001', player: '97199000-0000-4000-8000-000000000002' }
+const ids = { coach: '97199000-0000-4000-8000-000000000001', player: '97199000-0000-4000-8000-000000000002', parent: '97199000-0000-4000-8000-000000000003' }
+// TRAK-441 slice 2: the parent's two children.
+const children = [{ user_id: 'child-199-a', full_name: 'Kostas Manolas' }, { user_id: 'child-199-b', full_name: 'Sokratis Papastathopoulos' }]
 type Role = keyof typeof ids
 const players = ['Hugo Lloris', 'Bukayo Saka', 'Beth Mead', 'Cole Palmer', 'Ella Toone', 'Declan Rice'].map((name, i) => ({
   id: `sq-${i + 1}`, coach_user_id: ids.coach, player_name: name, position: 'Defender', age_group: 'U16', shirt_number: i + 1,
@@ -28,7 +30,9 @@ async function backend(context: BrowserContext, role: Role, unexpected: string[]
     const path = url.pathname
     if (path === '/auth/v1/user') return json(user)
     if (path === '/rest/v1/telemetry_events') return route.fulfill({ status: 201, body: '' })
-    if (path === '/rest/v1/profiles') return json([{ user_id: id, id, role, full_name: role === 'coach' ? 'Synthetic Coach' : 'Synthetic Player' }])
+    if (path === '/rest/v1/profiles' && role === 'parent' && !url.searchParams.get('user_id')?.includes(id)) return json(children)
+    if (path === '/rest/v1/player_parent_links' && role === 'parent') return json(children.map(child => ({ player_user_id: child.user_id })))
+    if (path === '/rest/v1/profiles') return json([{ user_id: id, id, role, full_name: role === 'coach' ? 'Synthetic Coach' : role === 'parent' ? 'Eleni Seitaridi' : 'Synthetic Player' }])
     if (path === '/rest/v1/coach_details') return json([{ user_id: ids.coach, organization_id: 'org-199', coach_role: 'Head Coach', team: 'U16' }])
     if (path === '/rest/v1/squad_players' && role === 'coach') {
       const one = url.searchParams.get('id')?.replace(/^eq\./, '')
@@ -212,6 +216,20 @@ test("a player's laptop frame, with the academy's family_look on: the side menu,
   expect(await page.evaluate(() => document.documentElement.dataset.layout)).toBe('coach')
   await page.waitForTimeout(400)
   await page.screenshot({ path: testInfo.outputPath('family-frame-1440.png') })
+  expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
+})
+
+// TRAK-441 slice 2: a parent picks the child in the side menu, where the coach picks the squad.
+test("a parent's laptop frame: the child switcher in the side menu", async ({ page, context }, testInfo) => {
+  const { unexpected, errors } = await open(page, context, 'parent', '/parent/home', 1440, 900, ['events', 'family_look'])
+  await expect(page.getByRole('navigation', { name: 'Trak' }).getByRole('button', { name: /^Events/ })).toBeVisible()
+  await page.getByRole('button', { name: /^Child: Kostas Manolas/ }).click()
+  await page.getByRole('listbox', { name: 'Children' }).getByRole('option', { name: /Sokratis Papastathopoulos/ }).click()
+  await expect(page.getByRole('button', { name: /^Child: Sokratis Papastathopoulos/ })).toBeVisible()
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: testInfo.outputPath('family-frame-parent-1440.png') })
   expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
   expect(unexpected).toEqual([])
   expect(errors).toEqual([])

@@ -1,4 +1,5 @@
 import { CalendarDays, House, TrafficCone, UserRound, type LucideIcon } from 'lucide-react'
+import { createContext, useContext } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { Role } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
@@ -14,7 +15,7 @@ interface NavItem {
 
 /** TRAK-440 (Imad, 11-12 Nov): the coach's tabs and icons. The player's Card leaves the bar (it becomes part of
  *  Profile); "Sessions" is Matches. */
-const NAV: Record<'player' | 'parent', NavItem[]> = {
+export const FAMILY_TABS: Record<'player' | 'parent', NavItem[]> = {
   player: [
     { label: 'home', path: '/player/home', Icon: House },
     { label: 'matches', path: '/player/matches', Icon: PitchIcon },
@@ -36,14 +37,18 @@ interface NavBarProps {
   sideMenuOnly?: boolean
 }
 
+/** TRAK-441: inside the family frame (a laptop, the academy's family_look on) the side menu is the nav. */
+export const FamilyFramed = createContext(false)
+
 /** A player's and a parent's bar: the coach's glass tab bar (CoachFrame's, TRAK-440). A coach's nav is the frame's. */
 export function NavBar({ role, activeTab, onNavigate }: NavBarProps) {
   const { t } = useTranslation()
   const { pathname } = useLocation()
-  if (role === 'coach') return null
+  const framed = useContext(FamilyFramed)
+  if (role === 'coach' || framed) return null
   // As before: everyone but a player (a parent, a club account) gets the parent's tabs.
   const who = role === 'player' ? 'player' : 'parent'
-  const items = NAV[who]
+  const items = FAMILY_TABS[who]
   // TRAK-186: a tab stays marked on every page under it (Events → an event).
   const active = items.find(item => activeTab === item.path || activeTab.startsWith(`${item.path}/`))?.path ?? ''
   return (

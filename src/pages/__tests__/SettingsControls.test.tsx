@@ -223,7 +223,8 @@ describe("Settings on Arc's settings page", () => {
     const nav = await screen.findByRole('navigation', { name: 'Settings sections' })
     expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(sections)
     for (const name of sections) expect(screen.getByRole('heading', { name })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Read how Trak works' })).toHaveAttribute('href', '/how-it-works')
+    // TRAK-418: a coach reads their own page; everyone else the shared one.
+    expect(screen.getByRole('link', { name: 'Read how Trak works' })).toHaveAttribute('href', role === 'coach' ? '/coach/how-trak-works' : '/how-it-works')
   })
 
   it("a coach's switches each save their own column and nothing else", async () => {

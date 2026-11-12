@@ -1,6 +1,7 @@
 import 'i18next'
 import type coachAssess from '@/locales/en/coachAssess.json'
 import type coachHome from '@/locales/en/coachHome.json'
+import type coachHowTrakWorks from '@/locales/en/coachHowTrakWorks.json'
 import type coachMatches from '@/locales/en/coachMatches.json'
 import type coachSchedule from '@/locales/en/coachSchedule.json'
 import type coachSquad from '@/locales/en/coachSquad.json'
@@ -17,6 +18,7 @@ declare module 'i18next' {
     resources: {
       coachAssess: typeof coachAssess
       coachHome: typeof coachHome
+      coachHowTrakWorks: typeof coachHowTrakWorks
       coachMatches: typeof coachMatches
       coachSchedule: typeof coachSchedule
       coachSquad: typeof coachSquad

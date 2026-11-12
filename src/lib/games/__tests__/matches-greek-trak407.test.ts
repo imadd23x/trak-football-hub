@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { i18n, showLanguage, SOURCE_LANGUAGE } from '@/lib/i18n'
 import { STATE, matchActions, type GameState } from '@/lib/games/loop'
-import { MATCH_WORD } from '@/lib/games/match-words'
+import { MATCH_WORD, optionWords } from '@/lib/games/match-words'
+import { CONTEXT, EXPECTATIONS, markerWords } from '@/lib/games/lineup'
+import { STRENGTHS } from '@/lib/games/plan'
 import { matchResult } from '@/lib/games/results'
 import { shown } from '@/lib/squad/trait-words'
 import { gameTitle } from '@/components/coach/games/useGames'
@@ -23,6 +25,23 @@ describe('TRAK-407: Matches in Greek', () => {
     for (const label of labels()) expect(shown(MATCH_WORD, label)).toBe(label)
     await showLanguage('el')
     for (const label of labels()) expect(shown(MATCH_WORD, label)).not.toBe(label)
+  })
+
+  it('has a word for every strength, context and expectation, the same in English', async () => {
+    const lists = () => [optionWords('strength', STRENGTHS), optionWords('context', CONTEXT), optionWords('expectation', EXPECTATIONS)]
+    expect(lists()).toEqual([STRENGTHS, CONTEXT, EXPECTATIONS])
+    const english = lists().flat().flatMap(option => [option.label, ...('description' in option ? [option.description] : [])])
+    await showLanguage('el')
+    const greek = lists().flat().flatMap(option => [option.label, ...('description' in option ? [option.description] : [])])
+    expect(greek).toHaveLength(english.length)
+    greek.forEach((word, i) => expect(word).not.toBe(english[i]))
+  })
+
+  it('says a face\'s markers in the language showing', async () => {
+    const plan = { role: 'starter' as const, slot: 2, job: 'Win it', note: '', context: ['first_start', 'playing_up'], expectation: 'lead' as const }
+    expect(markerWords(plan)).toEqual(['lead', 'has a job', 'context: first start and playing up an age group'])
+    await showLanguage('el')
+    expect(markerWords(plan)).toEqual(['ηγέτης', 'έχει ρόλο', 'πλαίσιο: πρώτη φορά βασικός και παίζει σε μεγαλύτερη ηλικιακή ομάδα'])
   })
 
   it('says a result and a title in the language showing', async () => {

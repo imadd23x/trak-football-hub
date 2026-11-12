@@ -1,3 +1,4 @@
+import { currentLanguage, dateLocale, i18n, useTranslation } from '@/lib/i18n'
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { dateAsDay, dayAsDate, type EventRow } from '@/lib/coach-events'
@@ -29,8 +30,8 @@ import { MatchClock } from './MatchClock'
    page holds whether it's open (`picking`). Imad, 6 Nov: no repeats: "Shared at Fri 19:00" is the heading, with no
    badge or line under it, and a plan locked unshared says "Not shared" alone. */
 
-const players = (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`
-const list = (names: string[]) => names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+const list = (names: string[]) => names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')}${i18n.t('coachSquad:fmAnd')}${names.at(-1)}`
+const dates = () => (currentLanguage() === 'en' ? 'en-GB' : currentLanguage())
 const sub = 'text-sm font-medium text-ink'
 
 export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSchedule, sharing, problem, locked = false, onStep, onEditLogistics, picking, onPicking }: {
@@ -55,9 +56,10 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
 }) {
   // The face-to-face tick.
   const [talked, setTalked] = useState(false)
+  const { t } = useTranslation()
 
-  if (who.error) return <LoadError what="who can come" onRetry={who.retry} />
-  if (who.isPending) return <LoadingSkeleton label="Loading who can come…" rows={2} className="pt-6" />
+  if (who.error) return <LoadError what={t('coachMatches:whoCanComeWhat')} onRetry={who.retry} />
+  if (who.isPending) return <LoadingSkeleton label={t('coachMatches:loadingWhoCanCome')} rows={2} className="pt-6" />
 
   const reading = readers(form, who.players)
   const { placed, withJob, bench, instructions, ready, incomplete } = planParts(form, who.players, game.published)
@@ -66,62 +68,62 @@ export function ShareStep({ game, form, who, sharedAt, changes, onShare, onSched
   const waiting = sharedAt != null && !locked && Date.now() < Date.parse(sharedAt)
 
   const rows: ReviewRow[] = [
-    { id: 'logistics', label: 'Logistics', status: ready.logistics ? 'good' : 'risk', onEdit: onEditLogistics },
-    { id: 'tactics', label: 'Tactics & analysis', status: ready.tactics ? 'good' : 'watch', onEdit: () => onStep(0) },
-    { id: 'instructions', label: 'Instructions', status: ready.instructions ? 'good' : 'watch', onEdit: () => onStep(0),
-      detail: instructions ? `${instructions} ${instructions === 1 ? 'instruction' : 'instructions'}` : 'None yet' },
-    { id: 'line-up', label: 'Line-up', status: ready.lineUp ? 'good' : 'watch', onEdit: () => onStep(1),
-      detail: `${placed} of ${form.format} placed · ${bench} on the bench` },
-    { id: 'jobs', label: 'Jobs', status: ready.jobs ? 'good' : 'watch', onEdit: () => onStep(1),
-      detail: placed === 0 ? 'Nobody is on the pitch yet' : `${withJob} of ${placed} starters have one` },
+    { id: 'logistics', label: t('coachMatches:actLogistics'), status: ready.logistics ? 'good' : 'risk', onEdit: onEditLogistics },
+    { id: 'tactics', label: t('coachMatches:stepTactics'), status: ready.tactics ? 'good' : 'watch', onEdit: () => onStep(0) },
+    { id: 'instructions', label: t('coachMatches:instructions'), status: ready.instructions ? 'good' : 'watch', onEdit: () => onStep(0),
+      detail: instructions ? t('coachMatches:instructionCount', { count: instructions }) : t('coachSquad:noneYet') },
+    { id: 'line-up', label: t('coachMatches:lineUp'), status: ready.lineUp ? 'good' : 'watch', onEdit: () => onStep(1),
+      detail: t('coachMatches:placedOf', { placed, format: form.format, bench }) },
+    { id: 'jobs', label: t('coachMatches:jobs'), status: ready.jobs ? 'good' : 'watch', onEdit: () => onStep(1),
+      detail: placed === 0 ? t('coachMatches:nobodyOnPitch') : t('coachMatches:withJobOf', { withJob, placed }) },
   ]
-  const band = incomplete === 0 ? { status: 'good' as const, label: 'Ready to share' }
-    : { status: game.published ? 'watch' as const : 'risk' as const, label: `${incomplete} incomplete` }
+  const band = incomplete === 0 ? { status: 'good' as const, label: t('coachMatches:readyToShare') }
+    : { status: game.published ? 'watch' as const : 'risk' as const, label: t('coachMatches:incompleteCount', { count: incomplete }) }
   const holdsBack = !game.published || !talked
 
   return (
     <div className="arc">
       {/* TRAK-373 (Imad, 5 Nov): after kick-off, the match clock, then "Locked", in the countdown's place. */}
-      <PlanReview title="Game plan review" footerId="plan-share" rows={rows} band={band} readOnly={locked} aside={locked ? <MatchClock game={game} /> : undefined}
-        countdown={{ label: 'Kick-off in', end: game.starts_at, completeLabel: 'Locked' }}>
+      <PlanReview title={t('coachMatches:reviewTitle')} footerId="plan-share" rows={rows} band={band} readOnly={locked} aside={locked ? <MatchClock game={game} /> : undefined}
+        countdown={{ label: t('coachMatches:kickOffIn'), end: game.starts_at, completeLabel: t('coachMatches:locked') }}>
         {sharedAt == null && locked ? (
           <section aria-labelledby="plan-not-shared">
-            <h4 id="plan-not-shared" className={sub}>Not shared</h4>
+            <h4 id="plan-not-shared" className={sub}>{t('coachMatches:notShared')}</h4>
           </section>
         ) : sharedAt == null ? <>
           {/* TRAK-345 (Imad, 3 Nov): the tick says this and nothing else; Schedule (it was "Share at…") opens under the button.
               TRAK-369 (Imad, 4 Nov): no line for who gets it, nor one for the tick; only the logistics say why Share waits. */}
-          <Checkbox label="I’ve talked selection through with the players" checked={talked} onCheckedChange={value => setTalked(value === true)} />
+          <Checkbox label={t('coachMatches:talkedThrough')} checked={talked} onCheckedChange={value => setTalked(value === true)} />
           <div className="flex flex-wrap items-center gap-3">
-            {!game.published && <span className="text-sm text-ink-3">Publish the match in Logistics first</span>}
-            <span className="ml-auto"><SplitButton label={sharing ? 'Sharing…' : 'Share plan'} onClick={() => onShare(talked)}
-              disabled={holdsBack || sharing} actions={[{ label: 'Schedule', onSelect: () => onPicking(true), disabled: holdsBack }]} /></span>
+            {!game.published && <span className="text-sm text-ink-3">{t('coachMatches:publishFirst')}</span>}
+            <span className="ml-auto"><SplitButton label={sharing ? t('coachMatches:sharing') : t('coachMatches:actSharePlan')} onClick={() => onShare(talked)}
+              disabled={holdsBack || sharing} actions={[{ label: t('coachMatches:schedule'), onSelect: () => onPicking(true), disabled: holdsBack }]} /></span>
           </div>
-          {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta={when => when ? `Schedule for ${when}` : 'Schedule'}
+          {picking && <ShareAt game={game} initial={{ day: localTodayISO(), time: '' }} cta={when => when ? t('coachMatches:scheduleFor', { when }) : t('coachMatches:schedule')}
             busy={sharing} ready={!holdsBack} onSchedule={at => onSchedule(at, talked)} onCancel={() => onPicking(false)} />}
           {problem && <p role="alert" className="text-sm text-danger">{problem}</p>}
         </> : waiting ? (
           <section aria-labelledby="plan-scheduled" className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 id="plan-scheduled" className={sub}>Scheduled</h4>
-              <Badge tone="info">Shares {format(new Date(sharedAt), 'EEE HH:mm')}</Badge>
+              <h4 id="plan-scheduled" className={sub}>{t('coachMatches:scheduled')}</h4>
+              <Badge tone="info">{t('coachMatches:sharesAt', { when: format(new Date(sharedAt), 'EEE HH:mm', { locale: dateLocale() }) })}</Badge>
             </div>
-            <p className="text-sm text-ink-2">{players(reading.length)} and their families read it from {format(new Date(sharedAt), 'EEE d MMM, HH:mm')}, in the app only. What you save before then goes out with it.</p>
+            <p className="text-sm text-ink-2">{t('coachMatches:scheduledBody', { count: reading.length, when: format(new Date(sharedAt), 'EEE d MMM, HH:mm', { locale: dateLocale() }) })}</p>
             {picking
-              ? <ShareAt game={game} initial={shareWall(game, sharedAt)} cta={when => when ? `Move to ${when}` : 'Move'} busy={sharing} ready
+              ? <ShareAt game={game} initial={shareWall(game, sharedAt)} cta={when => when ? t('coachMatches:moveTo', { when }) : t('coachMatches:move')} busy={sharing} ready
                   onSchedule={at => onSchedule(at, false)} onCancel={() => onPicking(false)} />
               : <div className="flex flex-wrap gap-2">
-                  <Button size="sm" loading={sharing} onClick={() => onShare(false)}>Share now</Button>
-                  <Button size="sm" variant="secondary" onClick={() => onPicking(true)}>Change time</Button>
+                  <Button size="sm" loading={sharing} onClick={() => onShare(false)}>{t('coachMatches:shareNow')}</Button>
+                  <Button size="sm" variant="secondary" onClick={() => onPicking(true)}>{t('coachMatches:changeTime')}</Button>
                 </div>}
             {problem && <p role="alert" className="text-sm text-danger">{problem}</p>}
           </section>
         ) : (
           <section aria-labelledby="plan-shared" className="grid gap-3">
-            <h4 id="plan-shared" className={sub}>Shared at {format(new Date(sharedAt), 'EEE HH:mm')}</h4>
-            <Alert tone="info" open={!locked && changes.length > 0} title="Changes not shared">
-              {changed.length ? `${list(changed)}. ` : ''}Only they and their families get the update.
-              <span className="mt-3 block"><Button size="sm" loading={sharing} onClick={() => onShare(false)}>Share changes with {changes.length}</Button></span>
+            <h4 id="plan-shared" className={sub}>{t('coachMatches:sharedAtTime', { when: format(new Date(sharedAt), 'EEE HH:mm', { locale: dateLocale() }) })}</h4>
+            <Alert tone="info" open={!locked && changes.length > 0} title={t('coachMatches:stateChanges')}>
+              {changed.length ? t('coachMatches:changedNames', { names: list(changed) }) : ''}{t('coachMatches:onlyTheyGet')}
+              <span className="mt-3 block"><Button size="sm" loading={sharing} onClick={() => onShare(false)}>{t('coachMatches:shareChangesWith', { count: changes.length })}</Button></span>
             </Alert>
             {problem && <p role="alert" className="text-sm text-danger">{problem}</p>}
           </section>
@@ -143,21 +145,22 @@ export function ShareAt({ game, initial, cta, busy, ready, onSchedule, onCancel 
 }) {
   const [day, setDay] = useState(initial.day)
   const [time, setTime] = useState(initial.time)
-  const when = day && time ? `${format(dayAsDate(day)!, 'EEE')} ${time}` : null
+  const { t } = useTranslation()
+  const when = day && time ? `${format(dayAsDate(day)!, 'EEE', { locale: dateLocale() })} ${time}` : null
   return (
     <div className="grid gap-3">
       {/* TRAK-345: the day and the time side by side, on a phone too. */}
       <div className="grid grid-cols-2 gap-3">
-        <DatePicker label="Day" className="arc-trak-field min-w-0" value={dayAsDate(day)} clearable={false} placeholder="Pick a day"
+        <DatePicker label={t('coachMatches:day')} className="arc-trak-field min-w-0" value={dayAsDate(day)} clearable={false} placeholder={t('coachMatches:pickDay')}
           onChange={date => { if (date) setDay(dateAsDay(date)) }} minDate={dayAsDate(localTodayISO())}
-          maxDate={dayAsDate(displayEventTime(game).date)} format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale="en-GB" />
-        <TimePicker label="Time" className="arc-trak-field min-w-0" value={time} onChange={setTime} minuteStep={5} format="12h"
-          placeholder="Pick a time" emptyAt="19:00" />
+          maxDate={dayAsDate(displayEventTime(game).date)} format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale={dates()} />
+        <TimePicker label={t('coachMatches:time')} className="arc-trak-field min-w-0" value={time} onChange={setTime} minuteStep={5} format="12h"
+          placeholder={t('coachSchedule:pickTime')} emptyAt="19:00" />
       </div>
-      <p className="text-sm text-ink-3">Any time before kick-off. Until then, only you see it.</p>
+      <p className="text-sm text-ink-3">{t('coachMatches:anyTimeBefore')}</p>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" disabled={!ready || !day || !time} loading={busy} onClick={() => onSchedule(`${day}T${time}`)}>{cta(when)}</Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>{t('coachSchedule:cancel')}</Button>
       </div>
     </div>
   )

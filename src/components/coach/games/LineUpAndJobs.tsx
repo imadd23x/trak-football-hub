@@ -1,10 +1,12 @@
+import { i18n, useTranslation } from '@/lib/i18n'
+import { lineWord, positionsShown } from '@/lib/position-words'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFeatureState } from '@/components/trak/parked'
 import { DEFAULT_FORMATION, FORMATIONS, FORMATS, lineName, slotsOf } from '@/lib/games/formations'
 import { fitFormat, followPosition, moveTo, playerPlan, type LineUpDrop, type PlayerPlan, type PlayerPlans } from '@/lib/games/lineup'
 import type { PlanForm } from '@/lib/games/plan'
-import { fitOf, positionsShort, slotPosition } from '@/lib/squad/formation-board'
+import { fitOf, slotPosition } from '@/lib/squad/formation-board'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { usePlayerRoles } from '@/components/coach/squad/usePlayerRoles'
 import { DragGhost } from '@/components/coach/squad/formations/FormationBoard'
@@ -33,7 +35,8 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    keeps them there until the family undoes it; a report that comes after the coach placed them only flags them. */
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
-const SHAPES = FORMATS.map(format => ({ label: `${format} a side`, options: FORMATIONS[format].map(shape => ({ value: shape, label: shape })) }))
+/* TRAK-407: read when shown, so "9 a side" follows the language. */
+const shapes = () => FORMATS.map(format => ({ label: i18n.t('coachSquad:fmASide', { count: format }), options: FORMATIONS[format].map(shape => ({ value: shape, label: shape })) }))
 /** A tab's name with its count under it, so three tabs fit the card on a phone and beside the pitch. The name is still
  *  "Bench · 6" to a screen reader. */
 const TabLabel = ({ name, count }: { name: string; count: number }) =>
@@ -48,6 +51,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false, copy = 
   form: PlanForm; onFormChange: (form: PlanForm) => void; who: ReturnType<typeof useWhoCanCome>; locked?: boolean; copy?: FormationCopy | null
 }) {
   const { user } = useAuth()
+  const { t } = useTranslation()
   // TRAK-358: Can also play, so a placement outside it ticks Out of position.
   const roles = usePlayerRoles(user?.id)
   const phone = useIsMobile()
@@ -86,8 +90,8 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false, copy = 
   })
   const drag = locked ? null : swap
 
-  if (who.error || roles.isError) return <LoadError what="who can come" onRetry={() => { who.retry(); void roles.refetch() }} />
-  if (who.isPending || roles.isPending) return <LoadingSkeleton label="Loading who can come…" lines={1} avatar rows={4} className="pt-6" />
+  if (who.error || roles.isError) return <LoadError what={t('coachMatches:whoCanComeWhat')} onRetry={() => { who.retry(); void roles.refetch() }} />
+  if (who.isPending || roles.isPending) return <LoadingSkeleton label={t('coachMatches:loadingWhoCanCome')} lines={1} avatar rows={4} className="pt-6" />
 
   const starters = new Map<number, PitchPlayer>()
   for (const player of who.players) {
@@ -100,15 +104,15 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false, copy = 
   const bench = who.players.filter(player => !['not_selected', 'not_attending'].includes(plan(player).role) && !placed.has(player.id))
   const leftOut = who.players.filter(player => plan(player).role === 'not_selected')
   const notComing = who.players.filter(player => plan(player).role === 'not_attending')
-  const title = target?.kind === 'slot' ? `${lineName(shape, target.slot)}, slot ${target.slot}`
-    : who.players.find(player => target && player.id === target.id)?.name ?? 'Player'
+  const title = target?.kind === 'slot' ? t('coachMatches:slotTitle', { line: lineWord(lineName(shape, target.slot)), slot: target.slot })
+    : who.players.find(player => target && player.id === target.id)?.name ?? t('nav:player')
   const panel = target && <PlayerPanel target={target} players={form.players} onPlayers={setPlayers} candidates={who.players}
     shape={shape} onTarget={setTarget} locked={locked} />
   const open = (player: Candidate) => setTarget({ kind: 'player', id: player.id })
   const opened = (player: Candidate) => target?.kind === 'player' && target.id === player.id
-  const detail = (player: Candidate) => `${player.shirt != null ? `#${player.shirt} · ` : ''}${positionsShort(player.position, roles.of(player.id).also)}`
+  const detail = (player: Candidate) => `${player.shirt != null ? `#${player.shirt} · ` : ''}${positionsShown(player.position, roles.of(player.id).also)}`
   const faces = (players: Candidate[], words: 'bench' | 'not selected' | 'not attending') =>
-    <ul role="group" aria-label={words === 'bench' ? 'Bench' : words === 'not selected' ? 'Not selected' : 'Not attending'} className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2 p-0">
+    <ul role="group" aria-label={words === 'bench' ? t('coachSquad:fmBench') : words === 'not selected' ? t('coachMatches:notSelected') : t('coachMatches:notAttending')} className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2 p-0">
       {players.map(player => <li key={player.id}>
         <ListFace player={player} plan={plan(player)} list={words} detail={detail(player)} on={opened(player)} onOpen={() => open(player)} swap={drag} />
       </li>)}
@@ -117,13 +121,12 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false, copy = 
   const dropOn = (spot: LineUpSpot) => (drag ? { 'data-spot': spot } : {})
   const lit = (spot: LineUpSpot) => (drag?.drag?.over === spot ? 'ring-2 ring-brand' : '')
 
-  const plural = (n: number) => `${n} player${n === 1 ? '' : 's'}`
   return (
     <div className="grid gap-4">
-      {copy && <div className="arc"><Alert tone="info" title={copy.byDefault ? `${copy.name} loaded: your default for ${copy.format ?? form.format} a side.` : `Copied from ${copy.name}.`}>
-        {[copy.notComing > 0 && `${plural(copy.notComing)} in this formation ${copy.notComing === 1 ? 'isn’t' : 'aren’t'} coming, so ${copy.notComing === 1 ? 'is' : 'are'} in Not attending.`,
-          copy.skipped > 0 && `${plural(copy.skipped)} ${copy.skipped === 1 ? 'was' : 'were'} skipped: they left the roster, or their consent was withdrawn.`,
-          'Change anything here; the formation itself stays as it was.'].filter(Boolean).join(' ')}</Alert></div>}
+      {copy && <div className="arc"><Alert tone="info" title={copy.byDefault ? t('coachMatches:copyLoaded', { name: copy.name, count: copy.format ?? form.format }) : t('coachMatches:copiedFrom', { name: copy.name })}>
+        {[copy.notComing > 0 && t('coachMatches:copyNotComing', { count: copy.notComing }),
+          copy.skipped > 0 && t('coachMatches:copySkipped', { count: copy.skipped }),
+          t('coachMatches:copyChange')].filter(Boolean).join(' ')}</Alert></div>}
       {/* TRAK-323 (Imad, 30 Oct): on a laptop the pitch, the tabs and the selected player's sheet sit side by side, the
           pitch and the sheet staying in view; on a tablet the tabs go under them. TRAK-358: only a laptop pins them, as
           on a tablet the tabs below would scroll under the pinned pitch (and a drop there would land on the tabs). The
@@ -136,9 +139,9 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false, copy = 
         <section aria-labelledby="plan-pitch" className={`${card} laptop:sticky laptop:top-[calc(var(--ph-pinned,0px)+1rem)]`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="plan-pitch" className={locked ? 'text-lg font-medium text-ink' : 'sr-only'}>{shape}</h2>
-            {!locked && <span className="arc"><MorphSelect label="Formation" hideLabel items={SHAPES} value={shape} onValueChange={setShape}
+            {!locked && <span className="arc"><MorphSelect label={t('coachHome:formation')} hideLabel items={shapes()} value={shape} onValueChange={setShape}
               searchable={false} panelWidth={200} /></span>}
-            <span className="text-sm text-ink-3">Attacking ↑</span>
+            <span className="text-sm text-ink-3">{t('coachMatches:attackingUp')}</span>
           </div>
           <Pitch shape={shape} format={form.format} starters={starters} swap={drag} className="laptop:max-w-[min(460px,calc((100dvh_-_var(--ph-pinned,0px)_-_20rem)*0.8))]"
             selected={target?.kind === 'slot' ? target.slot : target ? playerPlan(form.players, target.id).slot : null}
@@ -147,48 +150,48 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false, copy = 
         </section>
         {phone
           ? <BottomSheet className="arc" open={!!target} onOpenChange={next => { if (!next) setTarget(null) }} title={title} detents={[0.6, 0.92]}>{panel}</BottomSheet>
-          : <aside aria-label={target ? title : 'Selected player'} className={`${card} laptop:sticky laptop:top-[calc(var(--ph-pinned,0px)+1rem)] laptop:order-3`}>
+          : <aside aria-label={target ? title : t('coachMatches:selectedPlayer')} className={`${card} laptop:sticky laptop:top-[calc(var(--ph-pinned,0px)+1rem)] laptop:order-3`}>
               {target ? <><h2 className="text-lg font-medium text-ink">{title}</h2>{panel}</>
-                : <p className="text-sm text-ink-2">Pick a slot or a player to see their job and expectation here.</p>}
+                : <p className="text-sm text-ink-2">{t('coachMatches:pickSlotHint')}</p>}
             </aside>}
         <div className="grid min-w-0 gap-4 tablet:col-span-2 laptop:order-2 laptop:col-span-1">
-          <section aria-label="Off the pitch" className={`arc ${card}`}>
+          <section aria-label={t('coachMatches:offThePitch')} className={`arc ${card}`}>
             <div className="grid gap-3">
-              <p className="text-sm text-ink-3">{locked ? 'Tap a player to see their job.'
-                : 'Drag a player onto a place, or tap a place to pick who plays there. Tap a player to give them a job.'}</p>
+              <p className="text-sm text-ink-3">{locked ? t('coachMatches:tapToSeeJob')
+                : t('coachMatches:dragHint')}</p>
               <MarkersKey />
             </div>
             {/* min-w-0: three tabs are wider than a phone's card, and the tab list scrolls within it rather than the page. */}
             <Tabs className="min-w-0" value={list} onValueChange={value => setList(value as List)}>
-              <TabsList aria-label="Off the pitch">
-                <TabsTrigger value="bench" {...dropOn('list:bench')} className={`!min-w-0 !px-2 laptop:!px-1 laptop:!text-[13px] ${lit('list:bench')}`}><TabLabel name="Bench" count={bench.length} /></TabsTrigger>
-                <TabsTrigger value="not_selected" {...dropOn('list:not_selected')} className={`!min-w-0 !px-2 laptop:!px-1 laptop:!text-[13px] ${lit('list:not_selected')}`}><TabLabel name="Not selected" count={leftOut.length} /></TabsTrigger>
-                <TabsTrigger value="not_attending" {...dropOn('list:not_attending')} className={`!min-w-0 !px-2 laptop:!px-1 laptop:!text-[13px] ${lit('list:not_attending')}`}><TabLabel name="Not attending" count={notComing.length} /></TabsTrigger>
+              <TabsList aria-label={t('coachMatches:offThePitch')}>
+                <TabsTrigger value="bench" {...dropOn('list:bench')} className={`!min-w-0 !px-2 laptop:!px-1 laptop:!text-[13px] ${lit('list:bench')}`}><TabLabel name={t('coachSquad:fmBench')} count={bench.length} /></TabsTrigger>
+                <TabsTrigger value="not_selected" {...dropOn('list:not_selected')} className={`!min-w-0 !px-2 laptop:!px-1 laptop:!text-[13px] ${lit('list:not_selected')}`}><TabLabel name={t('coachMatches:notSelected')} count={leftOut.length} /></TabsTrigger>
+                <TabsTrigger value="not_attending" {...dropOn('list:not_attending')} className={`!min-w-0 !px-2 laptop:!px-1 laptop:!text-[13px] ${lit('list:not_attending')}`}><TabLabel name={t('coachMatches:notAttending')} count={notComing.length} /></TabsTrigger>
               </TabsList>
               {/* Both panels stay mounted, so a tab is never mid-animation when a drag lands; the other is hidden. The grid
                   is inside each panel: a display class on the panel itself would override `hidden` and show both. */}
               <TabsContent value="bench" forceMount hidden={list !== 'bench'} {...dropOn('list:bench')} className={`rounded-xl ${lit('list:bench')}`}>
                 <div className="grid gap-3">
-                {!locked && <p className="text-sm text-ink-3">Drag a player onto a place on the pitch, or onto Not selected to leave them out.</p>}
+                {!locked && <p className="text-sm text-ink-3">{t('coachMatches:benchHint')}</p>}
                 {bench.length === 0
-                  ? <p className="text-sm text-ink-2">{starters.size + leftOut.length + notComing.length > 0 ? 'Nobody on the bench.'
-                    : seasonPlan.on ? 'Nobody in this squad yet.' : 'Nobody can come yet. Confirm players in Squad › Availability.'}</p>
+                  ? <p className="text-sm text-ink-2">{starters.size + leftOut.length + notComing.length > 0 ? t('coachMatches:nobodyBench')
+                    : seasonPlan.on ? t('coachMatches:nobodySquad') : t('coachMatches:nobodyCanCome')}</p>
                   : faces(bench, 'bench')}
                 </div>
               </TabsContent>
               <TabsContent value="not_selected" forceMount hidden={list !== 'not_selected'} {...dropOn('list:not_selected')} className={`rounded-xl ${lit('list:not_selected')}`}>
                 <div className="grid gap-3">
-                <p className="text-sm text-ink-3">Their families see “Not in the squad this week”. Each player reads your note.</p>
+                <p className="text-sm text-ink-3">{t('coachMatches:notSelectedNote')}</p>
                 {leftOut.length === 0
-                  ? <p className="text-sm text-ink-2">{locked ? 'Nobody was left out.' : 'Nobody is left out. Drag a player onto this tab, or pick Not selected in their sheet.'}</p>
+                  ? <p className="text-sm text-ink-2">{locked ? t('coachMatches:nobodyLeftOutLocked') : t('coachMatches:nobodyLeftOut')}</p>
                   : faces(leftOut, 'not selected')}
                 </div>
               </TabsContent>
               <TabsContent value="not_attending" forceMount hidden={list !== 'not_attending'} {...dropOn('list:not_attending')} className={`rounded-xl ${lit('list:not_attending')}`}>
                 <div className="grid gap-3">
-                <p className="text-sm text-ink-3">Their families see “Not in the squad this week”. A child whose family said they can’t make it is here until the family undoes it.</p>
+                <p className="text-sm text-ink-3">{t('coachMatches:notAttendingNote')}</p>
                 {notComing.length === 0
-                  ? <p className="text-sm text-ink-2">{locked ? 'Nobody was marked.' : 'Everyone is coming. Drag a player here when the group says they aren’t.'}</p>
+                  ? <p className="text-sm text-ink-2">{locked ? t('coachMatches:nobodyMarked') : t('coachMatches:everyoneComing')}</p>
                   : faces(notComing, 'not attending')}
                 </div>
               </TabsContent>

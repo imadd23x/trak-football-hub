@@ -9,6 +9,7 @@ import { Button } from "../../button/button";
 import { Countdown } from "../../countdown/countdown";
 import { motionTokens } from "../../lib/motion-tokens";
 import styles from "./plan-review.module.css";
+import { useTranslation } from "@/lib/i18n";
 
 /* Trak (TRAK-332, Imad 2 Nov): Review & share. Account health's card (a gauge, a countdown, signal rows, one next step)
    reads a game plan instead of a customer: the gauge counts the parts that are ready, the countdown runs to kick-off,
@@ -61,6 +62,7 @@ function StatusIcon({ status, spoken = false }: { status: ReviewStatus; spoken?:
 }
 
 export function PlanReview({ title, rows, band, countdown, aside, readOnly = false, children, footerId }: PlanReviewProps) {
+  const { t } = useTranslation();
   const reduced = useReducedMotion() ?? false;
   const rootRef = useRef<HTMLElement>(null);
   const titleId = useId();
@@ -97,7 +99,7 @@ export function PlanReview({ title, rows, band, countdown, aside, readOnly = fal
         <h3 id={titleId} className={styles.name}>{title}</h3>
         <div className={styles.overview} data-single={aside || countdown ? undefined : ""}>
           <div className={styles.cell}>
-            <div className={styles.gauge} role="img" aria-label={`${ready} of ${rows.length} parts ready, ${band.label.toLowerCase()}`}>
+            <div className={styles.gauge} role="img" aria-label={t("coachMatches:reviewGauge", { ready, total: rows.length, band: band.label.toLocaleLowerCase() })}>
               <svg viewBox="0 0 112 60" width="112" height="60" aria-hidden="true">
                 <path className={styles.gaugeTrack} d="M8 56a48 48 0 0 1 96 0" />
                 <motion.path className={styles.gaugeValue} data-status={band.status} d="M8 56a48 48 0 0 1 96 0" style={{ pathLength: arc, opacity: arcOpacity }} />
@@ -119,14 +121,14 @@ export function PlanReview({ title, rows, band, countdown, aside, readOnly = fal
         </div>
       </div>
 
-      <ul className={styles.rows} aria-label="The plan">
+      <ul className={styles.rows} aria-label={t("coachMatches:thePlan")}>
         {rows.map(row => <li key={row.id} className={styles.row} data-read-only={readOnly || undefined}>
           <StatusIcon status={row.status} spoken />
           <span className={styles.rowText}>
             <span className={styles.rowLabel}>{row.label}</span>
             {row.detail ? <span className={styles.rowDetail}>{row.detail}</span> : null}
           </span>
-          {!readOnly && row.onEdit ? <Button variant="ghost" size="sm" aria-label={`Edit ${row.label.toLowerCase()}`} onClick={row.onEdit}>Edit</Button> : null}
+          {!readOnly && row.onEdit ? <Button variant="ghost" size="sm" aria-label={t("coachMatches:editPart", { part: row.label.toLocaleLowerCase() })} onClick={row.onEdit}>{t("coachSchedule:edit")}</Button> : null}
         </li>)}
       </ul>
 

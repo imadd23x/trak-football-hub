@@ -19,7 +19,8 @@ function coach() {
   server.use(
     table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Angelos Basinas', invite_code: 'ABCD' }]),
     table('coach_sessions', []), table('squad_players', []), table('coach_details', []),
-    rpc('feature_on', () => true),
+    // TRAK-426: Training off, so the old log's pages are still there to mark.
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'training'),
   )
 }
 const bar = () => screen.findByRole('tablist', { name: 'Coach' })

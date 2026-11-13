@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -6,8 +6,13 @@ import { server } from '../../../../tests/msw/server'
 import { rpcRows, table } from '../../../../tests/msw/supabase'
 import { SessionLog } from '../SessionLog'
 
+// TRAK-426: whether the old log has retired (Training and Matches both on); rendered here without the signed-in frame.
+const oldLog = vi.hoisted(() => ({ retired: false }))
+vi.mock('@/components/coach/old-log', () => ({ useOldLogRetired: () => ({ retired: oldLog.retired, known: true }) }))
+
 /* Imad, 23 Oct: "View log" shows the log, read only, with Edit log one tap further. */
 
+afterEach(() => { oldLog.retired = false })
 afterEach(cleanup)
 
 function renderLog() {
@@ -55,5 +60,21 @@ describe('SessionLog', () => {
     expect(screen.queryByText('Beth Mead')).toBeNull()
     expect(screen.getByText("Didn't play: Cole Palmer")).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Edit log' })).toHaveAttribute('href', '/coach/sessions/s-1')
+  })
+})
+
+// TRAK-426 (Kostas, 12 Nov): where Training and Matches are both on, the old Edit session is gone; a training is
+// changed on its own page (Who's here, notes), a match in its evaluation.
+describe('SessionLog where the old log has retired', () => {
+  it('shows the log, read only, with no Edit log', async () => {
+    oldLog.retired = true
+    server.use(
+      table('coach_sessions', [{ id: 's-1', session_type: 'training', title: 'Tactical / Finishing — Pressing', session_date: '2026-10-22', training_type: 'tactical,finishing', notes: '75 min · High intensity' }]),
+      table('session_attendance', [{ squad_player_id: 'p-1', status: 'present' }]),
+      table('squad_players', [{ id: 'p-1', player_name: 'Bukayo Saka' }]),
+    )
+    renderLog()
+    expect(await screen.findByText('Attended · 1')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit log' })).toBeNull()
   })
 })

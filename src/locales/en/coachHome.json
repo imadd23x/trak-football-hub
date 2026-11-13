@@ -53,7 +53,7 @@
   "todayWhat": "today’s plan",
   "todayLoading": "Loading today’s plan",
   "nextUp": "Next up",
-  "nothingAhead": "No training or match coming up. Add one in Schedule.",
+  "nothingAhead": "No training or match coming up. Add one in Events.",
   "trainingNamed": "Training, {{title}}",
   "trainingPlan": "Training plan",
   "planThisSession": "Plan this session",
@@ -126,5 +126,18 @@
   "assessedAgo_one": "Assessed {{count}} day ago",
   "assessedAgo_other": "Assessed {{count}} days ago",
   "draftFrom": "Draft from {{day}}: families can't see it yet",
-  "draftsFrom": "{{count}} drafts, the latest from {{day}}: families can't see them yet"
+  "draftsFrom": "{{count}} drafts, the latest from {{day}}: families can't see them yet",
+  "useCreate": "Use Create to plan an event",
+  "filterType": "Show",
+  "filterAll": "All",
+  "filterMatches": "Matches",
+  "filterAssessments": "Assessments",
+  "filterTraining": "Training",
+  "sortBy": "Order",
+  "sortUrgent": "Most urgent",
+  "sortNewest": "Newest first",
+  "sortOldest": "Oldest first",
+  "showAll": "Show all {{count}}",
+  "showFewer": "Show fewer",
+  "needsYouNoneFiltered": "Nothing in this filter."
 }

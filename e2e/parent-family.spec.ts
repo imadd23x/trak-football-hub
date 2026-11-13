@@ -92,8 +92,9 @@ await context.route('**/*',async route=>{
  await page.getByRole('tab',{name:'Home',exact:true}).click();
  await page.getByRole('button',{name:/^Alerts/}).click();
  const alertsSheet=page.getByRole('dialog',{name:'Alerts'});
- await expect(alertsSheet.getByText(/vs Zara Opposition/).first()).toBeVisible();
- await expect(alertsSheet.getByText(/vs Alex Opposition/)).toHaveCount(0);
+ // TRAK-436: a match reaches the bell as the coach's review, not "Match logged" (per-child scoping: unit tests).
+ await expect(alertsSheet.getByText(/^New assessment from /).first()).toBeVisible();
+ await expect(alertsSheet.getByText(/Opposition/)).toHaveCount(0);
  // TRAK-122: Escape during the sheet's opening animation can be ignored; wait for it first.
  await alertsSheet.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
  await page.keyboard.press('Escape');
@@ -172,6 +173,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         if (url.pathname === '/rest/v1/coach_sessions' && url.searchParams.has('event_id')) return json([])
         if (url.pathname === '/rest/v1/coach_sessions') return json([{ id: 'saved-session', title: 'Logged set pieces', session_type: 'training', session_date: day, event_id: null, venue: 'Synthetic pitch' }])
         if (url.pathname === '/rest/v1/rpc/season_plan_for_player') return json([]) // TRAK-399: nothing shared
+        if (url.pathname === '/rest/v1/rpc/family_feature_on') return json(false) // TRAK-441: family_look off
         if (url.pathname === '/rest/v1/rpc/child_events') {
           const child = req.postDataJSON().p_child
           const filter = url.searchParams.get('id')
@@ -253,11 +255,11 @@ test.describe('TRAK-171 Home follow-ups', () => {
         await week.getByRole('button', { name: 'Details' }).click()
         const logged = page.getByRole('dialog', { name: 'Logged set pieces' })
         await expect(logged.getByText('Logged.')).toBeVisible()
-        // Imad, 23 Oct (TRAK-278): the sheet shows the log, read only; Edit log opens the saved record.
-        await logged.getByRole('link', { name: 'Edit log' }).click()
-        await expect(page).toHaveURL(/\/coach\/sessions\/saved-session$/)
-        await page.getByRole('navigation', { name: 'Breadcrumb trail' }).getByRole('link', { name: 'Home' }).click()
-        await expect(page).toHaveURL(/\/coach\/home$/)
+        // Imad, 23 Oct (TRAK-278): the sheet shows the log, read only. TRAK-426 (Kostas, 12 Nov): with Training and
+        // Matches both on (this test answers every switch "on"), the old log retires, so there is no Edit log.
+        await expect(logged.getByRole('link', { name: 'Edit log' })).toHaveCount(0)
+        await page.keyboard.press('Escape')
+        await expect(logged).toBeHidden()
         await week.getByRole('button', { name: /Technical training/ }).click()
         await week.getByRole('button', { name: 'Details' }).click()
         const sheet = page.getByRole('dialog', { name: 'Technical training' })
@@ -276,7 +278,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         await expect(sheet).toHaveCount(0)
         // TRAK-255: the coach's is called Schedule, and a day with a started event that has no
         // register yet also says "needs you" (by the time of day this runs).
-        await page.getByRole('link', { name: 'Schedule' }).click()
+        await page.getByRole('link', { name: 'Events' }).click()
         await expect(page.getByRole('gridcell', { name: /, 2 events(, needs you)?$/ })).toHaveAttribute('aria-selected', 'true')
         await page.screenshot({ path: testInfo.outputPath('coach-schedule-month.png'), fullPage: true })
       }

@@ -150,7 +150,8 @@ describe('TRAK-387: the Library’s pages', { timeout: 20_000 }, () => {
   it('My drills says how to add one while it’s empty (TRAK-390 adds bookmarks)', async () => {
     renderApp('/coach/training/drills/mine')
     expect(await screen.findByRole('heading', { name: 'My drills', level: 1 })).toBeInTheDocument()
-    expect(await screen.findByText(/^Nothing here yet\. Open any drill and press Add to My drills/)).toBeInTheDocument()
+    expect(await screen.findByText('Nothing in My drills yet')).toBeInTheDocument() // TRAK-432: Arc's empty state
+    expect(screen.getByText(/^Open a drill and choose Add to My drills/)).toBeInTheDocument()
   })
 
   it('a drill’s page: the picture with a description, its key, the five details, why, how and what to watch for (TRAK-389 adds more)', async () => {

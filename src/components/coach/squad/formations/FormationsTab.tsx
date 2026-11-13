@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Check, Pencil, Plus } from 'lucide-react'
+import { Check, LayoutGrid, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { Alert } from '@/components/arc/alert/alert'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
+import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { Select } from '@/components/arc/select/select'
 import { LoadError } from '@/components/trak/LoadError'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
@@ -42,9 +43,9 @@ export function FormationsTab({ roster }: { roster: SquadRoster }) {
   const { t } = useTranslation()
   // The squad picked, or a coach's only squad.
   const squad = roster.squad ?? (roster.squads.length === 1 ? roster.squads[0] : null)
-  if (!squad || !user) return <div className="grid justify-items-center gap-2 pt-14 text-center">
-    <p className="text-[15px] font-medium text-ink-2">{t('coachSquad:fmPickSquad')}</p>
-    <p className="max-w-sm text-sm text-ink-3">{t('coachSquad:fmPickSquadBody')}</p>
+  // TRAK-432: Arc's empty state; the squad is chosen in the menu, so there is no button here.
+  if (!squad || !user) return <div className="arc pt-10">
+    <EmptyState icon={<LayoutGrid size={24} strokeWidth={1.5} />} title={t('coachSquad:fmPickSquad')} description={t('coachSquad:fmPickSquadBody')} />
   </div>
   // Keyed by squad, so one squad's edits never show in another's.
   return <Playbook key={squad} coachId={user.id} squad={squad} roster={roster} />

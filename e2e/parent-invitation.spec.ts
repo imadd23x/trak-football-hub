@@ -372,8 +372,9 @@ test('existing parent accepts a second child, recovers a failed family refresh a
   await page.getByRole('tab', { name: 'Home', exact: true }).click();
   await page.getByRole('button', { name: /^Alerts/ }).click();
   const alertsSheet = page.getByRole('dialog', { name: 'Alerts' });
-  await expect(alertsSheet.getByText(`vs ${zara.opponent} · 2–1`, { exact: true })).toBeVisible();
-  await expect(alertsSheet.getByText(`vs ${alex.opponent} · 2–1`, { exact: true })).toHaveCount(0);
+  // TRAK-436: a match reaches the bell as the coach's review, not "Match logged" (per-child scoping: unit tests).
+  await expect(alertsSheet).toBeVisible();
+  await expect(alertsSheet.getByText(/· 2–1/)).toHaveCount(0);
   // TRAK-122: Escape pressed during the sheet's 500 ms opening animation was
   // ignored in about half the runs (not handled; the sheet stayed open). Wait
   // for the animation, as a person would, then press it.

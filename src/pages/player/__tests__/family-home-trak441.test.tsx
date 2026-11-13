@@ -36,7 +36,7 @@ beforeEach(() => {
     table('squad_players', [{ id: 'squad-1', coach_user_id: 'coach-1' }]), table('coach_assessments', []),
     table('coach_shared_feedback', []),
     table('game_for_family', [{ event_id: 'parkview', shared_at: new Date(Date.now() - 3_600_000).toISOString(), changed_at: null, role: 'starter', coach_name: 'Otto Rehhagel' }]),
-    table('game_for_player', []), table('game_review_for_family', []),
+    table('game_for_player', []), table('game_review_for_family', []), table('matches', [{ id: 'm1' }, { id: 'm2' }]),
     rpcRows('child_events', [MATCH]), rpcRows('season_plan_for_player', []), rpcRows('family_academy', [{ name: 'Rehearsal FC', logo_url: null }]),
     rpc('get_player_invites_for_current_user', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),
@@ -55,6 +55,9 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     // The coach's Home top: the bell is on the page; the details line is not said a second time.
     expect(screen.getByRole('button', { name: /^Alerts/ })).toBeInTheDocument()
     expect(screen.queryByText('Defender · Rehearsal FC · U16')).toBeNull()
+    // Slice 2.5b: Season so far, counts only.
+    const soFar = await screen.findByRole('region', { name: 'Season so far' })
+    expect(within(soFar).getByText('Matches').nextElementSibling).toHaveTextContent('2')
     await userEvent.click(within(forYou).getByRole('button', { name: 'Open game plan' }))
     await waitFor(() => expect(window.location.pathname + window.location.hash).toBe('/player/event/parkview#game-plan'))
   })
@@ -65,6 +68,7 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     renderApp('/player/home')
     expect(await screen.findByText('Defender · Rehearsal FC · U16', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: /^For you/ })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Season so far' })).toBeNull()
   })
 
   it('slice 2.5: the latest evaluation as the coach\'s bars, marked New; its note stays on its own page', async () => {

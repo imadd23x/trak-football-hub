@@ -235,6 +235,24 @@ test("a parent's laptop frame: the child switcher in the side menu", async ({ pa
   expect(errors).toEqual([])
 })
 
+// TRAK-441 slice 2 (Imad, 13 Nov): the player Home in the coach's look, behind family_look. A phone: the bell on the
+// page; a laptop: the bell in the top bar and two columns. No sideways scroll either way.
+for (const [label, width, height] of [['a phone', 390, 844], ['a laptop', 1440, 900]] as const) {
+  test(`the player Home in the coach's look on ${label}`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, 'player', '/player/home', width, height, ['events', 'family_look'])
+    const bell = page.getByRole('button', { name: /^Alerts/ })
+    await expect(bell).toBeVisible()
+    // A phone: the bell in the page's own top row, the glass tab bar. A laptop: the side menu, the bell in its top bar.
+    await expect(page.getByRole('navigation', { name: 'Trak' })).toHaveCount(width < 1024 ? 0 : 1)
+    expect((await bell.boundingBox())!.y).toBeLessThan(60)
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`family-home-${width}.png`), fullPage: true })
+    expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}
+
 // TRAK-250: Squad is a coach workspace of views. TRAK-263 (Imad, 22 Oct): Players (Arc's team
 // directory) replaced Snapshot, and the views sit on Arc's glass segmented control. On a tablet
 // or a laptop it uses the room: a page wider than the phone column. TRAK-351 (Tarek, 3 Nov): a player opens as their

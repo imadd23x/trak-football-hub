@@ -282,7 +282,8 @@ export function SidebarRail({ label, brand, items, footerItem, profile, active, 
     </AnimatePresence>
   </Dialog.Root>;
 
-  if (narrow) return <LayoutGroup id={baseId}>{children}{sheetUi}</LayoutGroup>;
+  // TRAK-415: the page keeps the laptop shell's `.arc` scope (Arc's tokens); `contents` adds no box to the layout.
+  if (narrow) return <LayoutGroup id={baseId}><div className="arc contents">{children}</div>{sheetUi}</LayoutGroup>;
 
   return <LayoutGroup id={baseId}>
     <TooltipPrimitive.Provider delayDuration={250} skipDelayDuration={300}>

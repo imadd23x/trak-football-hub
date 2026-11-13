@@ -3,7 +3,6 @@ import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PlayerProfile from '@/pages/player/PlayerProfilePage'
-import CoachProfile from '@/pages/coach/CoachProfilePage'
 import ParentProfile from '@/pages/parent/ParentProfilePage'
 import ClubProfile from '@/pages/club/ClubProfile'
 
@@ -36,7 +35,8 @@ beforeEach(() => mocks.avatar.mockClear())
 afterEach(cleanup)
 
 describe('G7 profile photos', () => {
-  it.each([['player', PlayerProfile], ['coach', CoachProfile], ['parent', ParentProfile], ['club', ClubProfile]] as const)(
+  // TRAK-418: the coach's old Profile page is gone; a coach's profile is Settings, which shows no photo (photosSoon).
+  it.each([['player', PlayerProfile], ['parent', ParentProfile], ['club', ClubProfile]] as const)(
     '%s never renders or signs a stored photo', async (_role, Profile) => {
       let container!: HTMLElement
       await act(async () => { ({ container } = render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><Profile /></MemoryRouter></QueryClientProvider>)) })

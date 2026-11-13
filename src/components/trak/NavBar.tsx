@@ -1,40 +1,32 @@
-import { forwardRef } from 'react'
+import { CalendarDays, House, TrafficCone, UserRound, type LucideIcon } from 'lucide-react'
+import { createContext, useContext } from 'react'
+import { useLocation } from 'react-router-dom'
 import type { Role } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
-import {
-  IconHome,
-  IconLog,
-  IconGoals,
-  IconRecognition,
-  IconProfile,
-  IconMatch,
-  IconTraining,
-  ACTIVE_COLOR,
-  DEFAULT_COLOR,
-} from '@/components/icons/TrakIcons'
-
-type IconComponent = (props: { size?: number; color?: string }) => JSX.Element
+import { GlassTabBar } from '@/components/arc/glass-tabbar/glass-tabbar'
+import { PitchIcon } from '@/components/icons/PitchIcon'
 
 interface NavItem {
   /** Its word in nav.json (TRAK-406). */
-  label: 'home' | 'sessions' | 'trainings' | 'card' | 'profile' | 'events'
+  label: 'home' | 'matches' | 'trainings' | 'profile' | 'events'
   path: string
-  Icon: IconComponent
+  Icon: LucideIcon | typeof PitchIcon
 }
 
-function getNavItems(role: Role): NavItem[] {
-  if (role === 'player') return [
-    { label: 'home', path: '/player/home', Icon: IconHome },
-    { label: 'sessions', path: '/player/matches', Icon: IconMatch },  // TRAK-112: matches and training
-    { label: 'trainings', path: '/player/trainings', Icon: IconTraining },
-    { label: 'card', path: '/player/evolution', Icon: IconRecognition },
-    { label: 'profile', path: '/player/profile', Icon: IconProfile },
-  ]
-  return [
-    { label: 'home',    path: '/parent/home',    Icon: IconHome },
-    { label: 'events',  path: '/parent/matches', Icon: IconMatch },
-    { label: 'profile', path: '/parent/profile', Icon: IconProfile },
-  ]
+/** TRAK-440 (Imad, 11-12 Nov): the coach's tabs and icons. The player's Card leaves the bar (it becomes part of
+ *  Profile); "Sessions" is Matches. */
+export const FAMILY_TABS: Record<'player' | 'parent', NavItem[]> = {
+  player: [
+    { label: 'home', path: '/player/home', Icon: House },
+    { label: 'matches', path: '/player/matches', Icon: PitchIcon },
+    { label: 'trainings', path: '/player/trainings', Icon: TrafficCone },
+    { label: 'profile', path: '/player/profile', Icon: UserRound },
+  ],
+  parent: [
+    { label: 'home', path: '/parent/home', Icon: House },
+    { label: 'events', path: '/parent/matches', Icon: CalendarDays },
+    { label: 'profile', path: '/parent/profile', Icon: UserRound },
+  ],
 }
 
 interface NavBarProps {
@@ -45,52 +37,29 @@ interface NavBarProps {
   sideMenuOnly?: boolean
 }
 
-export const NavBar = forwardRef<HTMLElement, NavBarProps>(
-  function NavBar({ role, activeTab, onNavigate }, ref) {
-    const { t } = useTranslation()
-    // TRAK-259: a coach's nav is the frame's (CoachFrame: the sidebar on a laptop, the glass tab bar on a phone).
-    if (role === 'coach') return null
-    const items = getNavItems(role)
-    return (
-      <nav
-      ref={ref}
-      // TRAK-199: as wide as a page.
-      className="trak-nav trak-page fixed bottom-0 w-full mx-auto left-1/2 -translate-x-1/2 flex justify-around items-center px-4 py-2 border-t border-line z-50"
-      style={{
-        background: 'rgb(var(--t-ground) / 0.96)',
-        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
-        willChange: 'auto',
-      }}
-    >
-      {items.map(item => {
-        // TRAK-186: a tab stays marked on every page under it (Squad → a player).
-        const isActive = activeTab === item.path || activeTab.startsWith(`${item.path}/`)
-        const Icon = item.Icon
-        return (
-          <button
-            key={item.path}
-            onClick={() => onNavigate(item.path)}
-            aria-current={isActive ? 'page' : undefined}
-            className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all relative"
-            style={{
-              background: isActive ? 'rgb(var(--t-brand) / 0.06)' : 'transparent',
-              minWidth: 52,
-            }}
-          >
-            <Icon size={20} color={isActive ? ACTIVE_COLOR : DEFAULT_COLOR} />
-            <span className="trak-nav-label" style={{ color: isActive ? 'rgb(var(--t-brand))' : 'rgb(var(--t-ink-3))' }}>
-              {t(`nav:${item.label}`)}
-            </span>
-            {isActive && (
-              <span
-                className="trak-nav-dot absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
-                style={{ background: 'rgb(var(--t-brand))' }}
-              />
-            )}
-          </button>
-        )
-      })}
-      </nav>
-    )
-  },
-)
+/** TRAK-441: inside the family frame (a laptop, the academy's family_look on) the side menu is the nav. */
+export const FamilyFramed = createContext(false)
+
+/** A player's and a parent's bar: the coach's glass tab bar (CoachFrame's, TRAK-440). A coach's nav is the frame's. */
+export function NavBar({ role, activeTab, onNavigate }: NavBarProps) {
+  const { t } = useTranslation()
+  const { pathname } = useLocation()
+  const framed = useContext(FamilyFramed)
+  if (role === 'coach' || framed) return null
+  // As before: everyone but a player (a parent, a club account) gets the parent's tabs.
+  const who = role === 'player' ? 'player' : 'parent'
+  const items = FAMILY_TABS[who]
+  // TRAK-186: a tab stays marked on every page under it (Events → an event).
+  const active = items.find(item => activeTab === item.path || activeTab.startsWith(`${item.path}/`))?.path ?? ''
+  return (
+    <div className="arc fixed inset-x-0 z-50 px-3 pointer-events-none" style={{ bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="mx-auto max-w-[406px]">
+        {/* On a page under a tab (an event under Events), its marked tab goes back to the tab's page. */}
+        <GlassTabBar label={t(`nav:${who}`)} value={active} onValueChange={onNavigate}
+          onReselect={path => { if (pathname !== path) onNavigate(path) }}
+          style={{ ['--glass-active' as string]: 'rgb(var(--t-brand))' }}
+          items={items.map(({ label, path, Icon }) => ({ value: path, label: t(`nav:${label}`), icon: <Icon /> }))} />
+      </div>
+    </div>
+  )
+}

@@ -156,6 +156,18 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     await waitFor(() => expect(trigger()).toHaveAccessibleName('Squad: U16. 1 player'), { timeout: 5000 })
   })
 
+  // TRAK-430: the squad picker stays in the sidebar on the pages with no phone bar, or the rows under it jump 64 px.
+  it('TRAK-430: on a laptop the squad picker stays on Settings, a player\'s page and a session', async () => {
+    screenIs(true)
+    for (const path of ['/settings', '/coach/squad/player/sq-1', '/coach/sessions/new']) {
+      renderApp(path)
+      await screen.findByRole('navigation', { name: 'Rehearsal FC' })
+      // Present is enough: the squad picked in an earlier test holds.
+      expect(await screen.findByRole('button', { name: /^Squad: / }, { timeout: 5000 })).toBeInTheDocument()
+      cleanup()
+    }
+  })
+
   it("Imad, 24 Oct: the academy's logo in the sidebar; the coach stays initials (G7)", async () => {
     screenIs(true)
     renderApp('/coach/home')
@@ -173,7 +185,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
   })
 
   it('keeps the phone bar off pages that had none: their own actions sit at the bottom', async () => {
-    for (const path of ['/settings', '/coach/manual', '/coach/squad/player/sp-1', '/coach/sessions/add', '/coach/sessions/quick', '/coach/sessions/abc'])
+    for (const path of ['/settings', '/coach/how-trak-works', '/coach/squad/player/sp-1', '/coach/sessions/add', '/coach/sessions/quick', '/coach/sessions/abc'])
       expect(BARLESS.test(path)).toBe(true)
     for (const path of ['/coach/home', '/coach/sessions', '/coach/sessions/list', '/coach/assess', '/coach/squad', '/coach/trainings'])
       expect(BARLESS.test(path)).toBe(false)

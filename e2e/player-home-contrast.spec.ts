@@ -41,7 +41,8 @@ async function playerBackend(context: BrowserContext, hasMatches: boolean, unexp
     if (path === '/rest/v1/squad_players') return rows([{ id: 'sq-189', coach_user_id: 'coach-189', linked_player_id: playerId, status: 'active' }])
     if (path === '/rest/v1/coach_assessments') return rows([{ id: 'as-189', squad_player_id: 'sq-189', coach_user_id: 'coach-189',
       created_at: '2026-10-12T10:00:00Z', coach_rating: 6.3, work_rate: 9, tactical: 6, attitude: 8, technical: 5, physical: 7, coachability: 3 }])
-    if (['coach_shared_feedback', 'player_parent_links', 'recognition_awards'].some(table => path === `/rest/v1/${table}`)) return rows([])
+    // TRAK-436: the bell reads his game plans and the coach's reviews.
+    if (['coach_shared_feedback', 'player_parent_links', 'recognition_awards', 'game_for_family', 'game_for_player', 'game_review_for_family'].some(table => path === `/rest/v1/${table}`)) return rows([])
     if (path === '/rest/v1/rpc/my_consent_status') return json({ required: false, invited_parent: null })
     if (path === '/rest/v1/rpc/my_session_is_live' || path === '/rest/v1/rpc/feature_on') return json(true)
     if (['child_events', 'get_player_invites_for_current_user', 'season_plan_for_player'].some(rpc => path === `/rest/v1/rpc/${rpc}`)) return json([])
@@ -56,11 +57,10 @@ for (const hasMatches of [false, true]) {
     page.on('pageerror', error => errors.push(error.message))
     await playerBackend(context, hasMatches, unexpected)
     await page.goto('/player/home')
-    await expect(page.getByText('THIS SEASON')).toBeVisible()
-    if (hasMatches) {
-      await expect(page.getByText('Season bands', { exact: true })).toBeVisible()
-      await expect(page.getByText('3 more Good → Good season')).toBeVisible()
-    } else await expect(page.getByText('EXC', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Alerts/ })).toBeVisible()
+    // TRAK-435 (Imad, 12 Nov): no card built on match ratings, with rated matches or without.
+    await expect(page.getByText('THIS SEASON')).toHaveCount(0)
+    await expect(page.getByText('Season bands', { exact: true })).toHaveCount(0)
     await page.waitForLoadState('networkidle')
     await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') })
     const violations = await page.evaluate(async () => {

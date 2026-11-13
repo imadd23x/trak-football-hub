@@ -1,3 +1,5 @@
+import { currentLanguage, useTranslation } from '@/lib/i18n'
+import { bandWord } from '@/lib/band-words'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -37,12 +39,13 @@ export function CoachAssessmentCard({ assessment, playerName, message, messageFa
   onChanged?: (published: boolean) => void
 }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [published, setPublished] = useState(assessment.published_at != null)
   const [busy, setBusy] = useState(false)
   const band = scoreToBand(average(assessment))
-  const bandWord = BANDS.find(b => b.word.toLowerCase() === band)?.word ?? band
-  const date = new Date(assessment.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-  const label = published ? 'Published' : 'Draft'
+  const bandName = bandWord(BANDS.find(b => b.word.toLowerCase() === band)?.word ?? band)
+  const date = new Date(assessment.created_at).toLocaleDateString(currentLanguage() === 'en' ? 'en-GB' : currentLanguage(), { day: 'numeric', month: 'short' })
+  const label = published ? t('coachHome:notePublished') : t('coachHome:stateDraft')
 
   const setPublishedTo = async (next: boolean) => {
     if (busy) return
@@ -55,50 +58,50 @@ export function CoachAssessmentCard({ assessment, playerName, message, messageFa
       if (error) throw error
       setPublished(next)
       onChanged?.(next)
-      toast.success(next ? 'Published. The player and their parents can see it.' : 'Unpublished. Only you can see it now.')
+      toast.success(next ? t('coachAssess:cardPublishedToast') : t('coachAssess:cardUnpublishedToast'))
     } catch {
-      toast.error(next ? 'Not published. Check your connection and try again.' : 'Not unpublished. The family may still see it. Try again.')
+      toast.error(next ? t('coachAssess:cardNotPublished') : t('coachAssess:cardNotUnpublished'))
     } finally {
       setBusy(false)
     }
   }
 
-  const edit = { label: 'Edit', onSelect: () => navigate(`/coach/assess?assessment=${assessment.id}`) }
+  const edit = { label: t('coachSchedule:edit'), onSelect: () => navigate(`/coach/assess?assessment=${assessment.id}`) }
   return (
     // TRAK-229: a light Arc card like the rest; each bar carries its band's colour.
     <Card
       className="arc"
-      aria-label={`${label} assessment${playerName ? `, ${playerName}` : ''}, ${date}`}
+      aria-label={playerName ? t('coachAssess:cardAriaNamed', { label, name: playerName, date }) : t('coachAssess:cardAria', { label, date })}
       title={label}
       description={playerName}
-      meta={bandWord}
+      meta={bandName}
       action={<SplitButton
-        label={published ? 'Published' : 'Publish'}
+        label={published ? t('coachHome:notePublished') : t('coachHome:publish')}
         variant={published ? 'secondary' : 'primary'}
         disabled={busy}
         onClick={published ? undefined : () => void setPublishedTo(true)}
-        actions={published ? [edit, { label: 'Unpublish', onSelect: () => void setPublishedTo(false) }] : [edit]}
+        actions={published ? [edit, { label: t('coachAssess:unpublish'), onSelect: () => void setPublishedTo(false) }] : [edit]}
       />}
       details={<div className="space-y-3 text-sm">
-        <p className="text-foreground">{assessment.coach_sessions?.title ?? 'No session recorded'}</p>
+        <p className="text-foreground">{assessment.coach_sessions?.title ?? t('coachAssess:noSessionRecorded')}</p>
         <p className="text-muted-foreground">{date}</p>
         <div>
-          <MetadataLabel text="MESSAGE TO THE PLAYER" />
-          <p className="mt-1 text-foreground">{messageFailed ? "Couldn't load the message. Publish still sends it." : message || 'No message'}</p>
+          <MetadataLabel text={t('coachAssess:messageToPlayerCaps')} />
+          <p className="mt-1 text-foreground">{messageFailed ? t('coachAssess:couldntLoadMessage') : message || t('coachAssess:noMessage')}</p>
         </div>
         {note ? <div>
-          <MetadataLabel text="PRIVATE NOTE · ONLY YOU" />
+          <MetadataLabel text={t('coachAssess:privateNoteCaps')} />
           <p className="mt-1 italic text-muted-foreground">{note}</p>
         </div> : null}
       </div>}
     >
       <div className="space-y-2.5 mt-2">
-        <CategoryBar label="Work Rate" score={assessment.work_rate} />
-        <CategoryBar label="Technical" score={assessment.technical} />
-        <CategoryBar label="Physical" score={assessment.physical} />
-        <CategoryBar label="Coachability" score={assessment.coachability} />
-        <CategoryBar label="Attitude" score={assessment.attitude} />
-        <CategoryBar label="Tactical" score={assessment.tactical} />
+        <CategoryBar label={t('coachAssess:sliderWorkRate')} score={assessment.work_rate} />
+        <CategoryBar label={t('coachHome:attributeTechnical')} score={assessment.technical} />
+        <CategoryBar label={t('coachHome:attributePhysical')} score={assessment.physical} />
+        <CategoryBar label={t('coachAssess:sliderCoachability')} score={assessment.coachability} />
+        <CategoryBar label={t('coachHome:attributeAttitude')} score={assessment.attitude} />
+        <CategoryBar label={t('coachHome:attributeTactical')} score={assessment.tactical} />
       </div>
     </Card>
   )

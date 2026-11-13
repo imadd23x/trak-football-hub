@@ -318,12 +318,35 @@ test.describe('TRAK-425 Assess player on a laptop', () => {
     // Nothing picked yet: Review cannot be jumped to.
     await expect(steps.getByRole('button', { name: /Review/ })).toBeDisabled()
     await page.getByRole('combobox', { name: 'Player' }).selectOption({ label: 'Bukayo Saka' })
+    // A picked player shows once: the card (with Change) replaces the list.
+    await expect(page.getByRole('combobox', { name: 'Player' })).toHaveCount(0)
+    await expect(page.getByText('Bukayo Saka')).toHaveCount(1)
     await page.getByRole('combobox', { name: 'Session' }).selectOption({ index: 1 })
     await steps.getByRole('button', { name: /Review/ }).click()
     await expect(page.getByRole('button', { name: 'Publish' }).or(page.getByRole('button', { name: 'Save' })).first()).toBeVisible()
     await steps.getByRole('button', { name: /Ratings/ }).click()
     await expect(page.getByRole('slider', { name: 'Work Rate' })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('coach-assess-laptop.png') })
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+})
+
+// TRAK-425: on a phone Assess has its own Back and Next bar, so the glass tab bar steps aside: one bar at the bottom, not two.
+test.describe('TRAK-425 Assess player on a phone', () => {
+  test.use({ timezoneId: 'Asia/Dubai', viewport: { width: 390, height: 844 } })
+
+  test('has one bar at the bottom, and its sessions read like the rest of the app', async ({ page, context }, testInfo) => {
+    const unexpected: string[] = [], errors: string[] = []
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+    await coachBackend(context, unexpected)
+    await page.goto('/coach/assess')
+    await expect(page.getByRole('button', { name: 'Next' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Coach' })).toHaveCount(0)
+    await page.getByRole('combobox', { name: 'Player' }).selectOption({ label: 'Bukayo Saka' })
+    const labels = await page.getByRole('combobox', { name: 'Session' }).locator('option').allTextContents()
+    expect(labels.slice(1).every(label => / · (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}/.test(label))).toBe(true)
+    await page.screenshot({ path: testInfo.outputPath('coach-assess-phone.png') })
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
   })

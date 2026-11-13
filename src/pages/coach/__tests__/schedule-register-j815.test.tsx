@@ -60,7 +60,7 @@ function fixtures() {
     http.get(`${SUPABASE_URL}/rest/v1/coach_sessions`, () => HttpResponse.json(sessions)),
     http.get(`${SUPABASE_URL}/rest/v1/session_attendance`, () => HttpResponse.json(attendance)),
     table('squad_players', SQUAD),
-    table('event_absences', [{ squad_player_id: 'sp-2', reason: 'Ill' }, { squad_player_id: 'sp-4', reason: null }]),
+    table('event_absences', [{ squad_player_id: 'sp-2', reason: 'family' }, { squad_player_id: 'sp-4', reason: null }]),
     // TRAK-288: Games off, so a match is still logged as today.
     rpc('feature_on', ({ p_feature }) => p_feature !== 'games'),
     rpc('coach_squad_player_consent_required', args => args.p_squad_player_id === 'sp-6'),
@@ -105,7 +105,7 @@ describe('J8.15: the coach takes the register from the schedule', () => {
     expect(mark('Dan Roe')).toHaveAttribute('aria-pressed', 'false')
     for (const name of ['Cal Moss', 'Eli Fox']) expect(mark(name)).toHaveAttribute('aria-pressed', 'true')
     // The family's word is shown, with its reason when there is one.
-    expect(within(sheet).getByText("Can't make it · Ill")).toBeInTheDocument()
+    expect(within(sheet).getByText("Can't make it · Family")).toBeInTheDocument()
     // Never tickable: no button, and the reason is said.
     expect(screen.queryByRole('button', { name: /^Wes Wait:/ })).toBeNull()
     expect(within(sheet).getByText(/Not recorded until a parent approves: Wes Wait/)).toBeInTheDocument()

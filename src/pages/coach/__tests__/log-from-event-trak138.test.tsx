@@ -57,7 +57,7 @@ function fixtures() {
     table('session_attendance', []),
     table('squad_players', SQUAD),
     // Bea's family said "Can't make it".
-    table('event_absences', [{ squad_player_id: 'sp-2', reason: 'Ill' }]),
+    table('event_absences', [{ squad_player_id: 'sp-2', reason: 'family' }]),
     // TRAK-288: Games off, so a match is still logged as today.
     rpc('feature_on', ({ p_feature }) => p_feature !== 'games'),
     rpc('coach_squad_player_consent_required', () => false),

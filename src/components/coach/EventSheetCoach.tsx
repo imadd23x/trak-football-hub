@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Ban, Check, Pencil } from 'lucide-react'
+import { Ban, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { publishEvent } from '@/lib/event-publish'
@@ -16,6 +16,7 @@ import type { StripEvent } from '@/components/trak/WeekStrip'
 import { updatedNote } from '@/lib/alert-read-state'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { i18n, useTranslation } from '@/lib/i18n'
+import { EditIcon } from '@/components/trak/IconAction'
 
 /* TRAK-182: the coach's part of the event sheet. Publish (a draft) or
    Published; after the event, Take register (J8.15). Share (the
@@ -146,7 +147,8 @@ export function EventSheetCoach({ event, coachId, onChanged }: { event: StripEve
         <div className="flex flex-wrap gap-2">
           {cancelled ? null : canRegister ? (
             <button type="button" onClick={() => setRegistering(true)} className={`${button} bg-brand text-on-brand`}>
-              {sessionId ? t('coachSchedule:editRegister') : t('coachHome:takeRegister')}
+              {/* TRAK-455: no "Edit" word; a taken register opens again under its own name. */}
+              {sessionId ? t('coachSchedule:register') : t('coachHome:takeRegister')}
             </button>
           ) : row?.published ? (
             <button type="button" disabled className={`${button} bg-raised text-ink`}><Check size={16} aria-hidden="true" />{t('coachHome:notePublished')}</button>
@@ -166,17 +168,13 @@ export function EventSheetCoach({ event, coachId, onChanged }: { event: StripEve
           )}
           {/* TRAK-185: a logged match is corrected from its event (score, goals, assists, cards). */}
           {!cancelled && row?.event_type === 'match' && sessionId && (
-            <button type="button" onClick={() => navigate(`/coach/sessions/${sessionId}`)} className={quiet}>
-              <Pencil size={16} aria-hidden="true" />{t('coachSchedule:editMatch')}
-            </button>
+            <EditIcon label={t('coachSchedule:editMatch')} onClick={() => navigate(`/coach/sessions/${sessionId}`)} />
           )}
           {/* TRAK-230 (Kostas, 21 Oct): once it has started, what families were told is fixed. */}
           {!cancelled && row && startedLocked(row) ? (
             <p className="basis-full text-[13px] text-ink-2">{t('coachSchedule:startedDetailsFixed')}</p>
           ) : !cancelled && <>
-            <button type="button" onClick={() => navigate(`/coach/schedule?edit=${event.id}`)} className={quiet}>
-              <Pencil size={16} aria-hidden="true" />{t('coachSchedule:edit')}
-            </button>
+            <EditIcon label={t('coachSchedule:editEvent')} onClick={() => navigate(`/coach/schedule?edit=${event.id}`)} />
             {/* A published event is cancelled, never deleted; a draft is edited or deleted in Schedule. */}
             {row?.published && !hasStarted(row) && (
               <button type="button" onClick={() => navigate(`/coach/schedule?cancel=${event.id}`)} className={quiet}>

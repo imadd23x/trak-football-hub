@@ -98,7 +98,7 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     expect(row('Type')).toHaveTextContent('Match')
     expect(row('Opponent')).toHaveTextContent('Parkview Athletic (Home)')
     expect(row('Message to players')).toHaveTextContent('Bring water')
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit event' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Edit in Schedule' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Publish' })).toBeNull()
 
@@ -160,7 +160,7 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     renderApp('/coach/matches/g1')
     expect(await screen.findByText('Locked at kick-off')).toBeInTheDocument()
     expect(screen.getByText('Shared')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit event' })).toBeNull()
   })
 
   it("TRAK-331: Edit pulls up the event's edit sheet on the match page; a saved change shows here, families are told as from Schedule, and the coach never leaves", async () => {
@@ -179,7 +179,7 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
       http.post(`${SUPABASE_URL}/functions/v1/send-event-emails`, () => { emails += 1; return HttpResponse.json({}) }),
     )
     renderApp('/coach/matches/g1')
-    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit event' }))
     const sheet = await screen.findByRole('dialog', { name: 'Edit event' })
     const venue = within(sheet).getByLabelText('Venue')
     await user.clear(venue)

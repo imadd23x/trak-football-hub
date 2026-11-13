@@ -157,6 +157,7 @@
   "savedProfile": "Saved {{name}}'s profile",
   "profileTitle": "{{name}}'s profile",
   "editProfile": "Edit profile",
+  "editProfileOf": "Edit {{name}}'s profile",
   "traitGetsForwardWheneverPossible": "Gets forward whenever possible",
   "traitStaysBackAtAllTimes": "Stays back at all times",
   "traitComesDeepToGetTheBall": "Comes deep to get the ball",

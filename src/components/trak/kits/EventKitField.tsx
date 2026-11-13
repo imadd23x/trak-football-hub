@@ -5,6 +5,7 @@ import { KitPicker } from './KitPicker'
 import { KitAnnouncement } from './KitAnnouncement'
 import { TeamKitEditor } from './TeamKitEditor'
 import { Button } from '@/components/arc/button/button'
+import { EditIcon } from '@/components/trak/IconAction'
 
 /** Key by coach + event squad at the caller, so changing scope discards stale reads. */
 export function EventKitField({ coachId, squad, value, onChange }: {
@@ -61,10 +62,12 @@ export function EventKitField({ coachId, squad, value, onChange }: {
     </div> : <>
       {kits ? <KitPicker kits={kits} value={value && JSON.stringify(value.design) === JSON.stringify(kits[value.slot]) ? value.slot : null}
         onChange={slot => onChange(snapshotKit(kits, slot))} /> : <p className="text-sm text-muted-foreground">Set up home, away and alternate kits for this squad.</p>}
-      <Button type="button" variant="secondary" size="md" onClick={() => {
-        setSaved(false)
-        setDraft(copyKitSet(kits ?? { version: 1, home: BLANK_KIT, away: BLANK_KIT, alternate: BLANK_KIT }))
-      }}>{kits ? 'Edit team kits' : 'Set up team kits'}</Button>
+      {/* TRAK-455: editing the kits is a pencil; setting them up the first time keeps its words. */}
+      {kits ? <EditIcon label="Edit team kits" onClick={() => { setSaved(false); setDraft(copyKitSet(kits)) }} />
+        : <Button type="button" variant="secondary" size="md" onClick={() => {
+          setSaved(false)
+          setDraft(copyKitSet({ version: 1, home: BLANK_KIT, away: BLANK_KIT, alternate: BLANK_KIT }))
+        }}>Set up team kits</Button>}
       {saved && <p role="status" className="text-xs text-muted-foreground">Team kits saved. Choose one above to use it for this event.</p>}
     </>}
   </section>

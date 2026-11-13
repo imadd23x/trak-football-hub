@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ArrowRight, Pencil, Plus, X } from 'lucide-react'
+import { ArrowRight, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { trainingMinutes } from '@/lib/training/sessions'
 import { libraryDrill, squadPlayers, type LibraryDrill } from '@/lib/training/library'
@@ -25,6 +25,7 @@ import { Input } from '@/components/arc/input/input'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Textarea } from '@/components/arc/textarea/textarea'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { RemoveIcon } from '@/components/trak/IconAction'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): Plan session. A plan is a list of parts; the coach goes
    through them one step each, then Review, and saves the plan whole. A new plan starts from the parts the coach saved
@@ -365,9 +366,7 @@ function DraftNote({ saving, saved }: { saving: boolean; saved: boolean }) {
   return <span role="status" className="text-sm text-ink-3">{saving ? 'Saving draft…' : saved ? 'Draft saved' : ''}</span>
 }
 
-/** TRAK-404 (Kostas, 10 Nov): × alone removes a part; its name is still read out. */
+/** TRAK-404 (Kostas, 10 Nov): an icon alone removes a part; its name is still read out. TRAK-455: a bin, not an ×. */
 function RemoveButton({ name, onRemove }: { name: string; onRemove: () => void }) {
-  return <button type="button" aria-label={`Remove ${name}`} title={`Remove ${name}`} onClick={onRemove}
-    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-2 hover:bg-raised hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-    <X aria-hidden size={18} /></button>
+  return <RemoveIcon label={`Remove ${name}`} onClick={onRemove} className="rounded-full" />
 }

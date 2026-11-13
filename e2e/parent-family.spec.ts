@@ -267,7 +267,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         const share = sheet.getByRole('link', { name: 'Share' }).or(sheet.getByRole('button', { name: 'Share' }))
         await expect(share).toBeVisible()
         if (await share.evaluate(el => el.tagName === 'A')) await expect(share).toHaveAttribute('href', /^https:\/\/wa\.me\/\?text=/)
-        await expect(sheet.getByRole('button', { name: 'Edit' })).toBeVisible()
+        await expect(sheet.getByRole('button', { name: 'Edit event' })).toBeVisible()
         await expect(sheet.getByText('No players in your squad yet.')).toBeVisible()
         await expect(page).toHaveURL(/\/coach\/home$/)
         await sheetAtRest(sheet)

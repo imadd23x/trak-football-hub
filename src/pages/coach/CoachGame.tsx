@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { CalendarDays, Check, ClipboardCheck, Clock, MapPin, Pencil, Save, Share, Users } from 'lucide-react'
+import { CalendarDays, Check, ClipboardCheck, Clock, MapPin, Save, Share, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/integrations/supabase/client'
@@ -32,6 +32,7 @@ import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { PageHeader, PageHeaderPanel, type PageHeaderAction, type PageHeaderTab } from '@/components/arc/blocks/page-header/page-header'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { EditIcon } from '@/components/trak/IconAction'
 
 /* TRAK-283 (Games 1/8): a game's page. Its header says where it is in the loop; Logistics, Game plan and
    Evaluation are peer panels of the one game, and the panel lives in the URL (?tab=). TRAK-284 to
@@ -285,7 +286,7 @@ function Logistics({ row, squad, onEdit, publish }: {
       <div className="flex flex-wrap items-center gap-3">
         <Badge tone={row.published ? 'success' : 'neutral'}>{row.published ? t('coachMatches:sharedBadge') : t('coachHome:stateDraft')}</Badge>
         {!row.published && <Button loading={publish.isPending} onClick={() => publish.mutate()}>{t('coachHome:publish')}</Button>}
-        {onEdit && <Button variant="secondary" size="sm" onClick={onEdit}><Pencil size={14} aria-hidden="true" />{t('coachSchedule:edit')}</Button>}
+        {onEdit && <EditIcon label={t('coachSchedule:editEvent')} onClick={onEdit} />}
       </div>
       <EventSummary form={rowToForm(row)} repeat={null} noteProblem={null} squad={squad} />
     </div>

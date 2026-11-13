@@ -153,7 +153,7 @@ describe('TRAK-367: the message to players', { timeout: 30_000 }, () => {
     renderApp('/coach/training')
     const next = await card('Training soon')
     expect(within(next).getByText('Bring shin pads.')).toBeInTheDocument()
-    expect(within(next).getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/coach/schedule?edit=soon&step=2')
+    expect(within(next).getByRole('link', { name: 'Edit the message to players' })).toHaveAttribute('href', '/coach/schedule?edit=soon&step=2')
   })
 
   it('with none, Add a message is there', async () => {
@@ -168,7 +168,7 @@ describe('TRAK-367: the message to players', { timeout: 30_000 }, () => {
     renderApp('/coach/training')
     const next = await card('Training now')
     expect(within(next).getByText('Bring shin pads.')).toBeInTheDocument()
-    expect(within(next).queryByRole('link', { name: 'Edit' })).toBeNull()
+    expect(within(next).queryByRole('link', { name: 'Edit the message to players' })).toBeNull()
   })
 
   it('once it has started with no message, there is no line', async () => {

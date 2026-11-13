@@ -157,6 +157,7 @@
   "savedProfile": "Το προφίλ αποθηκεύτηκε: {{name}}",
   "profileTitle": "Προφίλ: {{name}}",
   "editProfile": "Επεξεργασία προφίλ",
+  "editProfileOf": "Επεξεργασία προφίλ: {{name}}",
   "traitGetsForwardWheneverPossible": "Ανεβαίνει μπροστά όποτε μπορεί",
   "traitStaysBackAtAllTimes": "Μένει πάντα πίσω",
   "traitComesDeepToGetTheBall": "Χαμηλώνει για να πάρει την μπάλα",

@@ -117,8 +117,8 @@ SELECT public.record_parental_consent(pg_temp.eaid(23),'parent','{"coaching_reco
 
 -- ── 1. The guardian reports, changes the reason, and undoes ────────────────
 SELECT pg_temp.eaactor(30);
-SELECT pg_temp.eaok(pg_temp.eareport(700,20,'Dentist'),'1 a guardian reports their child can''t make a published training');
-SELECT pg_temp.eaok(pg_temp.eareport(700,20,'School trip'),'1 reporting again just updates the reason');
+SELECT pg_temp.eaok(pg_temp.eareport(700,20,'other'),'1 a guardian reports their child can''t make a published training');
+SELECT pg_temp.eaok(pg_temp.eareport(700,20,'school'),'1 reporting again just updates the reason');
 SELECT pg_temp.eaok(pg_temp.eareport(704,20),'1 an untimed event today can still be reported (until the end of its day)');
 SELECT pg_temp.eacheck(pg_temp.easeen()='700:20,704:20','1 the guardian reads their own child''s absences',pg_temp.easeen());
 SELECT pg_temp.eaok(pg_temp.eaundo(704,20),'1 the guardian undoes one');
@@ -132,7 +132,9 @@ SELECT pg_temp.earefused(pg_temp.eareport(701,20),'2 a draft is refused','42501'
 SELECT pg_temp.earefused(pg_temp.eareport(702,20),'2 a cancelled event is refused','42501','cancelled');
 SELECT pg_temp.earefused(pg_temp.eareport(703,20),'2 an event that has started is refused','42501','started');
 SELECT pg_temp.earefused(pg_temp.eaundo(703,20),'2 an undo after kickoff is refused','42501','started');
-SELECT pg_temp.earefused(pg_temp.eareport(700,20,repeat('x',141)),'2 a reason over 140 characters is refused','23514','');
+-- TRAK-249 (Imad, 21 Oct; list confirmed 13 Nov): a fixed reason or none; free text could carry health details.
+SELECT pg_temp.earefused(pg_temp.eareport(700,20,'the flu'),'2 a free-text reason is refused (TRAK-249)','22023','reason from the list');
+SELECT pg_temp.earefused(pg_temp.eareport(700,20,'School'),'2 only the exact keys: school, family, travel, other','22023','reason from the list');
 SELECT pg_temp.eaactor(32);
 SELECT pg_temp.earefused(pg_temp.eareport(706,23),'2 an academy with events switched off is refused','42501','switched off');
 SELECT pg_temp.eaactor(20);
@@ -143,7 +145,7 @@ SELECT pg_temp.earefused(format('INSERT INTO public.event_absences(event_id,squa
 -- ── 3. Who reads ───────────────────────────────────────────────────────────
 SELECT pg_temp.eaactor(31);
 SELECT pg_temp.earefused(pg_temp.eareport(700,24),'2 a squad row the coach has left can''t be reported through','42501','not available');
-SELECT pg_temp.eaok(pg_temp.eareport(705,22,'Away'),'3 parent Q reports their own child');
+SELECT pg_temp.eaok(pg_temp.eareport(705,22,'travel'),'3 parent Q reports their own child');
 SELECT pg_temp.eacheck(pg_temp.easeen()='705:22','3 parent Q sees only their own child''s absence',pg_temp.easeen());
 SELECT pg_temp.eaactor(10);
 SELECT pg_temp.eacheck(pg_temp.easeen()='700:20','3 coach A sees their own event''s absence, not coach B''s',pg_temp.easeen());
@@ -160,15 +162,17 @@ SELECT pg_temp.earefused(pg_temp.eaundo(700,20),'4 after withdrawal an undo is r
 SELECT pg_temp.eaactor(10);
 SELECT pg_temp.eacheck(pg_temp.easeen()='700:20','4 the coach still sees the absence reported before withdrawal',pg_temp.easeen());
 RESET ROLE;
-SELECT pg_temp.eacheck((SELECT reason='School trip' AND reported_by=pg_temp.eaid(30) FROM public.event_absences
+SELECT pg_temp.eacheck((SELECT reason='school' AND reported_by=pg_temp.eaid(30) FROM public.event_absences
   WHERE event_id=pg_temp.eaid(700) AND squad_player_id=pg_temp.eaid(40)),'4 readback: one row, the latest reason, the reporting guardian');
 SELECT pg_temp.eacheck(NOT has_function_privilege('anon','public.report_cant_make_it(uuid,uuid,text)','EXECUTE')
   AND NOT has_table_privilege('authenticated','public.event_absences','INSERT'),'4 no anonymous calls and no direct inserts');
+SELECT pg_temp.earefused(format('UPDATE public.event_absences SET reason = %L WHERE event_id = %L', 'stomach ache', pg_temp.eaid(700)),
+  '4 the table itself refuses free text, whoever writes (TRAK-249)','23514','');
 
 DO $$ DECLARE failures text; n integer; BEGIN
  SELECT string_agg(label||coalesce(': '||detail,''),E'\n') INTO failures FROM pg_temp.ea_results WHERE ok IS DISTINCT FROM true;
  SELECT count(*) INTO n FROM pg_temp.ea_results;
- IF n <> 29 THEN RAISE EXCEPTION 'Event absences: % checks ran; expected exactly 29', n; END IF;
+ IF n <> 31 THEN RAISE EXCEPTION 'Event absences: % checks ran; expected exactly 31', n; END IF;
  IF failures IS NOT NULL THEN RAISE EXCEPTION USING MESSAGE='Event absences failed',DETAIL=failures; END IF;
  RAISE NOTICE 'Event absences: % checks passed',n;
 END $$;

@@ -128,16 +128,6 @@
   "draftFrom": "Draft from {{day}}: families can't see it yet",
   "draftsFrom": "{{count}} drafts, the latest from {{day}}: families can't see them yet",
   "useCreate": "Use Create to plan an event",
-  "filterType": "Show",
-  "filterAll": "All",
-  "filterMatches": "Matches",
-  "filterAssessments": "Assessments",
-  "filterTraining": "Training",
-  "sortBy": "Order",
-  "sortUrgent": "Most urgent",
-  "sortNewest": "Newest first",
-  "sortOldest": "Oldest first",
   "showAll": "Show all {{count}}",
-  "showFewer": "Show fewer",
-  "needsYouNoneFiltered": "Nothing in this filter."
+  "showFewer": "Show fewer"
 }

@@ -35,7 +35,7 @@ beforeEach(() => mocks.avatar.mockClear())
 afterEach(cleanup)
 
 describe('G7 profile photos', () => {
-  // TRAK-418: the coach's old Profile page is gone; a coach's profile is Settings, which shows no photo (photosSoon).
+  // TRAK-418: the coach's old Profile page is gone; a coach's profile is Settings, where a coach may add their own picture (TRAK-460); the rest stay on photosSoon.
   it.each([['player', PlayerProfile], ['parent', ParentProfile], ['club', ClubProfile]] as const)(
     '%s never renders or signs a stored photo', async (_role, Profile) => {
       let container!: HTMLElement

@@ -49,7 +49,9 @@ describe('TRAK-220: every Arc panel opened into <body> carries the arc class', (
       'src/components/coach/squad/PlayerFactsEditor.tsx', 'src/components/coach/squad/PositionAndRolesSheet.tsx',
       'src/components/coach/squad/formations/NameSheet.tsx', 'src/components/coach/squad/formations/UseForMatchesSheet.tsx',
       'src/components/coach/training/PastPlanSheet.tsx', 'src/components/coach/training/PlannerSheets.tsx', 'src/components/coach/training/RegisterSheet.tsx',
-      'src/components/coach/training/library/AddToTraining.tsx', 'src/components/trak/EventSheet.tsx'])
+      'src/components/coach/training/library/AddToTraining.tsx',
+      'src/components/parent/CantMakeIt.tsx', // TRAK-441: the family week's Can't make it reasons.
+      'src/components/trak/EventSheet.tsx'])
     for (const file of files) {
       const sheets = readFileSync(join(process.cwd(), file), 'utf8').match(/<BottomSheet\b[^>]*>/gs) ?? []
       expect(sheets.length, file).toBeGreaterThan(0)

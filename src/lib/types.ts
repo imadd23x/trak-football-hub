@@ -30,18 +30,19 @@ export interface BandConfig {
 
 // Bands span the full 0..10 slider range. 5 sits squarely in "Mixed" (the neutral middle).
 // Edges:  0–2 Difficult · 2–4 Developing · 4–6 Mixed · 6–7 Steady · 7–8 Good · 8–9 Standout · 9–10 Exceptional
-// TRAK-229 (Kostas, 22 Oct, option A): colours for Trak's light screens. Greens above
-// Steady, slate for Steady, clay below; each arm is one hue, darker further from
-// Steady. Clay, not red: a low band means "keep working". Bands sit on light cards,
-// never dark ones; the word is always shown, so colour is never the only signal.
+// TRAK-458 (Kostas, 13 Nov, "full spectrum"): each band its own bright hue, so any two tell apart at a glance:
+// green, teal, blue, violet, yellow, orange, red. `color` is the bright fill (black words on it, 5:1 or more);
+// `text` its darker shade for a word written in colour (4.5:1 on the page and on `bg`); `border` a darker edge, so a
+// light fill (yellow, teal) still reads as a shape on the page. The word is always shown, so colour is never the only
+// signal. (Before: TRAK-229's greens, slate and three close clays.)
 export const BANDS: BandConfig[] = [
-  { word: 'Exceptional', color: '#0b5d20', text: '#0b5d20', bg: '#dde8e0', border: '#b1cbb8', minScore: 9 },
-  { word: 'Standout',    color: '#2d7f3b', text: '#227632', bg: '#e2ede4', border: '#bcd6c0', minScore: 8 },
-  { word: 'Good',        color: '#4d9e58', text: '#257935', bg: '#e6f1e8', border: '#c6e0ca', minScore: 7 },
-  { word: 'Steady',      color: '#688594', text: '#516d7c', bg: '#eaeef0', border: '#cfd8dd', minScore: 6 },
-  { word: 'Mixed',       color: '#c67f4d', text: '#9c5825', bg: '#f7ede6', border: '#edd6c6', minScore: 4 },
-  { word: 'Developing',  color: '#ac6227', text: '#9c5314', bg: '#f3e9e1', border: '#e4cdba', minScore: 2 },
-  { word: 'Difficult',   color: '#8c4a11', text: '#8c4a11', bg: '#efe6de', border: '#dac5b3', minScore: 0 },
+  { word: 'Exceptional', color: '#0A9F4A', text: '#087938', bg: '#d8f0e2', border: '#077235', minScore: 9 },
+  { word: 'Standout',    color: '#14B8A6', text: '#0d796e', bg: '#d9f4f1', border: '#0e8478', minScore: 8 },
+  { word: 'Good',        color: '#2F7FE0', text: '#2768b8', bg: '#deebfa', border: '#225ba1', minScore: 7 },
+  { word: 'Steady',      color: '#8B5CF6', text: '#754dcf', bg: '#ece5fe', border: '#6442b1', minScore: 6 },
+  { word: 'Mixed',       color: '#F2B705', text: '#8c6a03', bg: '#fdf3d7', border: '#ae8404', minScore: 4 },
+  { word: 'Developing',  color: '#F07A1A', text: '#a85512', bg: '#fdeada', border: '#ad5813', minScore: 2 },
+  { word: 'Difficult',   color: '#E0413A', text: '#bc3731', bg: '#fae1df', border: '#a12f2a', minScore: 0 },
 ]
 
 /** TRAK-189: each band's colour by name, from BANDS, for the few places that

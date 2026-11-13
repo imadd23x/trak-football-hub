@@ -55,6 +55,9 @@ async function backend(context: BrowserContext, role: Role, unexpected: string[]
     ] : [])
     if (['/rest/v1/coach_sessions', '/rest/v1/session_attendance', '/rest/v1/rpc/coach_squad_season', '/rest/v1/coach_calendar_events',
       '/rest/v1/event_confirmations', '/rest/v1/event_absences'].includes(path)) return json([])
+    // TRAK-441: a family's week has today's match, so the picker's footer shows Details (and a parent's red Can't make it).
+    if (path === '/rest/v1/rpc/child_events') return json([{ id: 'ev-199', event_type: 'match', title: 'League', opponent: 'Rivals FC',
+      event_date: new Date().toLocaleDateString('en-CA'), start_time: '23:30:00', status: 'scheduled', sequence: 0, updated_at: '2026-11-01T00:00:00Z' }])
     // Layout only: every other read is empty.
     if (path.startsWith('/rest/v1/')) return json(req.method() === 'GET' || path.startsWith('/rest/v1/rpc/') ? [] : null)
     unexpected.push(`${req.method()} ${path}`)
@@ -236,20 +239,23 @@ test("a parent's laptop frame: the child switcher in the side menu", async ({ pa
   expect(errors).toEqual([])
 })
 
-// TRAK-441 slice 2 (Imad, 13 Nov): the player Home in the coach's look, behind family_look. A phone: the bell on the
-// page; a laptop: the bell in the top bar and two columns. No sideways scroll either way.
-for (const [label, width, height] of [['a phone', 390, 844], ['a laptop', 1440, 900]] as const) {
-  test(`the player Home in the coach's look on ${label}`, async ({ page, context }, testInfo) => {
-    const { unexpected, errors } = await open(page, context, 'player', '/player/home', width, height, ['events', 'family_look'])
+// TRAK-441 slice 2 (Imad, 13 Nov): the player Home in the coach's look, behind family_look; the parent's too (2.6). A
+// phone: the bell on the page; a laptop: the bell in the top bar and two columns. No sideways scroll either way.
+for (const who of ['player', 'parent'] as const) for (const [label, width, height] of [['a phone', 390, 844], ['a laptop', 1440, 900]] as const) {
+  test(`the ${who} Home in the coach's look on ${label}`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, who, `/${who}/home`, width, height, ['events', 'family_look'])
     const bell = page.getByRole('button', { name: /^Alerts/ })
     await expect(bell).toBeVisible()
     // 2.4c: the coach's week picker, not the letter strip.
     await expect(page.getByRole('heading', { name: 'This week', level: 2 })).toBeVisible()
+    // 2.6b: today's match, Details beside a red Can't make it for a parent; a player under the consent age has none.
+    await expect(page.getByRole('button', { name: 'Details' })).toBeVisible()
+    await expect(page.getByRole('button', { name: "Can't make it" })).toHaveCount(who === 'parent' ? 1 : 0)
     // A phone: the bell in the page's own top row, the glass tab bar. A laptop: the side menu, the bell in its top bar.
     await expect(page.getByRole('navigation', { name: 'Trak' })).toHaveCount(width < 1024 ? 0 : 1)
     expect((await bell.boundingBox())!.y).toBeLessThan(60)
     await page.waitForTimeout(400)
-    await page.screenshot({ path: testInfo.outputPath(`family-home-${width}.png`), fullPage: true })
+    await page.screenshot({ path: testInfo.outputPath(`family-home-${who}-${width}.png`), fullPage: true })
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])

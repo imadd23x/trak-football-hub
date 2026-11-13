@@ -113,7 +113,7 @@ describe('TRAK-397: the My season card on player Home', () => {
   it('shows no card when the function returns no plan (not shared, switch off, consent withdrawn)', async () => {
     setup(() => [])
     renderApp('/player/home')
-    expect(await screen.findByText('Defender · Rehearsal Athens · U16')).toBeInTheDocument()
+    expect(await screen.findByText('Rehearsal Athens · U16')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('region', { name: 'My season' })).toBeNull())
     expect(screen.queryByText('My season')).toBeNull()
   })
@@ -122,7 +122,7 @@ describe('TRAK-397: the My season card on player Home', () => {
     setup()
     server.use(rpcError('season_plan_for_player', 500, { message: 'boom' }))
     renderApp('/player/home')
-    expect(await screen.findByText('Defender · Rehearsal Athens · U16')).toBeInTheDocument()
+    expect(await screen.findByText('Rehearsal Athens · U16')).toBeInTheDocument()
     expect(await screen.findByText('Theodoros Zagorakis')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'My season' })).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()

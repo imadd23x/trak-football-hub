@@ -328,6 +328,8 @@ function CoachAssessmentForm() {
      from a raw row-level-security error after. The database stays the gate:
      if this check fails we do not block on a guess. */
   const [consentWait, setConsentWait] = useState(false)
+  // TRAK-425: step 1 is done once a player and session can be assessed; only then may the steps be jumped (ahead as well as back).
+  const playerReady = !!playerId && formReady && !consentWait && (isTraining || !!appearance)
   // TRAK-182 (Imad, 15 Oct): one step per screen; the review step saves.
   const [step, setStep] = useState(0)
   useEffect(() => {
@@ -565,8 +567,9 @@ function CoachAssessmentForm() {
   }
 
   /* ---- render ---- */
+  // TRAK-425: the page width every coach page uses (a laptop filled, not a 640 px column); a phone is unchanged.
   return (
-    <div className="flex flex-col mx-auto trak-read bg-ground h-dvh">
+    <div className="flex flex-col mx-auto w-full trak-wide bg-ground h-dvh">
       {/* ---- header: always visible, never scrolls ---- */}
       <div className="flex items-center gap-3 px-5 py-3 shrink-0"
         style={{ borderBottom: '1px solid rgb(var(--t-line))' }}>
@@ -578,8 +581,8 @@ function CoachAssessmentForm() {
 
       {/* ---- scrollable content ---- */}
       <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-5 pt-4">
-        <div className="arc">
-          <Stepper label={t('coachAssess:assessmentSteps')} steps={steps} current={step} onStepSelect={setStep} />
+        <div className="arc pb-2">
+          <Stepper label={t('coachAssess:assessmentSteps')} steps={steps} current={step} onStepSelect={setStep} jumpAhead={playerReady} />
         </div>
 
         {/* Shown on every step: a refused save (consent withdrawn mid-edit) says why where the coach is. */}
@@ -718,7 +721,7 @@ function CoachAssessmentForm() {
         </>}
         {step === 1 && <>
         {/* ---- 5. sliders on a light card (TRAK-229); each fill takes its band's colour ---- */}
-        <div className="rounded-[14px] bg-surface border border-line p-[14px_16px] space-y-5">
+        <div className="rounded-[14px] bg-surface border border-line p-[14px_16px] space-y-5 tablet:space-y-0 tablet:grid tablet:grid-cols-2 tablet:gap-x-10 tablet:gap-y-5">
           <SliderInput label={t('coachAssess:sliderWorkRate')} value={workRate}     onChange={setWorkRate} disabled={!formReady || saving || consentWait} />
           <SliderInput label={t('coachHome:attributeTactical')} value={tactical}     onChange={setTactical} disabled={!formReady || saving || consentWait} />
           <SliderInput label={t('coachHome:attributeAttitude')} value={attitude}     onChange={setAttitude} disabled={!formReady || saving || consentWait} />
@@ -890,7 +893,7 @@ function CoachAssessmentForm() {
           {step > 0 && <Button size="lg" variant="secondary" className="flex-1" aria-label={t('coachSchedule:backTo', { step: steps[step - 1].label })}
             onClick={() => setStep(step - 1)}>{t('common:back')}</Button>}
           {/* The first step opens only once the player can be assessed: the form below it stays locked otherwise. */}
-          <Button size="lg" className="flex-1" disabled={step === 0 && (!playerId || !formReady || consentWait || (!isTraining && !appearance))}
+          <Button size="lg" className="flex-1" disabled={step === 0 && !playerReady}
             onClick={() => setStep(step + 1)}>{t('coachSchedule:next')}</Button>
         </>}
       </div>

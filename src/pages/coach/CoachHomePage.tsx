@@ -127,8 +127,7 @@ export default function CoachHomePage() {
       reason: item.step === 'evaluate' ? t('coachHome:owedEvaluate') : item.step === 'publish-evaluation' ? t('coachHome:owedEvaluationDraft')
         : item.kind === 'match' ? t('coachHome:owedLog') : t('coachHome:owedRegister'),
       action: <NextStep item={item} coachId={user.id} roster={undefined} onChanged={owedChanged} />,
-      // TRAK-444: a match's log or evaluation, or a training's register, for the type filter and the date sort.
-      kind: item.kind === 'match' ? 'match' : 'training',
+      // TRAK-444: when it is about, so the newest come first.
       at: Date.parse(`${item.date}T${/^\d{2}:\d{2}/.test(item.time ?? '') ? item.time!.slice(0, 5) : '00:00'}`),
       // TRAK-290: from 09:00 the morning after the draft was saved (the academy's clock), worked out as Home is read.
       urgent: remindAt !== undefined && Date.now() >= Date.parse(remindAt),
@@ -147,7 +146,7 @@ export default function CoachHomePage() {
       reason: state === 'changes' ? t('coachHome:changesNotShared', { count: changed }) : t('coachHome:planNotShared'),
       // TRAK-333 (Imad, 2 Nov): every match action is a split button, with the match's other pages behind its chevron.
       action: <MatchAction state={state} eventId={game.id} />,
-      kind: 'match', at: Date.parse(game.starts_at),
+      at: Date.parse(game.starts_at),
     }]
   })
   // TRAK-364: one Evaluation due card per squad whose evaluation is due, in place of its per-player Assess cards. A
@@ -160,7 +159,7 @@ export default function CoachHomePage() {
     reason: due.since! < evaluations.today ? t('coachHome:evaluationDueSince', { day: evalDay(due.since!) })
       : t('coachHome:evaluationDueNow'),
     urgent: due.since! < evaluations.today,
-    kind: 'assessment', at: Date.parse(`${due.since}T00:00`),
+    at: Date.parse(`${due.since}T00:00`),
     action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad) coachSquad.pick(squad); navigate('/coach/evaluation') }}>{t('coachHome:evaluate')}</Button></span>,
   }))
   // TRAK-352: where the season plan is on, one card per squad with consented players still to place. A newly

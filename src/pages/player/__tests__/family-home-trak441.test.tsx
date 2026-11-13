@@ -54,7 +54,7 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     expect(within(forYou).getByText('Your game plan is in')).toBeInTheDocument()
     // The coach's Home top: the bell is on the page; the details line is not said a second time.
     expect(screen.getByRole('button', { name: /^Alerts/ })).toBeInTheDocument()
-    expect(screen.queryByText('Defender · Rehearsal FC · U16')).toBeNull()
+    expect(screen.queryByText('Rehearsal FC · U16')).toBeNull()
     // Slice 2.5b: Season so far, counts only.
     const soFar = await screen.findByRole('region', { name: 'Season so far' })
     expect(within(soFar).getByText('Matches').nextElementSibling).toHaveTextContent('2')
@@ -67,7 +67,7 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     switchOn = false
     screenIs(false)
     renderApp('/player/home')
-    expect(await screen.findByText('Defender · Rehearsal FC · U16', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByText('Rehearsal FC · U16', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: /^For you/ })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Season so far' })).toBeNull()
   })
@@ -86,6 +86,22 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     expect(screen.queryByText('Keep pressing high.')).toBeNull()
     expect(screen.queryByRole('region', { name: 'Latest coach assessment' })).toBeNull()
   })
+
+  // Slice 2.6b (Imad, 13 Nov): a player who reports for themselves gets the parent's red Can't make it; one under the
+  // academy's consent age still can't report, so has none.
+  for (const [who, age, shown] of [['at the consent age', 16, 1], ['under it', 13, 0]] as const) {
+    it(`the week's red Can't make it, for a player ${who}`, async () => {
+      server.use(
+        rpcRows('child_events', [{ ...MATCH, id: 'today', event_date: new Date().toLocaleDateString('en-CA'), start_time: '23:30:00' }]),
+        rpc('my_consent_status', () => ({ required: false, age, consent_age: 15, threshold: 18, own_choice: age >= 15 })),
+        table('event_absences', []),
+      )
+      screenIs(false)
+      renderApp('/player/home')
+      await screen.findByRole('button', { name: 'Details' }, { timeout: 5000 })
+      expect(screen.queryAllByRole('button', { name: "Can't make it" })).toHaveLength(shown)
+    })
+  }
 
   it('a laptop: the bell is in the top bar, beside the side menu, and the page has no header of its own', async () => {
     screenIs(true)

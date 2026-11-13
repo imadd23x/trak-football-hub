@@ -72,9 +72,9 @@ describe('there is exactly one band to colour map', () => {
 })
 
 describe('the specific contradictions Kostas saw', () => {
-  it('a 5 is Mixed and clay (TRAK-229), on every screen', () => {
+  it('a 5 is Mixed and yellow (TRAK-458), on every screen', () => {
     expect(bandForScore(5).word).toBe('Mixed')
-    expect(bandForScore(5).color).toBe('#c67f4d')
+    expect(bandForScore(5).color).toBe('#F2B705')
     expect(categoryScoreToBand(5)).toBe('Mixed')
   })
 

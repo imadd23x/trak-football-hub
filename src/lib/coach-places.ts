@@ -4,11 +4,14 @@ import { i18n } from '@/lib/i18n'
 
 export type CoachScreen = 'home' | 'calendar' | 'squad' | 'games' | 'training' | 'library' | 'settings'
 
+/** TRAK-418: the coach's own How Trak works (players and parents keep /how-it-works). */
+export const COACH_HOW_PATH = '/coach/how-trak-works'
+
 export const COACH_SCREEN_PATH: Record<CoachScreen, string> = {
   home: '/coach/home', calendar: '/coach/schedule', squad: '/coach/squad', games: '/coach/matches', training: '/coach/training', library: '/coach/trainings', settings: '/settings',
 }
 
-type PlaceName = 'home' | 'schedule' | 'player' | 'squad' | 'matches' | 'drills' | 'training' | 'library' | 'settings' | 'profile'
+type PlaceName = 'home' | 'schedule' | 'player' | 'squad' | 'matches' | 'drills' | 'training' | 'library' | 'settings'
   | 'howTrakWorks' | 'feedback' | 'assess' | 'evaluation' | 'log'
 
 /** Which nav row a path belongs to, and the name in the laptop's top bar (its word in nav.json, TRAK-406). */
@@ -22,8 +25,8 @@ const PLACES: [prefix: string, screen: CoachScreen | null, title: PlaceName][] =
   ['/coach/training', 'training', 'training'], // TRAK-294: Training home, its drills and plans
   ['/coach/trainings', 'library', 'library'],
   ['/settings', 'settings', 'settings'],
-  ['/coach/profile', 'settings', 'profile'],
-  ['/coach/manual', 'settings', 'howTrakWorks'],
+  // TRAK-418: the coach's How Trak works, opened from Settings.
+  ['/coach/how-trak-works', 'settings', 'howTrakWorks'],
   ['/coach/feedback', null, 'feedback'],
   ['/coach/assess', null, 'assess'],
   // TRAK-364: the squad's evaluation opens from Home's Needs you.
@@ -47,4 +50,4 @@ export function tabOf(path: string): { label: string; href: string } {
 
 /** Pages with no bottom bar on a phone before (TRAK-254's `sideMenuOnly`) keep none: their own actions sit at the bottom,
  *  and Back leaves them. Settings, the manual, a player's page, and adding or editing a session (not History). */
-export const BARLESS = /^\/(settings|coach\/(manual|squad\/player\/.+|sessions\/(?!list$)[^/]+))$/
+export const BARLESS = /^\/(settings|coach\/(how-trak-works|squad\/player\/.+|sessions\/(?!list$)[^/]+))$/

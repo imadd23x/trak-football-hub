@@ -4,6 +4,7 @@ import { AlertsBell, type BellAlert } from '@/components/trak/AlertsBell'
 import { LoadError } from '@/components/trak/LoadError'
 import { assessmentAlertTitle, eventAlert } from '@/lib/parent-data'
 import { noteEventSnapshots, noteFirstSeen, readFirstSeen, type PlayerEvent } from '@/lib/player-events'
+import { newsAlert, useFamilyNews, type NewsItem } from '@/lib/games/news'
 
 /* TRAK-163 (Imad, 12 Oct): players get the parent's bell for their squad's
    events: new, changed (with the new time) and cancelled, counted since the
@@ -16,15 +17,26 @@ export interface PublishedAssessmentAlert {
   publishedAt: string
   /** TRAK-202: the coach who wrote it, for "New assessment from Coach <name>". */
   coachName?: string
+  /** False for an evaluation published without a note. */
+  hasMessage?: boolean
 }
 
-export function PlayerAlertsBell({ userId, events, assessment, assessmentLoadFailed, onRetry }: {
+type BellProps = {
   userId: string
   events: PlayerEvent[]
+  /** TRAK-436: his game plans shared or changed and the coach's reviews (useFamilyNews). */
+  news?: NewsItem[]
   assessment?: PublishedAssessmentAlert | null
   assessmentLoadFailed?: boolean
   onRetry?: () => void
-}) {
+}
+
+/** Home's bell: reads his game plans and reviews itself, so their arrival re-renders the bell, not Home under it. */
+export function PlayerHomeBell(props: Omit<BellProps, 'news'>) {
+  return <PlayerAlertsBell {...props} news={useFamilyNews(props.userId, true).all} />
+}
+
+export function PlayerAlertsBell({ userId, events, news = [], assessment, assessmentLoadFailed, onRetry }: BellProps) {
   const navigate = useNavigate()
   // Live run, 19 Oct (Tarek): the event page's Back returns where the bell was opened (Home).
   const { pathname } = useLocation()
@@ -41,9 +53,13 @@ export function PlayerAlertsBell({ userId, events, assessment, assessmentLoadFai
   if (!assessmentLoadFailed && assessment?.userId === userId) alerts.push({
     id: `assessment-${assessment.id}`, title: assessmentAlertTitle(assessment.coachName),
     // TRAK-226: the title already says who and what; this line says what's in it.
-    description: 'Your ratings and a message to read.', date: assessment.publishedAt,
+    description: assessment.hasMessage === false ? 'Your ratings to read.' : 'Your ratings and a message to read.', date: assessment.publishedAt,
     action: { label: 'Open assessment', onSelect: () => navigate(`/player/feedback/${assessment.id}`) },
   })
+  for (const item of news) {
+    const { path, action, ...alert } = newsAlert(item, 'player', '')
+    alerts.push({ ...alert, tone: 'success', action: { label: action, onSelect: () => navigate(path, { state: { from: pathname } }) } })
+  }
   alerts.sort((a, b) => (Date.parse(b.date ?? '') || 0) - (Date.parse(a.date ?? '') || 0))
 
   return (

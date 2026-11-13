@@ -732,3 +732,22 @@ test('the side menu cuts no letter: on a laptop and in a phone’s menu (Kostas,
   expect(unexpected).toEqual([])
   expect(errors).toEqual([])
 })
+
+// TRAK-415: below 1024 px the frame drew pages with no `.arc` around them, so Arc's parts there (Upcoming's badges,
+// Add to training) lost Arc's colours and sizes. Any part from an Arc stylesheet must sit inside `.arc`.
+const outsideArc = (page: Page) => page.evaluate(() => [...document.querySelectorAll('[class]')]
+  .filter(el => /(?:^|\s)_[A-Za-z]+_[a-z0-9]{4,6}_\d+/.test(el.getAttribute('class') ?? '') && !el.closest('.arc') && el.getBoundingClientRect().width > 0)
+  .map(el => `${el.getAttribute('class')} "${(el.textContent ?? '').trim().slice(0, 30)}"`))
+
+for (const [width, height] of [[390, 844], [820, 1180]] as const) {
+  test(`TRAK-415 at ${width} px: Training's badges and Add to training keep Arc's styling`, async ({ page, context }) => {
+    const { unexpected, errors } = await open(page, context, '/coach/training', width, height)
+    await expect(page.getByRole('region', { name: 'Upcoming trainings' }).first().getByText('Plan ready')).toBeVisible()
+    expect(await outsideArc(page)).toEqual([])
+    await page.goto('/coach/training/drills/d/lib-pass-between-defenders')
+    await expect(page.getByRole('button', { name: 'Add to training' })).toBeVisible()
+    expect(await outsideArc(page)).toEqual([])
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}

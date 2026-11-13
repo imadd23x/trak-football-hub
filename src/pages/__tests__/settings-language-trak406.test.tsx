@@ -122,8 +122,8 @@ describe('TRAK-406: the account\'s language follows the person', () => {
     state.role = 'parent'
     state.language = 'el'
     render(<MemoryRouter><AccountLanguage /><NavBar role="parent" activeTab="/parent/home" onNavigate={() => {}} /></MemoryRouter>)
-    expect(await screen.findByRole('button', { name: /Αρχική/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Πρόγραμμα/ })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: /Αρχική/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Πρόγραμμα/ })).toBeInTheDocument()
     expect(currentLanguage()).toBe('el')
   })
 
@@ -131,14 +131,14 @@ describe('TRAK-406: the account\'s language follows the person', () => {
     state.language = null
     await act(async () => { await i18n.changeLanguage('el') })
     render(<MemoryRouter><AccountLanguage /><NavBar role="parent" activeTab="/parent/home" onNavigate={() => {}} /></MemoryRouter>)
-    expect(screen.getByRole('button', { name: /Αρχική/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Αρχική/ })).toBeInTheDocument()
     expect(currentLanguage()).toBe('el')
   })
 
   it('ignores a language this version of Trak does not know', async () => {
     state.language = 'xx'
     render(<MemoryRouter><AccountLanguage /><NavBar role="parent" activeTab="/parent/home" onNavigate={() => {}} /></MemoryRouter>)
-    expect(screen.getByRole('button', { name: /Home/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Home/ })).toBeInTheDocument()
     expect(currentLanguage()).toBe('en')
   })
 })

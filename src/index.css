@@ -273,10 +273,12 @@
 }
 
 /* Tablet sideways and laptop: a coach's pages sit right of the sidebar (TRAK-259,
-   CoachFrame, which sets --rail-w to its width); the wide column keeps the
-   tablet's 1,280 px (TRAK-307). The same query as SIDE_MENU_QUERY in
+   CoachFrame, which sets --rail-w to its width). TRAK-463 (11 Nov walk-through,
+   replaces TRAK-307's 1,280 px cap here): the wide column fills the screen beside
+   the sidebar, 32 px from each side. The same query as SIDE_MENU_QUERY in
    src/lib/side-menu-screen.ts. */
 @media (min-width: 1024px) and (min-height: 500px) {
+  :root[data-layout="coach"] { --wide-w: calc(100vw - var(--rail-w, 0px)); }
   /* With no bottom bar, the room kept for it goes: Assess's Back and Next sit at
      the bottom, and the Trainings frame runs down to it (below the frame's 60 px
      top bar and its own 105 px header). */
@@ -314,7 +316,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--t-font);
     font-weight: 400;
     text-transform: none;
     letter-spacing: normal;

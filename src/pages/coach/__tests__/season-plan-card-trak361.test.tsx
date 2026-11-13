@@ -188,6 +188,25 @@ describe('TRAK-361 the Season plan card', () => {
     release()
     expect(await within(await cardOf('U16')).findByText(/^Shared 1 Nov/)).toBeInTheDocument()
   }, 30_000)
+
+  // TRAK-416: a coach with no players has no squad to plan; the skeleton must not wait for one forever.
+  it('shows no loading bars for a coach with no players', async () => {
+    let release = () => {}
+    const held = new Promise<void>(resolve => { release = resolve })
+    server.use(http.get(`${SUPABASE_URL}/rest/v1/squad_players`, async () => { await held; return HttpResponse.json([]) }))
+    renderApp('/coach/home')
+    expect(await screen.findByLabelText('Loading your season plan…')).toBeInTheDocument()
+    release()
+    await waitFor(() => expect(screen.queryByLabelText('Loading your season plan…')).toBeNull())
+    expect(screen.queryByText('Not started')).toBeNull()
+  }, 30_000)
+
+  it('says so, with Retry, when the squads cannot be read', async () => {
+    server.use(http.get(`${SUPABASE_URL}/rest/v1/squad_players`, () => HttpResponse.json({ message: 'offline' }, { status: 500 })))
+    renderApp('/coach/home')
+    expect(await screen.findByText(/couldn.t load your season plan/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Loading your season plan…')).toBeNull()
+  }, 30_000)
 })
 
 describe('TRAK-361 the folded line', () => {

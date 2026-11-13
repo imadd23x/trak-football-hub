@@ -226,7 +226,8 @@ export default function CoachHomePage() {
               : navigate('/coach/assess', { state: { preselectedPlayerId: item.playerId } })} />
         </div>}
         {/* TRAK-350: the season plan, where the academy's switch is on; TRAK-361: the card that folds, one per squad under All. */}
-        {user && <SeasonPlanCard coachId={user.id} squads={coachSquad.squads} squad={planSquad(coachSquad)} everySquad={everySquad}
+        {user && <SeasonPlanCard coachId={user.id} squads={coachSquad.squads} squadsReady={coachSquad.ready} squadsFailed={coachSquad.failed} onRetry={coachSquad.retry}
+          squad={planSquad(coachSquad)} everySquad={everySquad}
           onPick={coachSquad.pick} className={wide ? 'mt-6' : 'mt-5'} />}
       </div>
       {user && <StuckSheet coachId={user.id} target={stuckTarget} onClose={() => setStuckTarget(null)} onSwapped={id => navigate(`/coach/squad/player/${id}`)} />}

@@ -19,7 +19,7 @@ const endpoint = (name: string) => `${SUPABASE_URL}/rest/v1/${name}`
 // the "Coming soon" pill. The backend stays closed (pilot_g7.sql,
 // parked_feature_boundary.sql); the actions are in parked-screens-coming-soon.
 const parked: [string, string, RegExp][] = [
-  ['player', '/player/passport', /PLAYER PASSPORT/i], ['player', '/player/evolution', /EVOLUTION CARD/i],
+  ['player', '/player/passport', /PLAYER PASSPORT/i],
   ['coach', '/coach/assistant', /TRY ASKING/i], ['coach', '/coach/feedback/audit-assessment', /Review feedback/i],
   ['coach', '/coach/schedule', /Schedule/], ['coach', '/coach/recognition', /Give Recognition/], ['coach', '/coach/award', /Give Award/],
   ['parent', '/parent/alerts', /^Alerts$/], ['club', '/club/home', /Pilot Active/], ['club', '/club/squads', /Filter by age group/],

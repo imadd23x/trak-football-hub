@@ -10,11 +10,13 @@ import { trackEvent } from '@/lib/telemetry'
 /** Native swipe/snap: a complete band card at rest, followed by All assessments.
     TRAK-172 (Imad, 19 Oct): the player's Home uses it too, with its own links and
     no All assessments slide (`allHref` null), since players have no such page. */
-export function ParentAssessmentCarousel({ assessments, allHref = '/parent/assessments', openHref, label = 'Latest coach assessment' }: {
+export function ParentAssessmentCarousel({ assessments, allHref = '/parent/assessments', openHref, label = 'Latest coach assessment', progressLines }: {
   assessments: ParentAssessment[]
   allHref?: string | null
   openHref?: (id: string) => string
   label?: string
+  /** TRAK-401: the Progress line of each evaluation assessment, by assessment id. */
+  progressLines?: Record<string, string>
 }) {
   const cards = assessments.slice(0, 5)
   const last = allHref ? cards.length : cards.length - 1
@@ -48,7 +50,7 @@ export function ParentAssessmentCarousel({ assessments, allHref = '/parent/asses
         }}>
         {cards.map((assessment, index) => <div key={assessment.id} role="group" aria-label={`Assessment ${index + 1} of ${cards.length}`}
           aria-hidden={index !== active} className="min-w-0" style={{ flex: '0 0 100%', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}>
-          <ParentAssessmentCard assessment={assessment} active={index === active} openHref={openHref?.(assessment.id)} />
+          <ParentAssessmentCard assessment={assessment} active={index === active} openHref={openHref?.(assessment.id)} progressLine={progressLines?.[assessment.id]} />
         </div>)}
         {allHref && <div aria-hidden={active !== cards.length} className="flex items-stretch min-w-0"
           style={{ flex: '0 0 100%', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}>

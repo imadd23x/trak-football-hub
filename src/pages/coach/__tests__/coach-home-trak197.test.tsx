@@ -65,7 +65,8 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); cleanup(); forgetScreens(); localStorage.clear() })
 
-describe('Home under the header (Imad, 23 Oct: no role and academy line)', () => {
+// TRAK-466: these tests wait up to 5 s for Home's first load, so each needs more than the default 5 s.
+describe('Home under the header (Imad, 23 Oct: no role and academy line)', { timeout: 20_000 }, () => {
   it('has no role or academy line, no greeting, no chips and no season card', async () => {
     home({ players: [player('a', 'Ade Okafor')], assessments: [{ squad_player_id: 'a', created_at: daysAgo(1) }], present: cameToAll('a') })
     renderApp('/coach/home')
@@ -178,7 +179,7 @@ describe('TRAK-211: the Feedback and assessment tab', { timeout: 20_000 }, () =>
 
 // TRAK-262 (Imad, 22 Oct): the two quick-action cards left Home (the "+" has both); Needs you, Squad shape and the
 // squad pills came. The full player overview stays the Feedback tab's.
-describe('TRAK-262: coach Home', () => {
+describe('TRAK-262: coach Home', { timeout: 20_000 }, () => {
   it('has no Assess a player or Log a match card: the "+" covers both', async () => {
     home({ players: [player('a', 'Ade Okafor')], present: cameToAll('a') })
     renderApp('/coach/home')

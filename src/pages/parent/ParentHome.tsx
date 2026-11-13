@@ -3,7 +3,7 @@ import { MobileShell, NavBar, MetadataLabel } from '@/components/trak'
 import { HomeHeader } from '@/components/trak/HomeHeader'
 import { LoadedWeekStrip } from '@/components/trak/WeekStrip'
 import { EventSheet } from '@/components/trak/EventSheet'
-import { CantMakeIt } from '@/components/parent/CantMakeIt'
+import { CantMakeIt, CantMakeItButton } from '@/components/parent/CantMakeIt'
 import { supabase } from '@/integrations/supabase/client'
 import { ParentChildSwitcher, ParentFamilyContent, ParentLoadError, ParentLoading, ParentRating } from '@/components/parent/ParentFamily'
 import { ParentAlertsBell } from '@/components/parent/ParentAlertsBell'
@@ -53,6 +53,7 @@ export default function ParentHome() {
     renderSheet={(event, trigger) => <EventSheet event={event} role="parent" trigger={trigger}>
       <CantMakeIt key={selectedChild.id} event={event} child={selectedChild} />
     </EventSheet>}
+    renderPrimary={event => <CantMakeItButton key={selectedChild.id} event={event} child={selectedChild} />}
     load={(from, to) => supabase.rpc('child_events', { p_child: selectedChild.id })
       .gte('event_date', from).lte('event_date', to).order('event_date', { ascending: true })} />
   const calendarPrompt = <CalendarHomePrompt hasEvents={(eventsQuery.data?.length ?? 0) > 0} />

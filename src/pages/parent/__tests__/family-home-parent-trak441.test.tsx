@@ -5,7 +5,8 @@
  * Test people are named after footballers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
@@ -77,6 +78,30 @@ describe("TRAK-441: the parent Home in the coach's look", () => {
     expect(screen.queryByRole('region', { name: 'Season so far' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Latest evaluation' })).toBeNull()
   })
+
+  it("the week's chosen event has a red Can't make it beside Details: a reason, Tell the coach, and the week says so", async () => {
+    screenIs(false)
+    const today = new Date().toLocaleDateString('en-CA')
+    let absent: { event_id: string }[] = []
+    const sent: unknown[] = []
+    server.use(
+      rpcRows('child_events', [{ id: 'ev-441', event_type: 'match', title: 'League', opponent: 'Rivals FC', event_date: today,
+        start_time: '23:30:00', status: 'scheduled', sequence: 0, updated_at: '2026-11-01T00:00:00Z' }]),
+      http.get(`${SUPABASE_URL}/rest/v1/event_absences`, () => HttpResponse.json(absent)),
+      rpc('report_cant_make_it', body => { sent.push(body); absent = [{ event_id: 'ev-441' }]; return null }),
+    )
+    renderApp('/parent/home')
+    await userEvent.click(await screen.findByRole('button', { name: "Can't make it" }, { timeout: 5000 }))
+    const sheet = await screen.findByRole('dialog', { name: "Can't make it" })
+    expect(within(sheet).getAllByRole('radio').map(radio => radio.closest('label')?.textContent)).toEqual(['School', 'Family', 'Travel', 'Other'])
+    await userEvent.click(within(sheet).getByRole('radio', { name: 'Family' }))
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Tell the coach' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: "Can't make it" })).toBeNull())
+    expect(sent).toEqual([{ p_event_id: 'ev-441', p_child: CHILD, p_reason: 'family' }])
+    // Reported: the line says so and the red button is gone; Undo stays in Details.
+    expect(await screen.findByRole('button', { name: /^Match vs Rivals FC, 23:30, Can't make it/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: "Can't make it" })).toBeNull()
+  }, 15_000)
 
   it('a laptop: the bell is in the top bar, outside the page, and there is one', async () => {
     screenIs(true)

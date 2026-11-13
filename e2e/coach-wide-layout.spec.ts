@@ -55,6 +55,9 @@ async function backend(context: BrowserContext, role: Role, unexpected: string[]
     ] : [])
     if (['/rest/v1/coach_sessions', '/rest/v1/session_attendance', '/rest/v1/rpc/coach_squad_season', '/rest/v1/coach_calendar_events',
       '/rest/v1/event_confirmations', '/rest/v1/event_absences'].includes(path)) return json([])
+    // TRAK-441: a family's week has today's match, so the picker's footer shows Details (and a parent's red Can't make it).
+    if (path === '/rest/v1/rpc/child_events') return json([{ id: 'ev-199', event_type: 'match', title: 'League', opponent: 'Rivals FC',
+      event_date: new Date().toLocaleDateString('en-CA'), start_time: '23:30:00', status: 'scheduled', sequence: 0, updated_at: '2026-11-01T00:00:00Z' }])
     // Layout only: every other read is empty.
     if (path.startsWith('/rest/v1/')) return json(req.method() === 'GET' || path.startsWith('/rest/v1/rpc/') ? [] : null)
     unexpected.push(`${req.method()} ${path}`)
@@ -245,6 +248,9 @@ for (const who of ['player', 'parent'] as const) for (const [label, width, heigh
     await expect(bell).toBeVisible()
     // 2.4c: the coach's week picker, not the letter strip.
     await expect(page.getByRole('heading', { name: 'This week', level: 2 })).toBeVisible()
+    // 2.6b: today's match, Details beside a red Can't make it for a parent; a player under the consent age has none.
+    await expect(page.getByRole('button', { name: 'Details' })).toBeVisible()
+    await expect(page.getByRole('button', { name: "Can't make it" })).toHaveCount(who === 'parent' ? 1 : 0)
     // A phone: the bell in the page's own top row, the glass tab bar. A laptop: the side menu, the bell in its top bar.
     await expect(page.getByRole('navigation', { name: 'Trak' })).toHaveCount(width < 1024 ? 0 : 1)
     expect((await bell.boundingBox())!.y).toBeLessThan(60)

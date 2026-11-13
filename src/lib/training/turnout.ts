@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 import { fromShelf, libraryOf, type Part, type PlanDrill } from './parts'
 import { shelfDrill, type Players, type ShelfDrill } from './shelf'
 import { DETAILS, PLAYERS_TODAY, START_LEVEL, fit, type Details, type LibraryDrill } from './library'
@@ -29,24 +30,28 @@ export function playersOf(drill: Pick<PlanDrill, 'source' | 'trak_drill' | 'play
 
 export type Setup = { ok: true; text: string } | { ok: false }
 
+/* TRAK-408: the set-up is said in the language showing (English as it was). A unit Trak has no word for keeps the old English. */
 const plural = (unit: string, count: number) => count === 1 ? unit : unit.endsWith('ch') ? `${unit}es` : `${unit}s`
+const UNITS = ['square', 'group', 'diamond', 'triangle', 'grid', 'area', 'wave', 'pitch']
+const unitsOf = (unit: string, count: number, size: number) => UNITS.includes(unit)
+  ? i18n.t(`coachTraining:unit_${unit}` as 'coachTraining:unit_group', { count, size }) : `${count} ${plural(unit, count)} of ${size}`
 /** `n` players into `k` groups as evenly as can be: 15 into 3 is 5, 5, 5; 14 into 3 is 5, 5, 4. */
 const split = (n: number, k: number) => Array.from({ length: k }, (_, i) => Math.floor(n / k) + (i < n % k ? 1 : 0))
 
 /** How a drill sets up for `n` players: "everyone together", "7 pairs and 1 group of 3", "7 v 7 + 1 floater",
  *  "3 grids of 5 · 4 v 1"; or not ok when it doesn't work with that many. */
 export function setupFor(players: Players, n: number): Setup {
-  if (players.kind === 'any') return n >= (players.min ?? 1) ? { ok: true, text: 'everyone together' } : { ok: false }
+  if (players.kind === 'any') return n >= (players.min ?? 1) ? { ok: true, text: i18n.t('coachTraining:everyoneTogether') } : { ok: false }
   if (players.kind === 'pairs') {
     if (n < 2) return { ok: false }
-    const pairs = (count: number) => `${count} ${count === 1 ? 'pair' : 'pairs'}`
+    const pairs = (count: number) => i18n.t('coachTraining:pairs', { count })
     if (n % 2 === 0) return { ok: true, text: pairs(n / 2) }
-    return { ok: true, text: n === 3 ? '1 group of 3' : `${pairs((n - 3) / 2)} and 1 group of 3` }
+    return { ok: true, text: n === 3 ? i18n.t('coachTraining:groupOf3') : i18n.t('coachTraining:pairsAndThree', { pairs: pairs((n - 3) / 2) }) }
   }
   if (players.kind === 'teams') {
     if (n < (players.min ?? 2)) return { ok: false }
     const side = Math.floor(n / 2)
-    return { ok: true, text: n % 2 ? `${side} v ${side} + 1 floater` : `${side} v ${side}` }
+    return { ok: true, text: i18n.t(n % 2 ? 'coachTraining:teamsFloater' : 'coachTraining:teams', { side }) }
   }
   const base = Math.max(1, Math.round(n / players.g))
   for (const k of [base, base - 1, base + 1]) {
@@ -57,8 +62,8 @@ export function setupFor(players: Players, n: number): Setup {
       for (const size of [...sizes].sort((a, b) => b - a)) counts.set(size, (counts.get(size) ?? 0) + 1)
       const text = [...counts].map(([size, count]) => {
         const label = players.labels?.[size]
-        return `${count} ${plural(players.unit, count)} of ${size}${label ? ` (${label})` : ''}`
-      }).join(' and ')
+        return `${unitsOf(players.unit, count, size)}${label ? ` (${label})` : ''}`
+      }).join(i18n.t('coachSquad:fmAnd'))
       return { ok: true, text }
     }
   }
@@ -77,14 +82,14 @@ export type Adaptation =
  *  Library drills are drawn for 8 to 20 players: fewer than 8 and the coach picks another; more than 20 fit as 20. */
 function refit(drill: PlanDrill, lib: LibraryDrill, here: number, squad: number): Adaptation {
   const planned: Setup = { ok: true, text: drill.numbers }
-  if (here === squad) return { status: 'same', planned, now: planned, message: 'Everyone’s here. No change.' }
+  if (here === squad) return { status: 'same', planned, now: planned, message: i18n.t('coachTraining:sameEveryone') }
   if (here < PLAYERS_TODAY.min) return { status: 'swap', planned, alt: null, now: { ok: false },
-    message: `${drill.name} is set up for ${PLAYERS_TODAY.min} to ${PLAYERS_TODAY.max} players. With ${here}, select another drill.` }
+    message: i18n.t('coachTraining:setFor', { name: drill.name, min: PLAYERS_TODAY.min, max: PLAYERS_TODAY.max, here }) }
   const details = fit(lib, Math.min(PLAYERS_TODAY.max, here), drill.trak_level ?? START_LEVEL).details
   const changed = DETAILS.filter(({ key }) => details[key] !== drill[key])
-  if (!changed.length) return { status: 'same', planned, now: planned, message: 'The same set-up still works.' }
+  if (!changed.length) return { status: 'same', planned, now: planned, message: i18n.t('coachTraining:sameSetup') }
   return { status: 'adjust', planned, now: { ok: true, text: details.numbers }, details,
-    message: changed.map(({ key, name }) => `${name}: ${drill[key] || '—'} to ${details[key]}.`).join(' ') }
+    message: changed.map(({ key }) => i18n.t('coachTraining:detailChange', { detail: i18n.t(`coachTraining:detail_${key}`), from: drill[key] || '—', to: details[key] })).join(' ') }
 }
 
 /** What a part needs with `here` players when it was planned for `squad`. */
@@ -92,22 +97,22 @@ export function adapt(drill: PlanDrill, here: number, squad: number): Adaptation
   const lib = libraryOf(drill)
   if (lib) return refit(drill, lib, here, squad)
   const players = playersOf(drill)
-  if (!players) return { status: 'unknown', message: 'Trak doesn’t know how many players this drill takes. Check it yourself.' }
+  if (!players) return { status: 'unknown', message: i18n.t('coachTraining:unknownPlayers') }
   const planned = setupFor(players, squad)
   const now = setupFor(players, here)
-  if (here === squad) return { status: 'same', planned, now, message: 'Everyone’s here. No change.' }
+  if (here === squad) return { status: 'same', planned, now, message: i18n.t('coachTraining:sameEveryone') }
   if (!now.ok) {
     const swapTo = drill.source === 'trak' ? shelfDrill(drill.trak_drill)?.swap : undefined
     const alt = swapTo ? shelfDrill(swapTo) ?? null : null
     const altNow = alt ? setupFor(alt.players, here) : null
-    if (alt && altNow?.ok) return { status: 'swap', planned, alt, now: altNow, message: `${drill.name} doesn’t work well with ${here}. Swap to ${alt.name}: ${altNow.text}.` }
-    return { status: 'swap', planned, alt: null, now: { ok: false }, message: `${drill.name} doesn’t work well with ${here}. Select another drill.` }
+    if (alt && altNow?.ok) return { status: 'swap', planned, alt, now: altNow, message: i18n.t('coachTraining:swapTo', { name: drill.name, here, alt: alt.name, text: altNow.text }) }
+    return { status: 'swap', planned, alt: null, now: { ok: false }, message: i18n.t('coachTraining:pickAnother', { name: drill.name, here }) }
   }
   if (planned.ok && now.text === planned.text) {
-    return { status: 'same', planned, now, message: players.kind === 'any' ? 'Works with any number. No change.' : 'The same set-up still works.' }
+    return { status: 'same', planned, now, message: players.kind === 'any' ? i18n.t('coachTraining:sameAny') : i18n.t('coachTraining:sameSetup') }
   }
-  const smaller = players.kind === 'teams' && squad - here >= 3 ? ' Make the pitch a little smaller.' : ''
-  return { status: 'adjust', planned, now, message: `Change to ${now.text}.${smaller}` }
+  const smaller = players.kind === 'teams' && squad - here >= 3 ? i18n.t('coachTraining:smallerPitch') : ''
+  return { status: 'adjust', planned, now, message: `${i18n.t('coachTraining:changeTo', { text: now.text })}${smaller}` }
 }
 
 /** A part with Trak's suggestion used: the new set-up goes in its Numbers (a Library drill takes all five fitted

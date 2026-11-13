@@ -18,6 +18,7 @@ import { trackEvent } from '@/lib/telemetry'
 import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
 import { OwnConsentCard } from '@/components/player/OwnConsentCard'
 import { MySeasonCard } from '@/components/player/MySeasonCard'
+import { LatestEvaluation } from '@/components/player/LatestEvaluation'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
 import { progressSummary, useEvaluationProgress } from '@/lib/evaluation-progress'
 
@@ -79,7 +80,8 @@ export default function PlayerHome() {
 
   // J7 counts published messages the player opens. The message is read here now
   // (TRAK-71), not behind a tap, so showing it is opening it.
-  const shownAssessmentId = coachAssessmentNote && !feedbackLoadFailed ? coachAssessment?.id : undefined
+  // TRAK-441: the new Home doesn't show the message (it's on the evaluation's page), so it doesn't count it.
+  const shownAssessmentId = !look && coachAssessmentNote && !feedbackLoadFailed ? coachAssessment?.id : undefined
   useEffect(() => {
     if (shownAssessmentId) trackEvent('feedback_opened', { assessment_id: shownAssessmentId })
   }, [shownAssessmentId])
@@ -357,7 +359,9 @@ export default function PlayerHome() {
 
         {/* Coach assessments: the parent's swipe cards (TRAK-172, Imad 19 Oct), each opening
             that assessment; the coach's message on the latest stays below (TRAK-71). */}
-        {coachAssessment && (
+        {/* TRAK-441 slice 2.5: the coach's look shows the latest evaluation's bands; its note is on its own page. */}
+        {look && user && coachAssessment && <LatestEvaluation assessment={coachAssessment} readerId={user.id} />}
+        {!look && coachAssessment && (
           <div className="mt-5">
             <ParentAssessmentCarousel key={recentAssessments.map(a => a.id).join(',')} assessments={recentAssessments}
               allHref={null} openHref={id => `/player/feedback/${encodeURIComponent(id)}`} progressLines={progressLines} />

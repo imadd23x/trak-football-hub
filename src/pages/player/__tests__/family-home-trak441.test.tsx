@@ -67,6 +67,21 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     expect(screen.queryByRole('region', { name: /^For you/ })).toBeNull()
   })
 
+  it('slice 2.5: the latest evaluation as the coach\'s bars, marked New; its note stays on its own page', async () => {
+    server.use(
+      table('coach_assessments', [{ id: 'eval-1', coach_user_id: 'coach-1', created_at: '2026-11-08T10:00:00Z', coach_rating: 7.5,
+        work_rate: 8, tactical: 7, attitude: 8, technical: 7, physical: 6, coachability: 9, evaluation_id: null }]),
+      table('coach_shared_feedback', [{ body: 'Keep pressing high.', published_at: '2026-11-08T10:00:00Z' }]),
+    )
+    screenIs(false)
+    renderApp('/player/home')
+    const card = await screen.findByRole('region', { name: 'Latest evaluation' }, { timeout: 5000 })
+    expect(within(card).getByText('New')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: /Open evaluation/ })).toHaveAttribute('href', '/player/feedback/eval-1')
+    expect(screen.queryByText('Keep pressing high.')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Latest coach assessment' })).toBeNull()
+  })
+
   it('a laptop: the bell is in the top bar, beside the side menu, and the page has no header of its own', async () => {
     screenIs(true)
     renderApp('/player/home')

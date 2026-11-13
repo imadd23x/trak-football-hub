@@ -65,7 +65,8 @@ export function SessionCard({ parts, length, current, onOpen, onReorder, onMove,
     </div>
     <TimeBar parts={parts} length={length} current={current} />
     {fit && <p className={`text-sm ${length && totalMinutes(parts) > length ? 'text-warning' : 'text-ink-3'}`}>{fit}</p>}
-    <p className="text-[12px] text-ink-3">Drag a part to move it, or use the arrow keys on its handle. × removes it.</p>
+    {/* TRAK-457: the drag line is gone; a keyboard user still hears how to move a part. */}
+    <p className="sr-only">To move a part, use the arrow keys on its handle.</p>
     <Reorder.Group as="ol" axis="y" values={parts} onReorder={onReorder} aria-label="Parts of the session" className="grid gap-1.5">
       {parts.map((part, i) => <SessionRow key={part.key} part={part} index={i} count={parts.length}
         state={part.key === current ? 'now' : at >= 0 && i < at ? 'done' : 'next'}

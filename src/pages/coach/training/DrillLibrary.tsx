@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { ON_LIBRARY, PRACTICE_KIND_COLOURS } from '@/lib/fixed-colours'
 import {
-  CHANGE_PRACTICE_PATH, CHARACTERISTICS, KINDS, KIND_ORDER, LIBRARY, MY_DRILLS_PATH, PLAYERS_TODAY, START_LEVEL, allDrillsPath, alsoCalled, anotherDrill,
+  CHANGE_PRACTICE_PATH, CHARACTERISTICS, KINDS, KIND_ORDER, LIBRARY, MY_DRILLS_PATH, PLAYERS_TODAY, START_LEVEL, allDrillsPath, anotherDrill,
   changedBy, characteristic, drillPath, fit, foundAs, squadPlayers, type Changed, kindInfo, kindPath, libraryDrill, nextLevel, practiceKey, practiceLayout, refit, searchDrills, step, typesOf, type Change,
   type Kind, type LibraryDrill, type Squad,
 } from '@/lib/training/library'
@@ -300,15 +300,14 @@ export function DrillPage() {
   </SubPage>
 }
 
+/** TRAK-457: the drill's other names ("Also called") aren't shown; search still finds the drill by them. */
 function DrillHead({ drill }: { drill: LibraryDrill }) {
-  const also = alsoCalled(drill)
   return <span className="grid gap-2">
     <span className="flex flex-wrap gap-1.5">
       <span className={CHIP}>{kindInfo(drill.kind).name}</span>
       {drill.kind !== 'warmup' && <span className={CHIP}>{drill.type}</span>}
       {drill.focus !== 'team' && <span className={CHIP}>{drill.focus === 'individual' ? 'Individual' : 'Goalkeeping'}</span>}
     </span>
-    {also.length > 0 && <span className="text-sm text-ink-3">Also called: {also.join(', ')}</span>}
   </span>
 }
 
@@ -353,7 +352,7 @@ function DrillBody({ drill, start, squadName }: { drill: LibraryDrill; start: Sq
         <Button variant="secondary" disabled={nextLevel(drill, players, level, 1) === null} onClick={() => press(1)}><ArrowUp aria-hidden size={16} />Harder</Button>
         {another && <span className="col-span-2 grid tablet:col-span-1"><Button variant="secondary" onClick={() => navigate(drillPath(another.id))}><Repeat aria-hidden size={16} />Another drill</Button></span>}
       </div>
-      <ChangeNote changed={changed} idle={`Set for ${squadName ? `your ${squadName}s` : 'your squad'}. Press Easier or Harder and Trak shows what it changed and why.`} />
+      <ChangeNote changed={changed} />
       <DetailList details={fitted.details} changed={changed} />
     </div>
     <div className="grid gap-5 rounded-2xl border border-line bg-surface p-4">

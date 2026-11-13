@@ -226,7 +226,7 @@ function SavedReview({ training, plan, cancelled }: { training: Training; plan: 
     </section>
     <aside aria-labelledby="players" className="arc grid content-start gap-3 rounded-2xl border border-line bg-surface p-5">
       <h2 id="players" className="text-lg font-medium text-ink">Players</h2>
-      <p className="text-sm text-ink-2">Planned for your whole squad. On the day, take the register with Who’s here at the top.</p>
+      <p className="text-sm text-ink-2">On the day, take the register with Who’s here at the top.</p>
     </aside>
     <AddPartSheet open={adding} onClose={() => setAdding(false)}
       onAdd={(type, name) => { setAdding(false); navigate(planPath(training.id), { state: { addPart: { type, name } } satisfies PlannerState }) }} />

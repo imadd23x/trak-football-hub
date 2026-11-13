@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Check } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, ClipboardList } from 'lucide-react'
 import { PART_TYPES, type PartType } from '@/lib/training/shelf'
 import {
   PART_NAME_MAX, drillKey, fromLibrary, hasOwnDrills, isSameDrill, libraryFor, libraryOf, tagFor, type Part, type PlanDrill, type Usage,
 } from '@/lib/training/parts'
-import { KIND_ORDER, LIBRARY, START_LEVEL, alsoCalled, changedBy, fit, kindInfo, nextLevel, searchDrills, step, type Changed, type LibraryDrill } from '@/lib/training/library'
+import { KIND_ORDER, LIBRARY, START_LEVEL, changedBy, fit, kindInfo, nextLevel, searchDrills, step, type Changed, type LibraryDrill } from '@/lib/training/library'
 import { DrillPitch, PitchKey } from './library/DrillPitch'
 import { AboutDrill, CHIP, ChangeNote, DetailList } from './library/DrillInfo'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
@@ -13,6 +13,7 @@ import { Button } from '@/components/arc/button/button'
 import { Input } from '@/components/arc/input/input'
 import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
+import { EmptyState } from '@/components/arc/empty-state/empty-state'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): the planner's pop-ups. Add a part (Trak's eight, or
    the coach's own name). TRAK-404 took Leave out: drafts save themselves. TRAK-392 (Drill Library 7/11): See more drills lists the part's Library drills by
@@ -94,8 +95,10 @@ export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPi
         <SegmentedControl label="Show" value={filter} onValueChange={value => setFilter(value as Filter)}
           options={[{ value: 'all', label: 'All' }, { value: 'used', label: 'You’ve used' }]} />
       </div>
-      {groups.length === 0 ? <p className="text-[15px] text-ink-2">{filter === 'used' && !query.trim()
-        ? 'You haven’t used any of these drills yet.' : 'No drills match. Try another word.'}</p>
+      {/* TRAK-457: nothing used yet is an empty state (an icon, "No drills yet"), not a sentence. */}
+      {groups.length === 0 ? filter === 'used' && !query.trim()
+        ? <EmptyState icon={<ClipboardList size={24} strokeWidth={1.5} />} title="No drills yet" />
+        : <p className="text-[15px] text-ink-2">No drills match. Try another word.</p>
         : groups.map((group, i) => <section key={group.name} aria-label={group.name} className="grid gap-2">
           {i === firstRest && i > 0 && <p className="border-t border-line pt-3 text-sm font-medium text-ink-2">The rest of the Drill Library</p>}
           <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-ink-3">{group.name}</h3>
@@ -138,11 +141,9 @@ export function ViewDrillSheet({ drill, part, players, onClose, onUse }: {
     const next = step(drill, players, level, by)
     if (next) { setLevel(next.level); setChanged(changedBy(by, next.changes)) }
   }
-  const also = alsoCalled(drill)
   const use = () => onUse(fromLibrary(drill, players, level))
   // Kostas, 10 Nov: wider than the other pop-ups, so the picture and the words beside it have room.
-  return <BottomSheet className="arc" wide open onOpenChange={next => { if (!next) onClose() }} detents={[0.96]} title={drill.name}
-    description={also.length ? `Also called: ${also.join(', ')}` : undefined}>
+  return <BottomSheet className="arc" wide open onOpenChange={next => { if (!next) onClose() }} detents={[0.96]} title={drill.name}>
     <div className="grid gap-4 pb-4">
       <p className="flex flex-wrap gap-1.5">
         <span className={CHIP}>{kindInfo(drill.kind).name}</span>
@@ -156,7 +157,7 @@ export function ViewDrillSheet({ drill, part, players, onClose, onUse }: {
             <Button variant="secondary" disabled={nextLevel(drill, players, level, -1) === null} onClick={() => press(-1)}><ArrowDown aria-hidden size={16} />Easier</Button>
             <Button variant="secondary" disabled={nextLevel(drill, players, level, 1) === null} onClick={() => press(1)}><ArrowUp aria-hidden size={16} />Harder</Button>
           </div>
-          <ChangeNote changed={changed} idle={`Set for ${players} players. Press Easier or Harder and Trak shows what it changed and why.`} />
+          <ChangeNote changed={changed} />
         </div>
         <div className="grid gap-4"><AboutDrill drill={drill} /></div>
       </div>

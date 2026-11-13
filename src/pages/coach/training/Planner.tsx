@@ -273,7 +273,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
               </li>
             })}
             {/* TRAK-404 (Kostas, 10 Nov): a fourth choice, any drill from the Drill Library. */}
-            <li className="grid grid-rows-[1fr_auto] gap-1"><ActionTile icon="search" label="Find another drill" note="From the Drill Library" onClick={() => setSheet('more')} />
+            <li className="grid grid-rows-[1fr_auto] gap-1"><ActionTile icon="search" label="Find another drill" onClick={() => setSheet('more')} />
               {/* As tall as a View drill link, so this tile ends level with the others. */}
               <span aria-hidden className="invisible px-1 py-1 text-sm">View drill</span></li>
           </ul>
@@ -335,7 +335,7 @@ function Review({ parts, length, note, onNote, onEdit, onRemove, onReorder, onMo
     <PlanRows parts={parts} onEdit={onEdit} onRemove={onRemove} onReorder={onReorder} onMove={onMove} />
     <div><Button size="sm" variant="secondary" onClick={onAdd}><Plus aria-hidden size={16} />Add a part</Button></div>
     {/* Kostas, 30 Oct: one optional note at the end, not one per drill. */}
-    <Textarea label="A note for you (optional)" description="Anything to remember on the day. Only you see it." rows={2} maxLength={NOTE_MAX}
+    <Textarea label="A note for you (optional)" rows={2} maxLength={NOTE_MAX}
       value={note} onChange={e => onNote(e.target.value)} placeholder="For example: remind the back four to talk to each other in the box" />
     <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
       <Button variant="secondary" onClick={onBack}>Back</Button>
@@ -350,14 +350,13 @@ function Review({ parts, length, note, onNote, onEdit, onRemove, onReorder, onMo
 function OnTheDay({ parts, title = 'On the day' }: { parts: Part[]; title?: string }) {
   return <aside aria-labelledby="on-the-day" className="arc grid content-start gap-3 rounded-2xl border border-line bg-surface p-5">
     <h2 id="on-the-day" className="text-lg font-medium text-ink">{title}</h2>
-    <p className="text-sm text-ink-3">{title === 'On the day' ? 'Your Today card on Home shows the plan like this. Only you see it.'
-      : 'The rest of the plan, as it is.'}</p>
+    {/* TRAK-457: no "Your Today card on Home shows the plan like this" line. */}
+    {title !== 'On the day' && <p className="text-sm text-ink-3">The rest of the plan, as it is.</p>}
     <div className="grid gap-1.5 rounded-xl bg-raised p-4">
       <p className="flex justify-between text-sm"><span className="font-medium text-ink">Training plan</span><span className="text-ink-3">{totalMinutes(parts)} min</span></p>
       {parts.filter(p => p.drill).map(p => <p key={p.key} className="flex justify-between gap-3 text-sm text-ink-2">
         <span className="truncate">{p.name === p.drill!.name ? p.name : `${p.name} · ${p.drill!.name}`}</span><span className="flex-none">{p.minutes} min</span></p>)}
     </div>
-    <p className="text-sm text-ink-3">Planned for your whole squad.</p>
   </aside>
 }
 

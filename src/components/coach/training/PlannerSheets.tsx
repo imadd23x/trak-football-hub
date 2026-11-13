@@ -1,3 +1,5 @@
+import { useTranslation } from '@/lib/i18n'
+import { partName, partNote } from '@/lib/training/words'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Check, ClipboardList } from 'lucide-react'
 import { PART_TYPES, type PartType } from '@/lib/training/shelf'
@@ -25,33 +27,34 @@ export function AddPartSheet({ open, onClose, onAdd }: { open: boolean; onClose:
   const [picked, setPicked] = useState<PartType | null>(null)
   const [name, setName] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
+  const { t } = useTranslation()
   useEffect(() => { if (open) { setPicked(null); setName(''); setProblem(null) } }, [open])
   const add = () => {
     const own = name.trim()
     if (own) return onAdd('own', own.slice(0, PART_NAME_MAX))
-    if (!picked) return setProblem('Pick a part, or name your own.')
+    if (!picked) return setProblem(t('coachTraining:pickPartOrName'))
     onAdd(picked, PART_TYPES.find(p => p.key === picked)!.name)
   }
-  return <BottomSheet className="arc" open={open} onOpenChange={next => { if (!next) onClose() }} detents={[0.92]} title="Add a part"
-    description="It goes at the end of the session. Drag it to move it.">
+  return <BottomSheet className="arc" open={open} onOpenChange={next => { if (!next) onClose() }} detents={[0.92]} title={t('coachTraining:addAPart')}
+    description={t('coachTraining:addPartDesc')}>
     <div className="grid gap-5 pb-4">
       <fieldset className="grid gap-2">
-        <legend className="mb-2 text-sm font-medium text-ink">Pick a part</legend>
+        <legend className="mb-2 text-sm font-medium text-ink">{t('coachTraining:pickAPart')}</legend>
         <div className="grid grid-cols-1 gap-2 tablet:grid-cols-2">
           {PART_TYPES.map(type => <button key={type.key} type="button" aria-pressed={picked === type.key}
             onClick={() => { setPicked(type.key); setName(''); setProblem(null) }}
             className={`grid gap-0.5 rounded-xl border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${picked === type.key ? 'border-brand bg-brand/10' : 'border-line bg-surface'}`}>
-            <span className="text-[15px] font-medium text-ink">{type.name}</span>
-            <span className="text-sm text-ink-3">{type.note}</span>
+            <span className="text-[15px] font-medium text-ink">{partName(type.name)}</span>
+            <span className="text-sm text-ink-3">{partNote(type.key)}</span>
           </button>)}
         </div>
       </fieldset>
-      <Input label="Or name your own" description="For example: Pressing game, Goalkeeper work, Fitness test." value={name}
+      <Input label={t('coachTraining:orNameOwn')} description={t('coachTraining:orNameOwnEx')} value={name}
         maxLength={PART_NAME_MAX} autoComplete="off" onChange={e => { setName(e.target.value); if (e.target.value.trim()) setPicked(null); setProblem(null) }} />
       {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={add}>Add part</Button>
+        <Button variant="secondary" onClick={onClose}>{t('coachSchedule:cancel')}</Button>
+        <Button onClick={add}>{t('coachTraining:addPart')}</Button>
       </div>
     </div>
   </BottomSheet>
@@ -67,6 +70,7 @@ export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPi
 }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const { t } = useTranslation()
   useEffect(() => { if (part) { setQuery(''); setFilter('all') } }, [part?.key]) // eslint-disable-line react-hooks/exhaustive-deps -- a new part starts afresh
   const own = useMemo(() => part ? libraryFor(part.type) : [], [part])
   const rest = useMemo(() => part && hasOwnDrills(part.type) ? LIBRARY.filter(d => !own.includes(d)) : [], [part, own])
@@ -80,7 +84,7 @@ export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPi
     : d.kind === 'warmup' ? kindInfo(d.kind).name : d.type
   // Searching, the best match first, in one list; otherwise by drill type, in the Library's order.
   const mine = shown.filter(d => own.includes(d)), others = shown.filter(d => !own.includes(d))
-  const groups = query.trim() ? [{ name: 'Drills found', drills: shown }]
+  const groups = query.trim() ? [{ name: t('coachTraining:drillsFound'), drills: shown }]
     : [...[...new Set(mine.filter(d => d.focus === 'team').map(groupOf)), 'Individual', 'Goalkeeping']
         .map(name => ({ name, drills: mine.filter(d => groupOf(d) === name) })),
       // The rest of the Library, by kind.
@@ -88,19 +92,19 @@ export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPi
       .filter(g => g.drills.length)
   const firstRest = groups.findIndex(g => 'rest' in g)
   return <BottomSheet className="arc" open onOpenChange={next => { if (!next) onClose() }} detents={[0.92]}
-    title={`Find another drill for ${part.name}`}>
+    title={t('coachTraining:findFor', { part: partName(part.name) })}>
     <div className="grid gap-4 pb-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px] flex-1"><SearchField label="Search drills" placeholder="For example: rondo, 4v2, pressing" value={query} onValueChange={setQuery} /></div>
-        <SegmentedControl label="Show" value={filter} onValueChange={value => setFilter(value as Filter)}
-          options={[{ value: 'all', label: 'All' }, { value: 'used', label: 'You’ve used' }]} />
+        <div className="min-w-[220px] flex-1"><SearchField label={t('coachTraining:searchDrills')} placeholder={t('coachTraining:searchDrillsEx')} value={query} onValueChange={setQuery} /></div>
+        <SegmentedControl label={t('coachTraining:show')} value={filter} onValueChange={value => setFilter(value as Filter)}
+          options={[{ value: 'all', label: t('coachTraining:filterAll') }, { value: 'used', label: t('coachTraining:youveUsed') }]} />
       </div>
       {/* TRAK-457: nothing used yet is an empty state (an icon, "No drills yet"), not a sentence. */}
       {groups.length === 0 ? filter === 'used' && !query.trim()
-        ? <EmptyState icon={<ClipboardList size={24} strokeWidth={1.5} />} title="No drills yet" />
-        : <p className="text-[15px] text-ink-2">No drills match. Try another word.</p>
+        ? <EmptyState icon={<ClipboardList size={24} strokeWidth={1.5} />} title={t('coachTraining:noneUsed')} />
+        : <p className="text-[15px] text-ink-2">{t('coachTraining:noDrillsMatch')}</p>
         : groups.map((group, i) => <section key={group.name} aria-label={group.name} className="grid gap-2">
-          {i === firstRest && i > 0 && <p className="border-t border-line pt-3 text-sm font-medium text-ink-2">The rest of the Drill Library</p>}
+          {i === firstRest && i > 0 && <p className="border-t border-line pt-3 text-sm font-medium text-ink-2">{t('coachTraining:restOfLibrary')}</p>}
           <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-ink-3">{group.name}</h3>
           <ul aria-label={group.name} className="divide-y divide-line rounded-2xl border border-line bg-surface px-4">
             {group.drills.map(lib => {
@@ -113,13 +117,13 @@ export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPi
                   <p className="text-[13px] text-ink-3">{[d.numbers, d.area].filter(Boolean).join(' · ')}</p>
                   {tag && <p className="text-[13px] text-brand">{tag}</p>}
                 </div>
-                {picked ? <Badge tone="success"><Check aria-hidden size={14} />Picked</Badge>
-                  : <Button size="sm" variant="secondary" aria-label={`Pick ${lib.name}`} onClick={() => onPick(d)}>Pick</Button>}
+                {picked ? <Badge tone="success"><Check aria-hidden size={14} />{t('coachTraining:picked')}</Badge>
+                  : <Button size="sm" variant="secondary" aria-label={t('coachTraining:pickNamed', { name: lib.name })} onClick={() => onPick(d)}>{t('coachTraining:pick')}</Button>}
               </li>
             })}
           </ul>
         </section>)}
-      <div className="flex justify-end"><Button variant="secondary" onClick={onClose}>Close</Button></div>
+      <div className="flex justify-end"><Button variant="secondary" onClick={onClose}>{t('coachSchedule:close')}</Button></div>
     </div>
   </BottomSheet>
 }
@@ -134,6 +138,7 @@ export function ViewDrillSheet({ drill, part, players, onClose, onUse }: {
   const start = picked ? part?.drill?.trak_level ?? START_LEVEL : START_LEVEL
   const [level, setLevel] = useState(start)
   const [changed, setChanged] = useState<Changed | null>(null)
+  const { t } = useTranslation()
   useEffect(() => { setLevel(start); setChanged(null) }, [drill?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- each drill opens afresh
   if (!drill || !part) return null
   const fitted = fit(drill, players, level)
@@ -154,8 +159,8 @@ export function ViewDrillSheet({ drill, part, players, onClose, onUse }: {
           <DrillPitch drill={drill} players={players} level={level} />
           <PitchKey legend={fitted.legend} />
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="secondary" disabled={nextLevel(drill, players, level, -1) === null} onClick={() => press(-1)}><ArrowDown aria-hidden size={16} />Easier</Button>
-            <Button variant="secondary" disabled={nextLevel(drill, players, level, 1) === null} onClick={() => press(1)}><ArrowUp aria-hidden size={16} />Harder</Button>
+            <Button variant="secondary" disabled={nextLevel(drill, players, level, -1) === null} onClick={() => press(-1)}><ArrowDown aria-hidden size={16} />{t('coachTraining:easier')}</Button>
+            <Button variant="secondary" disabled={nextLevel(drill, players, level, 1) === null} onClick={() => press(1)}><ArrowUp aria-hidden size={16} />{t('coachTraining:harder')}</Button>
           </div>
           <ChangeNote changed={changed} />
         </div>
@@ -163,9 +168,9 @@ export function ViewDrillSheet({ drill, part, players, onClose, onUse }: {
       </div>
       <DetailList details={fitted.details} changed={changed} />
       <div className="flex flex-wrap justify-end gap-2">
-        {picked ? <Button onClick={use}><Check aria-hidden size={16} />Done</Button> : <>
-          <Button variant="secondary" onClick={onClose}>Close</Button>
-          <Button onClick={use}>Use this drill</Button>
+        {picked ? <Button onClick={use}><Check aria-hidden size={16} />{t('coachTraining:done')}</Button> : <>
+          <Button variant="secondary" onClick={onClose}>{t('coachSchedule:close')}</Button>
+          <Button onClick={use}>{t('coachTraining:useThisDrill')}</Button>
         </>}
       </div>
     </div>

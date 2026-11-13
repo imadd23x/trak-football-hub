@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext } from '@playwright/test'
 import { createRequire } from 'node:module'
+import { openNewEvent } from './new-event'
 
 const require = createRequire(import.meta.url)
 
@@ -224,7 +225,7 @@ test.describe('TRAK-182 coach screens', () => {
     expect(listBox!.y).toBeGreaterThanOrEqual(0)
     await list.getByRole('option', { name: '5:00 PM' }).click()
     await form.getByRole('button', { name: 'Save draft' }).click()
-    await expect(page.getByText('Draft saved. Publish it from Schedule.')).toBeVisible()
+    await expect(page.getByText('Draft saved. Publish it from Events.')).toBeVisible()
     await page.waitForTimeout(300)
     await page.screenshot({ path: testInfo.outputPath('quick-add-4-check.png') })
     await expect(form).toHaveCount(0, { timeout: 3000 })
@@ -240,7 +241,7 @@ test.describe('TRAK-182 coach screens', () => {
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
     await coachBackend(context, unexpected)
     await page.goto('/coach/schedule')
-    await page.getByRole('button', { name: 'Add event' }).click()
+    await openNewEvent(page)
     const sheet = page.getByRole('dialog', { name: 'New event' })
     await sheet.getByRole('button', { name: 'Match' }).click()
     await sheet.getByLabel('Opponent').fill('Synthetic Rovers')
@@ -446,7 +447,7 @@ test.describe('TRAK-227 date and time pickers in the event form', () => {
     const unexpected: string[] = []
     await coachBackend(context, unexpected)
     await page.goto('/coach/schedule')
-    await page.getByRole('button', { name: 'Add event' }).click()
+    await openNewEvent(page)
     const sheet = page.getByRole('dialog', { name: 'New event' })
     await sheet.getByRole('button', { name: 'Next', exact: true }).click()
     // Fully inside every scroll area it sits in, and inside the screen.

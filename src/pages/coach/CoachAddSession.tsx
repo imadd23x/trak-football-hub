@@ -514,7 +514,7 @@ export default function CoachAddSession() {
       .single()
 
       if (error?.code === '23505' && eventId) {
-        toast.error('This match is already logged from its event. Nothing was saved; open it from Schedule to see it.', { duration: 12000 })
+        toast.error('This match is already logged from its event. Nothing was saved; open it from Events to see it.', { duration: 12000 })
         setSaving(false)
         return
       }

@@ -94,7 +94,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
 
   const items: RailEntry[] = [
     { id: 'home', label: t('nav:home'), icon: House },
-    { id: 'calendar', label: t('nav:schedule'), icon: CalendarDays }, // TRAK-255: the coach's is called Schedule
+    { id: 'calendar', label: t('nav:events'), icon: CalendarDays }, // TRAK-255, TRAK-449: the coach's is called Events, as the parent's is
     { id: 'squad', label: t('nav:squad'), icon: Users },
     // TRAK-306 (Kostas, 28 Oct): Imad's pitch (TRAK-265) for Games; a cone for Training, and for Library in its place.
     ...(games ? [{ id: 'games', label: t('nav:matches'), icon: PitchIcon }] : []),

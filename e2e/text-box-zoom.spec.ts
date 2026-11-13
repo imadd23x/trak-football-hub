@@ -1,4 +1,5 @@
 import { test, expect, devices, type Page } from '@playwright/test'
+import { openNewEvent } from './new-event'
 
 // TRAK-178: iPhone Safari zooms the whole page in when a text box under 16px
 // gets focus, and it stays zoomed. On a touch screen every text box shows at
@@ -66,7 +67,7 @@ test.describe('TRAK-178 on a phone', () => {
 
     const unexpected = await signedInCoach(page)
     await page.goto('/coach/schedule')
-    await page.getByRole('button', { name: 'Add event' }).click()
+    await openNewEvent(page)
     const sheet = page.getByRole('dialog', { name: 'New event' })
     await expect(sheet).toBeVisible()
     // TRAK-182: one step per screen, so each step's boxes are measured on it.

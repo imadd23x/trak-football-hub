@@ -1,8 +1,10 @@
 import { useId, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
+import { format, parseISO } from 'date-fns'
 import { Button as ArcButton } from '@/components/arc/button/button'
-import type { PlayerEvent } from '@/lib/player-events'
+import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
+import { eventHeading, type PlayerEvent } from '@/lib/player-events'
 import { ABSENCE_REASONS, absenceReasonWord, type AbsenceReason } from '@/lib/absence-reasons'
 
 /* TRAK-137 (J8.14, Imad 8 Oct): like a school register, everyone counts as
@@ -22,12 +24,16 @@ async function fetchAbsence(childId: string, eventId: string, signal: AbortSigna
   return data
 }
 
+/** Cancelled and past days take no report (the database also refuses after kickoff). */
+const closed = (event: PlayerEvent) => event.status === 'cancelled' || event.date < new Date().toLocaleDateString('en-CA')
+
 /** `self`: the player reporting for themselves, at or above their academy's
- *  consent age (TRAK-183). The words say "you"; the database decides. */
-export function CantMakeIt({ event, child, self = false }: { event: PlayerEvent; child: { id: string; name: string }; self?: boolean }) {
+ *  consent age (TRAK-183). The words say "you"; the database decides.
+ *  `onDone`: inside CantMakeItButton's sheet, it opens on the reasons and closes the sheet when sent or cancelled. */
+export function CantMakeIt({ event, child, self = false, onDone }: { event: PlayerEvent; child: { id: string; name: string }; self?: boolean; onDone?: () => void }) {
   const reasonId = useId()
   const client = useQueryClient()
-  const [writing, setWriting] = useState(false)
+  const [writing, setWriting] = useState(!!onDone)
   const [reason, setReason] = useState<AbsenceReason | ''>('')
   const key = ['parent', 'absence', child.id, event.id]
   const absence = useQuery({ queryKey: key, queryFn: ({ signal }) => fetchAbsence(child.id, event.id, signal) })
@@ -39,10 +45,10 @@ export function CantMakeIt({ event, child, self = false }: { event: PlayerEvent;
       if (error) throw error
     },
     // TRAK-231: the whole child's absences, so the week strip's marks follow too.
-    onSuccess: () => { setWriting(false); setReason(''); return client.invalidateQueries({ queryKey: ['parent', 'absence', child.id] }) },
+    onSuccess: () => { setWriting(false); setReason(''); onDone?.(); return client.invalidateQueries({ queryKey: ['parent', 'absence', child.id] }) },
   })
 
-  if (event.status === 'cancelled' || event.date < new Date().toLocaleDateString('en-CA')) return null
+  if (closed(event)) return null
   const refusal = change.error && <p role="alert" className="text-sm text-destructive mt-2">{change.error.message}</p>
   const button = 'min-h-11 shrink-0 px-4 rounded-full border border-border text-sm text-foreground focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50'
 
@@ -69,7 +75,7 @@ export function CantMakeIt({ event, child, self = false }: { event: PlayerEvent;
           </div>
           <div className="flex gap-2 mt-3">
             <button type="button" disabled={change.isPending} onClick={() => change.mutate(true)} className={button}>Tell the coach</button>
-            <button type="button" onClick={() => { setWriting(false); change.reset() }} className={button}>Cancel</button>
+            <button type="button" onClick={() => { change.reset(); if (onDone) onDone(); else setWriting(false) }} className={button}>Cancel</button>
           </div>
           {refusal}
         </> : <>
@@ -81,4 +87,16 @@ export function CantMakeIt({ event, child, self = false }: { event: PlayerEvent;
         </>}
     </section>
   )
+}
+
+/** TRAK-441 (mockup, 12 Nov): the family week's red Can't make it beside Details, for an event not yet reported.
+ *  The reasons open in a sheet; Undo stays in Details. */
+export function CantMakeItButton({ event, child, self = false }: { event: PlayerEvent & { absent?: boolean }; child: { id: string; name: string }; self?: boolean }) {
+  const [open, setOpen] = useState(false)
+  if (event.absent || closed(event)) return null
+  return <BottomSheet open={open} onOpenChange={setOpen} title="Can't make it" description={eventHeading(event)}
+    aside={format(parseISO(event.date), 'EEE MMM d')} className="arc"
+    trigger={<ArcButton variant="danger" size="sm">Can't make it</ArcButton>}>
+    <div className="pb-4"><CantMakeIt event={event} child={child} self={self} onDone={() => setOpen(false)} /></div>
+  </BottomSheet>
 }

@@ -31,7 +31,8 @@ type SquadPlayer = {
   age: number | null
 }
 
-type Competition = 'League' | 'Cup' | 'Friendly'
+// TRAK-438: the coach's three words everywhere (no "Cup").
+type Competition = 'League' | 'Tournament' | 'Friendly'
 type Venue      = 'Home' | 'Away'
 type CardType   = 'None' | 'Yellow' | 'Red'
 
@@ -758,7 +759,7 @@ export default function CoachAddSession() {
               <div>
                 <MetadataLabel text="COMPETITION" />
                 <div className="flex gap-2 mt-2 flex-wrap">
-                  {(['League', 'Cup', 'Friendly'] as const).map(c => (
+                  {(['League', 'Tournament', 'Friendly'] as const).map(c => (
                     <Chip key={c} active={competition === c} onClick={() => setCompetition(c)}>{c}</Chip>
                   ))}
                 </div>

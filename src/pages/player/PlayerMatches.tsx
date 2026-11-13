@@ -7,9 +7,11 @@ import { scoreToBand } from '@/lib/rating-engine'
 import { fetchReviews } from '@/lib/games/reviews'
 import { TrainingHistory } from '@/components/player/TrainingHistory'
 import { UpcomingEvents } from '@/components/player/UpcomingEvents'
+import { COMPETITION_LABELS, competitionLabel } from '@/lib/coach-events'
 
-// TRAK-112: the tab holds matches and training, so Training is a chip too.
-const FILTERS = ['All', 'League', 'Cup', 'Friendly', 'Training']
+// TRAK-112: the tab holds matches and training, so Training is a chip too. TRAK-438: the competitions are the coach's
+// own three words (League, Tournament, Friendly), from the one shared list.
+const FILTERS = ['All', ...COMPETITION_LABELS, 'Training']
 const PAGE_SIZE = 20
 
 export default function PlayerMatches() {
@@ -93,7 +95,7 @@ export default function PlayerMatches() {
   }
 
   const [filter, setFilter] = useState('All')
-  const filtered = filter === 'All' ? matches : matches.filter(m => m.competition === filter)
+  const filtered = filter === 'All' ? matches : matches.filter(m => competitionLabel(m.competition) === filter)
   const showMatches = filter !== 'Training'
   const showTraining = filter === 'All' || filter === 'Training'
 

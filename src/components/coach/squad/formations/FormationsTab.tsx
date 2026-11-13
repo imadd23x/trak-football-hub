@@ -110,7 +110,6 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
   const header = <div className="flex flex-wrap items-end justify-between gap-3">
     <div className="grid gap-0.5">
       <h2 className="text-lg font-medium text-ink">{t('coachSquad:fmPlaybook')}</h2>
-      <p className="text-sm text-ink-2">{t('coachSquad:fmPlaybookBody', { squad })}</p>
     </div>
     <Button variant="secondary" onClick={() => { setNamingProblem(null); setNaming({ kind: 'new', format: 11, shape: DEFAULT_FORMATION[11] }) }}>
       <Plus size={18} aria-hidden="true" />{t('coachSquad:fmNew')}</Button>
@@ -245,15 +244,14 @@ function Playbook({ coachId, squad, roster }: { coachId: string; squad: string; 
       <FormationBoard title={current.name} shape={current.shape} format={current.format} starters={current.starters} players={boardPlayers} bench={bench}
         onSwap={(a: Spot, b: Spot) => change(d => ({ ...d, starters: swapXI(d.starters, a, b) }))} onUndo={undo} canUndo={!!edit?.history.length} />
 
-      <section aria-label={t('coachSquad:fmSetMatchday')} className="grid gap-2 border-t border-line pt-4">
+      {/* TRAK-452 (11 Nov walk-through): Set for matchday shows only once the formation has been copied to a match. */}
+      {saved.copies.length > 0 && <section aria-label={t('coachSquad:fmSetMatchday')} className="grid gap-2 border-t border-line pt-4">
         <h3 className="text-[15px] font-medium text-ink">{t('coachSquad:fmSetMatchday')}</h3>
-        {saved.copies.length === 0
-          ? <p className="text-sm text-ink-3">{t('coachSquad:fmNotCopied')}</p>
-          : <ul className="m-0 grid list-none gap-1 p-0">{saved.copies.map(copy => <li key={copy.eventId} className="text-sm text-ink-2">
-            {t('coachSquad:fmCopiedOn', { label: copy.label, day: weekdayDayMonth(copy.copiedAt.slice(0, 10)) })}
-            {copy.notComing > 0 && t('coachSquad:fmNotComing', { count: copy.notComing })}
-            {copy.skipped > 0 && t('coachSquad:fmSkipped', { count: copy.skipped })}</li>)}</ul>}
-      </section>
+        <ul className="m-0 grid list-none gap-1 p-0">{saved.copies.map(copy => <li key={copy.eventId} className="text-sm text-ink-2">
+          {t('coachSquad:fmCopiedOn', { label: copy.label, day: weekdayDayMonth(copy.copiedAt.slice(0, 10)) })}
+          {copy.notComing > 0 && t('coachSquad:fmNotComing', { count: copy.notComing })}
+          {copy.skipped > 0 && t('coachSquad:fmSkipped', { count: copy.skipped })}</li>)}</ul>
+      </section>}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
         {confirming

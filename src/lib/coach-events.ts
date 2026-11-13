@@ -75,6 +75,11 @@ export type Competition = 'league' | 'tournament' | 'friendly'
 export const COMPETITIONS: { value: Competition; label: string }[] = [
   { value: 'league', label: 'League' }, { value: 'tournament', label: 'Tournament' }, { value: 'friendly', label: 'Friendly' },
 ]
+/** TRAK-438: the one list of competition words, as a match's row stores them (publish saves initcap: "Tournament").
+ *  The player's chips and the old match log use it too, so no screen says "Cup" any more. */
+export const COMPETITION_LABELS = COMPETITIONS.map(c => c.label) as readonly string[]
+/** A match logged before TRAK-438 could say "Cup" (none live on 13 Nov); it counts as a tournament. */
+export const competitionLabel = (stored: string | null | undefined) => stored === 'Cup' ? 'Tournament' : stored ?? ''
 
 export type EventRow = {
   id: string

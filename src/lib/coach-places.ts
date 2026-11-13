@@ -50,4 +50,4 @@ export function tabOf(path: string): { label: string; href: string } {
 
 /** Pages with no bottom bar on a phone before (TRAK-254's `sideMenuOnly`) keep none: their own actions sit at the bottom,
  *  and Back leaves them. Settings, the manual, a player's page, and adding or editing a session (not History). */
-export const BARLESS = /^\/(settings|coach\/(how-trak-works|squad\/player\/.+|sessions\/(?!list$)[^/]+))$/
+export const BARLESS = /^\/(settings|coach\/(how-trak-works|assess|squad\/player\/.+|sessions\/(?!list$)[^/]+))$/

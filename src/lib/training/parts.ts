@@ -1,3 +1,5 @@
+import { partName } from './words'
+import { i18n } from '@/lib/i18n'
 import type { Json } from '@/integrations/supabase/types'
 import { DRILL_LIMITS, blankDrill, type DrillDraft } from './sessions'
 import { PART_TYPES, STANDARD, partInfo, playersShort, shelfDrill, type PartType, type Players, type ShelfDrill } from './shelf'
@@ -100,10 +102,10 @@ export function partsFromSaved(practices: SavedPart[]): Part[] {
 
 /** Why the plan can't be saved yet, or null. Every part needs a drill. */
 export function planProblem(parts: Part[]): string | null {
-  if (!parts.length) return 'Add a part first.'
-  if (parts.length > PARTS_MAX) return `A plan holds at most ${PARTS_MAX} parts.`
+  if (!parts.length) return i18n.t('coachTraining:addPartFirst')
+  if (parts.length > PARTS_MAX) return i18n.t('coachTraining:planMax', { max: PARTS_MAX })
   const empty = parts.find(p => !p.drill)
-  return empty ? `Pick a drill for ${empty.name}, or remove the part.` : null
+  return empty ? i18n.t('coachTraining:pickDrillFor', { part: partName(empty.name) }) : null
 }
 
 /** What save_training_plan() takes: one practice per part, in order. */
@@ -200,14 +202,15 @@ export function shownFor(type: PartType, picked: PlanDrill | null, all: PlanDril
  *  "Only in this plan". */
 export function tagFor(d: PlanDrill, type: PartType, all: PlanDrill[], usage: Usage, bookmarks: readonly string[] = []): string {
   const u = used(usage, d)
-  if (u && same(usualFor(type, all, usage), d)) return `Your usual · ${u.count} of your last ${usage.plans}`
-  if (u) return `Last used ${u.last}`
+  // TRAK-408: in the language showing (English as it was).
+  if (u && same(usualFor(type, all, usage), d)) return i18n.t('coachTraining:tagUsual', { count: u.count, plans: usage.plans })
+  if (u) return i18n.t('coachTraining:tagLastUsed', { day: u.last })
   const lib = libraryOf(d)
-  if (lib) return same(usualFor(type, all, usage), d) ? 'Starter drill' : bookmarks.includes(lib.id) ? 'In My drills' : ''
-  if (d.source === 'drill') return 'My drill'
-  if (d.source === 'trak') return 'Trak drill'
-  if (d.source === 'library') return 'Library'
-  return 'Only in this plan'
+  if (lib) return same(usualFor(type, all, usage), d) ? i18n.t('coachTraining:tagStarter') : bookmarks.includes(lib.id) ? i18n.t('coachTraining:tagInMyDrills') : ''
+  if (d.source === 'drill') return i18n.t('coachTraining:tagMyDrill')
+  if (d.source === 'trak') return i18n.t('coachTraining:tagTrakDrill')
+  if (d.source === 'library') return i18n.t('coachTraining:tagLibrary')
+  return i18n.t('coachTraining:tagOnlyHere')
 }
 
 export const isSameDrill = same
@@ -239,7 +242,7 @@ export const totalMinutes = (parts: Pick<Part, 'minutes'>[]) => parts.reduce((su
 export function fitLine(total: number, length: number | null): string | null {
   if (!length) return null
   const diff = total - length
-  return diff === 0 ? `Fits your ${length} minutes.` : diff > 0 ? `${diff} min over. That’s fine, it’s only a guide.` : `${-diff} min spare.`
+  return diff === 0 ? i18n.t('coachTraining:fitsMinutes', { length }) : diff > 0 ? i18n.t('coachTraining:minOver', { diff }) : i18n.t('coachTraining:minSpare', { diff: -diff })
 }
 
 /** The minute choices for a part: its type's, plus whatever it's set to. */
@@ -277,7 +280,7 @@ export function moveTo<T>(list: T[], from: number, to: number): T[] {
 export function playersLine(drill: Pick<PlanDrill, 'source' | 'trak_drill' | 'players_kind' | 'group_size'>): string | null {
   const shelf = drill.source === 'trak' ? shelfDrill(drill.trak_drill) : undefined
   if (shelf) return playersShort(shelf.players)
-  if (drill.players_kind === 'groups') return drill.group_size ? `Groups of ${drill.group_size}` : 'In groups'
+  if (drill.players_kind === 'groups') return drill.group_size ? i18n.t('coachTraining:groupsOf', { g: drill.group_size }) : i18n.t('coachTraining:inGroups')
   return drill.players_kind ? playersShort({ kind: drill.players_kind } as Players) : null
 }
 
@@ -289,4 +292,4 @@ export function partColour(index: number, count: number): string {
 
 
 /** "1 · Rondo" over the drill's name; a plan from before parts names its part after its drill, so just "1" then. */
-export const partLine = (part: Part, index: number) => part.drill && part.name === part.drill.name ? `${index + 1}` : `${index + 1} · ${part.name}`
+export const partLine = (part: Part, index: number) => part.drill && part.name === part.drill.name ? `${index + 1}` : `${index + 1} · ${partName(part.name)}`

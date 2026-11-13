@@ -4,6 +4,7 @@ import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { BandPill } from '@/components/trak'
 import { HomeTitle } from '@/components/trak/HomeHeader'
 import { DropdownMenu } from '@/components/arc/dropdown-menu/dropdown-menu'
+import { TeamSwitcher } from '@/components/arc/team-switcher/team-switcher'
 import { scoreToBand } from '@/lib/rating-engine'
 import { BANDS } from '@/lib/types'
 import type { ParentAssessment } from '@/lib/parent-data'
@@ -76,6 +77,17 @@ export function ParentChildSwitcher() {
         items={children.map(child => ({ label: child.name, onSelect: () => selectChild(child.id) }))} />
     </div>
   )
+}
+
+/** TRAK-441 slice 2 (spec, Imad 12 Nov): the parent picks the child with the coach's squad switcher, in the side menu
+ *  where the coach picks a squad. The pick is the one every parent page follows. */
+export function ChildSwitcher() {
+  const { children, selectedChild, selectChild } = useParentChildren()
+  if (!selectedChild) return null
+  const initials = (name: string) => name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()
+  return <TeamSwitcher className="arc" manage={false} noun={{ one: 'child', many: 'Children' }} value={selectedChild.id} onSwitch={async () => {}}
+    onValueChange={selectChild} workspaces={children.map(child => ({ id: child.id, name: child.name,
+      logo: <span aria-hidden="true" style={{ fontSize: '.4em', fontWeight: 500 }}>{initials(child.name)}</span> }))} />
 }
 
 export function ParentFamilyContent({ children }: { children: ReactNode }) {

@@ -31,7 +31,7 @@ beforeEach(() => {
 })
 afterEach(() => cleanup())
 
-const labels = ['PERFORMANCE TREND', 'COACH ASSESSMENTS', 'MY PASSPORT', 'CONNECTIONS', 'HOW TRAK WORKS', 'SETTINGS']
+const labels = ['COACH ASSESSMENTS', 'MY PASSPORT', 'CONNECTIONS', 'HOW TRAK WORKS', 'SETTINGS']
 
 describe('TRAK-71: player Profile tab', () => {
   it('shows the sections in the agreed order', async () => {
@@ -42,6 +42,15 @@ describe('TRAK-71: player Profile tab', () => {
     for (let i = 1; i < nodes.length; i++) {
       expect(nodes[i - 1].compareDocumentPosition(nodes[i]) & Node.DOCUMENT_POSITION_FOLLOWING, `${labels[i - 1]} before ${labels[i]}`).toBeTruthy()
     }
+  })
+
+  // TRAK-435 (Imad, 12 Nov): a match gets the coach's words, not a rating, in every academy, so no rating trend and
+  // no "Log at least 3 matches": players don't log matches.
+  it('has no performance trend', async () => {
+    renderApp('/player/profile')
+    await screen.findByText('CONNECTIONS')
+    expect(screen.queryByText('PERFORMANCE TREND')).toBeNull()
+    expect(screen.queryByText(/Log at least 3 matches/)).toBeNull()
   })
 
   it('drops the separate "Your coach" card once a coach is linked', async () => {

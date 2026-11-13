@@ -20,6 +20,9 @@ import { ParentChildCredentials } from '@/components/parent/ParentChildCredentia
 import { ParentConsentWithdrawal } from '@/components/parent/ParentConsentWithdrawal'
 import { RosterConsentWithdrawals } from '@/components/parent/ApprovedAwaitingSignup'
 import { Avatar } from '@/components/arc/avatar/avatar'
+import { AVATAR_BUCKET } from '@/lib/avatar-url'
+import { PHOTO_TYPES, photoProblem } from '@/lib/profile-photo'
+import { OWN_AVATAR_KEY, useOwnAvatarUrl } from '@/hooks/use-own-avatar-url'
 import { PlayerFace } from '@/components/trak/PlayerFace'
 import { Button } from '@/components/arc/button/button'
 import { Input } from '@/components/arc/input/input'
@@ -42,13 +45,16 @@ export default function Settings() {
   </RouteGuard>
 }
 
-type Operation = 'name' | 'player' | 'delete' | 'password' | 'signout'
+type Operation = 'name' | 'player' | 'delete' | 'password' | 'signout' | 'photo'
 
 function AccountSettings({ userId }: { userId: string }) {
   const navigate = useNavigate()
   const { user, profile, signOut, refreshProfile } = useAuth()
   const { t } = useTranslation()
   const role = profile?.role
+  const queryClient = useQueryClient()
+  const photo = useOwnAvatarUrl() // TRAK-460: a coach's own photo, or null
+  const photoInput = useRef<HTMLInputElement>(null)
   const childLogin = isTechnicalChildAddress(user?.email)
   const mounted = useRef(false)
   useLayoutEffect(() => {
@@ -146,6 +152,51 @@ function AccountSettings({ userId }: { userId: string }) {
     finally { finish() }
   }
 
+  /* TRAK-460: a coach adds, changes or removes their picture. The database lets a coach store only an object named by their
+     own user id and set profile.avatar_url to it (20261113130000); a file that is not an image or is over 5 MB is refused
+     here first, with a plain message, and by the bucket if it ever got past. */
+  const choosePhoto = async (file: File | undefined) => {
+    if (photoInput.current) photoInput.current.value = ''
+    if (!file || role !== 'coach') return
+    const problem = photoProblem(file)
+    if (problem) { toast.error(t(problem === 'type' ? 'settings:photoBadType' : 'settings:photoTooBig')); return }
+    if (!begin('photo')) return
+    try {
+      const { client } = await getSettingsAccount(userId, isCurrent)
+      const up = await client.storage.from(AVATAR_BUCKET).upload(userId, file, { upsert: true, contentType: file.type, cacheControl: '3600' })
+      if (up.error) throw up.error
+      const { data, error } = await client.from('profiles').update({ avatar_url: userId })
+        .eq('user_id', userId).select('user_id, avatar_url').maybeSingle()
+      if (error) throw error
+      if (!data || data.avatar_url !== userId) throw new Error('Photo save was not confirmed')
+      await assertSettingsAccount(userId, isCurrent)
+      await refreshProfile()
+      await queryClient.invalidateQueries({ queryKey: [OWN_AVATAR_KEY] })
+      if (isCurrent()) toast.success(t('settings:photoSaved'))
+    } catch { if (isCurrent()) toast.error(t('settings:photoError')) }
+    finally { finish() }
+  }
+
+  /** The object goes first: a failed removal leaves the picture and says so, never a profile that names a file still stored. */
+  const removeStoredPhoto = async (client: Awaited<ReturnType<typeof getSettingsAccount>>['client']) => {
+    const { error } = await client.storage.from(AVATAR_BUCKET).remove([userId])
+    if (error) throw error
+  }
+  const removePhoto = async () => {
+    if (role !== 'coach' || !begin('photo')) return
+    try {
+      const { client } = await getSettingsAccount(userId, isCurrent)
+      await removeStoredPhoto(client)
+      const { error } = await client.from('profiles').update({ avatar_url: null }).eq('user_id', userId)
+      if (error) throw error
+      await assertSettingsAccount(userId, isCurrent)
+      await refreshProfile()
+      await queryClient.invalidateQueries({ queryKey: [OWN_AVATAR_KEY] })
+      if (isCurrent()) toast.success(t('settings:photoRemoved'))
+    } catch { if (isCurrent()) toast.error(t('settings:photoError')) }
+    finally { finish() }
+  }
+
   const changePassword = async () => {
     if (childLogin) {toast.info(t('settings:childPassword'));return}
     if (!user?.email || !begin('password')) return
@@ -167,6 +218,11 @@ function AccountSettings({ userId }: { userId: string }) {
     if (operation.current || !window.confirm(t('settings:deleteConfirm', { approvals })) || !begin('delete')) return
     try {
       const { client } = await getSettingsAccount(userId, isCurrent)
+      // TRAK-460: delete_my_account cannot reach storage, so a coach's picture is removed first. If that fails the account
+      // stays, with a message, rather than leaving a photo behind with nobody left to remove it.
+      if (role === 'coach' && profile?.avatar_url) {
+        try { await removeStoredPhoto(client) } catch { if (isCurrent()) toast.error(t('settings:photoRemoveBeforeDelete')); return }
+      }
       const { error } = await client.rpc('delete_my_account')
       if (error) throw error
       await assertSettingsAccount(userId, isCurrent)
@@ -202,11 +258,19 @@ function AccountSettings({ userId }: { userId: string }) {
       description: t('settings:profileDescription'),
       content: <>
         <div className="mb-4 flex items-center gap-4">
-          {role === 'player' ? <PlayerFace name={displayName || '?'} size="xl" /> : <Avatar name={displayName || '?'} size="xl" />}
+          {role === 'player' ? <PlayerFace name={displayName || '?'} size="xl" /> : <Avatar name={displayName || '?'} src={photo ?? undefined} size="xl" />}
           <div className="grid min-w-0 gap-0.5">
             <strong className="truncate text-sm font-medium text-ink">{displayName || '—'}</strong>
             <span className="truncate text-sm text-ink-3">{subtitle}</span>
-            <small className="text-xs text-ink-3">{t('settings:photosSoon')}</small>
+            {role === 'coach'
+              ? <div className="arc mt-1 flex flex-wrap gap-2">
+                  <input ref={photoInput} type="file" accept={PHOTO_TYPES.join(',')} className="sr-only" tabIndex={-1} aria-hidden="true"
+                    onChange={event => void choosePhoto(event.target.files?.[0])} />
+                  <Button size="sm" variant="secondary" loading={pending === 'photo'} disabled={!!pending}
+                    onClick={() => photoInput.current?.click()}>{t(profile?.avatar_url ? 'settings:photoChange' : 'settings:photoAdd')}</Button>
+                  {profile?.avatar_url ? <Button size="sm" variant="secondary" disabled={!!pending} onClick={() => void removePhoto()}>{t('settings:photoRemove')}</Button> : null}
+                </div>
+              : <small className="text-xs text-ink-3">{t('settings:photosSoon')}</small>}
           </div>
         </div>
         <SettingsRows>

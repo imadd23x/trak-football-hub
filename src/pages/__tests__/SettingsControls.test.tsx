@@ -85,7 +85,9 @@ describe('settings controls reflect supported behavior', () => {
     expect(screen.queryByRole('button', { name: 'Anyone with link' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Send reset email' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Change profile photo' })).not.toBeInTheDocument()
-    expect(document.querySelector('input[type="file"]')).not.toBeInTheDocument()
+    // TRAK-460: only a coach has a picture to add (their own); G7 keeps every other role off photos.
+    if (role === 'coach') expect(document.querySelector('input[type="file"]')).toBeInTheDocument()
+    else expect(document.querySelector('input[type="file"]')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Delete my account' })).toBeEnabled()
 

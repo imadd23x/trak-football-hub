@@ -110,6 +110,7 @@ describe('publishing (TRAK-289)', () => {
     })
     // TRAK-319: the parent reads no job, no "did the job" and no note.
     expect(previewReview(form, 'zagorakis', plans, null, 'parent')).toMatchObject({ job: '', didJob: null, note: null, coachName: null, against: 'above' })
-    expect(previewReview(form, 'charisteas', plans, null, 'player')).toMatchObject({ job: '', expectation: 'usual', context: [], didJob: 'yes', against: 'met', note: null })
+    // TRAK-447: Charisteas had no job in the plan, so there is no "did the job" for him to read.
+    expect(previewReview(form, 'charisteas', plans, null, 'player')).toMatchObject({ job: '', expectation: 'usual', context: [], didJob: null, against: 'met', note: null })
   })
 })

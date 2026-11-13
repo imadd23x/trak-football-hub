@@ -72,7 +72,8 @@ beforeEach(() => {
         const id = params.get('id')
         const session = params.get('session_id')
         return (!squad || squad.includes(row.squad_player_id)) && (!id || id === `eq.${row.id}`)
-          && (!session || session === `eq.${row.session_id}`)
+          // TRAK-439: the training history asks which of its sessions have an assessment with in.(a,b).
+          && (!session || session === `eq.${row.session_id}` || (session.startsWith('in.(') && session.slice(4, -1).replace(/"/g, '').split(',').includes(row.session_id)))
       })
       if (params.get('order')?.startsWith('created_at.desc')) {
         rows.sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id))

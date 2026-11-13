@@ -1,3 +1,6 @@
+import { useTranslation } from '@/lib/i18n'
+import { TRAINING_WORD } from '@/lib/training/words'
+import { shown } from '@/lib/squad/trait-words'
 import { Check } from 'lucide-react'
 import { LOOP_STEPS, type LoopState } from '@/lib/training/loop'
 
@@ -6,9 +9,10 @@ import { LOOP_STEPS, type LoopState } from '@/lib/training/loop'
 
 /** `note` says why the current step is there, e.g. "now". */
 export function LoopStrip({ state, note }: { state: Pick<LoopState, 'done' | 'at' | 'closed'>; note: string }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <ol aria-label="Training loop" className="flex flex-wrap items-center gap-1.5">
+      <ol aria-label={t('coachTraining:trainingLoop')} className="flex flex-wrap items-center gap-1.5">
         {LOOP_STEPS.map((step, i) => {
           const done = state.done[i]
           const current = i === state.at
@@ -17,15 +21,15 @@ export function LoopStrip({ state, note }: { state: Pick<LoopState, 'done' | 'at
             <span className={`inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 py-1 ${done ? 'bg-brand font-medium text-on-brand'
               : current ? 'border-[1.5px] border-brand bg-brand/10 font-medium text-brand' : 'bg-raised text-ink-3'}`}>
               {done && <Check aria-hidden size={14} />}
-              {i + 1} · {step}
-              {done && <span className="sr-only">(done)</span>}
-              {current && <span className="font-normal">({note})</span>}
+              {i + 1} · {shown(TRAINING_WORD, step)}
+              {done && <span className="sr-only">{t('coachTraining:doneParen')}</span>}
+              {current && <span className="font-normal">({shown(TRAINING_WORD, note)})</span>}
             </span>
           </li>
         })}
       </ol>
-      <span className="text-[13px] text-ink-3">{state.closed ? 'Closed. It’s in Past trainings.'
-        : 'It closes when the training ends and the register is taken. Notes are optional.'}</span>
+      <span className="text-[13px] text-ink-3">{state.closed ? t('coachTraining:closedInPast')
+        : t('coachTraining:closesWhen')}</span>
     </div>
   )
 }

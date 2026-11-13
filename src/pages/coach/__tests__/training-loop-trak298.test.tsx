@@ -135,7 +135,10 @@ describe('TRAK-298: the loop on a training’s page', { timeout: 30_000 }, () =>
     expect(screen.queryByRole('button', { name: 'View' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'View log' }))
     const sheet = await screen.findByRole('dialog', { name: 'The log' })
-    expect(await within(sheet).findByRole('link', { name: 'Edit log' })).toHaveAttribute('href', '/coach/sessions/session-done')
+    // TRAK-426: Training and Matches are both on here, so the old Edit session is gone; the training's own page
+    // (Who's here, notes) is where it changes. The log shows, read only.
+    expect(await within(sheet).findByText(/Attended/)).toBeInTheDocument()
+    expect(within(sheet).queryByRole('link', { name: 'Edit log' })).toBeNull()
   })
 
   it('an ended training without a register isn’t closed: Who’s here is still to do', async () => {

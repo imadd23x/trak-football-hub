@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): Trak's session parts and its drill shelf, built into
    the app (Kostas, 22 Oct: no links out of Trak). The drills use standard coaching names (Mirror drill, Y-passing
    drill, FIFA 11+); a coach should still check them. The new Trak Library (Kostas, 2 Nov) is a project of its own;
@@ -102,8 +103,9 @@ export const shelfDrill = (id: string | null | undefined) => SHELF.find(d => d.i
 /** "Any number", "In pairs", "Two teams", "Groups of 6 · 4 v 2". */
 export function playersShort(players: Players | null | undefined): string | null {
   if (!players) return null
-  if (players.kind === 'any') return 'Any number'
-  if (players.kind === 'pairs') return 'In pairs'
-  if (players.kind === 'teams') return 'Two teams'
-  return `Groups of ${players.g}${players.labels?.[players.g] ? ` · ${players.labels[players.g]}` : ''}`
+  // TRAK-408: in the language showing (English as it was).
+  if (players.kind === 'any') return i18n.t('coachTraining:anyNumber')
+  if (players.kind === 'pairs') return i18n.t('coachTraining:inPairs')
+  if (players.kind === 'teams') return i18n.t('coachTraining:twoTeams')
+  return `${i18n.t('coachTraining:groupsOf', { g: players.g })}${players.labels?.[players.g] ? ` · ${players.labels[players.g]}` : ''}`
 }

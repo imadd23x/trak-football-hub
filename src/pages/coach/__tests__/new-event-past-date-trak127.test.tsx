@@ -51,7 +51,8 @@ beforeEach(() => {
     table('session_attendance', []),
     table('event_absences', []),
     // TRAK-288: Games off, so a match is still logged as today.
-    rpc('feature_on', ({ p_feature }) => p_feature !== 'games'),
+    // TRAK-426: Training off too: where it is on, a past training is a New event Training (training-log-trak426).
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'games' && p_feature !== 'training'),
     rpc('coach_squad_player_consent_required', () => false),
   )
 })

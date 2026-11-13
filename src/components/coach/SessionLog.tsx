@@ -5,6 +5,7 @@ import { dateLocale, i18n, useTranslation } from '@/lib/i18n'
 import { supabase } from '@/integrations/supabase/client'
 import { LoadError } from '@/components/trak/LoadError'
 import { LoggedAttendance } from '@/components/coach/LoggedAttendance'
+import { useOldLogRetired } from '@/components/coach/old-log'
 import { parseTrainingNotes, parseTrainingTitle } from '@/lib/session-form'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { EditIcon } from '@/components/trak/IconAction'
@@ -100,6 +101,9 @@ function cardWord(card: string) {
 
 function EditLog({ sessionId }: { sessionId: string }) {
   const { t } = useTranslation()
-  // TRAK-455: a pencil, its name read out.
+  // TRAK-426: where the old log has retired, a training is changed on its own page (Who's here, notes) and a match in
+  // its evaluation; Edit session is gone. TRAK-455: a pencil, its name read out.
+  const { retired } = useOldLogRetired()
+  if (retired) return null
   return <EditIcon label={t('coachSchedule:editLog')} to={`/coach/sessions/${sessionId}`} />
 }

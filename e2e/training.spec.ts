@@ -594,7 +594,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page).toHaveURL(/\/coach\/training\/t-last$/)
     await expect(page.getByRole('list', { name: 'Training loop' }).getByText('(done)')).toHaveCount(3)
     await page.getByRole('button', { name: 'View log' }).click()
-    await expect(page.getByRole('dialog', { name: 'The log' }).getByRole('link', { name: 'Edit log' })).toBeVisible()
+    // TRAK-426: Training and Matches are on, so the old Edit session is gone; the log is read only here.
+    await expect(page.getByRole('dialog', { name: 'The log' }).getByText(/Attended/)).toBeVisible()
+    await expect(page.getByRole('dialog', { name: 'The log' }).getByRole('link', { name: 'Edit log' })).toHaveCount(0)
     await page.waitForTimeout(600)
     await page.screenshot({ path: testInfo.outputPath(`training-closed-${width}.png`) })
     expect(await sideways(page)).toBeLessThanOrEqual(0)

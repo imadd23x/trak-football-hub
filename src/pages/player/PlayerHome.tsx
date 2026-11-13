@@ -12,7 +12,7 @@ import { ForYou } from '@/components/trak/ForYou'
 import { Avatar } from '@/components/arc/avatar/avatar'
 import { LoadedWeekStrip } from '@/components/trak/WeekStrip'
 import { EventSheet } from '@/components/trak/EventSheet'
-import { CantMakeIt } from '@/components/parent/CantMakeIt'
+import { CantMakeIt, CantMakeItButton } from '@/components/parent/CantMakeIt'
 import { CalendarHomePrompt } from '@/components/trak/AddToCalendar'
 import { trackEvent } from '@/lib/telemetry'
 import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
@@ -313,6 +313,7 @@ export default function PlayerHome() {
         {user && <LoadedWeekStrip key={user.id} loadKey={user.id} absentFor={user.id} picker={look} renderSheet={(event, trigger) => <EventSheet event={event} role="player" trigger={trigger}>
           {reportsForSelf && <CantMakeIt event={event} child={{ id: user.id, name: 'you' }} self />}
         </EventSheet>}
+          renderPrimary={reportsForSelf ? event => <CantMakeItButton event={event} child={{ id: user.id, name: 'you' }} self /> : undefined}
           load={(from, to) => supabase.rpc('child_events', { p_child: user.id })
             .gte('event_date', from).lte('event_date', to).order('event_date', { ascending: true })} />}
         {/* TRAK-133 (J8.10): once there are events, offer the phone calendar. */}

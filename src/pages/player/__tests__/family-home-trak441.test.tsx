@@ -87,6 +87,22 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     expect(screen.queryByRole('region', { name: 'Latest coach assessment' })).toBeNull()
   })
 
+  // Slice 2.6b (Imad, 13 Nov): a player who reports for themselves gets the parent's red Can't make it; one under the
+  // academy's consent age still can't report, so has none.
+  for (const [who, age, shown] of [['at the consent age', 16, 1], ['under it', 13, 0]] as const) {
+    it(`the week's red Can't make it, for a player ${who}`, async () => {
+      server.use(
+        rpcRows('child_events', [{ ...MATCH, id: 'today', event_date: new Date().toLocaleDateString('en-CA'), start_time: '23:30:00' }]),
+        rpc('my_consent_status', () => ({ required: false, age, consent_age: 15, threshold: 18, own_choice: age >= 15 })),
+        table('event_absences', []),
+      )
+      screenIs(false)
+      renderApp('/player/home')
+      await screen.findByRole('button', { name: 'Details' }, { timeout: 5000 })
+      expect(screen.queryAllByRole('button', { name: "Can't make it" })).toHaveLength(shown)
+    })
+  }
+
   it('a laptop: the bell is in the top bar, beside the side menu, and the page has no header of its own', async () => {
     screenIs(true)
     renderApp('/player/home')

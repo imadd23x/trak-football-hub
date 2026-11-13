@@ -68,5 +68,14 @@
   "thisDevice": "This device",
   "signOut": "Sign out",
   "leaveTrak": "Leave Trak",
-  "deleteAccount": "Delete my account"
+  "deleteAccount": "Delete my account",
+  "photoAdd": "Add photo",
+  "photoChange": "Change photo",
+  "photoRemove": "Remove photo",
+  "photoBadType": "Choose a JPG, PNG, WebP or GIF picture.",
+  "photoTooBig": "That picture is over 5 MB. Choose a smaller one.",
+  "photoSaved": "Photo updated.",
+  "photoRemoved": "Photo removed.",
+  "photoError": "Couldn't save your photo. Check your connection and try again.",
+  "photoRemoveBeforeDelete": "Couldn't remove your photo, so your account was not deleted. Try again, or remove the photo first."
 }

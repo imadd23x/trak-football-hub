@@ -386,8 +386,10 @@ test("a phone's sidebar sheet closes while a page's code is still on its way", a
   await expect(page).toHaveURL(/\/coach\/squad$/)
   await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0, { timeout: 5000 })
   // The page's code arrives: the sheet must not slide back in, nor leave the page under it blocked.
-  await page.unrouteAll({ behavior: 'wait' })
-  await page.waitForTimeout(1200)
+  // Not 'wait': that waits for every held handler, and one whose request the page already dropped never finishes, so CI
+  // timed out here at 45 s on 11 to 13 Nov (2 in 48 locally). A held request still gets its continue when its 1.5 s is up.
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+  await page.waitForTimeout(1800)
   await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0)
   expect(await page.evaluate(() => document.body.style.pointerEvents)).toBe('')
   // The page takes taps (Home from the tab bar), and the menu still opens and closes there.

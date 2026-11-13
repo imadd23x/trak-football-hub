@@ -23,11 +23,12 @@ export type MySeason = Omit<Row, 'objectives' | 'season_objectives'> & { objecti
 
 export const mySeasonKey = (userId: string | undefined, child?: string) => ['season-plan-for-player', userId, child ?? null] as const
 
-export function useMySeason(child?: string) {
+/** `enabled` false asks for nothing: a guardian with no child chosen yet must not ask for a plan of their own. */
+export function useMySeason(child?: string, enabled = true) {
   const { user } = useAuth()
   return useQuery({
     queryKey: mySeasonKey(user?.id, child),
-    enabled: !!user,
+    enabled: !!user && enabled,
     queryFn: async (): Promise<MySeason | null> => {
       const { data, error } = await supabase.rpc('season_plan_for_player', child ? { p_child: child } : {})
       if (error) throw error

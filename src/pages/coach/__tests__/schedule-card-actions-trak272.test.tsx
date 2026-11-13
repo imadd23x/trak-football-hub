@@ -115,9 +115,9 @@ describe('TRAK-272: each Schedule card has a button group of its actions', { tim
     expect(await screen.findByRole('dialog', { name: /Shooting/ })).toBeInTheDocument()
   })
 
-  it('has a Back at the top on a phone, to coach Home when there is nowhere to go back to', async () => {
+  // TRAK-424: no Back beside the avatar, as on every other main page (this replaced TRAK-272's phone Back).
+  it('has no Back beside the avatar on a phone', async () => {
     await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
-    await waitFor(() => expect(window.location.pathname).toBe('/coach/home'))
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
   })
 })

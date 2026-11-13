@@ -1,7 +1,7 @@
 {
   "matchesWhat": "your matches",
   "noMatchesYet": "No matches yet",
-  "noMatchesBody": "Add a match in Schedule. Its game plan and evaluation will live here.",
+  "noMatchesBody": "Add a match in Events. Its game plan and evaluation will live here.",
   "addMatch": "Add a match",
   "nextMatch": "Next match",
   "noMatchComing": "No match coming up.",
@@ -296,5 +296,7 @@
   "nobodyWouldRead": "Nobody is ticked as playing, so nobody would read it.",
   "previewAs": "Preview as",
   "asPlayer": "As the player",
-  "asParent": "As the parent"
+  "asParent": "As the parent",
+  "ownGoal": "Own goal",
+  "notApplicable": "N/A"
 }

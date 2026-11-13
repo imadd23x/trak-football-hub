@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
+import { openNewEvent } from './new-event'
 
 // TRAK-199 (team decision, 21 Oct): a coach's screens use a tablet's or a laptop's
 // width; a phone, upright or sideways, keeps today's layout, and so does every
@@ -54,6 +55,9 @@ async function backend(context: BrowserContext, role: Role, unexpected: string[]
     ] : [])
     if (['/rest/v1/coach_sessions', '/rest/v1/session_attendance', '/rest/v1/rpc/coach_squad_season', '/rest/v1/coach_calendar_events',
       '/rest/v1/event_confirmations', '/rest/v1/event_absences'].includes(path)) return json([])
+    // TRAK-441: a family's week has today's match, so the picker's footer shows Details (and a parent's red Can't make it).
+    if (path === '/rest/v1/rpc/child_events') return json([{ id: 'ev-199', event_type: 'match', title: 'League', opponent: 'Rivals FC',
+      event_date: new Date().toLocaleDateString('en-CA'), start_time: '23:30:00', status: 'scheduled', sequence: 0, updated_at: '2026-11-01T00:00:00Z' }])
     // Layout only: every other read is empty.
     if (path.startsWith('/rest/v1/')) return json(req.method() === 'GET' || path.startsWith('/rest/v1/rpc/') ? [] : null)
     unexpected.push(`${req.method()} ${path}`)
@@ -98,7 +102,7 @@ for (const [label, width, height, pageWidth] of [
     expect(plus.x + plus.width).toBeLessThanOrEqual(width)
     // The avatar (top left) opens the side menu; the calendar sits beside the bell.
     await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Schedule' })).toBeVisible() // TRAK-255
+    await expect(page.getByRole('link', { name: 'Events' })).toBeVisible() // TRAK-255; TRAK-449
     await page.screenshot({ path: testInfo.outputPath(`coach-home-${width}.png`) })
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
@@ -113,7 +117,7 @@ test('coach Home on a laptop: the sidebar on the left, "+ Create" at the top rig
   // TRAK-259: Arc's sidebar rail. The club, then Home, Calendar, Squad, Library; Settings and the coach at the bottom.
   const sidebar = page.getByRole('navigation', { name: 'Your academy' })
   const rows = sidebar.getByRole('button')
-  await expect(rows).toHaveText(['Home', 'Schedule', 'Squad', 'Library', 'Settings']) // TRAK-255
+  await expect(rows).toHaveText(['Home', 'Events', 'Squad', 'Library', 'Settings']) // TRAK-255; TRAK-449
   const rail = await sidebar.evaluate(el => el.closest('[id$="-sidebar"]')!.getBoundingClientRect().toJSON() as DOMRect)
   expect([rail.x, rail.y, rail.width, rail.height].map(Math.round)).toEqual([0, 0, 240, 900])
   const [first, last] = [(await rows.first().boundingBox())!, (await rows.last().boundingBox())!]
@@ -185,7 +189,7 @@ test("a coach's Settings is Arc's settings page in the wide column on a laptop",
 
 test("the Calendar's sheets stop at the Arc bottom sheet's width on a tablet", async ({ page, context }) => {
   const { unexpected } = await open(page, context, 'coach', '/coach/schedule', 820, 1180)
-  await page.getByRole('button', { name: 'Add event' }).click()
+  await openNewEvent(page)
   const sheet = (await page.getByRole('dialog', { name: 'New event' }).boundingBox())!
   expect(Math.round(sheet.width)).toBe(576)
   expect(Math.round(sheet.x + sheet.width / 2)).toBe(410)
@@ -234,6 +238,29 @@ test("a parent's laptop frame: the child switcher in the side menu", async ({ pa
   expect(unexpected).toEqual([])
   expect(errors).toEqual([])
 })
+
+// TRAK-441 slice 2 (Imad, 13 Nov): the player Home in the coach's look, behind family_look; the parent's too (2.6). A
+// phone: the bell on the page; a laptop: the bell in the top bar and two columns. No sideways scroll either way.
+for (const who of ['player', 'parent'] as const) for (const [label, width, height] of [['a phone', 390, 844], ['a laptop', 1440, 900]] as const) {
+  test(`the ${who} Home in the coach's look on ${label}`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, who, `/${who}/home`, width, height, ['events', 'family_look'])
+    const bell = page.getByRole('button', { name: /^Alerts/ })
+    await expect(bell).toBeVisible()
+    // 2.4c: the coach's week picker, not the letter strip.
+    await expect(page.getByRole('heading', { name: 'This week', level: 2 })).toBeVisible()
+    // 2.6b: today's match, Details beside a red Can't make it for a parent; a player under the consent age has none.
+    await expect(page.getByRole('button', { name: 'Details' })).toBeVisible()
+    await expect(page.getByRole('button', { name: "Can't make it" })).toHaveCount(who === 'parent' ? 1 : 0)
+    // A phone: the bell in the page's own top row, the glass tab bar. A laptop: the side menu, the bell in its top bar.
+    await expect(page.getByRole('navigation', { name: 'Trak' })).toHaveCount(width < 1024 ? 0 : 1)
+    expect((await bell.boundingBox())!.y).toBeLessThan(60)
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`family-home-${who}-${width}.png`), fullPage: true })
+    expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}
 
 // TRAK-250: Squad is a coach workspace of views. TRAK-263 (Imad, 22 Oct): Players (Arc's team
 // directory) replaced Snapshot, and the views sit on Arc's glass segmented control. On a tablet
@@ -307,7 +334,7 @@ for (const [label, width, height, beside] of [['an upright tablet', 820, 1180, f
   test(`the Calendar on ${label}: the chosen day ${beside ? 'beside' : 'under'} the month`, async ({ page, context }) => {
     const { unexpected } = await open(page, context, 'coach', '/coach/schedule', width, height)
     const month = (await page.getByRole('grid').boundingBox())!
-    const day = (await page.getByText('Nothing planned. Tap + to schedule an event.').boundingBox())!
+    const day = (await page.getByText('Nothing planned', { exact: true }).boundingBox())!
     if (beside) {
       expect(day.x).toBeGreaterThan(month.x + month.width)
       expect(day.y).toBeLessThan(month.y + month.height)
@@ -358,15 +385,19 @@ test("a phone's sidebar sheet takes a tap: the row opens its page and the sheet 
 test("a phone's sidebar sheet closes while a page's code is still on its way", async ({ page, context }) => {
   const { unexpected, errors } = await open(page, context, 'coach', '/coach/home', 390, 844)
   await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
-  await page.route(/\/assets\/.+\.js$/, async route => { await new Promise(done => setTimeout(done, 1500)); await route.continue() })
+  // A held request can finish another way while it waits (the context's catch-all, or the page moving on): CI saw "Route is
+  // already handled!" from this continue on 11 and 12 Nov, which failed the test though the menu behaved. Only the delay matters.
+  await page.route(/\/assets\/.+\.js$/, async route => { await new Promise(done => setTimeout(done, 1500)); await route.continue().catch(() => {}) })
   await page.getByRole('button', { name: 'Open menu' }).click()
   const sheet = page.getByRole('navigation', { name: 'Your academy' })
   await sheet.getByRole('button', { name: 'Squad', exact: true }).click()
   await expect(page).toHaveURL(/\/coach\/squad$/)
   await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0, { timeout: 5000 })
   // The page's code arrives: the sheet must not slide back in, nor leave the page under it blocked.
-  await page.unrouteAll({ behavior: 'wait' })
-  await page.waitForTimeout(1200)
+  // Not 'wait': that waits for every held handler, and one whose request the page already dropped never finishes, so CI
+  // timed out here at 45 s on 11 to 13 Nov (2 in 48 locally). A held request still gets its continue when its 1.5 s is up.
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+  await page.waitForTimeout(1800)
   await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0)
   expect(await page.evaluate(() => document.body.style.pointerEvents)).toBe('')
   // The page takes taps (Home from the tab bar), and the menu still opens and closes there.
@@ -383,7 +414,7 @@ test("a phone's sidebar sheet closes while a page's code is still on its way", a
 test("a laptop's breadcrumb names the page, one title after several moves", async ({ page, context }) => {
   const { errors } = await open(page, context, 'coach', '/coach/home', 1440, 900)
   const side = page.getByRole('navigation', { name: 'Your academy' })
-  for (const name of ['Squad', 'Schedule', 'Library', 'Home']) {
+  for (const name of ['Squad', 'Events', 'Library', 'Home']) {
     await side.getByRole('button', { name, exact: true }).click()
     await page.waitForTimeout(300)
   }

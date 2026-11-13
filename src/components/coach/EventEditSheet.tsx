@@ -10,7 +10,7 @@ import {
   repeatProblem, seriesDates, type EventForm, type Repeat,
 } from '@/lib/coach-events'
 import {
-  COMPETITION_WORD, EVENT_STEPS, KIND_WORD, REVIEW, STEP_WORD, THEME_WORD, WEEKDAY_WORD, font, inSeries, inputClass, mono, pastProblem, playedMatch, seriesCount, stepProblem,
+  COMPETITION_WORD, EVENT_STEPS, KIND_WORD, REVIEW, STEP_WORD, THEME_WORD, WEEKDAY_WORD, font, inSeries, inputClass, mono, pastProblem, playedMatch, playedTraining, seriesCount, stepProblem,
   type EditSheet, type Scope,
 } from '@/lib/event-edit'
 import { familyNoteProblem } from '@/lib/event-share'
@@ -146,8 +146,11 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
   // TRAK-161: tell the coach as they type when families won't see the note.
   const noteProblem = familyNoteProblem(sheet.form.familyNote, childNames)
   // TRAK-127: said as soon as a past day is picked, with the two logs.
-  const datePassed = pastProblem(sheet.form, sheet.row, games)
+  // TRAK-426: where Training is on, a training already held is saved and opened on its register (Who's here).
+  const training = useFeature('training')
+  const datePassed = pastProblem(sheet.form, sheet.row, games, training)
   const played = playedMatch(sheet.form, sheet.row, games)
+  const heldTraining = playedTraining(sheet.form, sheet.row, training)
   const logInstead = (to: 'match' | 'training') => {
     const { date, opponent, homeAway } = sheet.form
     onClose()
@@ -189,7 +192,7 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
     })
   const toStep = (step: number) => onChange(s => ({ ...s, step, error: null }))
   const nextStep = () => {
-    const problem = stepProblem(sheet.step, sheet.form, sheet.repeat, sheet.row, games)
+    const problem = stepProblem(sheet.step, sheet.form, sheet.repeat, sheet.row, games, training)
     if (problem) onChange(s => ({ ...s, error: problem }))
     else toStep(sheet.step + 1)
   }
@@ -329,7 +332,7 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
             </div>
           </div>
 
-          {!sheet.row && sheet.form.kind !== 'match' && (
+          {!sheet.row && sheet.form.kind !== 'match' && !heldTraining && (
             <div className="space-y-2">
               <Chip on={sheet.repeat.on} onClick={() => setRepeat({ on: !sheet.repeat.on })}>{t('coachSchedule:repeatsWeekly')}</Chip>
               {sheet.repeat.on && (
@@ -404,7 +407,8 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
             <div className="flex gap-2">
               {/* TRAK-288: where Games is on, a played match is a New event Match, evaluated on its game page. */}
               {!games && <Button size="md" variant="secondary" className="flex-1" onClick={() => logInstead('match')}>{t('coachSchedule:logMatch')}</Button>}
-              <Button size="md" variant="secondary" className="flex-1" onClick={() => logInstead('training')}>{t('coachSchedule:logTraining')}</Button>
+              {/* TRAK-426: where Training is on, a held training is a New event Training, registered on its own page. */}
+              {!training && <Button size="md" variant="secondary" className="flex-1" onClick={() => logInstead('training')}>{t('coachSchedule:logTraining')}</Button>}
             </div>
           </div>
         )}
@@ -427,6 +431,8 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
               <Button size="lg" className="flex-1" loading={saving} disabled={!!datePassed} onClick={() => onSave()}>{t('coachSchedule:saveChanges')}</Button>
             ) : played ? (
               <Button size="lg" className="flex-1" loading={saving} onClick={() => onSave(true, true)}>{t('coachSchedule:saveAndEvaluate')}</Button>
+            ) : heldTraining ? (
+              <Button size="lg" className="flex-1" loading={saving} onClick={() => onSave(true, true)}>{t('coachSchedule:saveAndTakeRegister')}</Button>
             ) : <>
               <Button size="lg" variant="secondary" className="flex-1" loading={saving} disabled={!!datePassed} onClick={() => onSave()}>
                 {seriesCount(sheet) > 1 ? t('coachSchedule:saveDrafts', { count: seriesCount(sheet) }) : t('coachSchedule:saveDraft')}

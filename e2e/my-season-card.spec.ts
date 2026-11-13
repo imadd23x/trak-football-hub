@@ -117,7 +117,7 @@ test('a failed read shows no card, and Home carries on', async ({ context, page 
   page.on('pageerror', error => errors.push(error.message))
   await backend(context, unexpected, state)
   await page.goto('/player/home')
-  await expect(page.getByText('Defender · Synthetic FC · U16')).toBeVisible()
+  await expect(page.getByText('Synthetic FC · U16')).toBeVisible()
   await page.waitForLoadState('networkidle')
   await expect(page.getByRole('region', { name: 'My season' })).toHaveCount(0)
   await expect(page.getByRole('alert')).toHaveCount(0)

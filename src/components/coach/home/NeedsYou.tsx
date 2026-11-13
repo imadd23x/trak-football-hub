@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { PlayerFace } from '@/components/trak/PlayerFace'
 import { ScrollArea } from '@/components/arc/scroll-area/scroll-area'
+import { Button } from '@/components/arc/button/button'
 import { LoadError } from '@/components/trak/LoadError'
 import type { NeedsYouItem } from '@/lib/coach-needs-you'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
@@ -9,7 +10,13 @@ import { useTranslation } from '@/lib/i18n'
 
 /** An event still waiting for its register or match log (Imad, 24 Oct), with the week's own next step. TRAK-290: an
  *  evaluation draft past its 09:00 reminder is urgent. */
-export type OwedEvent = { id: string; title: string; when: string; squad: string | null; reason: string; action: ReactNode; urgent?: boolean }
+export type OwedEvent = { id: string; title: string; when: string; squad: string | null; reason: string; action: ReactNode; urgent?: boolean
+  /** TRAK-444: when the thing it is about happened (ms), so the newest come first. Without one, a card counts as now. */
+  at?: number }
+
+/** TRAK-444: a full season of owed items was 100 cards; this many show first, and Show all opens the rest. There are no
+ *  filters (Tarek, 13 Nov: not what he imagined, and not needed): the most urgent and the newest come first. */
+export const FIRST_CARDS = 5
 
 /** TRAK-262 (Imad, 22 Oct): Home's Needs you, one swipeable card per player (`needsYou()` says who). Imad, 24 Oct:
  *  events the week marks "Needs you" come first, with their Take register or Log it. */
@@ -22,7 +29,14 @@ export function NeedsYou({ items, events = [], failed, onRetry, onOpen }: {
   onOpen: (item: NeedsYouItem) => void
 }) {
   const { t } = useTranslation()
+  const [all, setAll] = useState(false)
   const count = items ? items.length + events.length : null
+  const long = count !== null && count > FIRST_CARDS
+  const when = (card: { at?: number }) => card.at ?? Date.now()
+  // The week's cards: urgent first, then the newest. Player cards already come most urgent first (needsYou()).
+  const sortedEvents = [...events].sort((a, b) => Number(!!b.urgent) - Number(!!a.urgent) || when(b) - when(a))
+  const cards = [...sortedEvents.map(event => ({ event })), ...(items ?? []).map(item => ({ item }))]
+  const shown = !long || all ? cards : cards.slice(0, FIRST_CARDS)
   return <section aria-labelledby="needs-you-title">
     <div className="mb-2 flex items-baseline justify-between gap-3">
       <h2 id="needs-you-title" className="text-lg font-medium text-ink">{t('coachHome:needsYouTitle')} {count !== null && <span className="text-ink-3 font-normal">{count}</span>}</h2>
@@ -34,7 +48,7 @@ export function NeedsYou({ items, events = [], failed, onRetry, onOpen }: {
       : <div className="arc -mx-1">
         <ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label={t('coachHome:needsYouList')}>
           <ul className="flex gap-3 px-1 pb-1">
-            {events.map(event => <li key={`event:${event.id}`} className="w-[248px] flex-none" style={{ scrollSnapAlign: 'start' }}>
+            {shown.flatMap(card => 'event' in card ? [card.event] : []).map(event => <li key={`event:${event.id}`} className="w-[248px] flex-none" style={{ scrollSnapAlign: 'start' }}>
               {/* The week's "needs you" yellow (TRAK-270), so the card reads as the same thing. */}
               <div className="flex h-full w-full flex-col gap-3 rounded-2xl border-[1.5px] bg-surface p-4" style={{ borderColor: 'rgb(var(--t-attention))' }}>
                 <span className="grid min-w-0">
@@ -48,7 +62,7 @@ export function NeedsYou({ items, events = [], failed, onRetry, onOpen }: {
                 <span className="mt-auto">{event.action}</span>
               </div>
             </li>)}
-            {items.map(item => <li key={`${item.kind}:${item.playerId}`} className="w-[248px] flex-none" style={{ scrollSnapAlign: 'start' }}>
+            {shown.flatMap(card => 'item' in card ? [card.item] : []).map(item => <li key={`${item.kind}:${item.playerId}`} className="w-[248px] flex-none" style={{ scrollSnapAlign: 'start' }}>
               <button type="button" onClick={() => onOpen(item)}
                 className="flex h-full w-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 text-left transition-transform active:scale-[.98] motion-reduce:transition-none">
                 <span className="flex items-center gap-3">
@@ -69,6 +83,11 @@ export function NeedsYou({ items, events = [], failed, onRetry, onOpen }: {
             </li>)}
           </ul>
         </ScrollArea>
+        {long && <div className="mt-2 px-1">
+          <Button variant="ghost" size="sm" onClick={() => setAll(v => !v)} aria-expanded={all}>
+            {all ? t('coachHome:showFewer') : t('coachHome:showAll', { count: cards.length })}
+          </Button>
+        </div>}
       </div>}
   </section>
 }

@@ -91,6 +91,9 @@ export function authHandlers(): HttpHandler[] {
     http.post(`${SUPABASE_URL}/rest/v1/rpc/get_my_approved_children_awaiting_signup`, () => HttpResponse.json([])),
     // TRAK-104: a signed-in player's session is live unless a test says otherwise.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/my_session_is_live`, () => HttpResponse.json(true)),
+    // TRAK-426: every academy feature is off unless a test switches it on, as the app treats a failed read. Answered at
+    // once, so a page that waits for a switch (the old log's pages) isn't held by a failed read and its retry.
+    http.post(`${SUPABASE_URL}/rest/v1/rpc/feature_on`, () => HttpResponse.json(false)),
     // TRAK-133: Home and Settings ask whether this person has a calendar link.
     // None unless a test says so; the calendar tests register their own replies.
     http.post(`${SUPABASE_URL}/rest/v1/rpc/my_calendar_link`, () => HttpResponse.json([])),

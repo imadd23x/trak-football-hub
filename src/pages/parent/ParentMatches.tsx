@@ -7,6 +7,7 @@ import { useParentChildren } from '@/contexts/ParentChildrenContext'
 import { TrainingHistory } from '@/components/player/TrainingHistory'
 import { ParentUpcomingEvents } from '@/components/parent/ParentEvents'
 import { formatParentDate, parentMatchHref, matchResult } from '@/lib/parent-data'
+import { fetchAssessedSessionIds } from '@/lib/parent-assessments'
 import { EVENT_COLOR } from '@/lib/coach-events'
 import { useReviews } from '@/lib/games/reviews'
 import { Badge } from '@/components/arc/badge/badge'
@@ -60,6 +61,7 @@ export default function ParentMatches() {
           {/* J6 (TRAK-77): the training the coach logged for this child. */}
           {selectedChild && <TrainingHistory key={selectedChild.id} playerUserId={selectedChild.id}
             assessmentHref={sessionId => `/parent/session/${encodeURIComponent(sessionId)}/assessment`}
+            assessedSessions={(ids, signal) => fetchAssessedSessionIds(selectedChild.id, ids, signal)}
             waitingText="Training appears once you approve this child." />}
         </ParentFamilyContent>
       </div>

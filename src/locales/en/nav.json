@@ -1,6 +1,5 @@
 {
   "home": "Home",
-  "schedule": "Schedule",
   "squad": "Squad",
   "matches": "Matches",
   "training": "Training",
@@ -31,5 +30,6 @@
   "breadcrumb": "Breadcrumb",
   "needYou": "{{count}} need you",
   "create": "Create",
-  "quickAdd": "Quick add"
+  "quickAdd": "Quick add",
+  "seasonPlan": "Season plan"
 }

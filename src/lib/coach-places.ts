@@ -11,13 +11,13 @@ export const COACH_SCREEN_PATH: Record<CoachScreen, string> = {
   home: '/coach/home', calendar: '/coach/schedule', squad: '/coach/squad', games: '/coach/matches', training: '/coach/training', library: '/coach/trainings', settings: '/settings',
 }
 
-type PlaceName = 'home' | 'schedule' | 'player' | 'squad' | 'matches' | 'drills' | 'training' | 'library' | 'settings'
-  | 'howTrakWorks' | 'feedback' | 'assess' | 'evaluation' | 'log'
+type PlaceName = 'home' | 'events' | 'player' | 'squad' | 'matches' | 'drills' | 'training' | 'library' | 'settings'
+  | 'howTrakWorks' | 'feedback' | 'assess' | 'evaluation' | 'seasonPlan' | 'log'
 
 /** Which nav row a path belongs to, and the name in the laptop's top bar (its word in nav.json, TRAK-406). */
 const PLACES: [prefix: string, screen: CoachScreen | null, title: PlaceName][] = [
   ['/coach/home', 'home', 'home'],
-  ['/coach/schedule', 'calendar', 'schedule'], // TRAK-255
+  ['/coach/schedule', 'calendar', 'events'], // TRAK-255; TRAK-449: the page is called Events, its address stays
   ['/coach/squad/player', 'squad', 'player'], // TRAK-351: a player's own page, in Squad
   ['/coach/squad', 'squad', 'squad'],
   ['/coach/matches', 'games', 'matches'], // TRAK-283: Games home and each game's page
@@ -31,6 +31,8 @@ const PLACES: [prefix: string, screen: CoachScreen | null, title: PlaceName][] =
   ['/coach/assess', null, 'assess'],
   // TRAK-364: the squad's evaluation opens from Home's Needs you.
   ['/coach/evaluation', 'home', 'evaluation'],
+  // TRAK-433: the season plan opens from the same place on Home, so Home stays marked on it too.
+  ['/coach/season-plan', 'home', 'seasonPlan'],
   // TRAK-186: the log's pages open from Home, so Home stays marked on them.
   ['/coach/sessions', 'home', 'log'],
 ]
@@ -50,4 +52,4 @@ export function tabOf(path: string): { label: string; href: string } {
 
 /** Pages with no bottom bar on a phone before (TRAK-254's `sideMenuOnly`) keep none: their own actions sit at the bottom,
  *  and Back leaves them. Settings, the manual, a player's page, and adding or editing a session (not History). */
-export const BARLESS = /^\/(settings|coach\/(how-trak-works|squad\/player\/.+|sessions\/(?!list$)[^/]+))$/
+export const BARLESS = /^\/(settings|coach\/(how-trak-works|assess|squad\/player\/.+|sessions\/(?!list$)[^/]+))$/

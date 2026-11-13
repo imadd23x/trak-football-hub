@@ -161,6 +161,7 @@ beforeEach(() => {
     http.post(endpoint('rpc/get_roster_children_awaiting_consent'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_my_child_logins'), () => HttpResponse.json([])),
     http.post(endpoint('rpc/get_my_approved_children_awaiting_signup'), () => HttpResponse.json([])),
+    http.post(endpoint('rpc/family_feature_on'), () => HttpResponse.json(false)), // TRAK-441: family_look off, today's Home
     http.post(endpoint('rpc/get_children_awaiting_consent'), async ({ request }) => {
       const account = assertAuthenticated(request)
       const body: unknown = await request.json()

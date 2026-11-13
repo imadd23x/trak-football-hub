@@ -9,6 +9,7 @@ import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
 import { localTodayISO, toInstant } from '@/lib/event-time'
 import { dateHeld, pickDate, pickTime } from '../../../../tests/support/arc-pickers'
 import { eventStep } from '../../../../tests/support/event-steps'
+import { openNewEvent } from '../../../../tests/support/schedule-actions'
 
 /**
  * TRAK-127 (J8.4), live run 3 (16 Oct): Imad created a match dated two days
@@ -51,7 +52,8 @@ beforeEach(() => {
     table('session_attendance', []),
     table('event_absences', []),
     // TRAK-288: Games off, so a match is still logged as today.
-    rpc('feature_on', ({ p_feature }) => p_feature !== 'games'),
+    // TRAK-426: Training off too: where it is on, a past training is a New event Training (training-log-trak426).
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'games' && p_feature !== 'training'),
     rpc('coach_squad_player_consent_required', () => false),
   )
 })
@@ -68,7 +70,7 @@ async function expectTrainingDate(day: string) {
 
 async function newEventOn(day: string) {
   renderApp('/coach/schedule')
-  await userEvent.click(await screen.findByRole('button', { name: 'Add event' }))
+  await openNewEvent()
   const sheet = screen.getByRole('dialog', { name: 'New event' })
   await eventStep(sheet, 'When')
   if (day !== today) await pickDate(userEvent, 'Date', day)

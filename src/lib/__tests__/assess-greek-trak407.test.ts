@@ -21,6 +21,15 @@ describe('TRAK-407: Assess in Greek', () => {
     expect(bandWord('Something else')).toBe('Something else')
   })
 
+  it('names the Feedback page\'s levels and the card\'s label in the language showing', async () => {
+    expect(i18n.t('coachAssess:levelOnTrack')).toBe('On track')
+    expect(i18n.t('coachAssess:cardAriaNamed', { label: 'Draft', name: 'Cal Moss', date: '12 Nov' })).toBe('Draft assessment, Cal Moss, 12 Nov')
+    expect(i18n.t('coachAssess:fbAll', { count: 18 })).toBe('All 18')
+    await showLanguage('el')
+    expect(i18n.t('coachAssess:levelOnTrack')).toBe('Σε καλό δρόμο')
+    expect(i18n.t('coachAssess:fbAll', { count: 18 })).toBe('Όλοι 18')
+  })
+
   it('says why a player cannot be assessed yet in the language showing', async () => {
     expect(waitText('parent', 'Cal Moss')).toBe('You can assess Cal Moss once a parent has approved their account.')
     expect(waitText(null, 'Cal Moss')).toBe("You can assess Cal Moss once a parent has approved and they've set up their Trak account.")

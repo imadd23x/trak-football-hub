@@ -14,6 +14,7 @@ import { ParentConsentWatcher } from "@/components/parent/ParentConsentWatcher";
 import { CoachLayout } from "@/components/coach/CoachLayout";
 import { FamilyFrame } from "@/components/trak/FamilyFrame";
 import { CoachFrame } from "@/components/coach/CoachFrame";
+import { OldLog } from "@/components/coach/OldLog";
 import { COACH_HOW_PATH } from "@/lib/coach-places";
 import { ErrorBoundary } from "@/components/trak/ErrorBoundary";
 import { ParkedScreen } from "@/components/trak/ParkedScreen";
@@ -184,8 +185,9 @@ const App = () => (
             <Route path="/coach/assess" element={<RouteGuard allowedRole="coach"><CoachAssessPage /></RouteGuard>} />
             <Route path="/coach/feedback" element={<RouteGuard allowedRole="coach"><CoachFeedbackPage /></RouteGuard>} />
             <Route path="/coach/feedback/:assessmentId" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachReviewFeedback /></ParkedScreen></RouteGuard>} />
-            <Route path="/coach/sessions" element={<RouteGuard allowedRole="coach"><CoachSessionsChooser /></RouteGuard>} />
-            <Route path="/coach/sessions/list" element={<RouteGuard allowedRole="coach"><CoachSessionsPage /></RouteGuard>} />
+            {/* TRAK-426: where Training and Matches are both on, the old log's pages retire (OldLog says where each goes). */}
+            <Route path="/coach/sessions" element={<RouteGuard allowedRole="coach"><OldLog to="new-training"><CoachSessionsChooser /></OldLog></RouteGuard>} />
+            <Route path="/coach/sessions/list" element={<RouteGuard allowedRole="coach"><OldLog to="past"><CoachSessionsPage /></OldLog></RouteGuard>} />
             {/* Quick match log now resolves to the full session screen, preset to Match.
                  It wrote identical inputs for every attending player — 90 minutes, no
                  goals, no assists — so a squad's computed bands varied only by position.
@@ -193,9 +195,9 @@ const App = () => (
                  each player the same way, with per-player detail available where it
                  matters. CoachQuickMatchLog.tsx is left in the repo, unrouted. */}
             <Route path="/coach/sessions/quick" element={<RouteGuard allowedRole="coach"><CoachAddSession /></RouteGuard>} />
-            <Route path="/coach/sessions/add" element={<RouteGuard allowedRole="coach"><CoachAddSession /></RouteGuard>} />
+            <Route path="/coach/sessions/add" element={<RouteGuard allowedRole="coach"><OldLog to="new-training"><CoachAddSession /></OldLog></RouteGuard>} />
             {/* TRAK-102: a history row opens its session; training and other are editable. */}
-            <Route path="/coach/sessions/:id" element={<RouteGuard allowedRole="coach"><CoachSessionEdit /></RouteGuard>} />
+            <Route path="/coach/sessions/:id" element={<RouteGuard allowedRole="coach"><OldLog to="past"><CoachSessionEdit /></OldLog></RouteGuard>} />
             {/* TRAK-418: the old Profile and the old coach manual are gone; old links and bookmarks land on Settings and
                 on the coach's How Trak works. */}
             <Route path="/coach/profile" element={<Navigate to="/settings" replace />} />

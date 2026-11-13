@@ -2,7 +2,7 @@
 -- Avatar-policy regressions. The original #113 suite failed 3 of 6 checks
 -- before 20260922143046_restrict_avatar_reads_to_owner.sql and joined --all
 -- with that fix. G7 (20260923110906) closed photos to every app role; TRAK-460
--- (20261113130000) reopens exactly one door: a COACH's own photo.
+-- (20261113150000) reopens exactly one door: a COACH's own photo.
 --
 -- Measured on production on 22 Sep as anon with only the public key: LIST the
 -- bucket returned every object name (object name = user_id), SIGN an object

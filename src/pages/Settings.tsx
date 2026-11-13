@@ -153,7 +153,7 @@ function AccountSettings({ userId }: { userId: string }) {
   }
 
   /* TRAK-460: a coach adds, changes or removes their picture. The database lets a coach store only an object named by their
-     own user id and set profile.avatar_url to it (20261113130000); a file that is not an image or is over 5 MB is refused
+     own user id and set profile.avatar_url to it (20261113150000); a file that is not an image or is over 5 MB is refused
      here first, with a plain message, and by the bucket if it ever got past. */
   const choosePhoto = async (file: File | undefined) => {
     if (photoInput.current) photoInput.current.value = ''

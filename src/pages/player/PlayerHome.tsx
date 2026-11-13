@@ -22,6 +22,7 @@ import { LatestEvaluation } from '@/components/player/LatestEvaluation'
 import { SeasonSoFar } from '@/components/player/SeasonSoFar'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
 import { progressSummary, useEvaluationProgress } from '@/lib/evaluation-progress'
+import { useMySeason } from '@/lib/my-season'
 
 
 export default function PlayerHome() {
@@ -91,6 +92,8 @@ export default function PlayerHome() {
   // failed read leaves the card as it was (the evaluation page says it when it can't load).
   const evaluationIds = recentAssessments.filter(a => a.evaluation_id).map(a => a.id as string)
   const evaluationProgress = useEvaluationProgress(evaluationIds)
+  // TRAK-437: the position is the one the coach set (the season plan's read, shared with the My season card), nothing if none; never the sign-up value.
+  const position = useMySeason().data?.position
   const progressLines: Record<string, string> = {}
   for (const [id, p] of evaluationProgress.data ?? []) {
     const line = progressSummary(p.objectives)
@@ -129,7 +132,7 @@ export default function PlayerHome() {
       setUpcomingEvents([])
     }
 
-    const detailsRequest = supabase.from('player_details').select('position, current_club, age_group').eq('user_id', user.id).maybeSingle()
+    const detailsRequest = supabase.from('player_details').select('current_club, age_group').eq('user_id', user.id).maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return
         // These sibling reads used to destructure only `data`, so a failure
@@ -306,7 +309,7 @@ export default function PlayerHome() {
         {header}
         {/* TRAK-194 (Kostas, 16 Oct): one quiet line, as parent Home has it, not a greeting and chips that look like buttons. */}
         {!look && details && <p className="text-xs text-muted-foreground text-center -mt-1 pb-4">
-          {[details.position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
+          {[position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
         </p>}
         <div className={look ? 'grid grid-cols-[minmax(0,1fr)] gap-5 laptop:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] laptop:items-start laptop:gap-6' : ''}>
         <div className={look ? 'grid grid-cols-[minmax(0,1fr)] content-start gap-5' : ''}>

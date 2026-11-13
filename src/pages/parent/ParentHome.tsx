@@ -14,6 +14,7 @@ import { averageRecordedRating, formatParentAward, formatParentDate, matchResult
 import { CalendarHomePrompt } from '@/components/trak/AddToCalendar'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
 import { useProgressLines } from '@/lib/evaluation-progress'
+import { useMySeason } from '@/lib/my-season'
 import { FamilySeasonCard } from '@/components/parent/FamilySeasonCard'
 import { ParentConsentBar } from '@/pages/parent/ParentConsent'
 import { FrameActions, useFamilyLook } from '@/components/trak/FamilyFrame'
@@ -41,6 +42,8 @@ export default function ParentHome() {
   const award = development?.awards[0]
   const details = development?.details
   // TRAK-402: an evaluation's card says how the objectives went; a failed read leaves the card as it was.
+  // TRAK-437: the position the coach set for this child, nothing if none; never the sign-up value.
+  const position = useMySeason(selectedChild?.id, !!selectedChild).data?.position
   const progressLines = useProgressLines(development?.assessments.slice(0, 5) ?? [], selectedChild?.id)
   const hasError = matchQuery.isError || developmentQuery.isError
   const loading = matchQuery.isPending || developmentQuery.isPending
@@ -111,7 +114,7 @@ export default function ParentHome() {
             ) : (
               <>
                 {details && <p className="text-xs text-muted-foreground text-center -mt-1 pb-4">
-                  {[details.position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
+                  {[position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
                 </p>}
                 {/* TRAK-163: the selected child's week, Monday to Sunday, under the header. */}
                 {week}

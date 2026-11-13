@@ -301,6 +301,34 @@ test.describe('TRAK-182 coach screens', () => {
 // TRAK-220 (20 Oct live run): menus and the expanded assessment card were
 // see-through on the light theme. Arc's tokens live on `.arc`; a panel Radix
 // portals to <body> has no `.arc` ancestor unless it carries the class itself.
+// TRAK-425 (Imad, 11 Nov): Assess player fills a laptop's page like the other coach pages, and its step strip goes forward
+// as well as back once a player and session are picked. Before that the form is locked, so the strip stays back-only.
+test.describe('TRAK-425 Assess player on a laptop', () => {
+  test.use({ timezoneId: 'Asia/Dubai', viewport: { width: 1440, height: 900 } })
+
+  test('fills the page, and the steps can be jumped ahead once a player is picked', async ({ page, context }, testInfo) => {
+    const unexpected: string[] = [], errors: string[] = []
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+    await coachBackend(context, unexpected)
+    await page.goto('/coach/assess')
+    const steps = page.getByRole('navigation', { name: 'Assessment steps' })
+    await expect(steps).toBeVisible()
+    // Not the old 640 px column: the page uses the room beside the side menu.
+    expect((await steps.boundingBox())!.width).toBeGreaterThan(800)
+    // Nothing picked yet: Review cannot be jumped to.
+    await expect(steps.getByRole('button', { name: /Review/ })).toBeDisabled()
+    await page.getByRole('combobox', { name: 'Player' }).selectOption({ label: 'Bukayo Saka' })
+    await page.getByRole('combobox', { name: 'Session' }).selectOption({ index: 1 })
+    await steps.getByRole('button', { name: /Review/ }).click()
+    await expect(page.getByRole('button', { name: 'Publish' }).or(page.getByRole('button', { name: 'Save' })).first()).toBeVisible()
+    await steps.getByRole('button', { name: /Ratings/ }).click()
+    await expect(page.getByRole('slider', { name: 'Work Rate' })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('coach-assess-laptop.png') })
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+})
+
 test.describe('TRAK-220 Arc panels opened over the page', () => {
   test.use({ timezoneId: 'Asia/Dubai', viewport: { width: 390, height: 844 } })
   // The alpha of an element's computed background colour (0 = see-through).

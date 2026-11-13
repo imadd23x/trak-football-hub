@@ -37,15 +37,18 @@ export function PlayersStep({ eventId, form, onFormChange, played, plans }: {
           const plan = playerPlan(plans, player.id)
           const name = first(player.name)
           return <li key={player.id}>
-            <ExpandableCard title={player.name} description={summary(answer)} badges={<>
+            <ExpandableCard title={player.name} description={summary(answer, !!plan.job.trim())} badges={<>
               {plan.context.map(value => <Badge key={value} size="sm" color="amber">{contexts.find(c => c.value === value)?.label ?? value}</Badge>)}
               <Badge size="sm" color={EXPECTATION_COLOR[plan.expectation]}>
                 {t('coachMatches:expectedLabel', { level: expectations.find(e => e.value === plan.expectation)!.label })}</Badge>
             </>}>
-              <div className="grid gap-4 p-4 tablet:grid-cols-2">
+              <div className="grid gap-3 p-3 tablet:grid-cols-2">
                 <div className="tablet:col-span-2"><LockedValue label={t('coachMatches:job')} value={plan.job.trim() || t('coachMatches:noJob')} /></div>
-                <RadioGroup label={t('coachMatches:didTheJob')} name={`did-job-${eventId}-${player.id}`} options={optionWords('didJob', DID_JOB)} value={answer.didJob}
-                  onValueChange={value => set(player.id, { didJob: value as DidJob })} />
+                {/* TRAK-447: the plan gave this player no job, so there is nothing to have done: N/A, and nothing for them to read. */}
+                {plan.job.trim()
+                  ? <RadioGroup label={t('coachMatches:didTheJob')} name={`did-job-${eventId}-${player.id}`} options={optionWords('didJob', DID_JOB)} value={answer.didJob}
+                    onValueChange={value => set(player.id, { didJob: value as DidJob })} />
+                  : <LockedValue label={t('coachMatches:didTheJob')} value={t('coachMatches:notApplicable')} />}
                 <RadioGroup label={t('coachMatches:againstExpectation')} name={`against-${eventId}-${player.id}`} options={optionWords('against', AGAINST)} value={answer.against}
                   onValueChange={value => set(player.id, { against: value as Against })} />
                 <div className="tablet:col-span-2">

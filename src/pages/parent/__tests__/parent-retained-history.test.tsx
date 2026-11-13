@@ -85,6 +85,9 @@ beforeEach(async () => {
     }),
     http.get(table('player_details'), () => HttpResponse.json([{ position: 'Midfielder', current_club: 'Synthetic Academy', age_group: 'Adult' }])),
     http.get(table('squad_players'), ({ request }) => HttpResponse.json([{ id: childFrom(request, 'linked_player_id') }])),
+    // TRAK-436: the bell reads the child's game plans and reviews.
+    http.get(table('game_for_family'), () => HttpResponse.json([])),
+    http.get(table('game_review_for_family'), () => HttpResponse.json([])),
     http.get(table('coach_assessments'), ({ request }) => HttpResponse.json(assessments[childFrom(request, 'squad_player_id')])),
     http.get(table('recognition_awards'), ({ request }) => HttpResponse.json(awards[childFrom(request, 'squad_player_id')])),
     http.get(table('matches'), ({ request }) => HttpResponse.json([{ id: id(300), created_at: '2026-09-18T11:00:00Z', match_date: '2026-09-18', opponent: `${label(childFrom(request, 'user_id'))} opposition`,

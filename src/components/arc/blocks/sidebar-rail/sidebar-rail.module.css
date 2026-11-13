@@ -66,6 +66,9 @@
 @media (hover: hover) and (pointer: fine) { .crumbs a:hover { color: var(--foreground); } }
 .actions { display: flex; flex: none; align-items: center; gap: 8px; }
 .content { flex: 1; min-width: 0; }
+/* Trak (TRAK-417): a page's full-height wrapper fills the window under the 60 px top bar, not a whole window below it. */
+.content :global(.min-h-screen) { min-height: calc(100vh - 60px); }
+.content :global(.h-dvh) { height: calc(100dvh - 60px); }
 
 /* The sheet: the same sidebar sliding in over a scrim. Trak (TRAK-265): the scrim stays under the sheet, or the sheet can't be tapped. */
 .scrim { position: absolute; inset: 0; z-index: 20; background: oklch(0% 0 0 / .3); -webkit-tap-highlight-color: transparent; }

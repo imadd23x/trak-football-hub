@@ -145,7 +145,6 @@ const savedDraft = http.get(`${SUPABASE_URL}/rest/v1/player_feedback`, () =>
 // clicks, extra fixtures]
 const screens: [string, string, RegExp, RegExp[], ReturnType<typeof http.get>[]?][] = [
   ['player', '/player/passport', /PLAYER PASSPORT/i, [/^Share$/, /Save Image/]],
-  ['player', '/player/evolution', /EVOLUTION CARD/i, [/Share card/]],
   ['coach', '/coach/feedback/a-1', /Review feedback/i, [/Draft feedback/]],
   ['coach', '/coach/feedback/a-1', /Review feedback/i, [/Send update|Send to/, /Draft again/], [savedDraft]],
   ['coach', '/coach/assistant', /TRY ASKING/i, [/./]],

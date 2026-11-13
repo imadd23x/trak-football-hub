@@ -1,4 +1,5 @@
 import { useReview } from '@/lib/games/reviews'
+import { useMarkOpened, useScrollTo } from '@/lib/games/news'
 import type { PlayerEvent } from '@/lib/player-events'
 import { GameReviewSection } from './GameReviewSection'
 
@@ -7,6 +8,9 @@ export function SharedGameReview({ event, childId, childName, as }: {
   event: PlayerEvent; childId: string; childName: string; as: 'player' | 'parent'
 }) {
   const query = useReview(event, childId, as === 'player')
+  // TRAK-441: shown here, so no longer new in For you or the bell.
+  useMarkOpened(childId, 'review', event.id, !!query.data)
+  useScrollTo('review', !!query.data)
   if (query.isError) {
     return <p className="text-[13px] text-ink-2">Couldn’t load the coach’s review.{' '}
       <button type="button" onClick={() => void query.refetch()}
@@ -14,5 +18,5 @@ export function SharedGameReview({ event, childId, childName, as }: {
     </p>
   }
   if (!query.data) return null
-  return <GameReviewSection review={query.data} as={as} childName={childName} />
+  return <div id="review" className="scroll-mt-4"><GameReviewSection review={query.data} as={as} childName={childName} /></div>
 }

@@ -43,10 +43,14 @@ function remember(coachId: string, squad: string, open: boolean) {
   try { localStorage.setItem(storeKey(coachId, squad), open ? 'open' : 'folded') } catch { /* storage unavailable: kept for this visit */ }
 }
 
-export function SeasonPlanCard({ coachId, squads, squad, everySquad, onPick, className }: {
+export function SeasonPlanCard({ coachId, squads, squadsReady, squadsFailed, onRetry, squad, everySquad, onPick, className }: {
   coachId: string
   /** The coach's squads, and the one in view: none under All. */
   squads: string[]
+  /** TRAK-416: false until the squads are known, so no squads yet is not mistaken for still loading. */
+  squadsReady: boolean
+  squadsFailed: boolean
+  onRetry: () => void
   squad: string | null
   everySquad: boolean
   /** Under All, opening a squad's plan picks that squad first. */
@@ -62,7 +66,11 @@ export function SeasonPlanCard({ coachId, squads, squad, everySquad, onPick, cla
     </section>
   }
   const only = squad ?? squads[0] ?? null
-  if (!only) return <LoadingSkeleton label="Loading your season plan…" lines={2} className={className} />
+  if (!only) {
+    // A coach with no players has no squad to plan yet: nothing to show, not a skeleton that never ends.
+    if (squadsFailed) return <section aria-label="Season plan" className={`${card} ${className ?? ''}`}><LoadError what="your season plan" onRetry={onRetry} /></section>
+    return squadsReady ? null : <LoadingSkeleton label="Loading your season plan…" lines={2} className={className} />
+  }
   return <SquadPlanCard coachId={coachId} squad={only} onOpen={() => undefined} className={className} />
 }
 

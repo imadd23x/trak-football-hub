@@ -12,6 +12,7 @@ import { PlayerConsentWatcher } from "@/components/player/PlayerConsentWatcher";
 import { PlayerSessionWatcher } from "@/components/player/PlayerSessionWatcher";
 import { ParentConsentWatcher } from "@/components/parent/ParentConsentWatcher";
 import { CoachLayout } from "@/components/coach/CoachLayout";
+import { FamilyFrame } from "@/components/trak/FamilyFrame";
 import { CoachFrame } from "@/components/coach/CoachFrame";
 import { COACH_HOW_PATH } from "@/lib/coach-places";
 import { ErrorBoundary } from "@/components/trak/ErrorBoundary";
@@ -83,7 +84,6 @@ const ParentConsent = lazy(() => import("./pages/parent/ParentConsent"));
 // TRAK-85: parked screens show as designed, inside ParkedScreen ("Coming soon"
 // pill; actions say so and send nothing). Their backend writes stay closed (G7).
 const PlayerPassport = lazy(() => import("./pages/player/PlayerPassport"));
-const PlayerEvolutionCard = lazy(() => import("./pages/player/PlayerEvolutionCard"));
 const CoachReviewFeedback = lazy(() => import("./pages/coach/CoachReviewFeedback"));
 const CoachAssistant = lazy(() => import("./pages/coach/CoachAssistant"));
 const CoachSchedule = lazy(() => import("./pages/coach/CoachSchedule"));
@@ -155,7 +155,8 @@ const App = () => (
             <Route path="/parent-invite" element={<ParentOnboarding />} />
             {DevSetupPage && <Route path="/dev-setup" element={<DevSetupPage />} />}
 
-            {/* Player routes */}
+            {/* Player routes. TRAK-441: inside the family frame (a laptop with the academy's family_look on). */}
+            <Route element={<FamilyFrame />}>
             <Route path="/player/home" element={<RouteGuard allowedRole="player"><PlayerHome /></RouteGuard>} />
             <Route path="/player/matches" element={<RouteGuard allowedRole="player"><PlayerMatches /></RouteGuard>} />
             <Route path="/player/match/:id" element={<RouteGuard allowedRole="player"><PlayerMatchDetail /></RouteGuard>} />
@@ -165,9 +166,11 @@ const App = () => (
             {/* TRAK-398: the player's My season page, opened from the Home card. */}
             <Route path="/player/season" element={<RouteGuard allowedRole="player"><PlayerSeason /></RouteGuard>} />
             <Route path="/player/passport" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerPassport /></ParkedScreen></RouteGuard>} />
-            <Route path="/player/evolution" element={<RouteGuard allowedRole="player"><ParkedScreen><PlayerEvolutionCard /></ParkedScreen></RouteGuard>} />
+            {/* TRAK-440 (Imad, 11 Nov): Card left the bar; it becomes part of Profile (TRAK-441, slice 6). The parked card (TRAK-30) has no address. */}
+            <Route path="/player/evolution" element={<Navigate to="/player/profile" replace />} />
             <Route path="/player/feedback/:assessmentId" element={<RouteGuard allowedRole="player"><PlayerFeedback /></RouteGuard>} />
             <Route path="/player/trainings" element={<RouteGuard allowedRole="player"><TrainingsPage role="player" /></RouteGuard>} />
+            </Route>
 
             {/* Coach routes. TRAK-259: inside the coach's frame (the sidebar on a laptop, the glass tab bar on a phone).
                 Settings and How Trak works are shared; the frame shows only for a coach. */}
@@ -218,7 +221,8 @@ const App = () => (
             <Route path="/coach/assistant" element={<RouteGuard allowedRole="coach"><ParkedScreen><CoachAssistant /></ParkedScreen></RouteGuard>} />
             </Route>
 
-            {/* Parent routes */}
+            {/* Parent routes, in the family frame too. */}
+            <Route element={<FamilyFrame />}>
             <Route path="/parent/home" element={<RouteGuard allowedRole="parent"><ParentHome /></RouteGuard>} />
             {/* TRAK-400: the family's Season plan page, opened from the Home card. */}
             <Route path="/parent/season" element={<RouteGuard allowedRole="parent"><ParentSeason /></RouteGuard>} />
@@ -233,6 +237,7 @@ const App = () => (
             <Route path="/parent/alerts" element={<RouteGuard allowedRole="parent"><ParkedScreen><ParentAlerts /></ParkedScreen></RouteGuard>} />
             <Route path="/parent/profile" element={<RouteGuard allowedRole="parent"><ParentProfilePage /></RouteGuard>} />
             <Route path="/parent/consent" element={<RouteGuard allowedRole="parent"><ParentConsent /></RouteGuard>} />
+            </Route>
 
             {/* Club admin routes */}
             <Route path="/club/home" element={<RouteGuard allowedRole="club"><ParkedScreen><ClubHome /></ParkedScreen></RouteGuard>} />

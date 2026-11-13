@@ -17,6 +17,7 @@ import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { BARLESS, COACH_SCREEN_PATH, placeOf, tabOf, type CoachScreen } from '@/lib/coach-places'
 import { CoachTrailProvider, TrailLink, type Trail } from '@/components/coach/CoachTrail'
 import { useTranslation } from '@/lib/i18n'
+import { FamilyFrame } from '@/components/trak/FamilyFrame'
 
 /* TRAK-259 (Imad, 22 Oct): the coach's frame, around every coach page.
    Laptop: Arc's sidebar rail (the club, Home, Calendar, Squads, Library, then
@@ -59,7 +60,8 @@ function useCoachIdentity(userId: string | undefined) {
 export function CoachFrame() {
   const { user, profile } = useAuth()
   const { t } = useTranslation()
-  if (profile?.role !== 'coach' || !user) return <Outlet />
+  // TRAK-441: Settings and How Trak works are shared; a player or parent gets them in the family frame.
+  if (profile?.role !== 'coach' || !user) return <FamilyFrame />
   return <Framed userId={user.id} name={profile.full_name || t('nav:coach')} />
 }
 
@@ -104,6 +106,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
   const club = identity?.club || t('nav:yourAcademy')
   const barred = BARLESS.test(pathname)
   // TRAK-324: the squad switcher sits in the sidebar, not in the top bar. TRAK-376: on a phone, in the sidebar's sheet.
+  // TRAK-430: on every page, the barless ones too, or the rows under it jump (8 px with one squad, 64 px with two).
   const switcher = <SquadSwitcher coachId={userId} />
 
   return <CoachFrameContext.Provider value={frame}><CoachTrailProvider tabs={tabs} topBar={wide ? setTrail : null}>
@@ -113,7 +116,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
       items={items} footerItem={{ id: 'settings', label: t('nav:settings'), icon: Settings }}
       profile={{ name, detail: identity?.role ?? undefined, avatar: <Avatar name={name} size="sm" /> }}
       active={screen ?? ''} onSelect={select}
-      afterBrand={!barred && switcher}
+      afterBrand={switcher}
       actions={<><CoachAlertsBell coachId={userId} /><CoachCreate placement="top" onSaved={saved} /></>}>
       <Suspense fallback={<div className="min-h-screen bg-ground" />}><Outlet /></Suspense>
     </SidebarRail>

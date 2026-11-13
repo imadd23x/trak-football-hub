@@ -6,7 +6,7 @@ import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { useFeature } from '@/components/trak/parked'
-import { weekDays, type StripEvent } from '@/components/trak/WeekStrip'
+import { weekDays, weekTitle, type StripEvent } from '@/components/trak/WeekStrip'
 import { EventSheet } from '@/components/trak/EventSheet'
 import { LoadError } from '@/components/trak/LoadError'
 import { EventSheetCoach } from '@/components/coach/EventSheetCoach'
@@ -50,10 +50,6 @@ export function CoachWeekStrip({ coachId, version = 0, everySquad = false }: {
     squadOf={squads.length >= 2 ? squadName : null} labelEach={everySquad} />
 }
 
-
-const weekTitle = (offset: number, monday: string) =>
-  offset === 0 ? i18n.t('coachHome:thisWeek') : offset === 1 ? i18n.t('coachHome:nextWeek') : offset === -1 ? i18n.t('coachHome:lastWeek')
-    : i18n.t('coachHome:weekOf', { day: format(parseISO(monday), 'd MMMM', { locale: dateLocale() }) })
 
 function CoachWeek({ coachId, version, games, inView, squadLabel, squadOf, labelEach }: {
   coachId: string

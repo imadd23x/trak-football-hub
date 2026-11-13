@@ -243,6 +243,8 @@ for (const [label, width, height] of [['a phone', 390, 844], ['a laptop', 1440, 
     const { unexpected, errors } = await open(page, context, 'player', '/player/home', width, height, ['events', 'family_look'])
     const bell = page.getByRole('button', { name: /^Alerts/ })
     await expect(bell).toBeVisible()
+    // 2.4c: the coach's week picker, not the letter strip.
+    await expect(page.getByRole('heading', { name: 'This week', level: 2 })).toBeVisible()
     // A phone: the bell in the page's own top row, the glass tab bar. A laptop: the side menu, the bell in its top bar.
     await expect(page.getByRole('navigation', { name: 'Trak' })).toHaveCount(width < 1024 ? 0 : 1)
     expect((await bell.boundingBox())!.y).toBeLessThan(60)

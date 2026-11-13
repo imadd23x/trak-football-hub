@@ -23,6 +23,8 @@ import { useTranslation } from '@/lib/i18n'
 import { POSITION_WORD } from '@/lib/position-words'
 import { ATTRIBUTE_WORD } from '@/lib/squad/attribute-words'
 import { ROLE_WORD, TRAIT_WORD, shown } from '@/lib/squad/trait-words'
+import { bandConfig } from '@/lib/types'
+import { scoreToBand } from '@/lib/rating-engine'
 
 const FOOT = { left: 'coachSquad:footLeft', right: 'coachSquad:footRight', both: 'coachSquad:footBoth' } as const
 /** The assessments shown at first, newest first. TRAK-368: "All N" shows the rest here too. */
@@ -128,7 +130,9 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
         {season && !seasonFailed && <RadarChart label={t('coachSquad:radarLabel', { name: player.name })} size={240} rings={5} max={10}
           axes={ATTRIBUTES.map(([k]) => ({ key: k, label: t(ATTRIBUTE_WORD[k]) }))}
           series={[{ key: 'player', label: first, values: season.scores }, ...(squadSeason ? [{ key: 'squad', label: t('coachSquad:squadAverage'), values: squadSeason }] : [])]}
-          formatValue={value => value.toFixed(1)} />}
+          formatValue={value => value.toFixed(1)}
+          // TRAK-458: each of the player's points in its band's colour (the band's word is in the cards below).
+          pointColor={value => bandConfig(scoreToBand(value)).color} />}
       </section>
     </div>
 

@@ -47,6 +47,8 @@ export interface RadarChartProps {
   /** Profile names with a line key below the chart. */
   legend?: boolean;
   emptyLabel?: string;
+  /** Trak (TRAK-458): a dot at each of the first profile's points, in the colour this returns (a band's), or none. */
+  pointColor?: (value: number, axis: RadarAxis) => string | undefined;
   /** React 18 (Trak): a function component doesn't receive `ref` as a prop, so leave this unset. */
   ref?: Ref<HTMLElement>;
   className?: string;
@@ -66,7 +68,7 @@ function useReducedMotionSafe() {
   return !!useReducedMotion() && hydrated;
 }
 
-export function RadarChart({ axes, series, label, max = 100, rings = 4, size = 320, formatValue, activeAxis, onActiveAxisChange, legend = true, emptyLabel = "No data", ref, className }: RadarChartProps) {
+export function RadarChart({ axes, series, label, max = 100, rings = 4, size = 320, formatValue, activeAxis, onActiveAxisChange, legend = true, emptyLabel = "No data", pointColor, ref, className }: RadarChartProps) {
   const reduced = useReducedMotionSafe();
   const figure = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -222,6 +224,10 @@ export function RadarChart({ axes, series, label, max = 100, rings = 4, size = 3
             {axes.map((item, i) => { const p = pointAt(i, 1); return <line key={item.key} className={styles.spoke} data-on={current === i || undefined} x1={cx} y1={cy} x2={p.x} y2={p.y} />; })}
           </g>
           {Array.from({ length: SLOTS }, (_, slot) => <path key={slot} ref={node => { shapes.current[slot] = node; }} className={styles.shape} data-slot={slot} data-dim={(focusSlot !== null && focusSlot !== slot) || undefined} data-on={focusSlot === slot || undefined} />)}
+          {/* Trak (TRAK-458): the first profile's points in their band's colour, once the web has unfolded. */}
+          {pointColor && shown[0] && (inView || reduced) && axes.map((item, i) => { const value = shown[0].values[item.key] ?? 0, fill = pointColor(value, item);
+            if (!fill) return null; const p = pointAt(i, targets[0][i]);
+            return <circle key={`point-${item.key}`} data-point={item.key} cx={p.x} cy={p.y} r={5} fill={fill} stroke="var(--surface, #fff)" strokeWidth={2} />; })}
           {Array.from({ length: SLOTS }, (_, slot) => shown[slot] ? <motion.circle key={slot} className={styles.marker} data-slot={slot} r={4.5} cx={0} cy={0} style={{ x: reduced ? markerX[slot] : springX[slot], y: reduced ? markerY[slot] : springY[slot] }} /> : null)}
         </svg>
         {axes.map((item, i) => {

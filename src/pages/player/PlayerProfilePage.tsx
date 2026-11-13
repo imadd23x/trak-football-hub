@@ -8,12 +8,15 @@ import { ChevronRight, Settings as SettingsIcon } from 'lucide-react'
 import { bandForScore } from '@/lib/rating-engine'
 import { ParentInviteCard } from '@/components/player/ParentInviteCard'
 import { PlayerConnections } from '@/components/player/PlayerConnections'
+import { useMySeason } from '@/lib/my-season'
 
 export default function PlayerProfilePage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [details, setDetails] = useState<any>(null)
+  // TRAK-437: the position is the one the coach set, nothing if none; never the sign-up value in player_details.
+  const position = useMySeason().data?.position
   const [assessments, setAssessments] = useState<any[]>([])
   const assessment = assessments[0] ?? null
 
@@ -66,9 +69,9 @@ export default function PlayerProfilePage() {
             {profile?.full_name}
           </p>
           <div className="flex justify-center gap-1.5 mt-2 flex-wrap">
-            {details?.position && (
+            {position && (
               <span className="h-5 px-2.5 rounded-full bg-raised border border-line text-[8px] font-medium tracking-[0.06em] uppercase text-ink-3 inline-flex items-center"
-                style={{ fontFamily: 'var(--t-font-mono)' }}>{details.position}</span>
+                style={{ fontFamily: 'var(--t-font-mono)' }}>{position}</span>
             )}
             {details?.current_club && (
               <span className="h-5 px-2.5 rounded-full bg-raised border border-line text-[8px] font-medium tracking-[0.06em] uppercase text-ink-3 inline-flex items-center"

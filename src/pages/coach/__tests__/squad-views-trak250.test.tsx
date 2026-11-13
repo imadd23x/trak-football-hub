@@ -624,7 +624,7 @@ describe('TRAK-250: Availability tab', { timeout: 20_000 }, () => {
     renderApp('/coach/squad?tab=availability')
     const panel = await screen.findByRole('region', { name: 'Availability' })
     expect(await within(panel).findByText('No upcoming events')).toBeInTheDocument()
-    expect(within(panel).getByRole('link', { name: /schedule/i })).toHaveAttribute('href', '/coach/schedule')
+    expect(within(panel).getByRole('link', { name: /events/i })).toHaveAttribute('href', '/coach/schedule')
     expect(within(panel).queryByRole('region', { name: 'Confirmed' })).toBeNull()
   })
 

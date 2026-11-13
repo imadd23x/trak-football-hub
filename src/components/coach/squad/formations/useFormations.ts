@@ -86,6 +86,17 @@ export function useFormationWrites(coachId: string, squad: string) {
         client.invalidateQueries({ queryKey: ['coach', coachId, 'game-players'] }), client.invalidateQueries({ queryKey: ['coach', coachId, 'game-plans'] })])
     },
   })
+  // TRAK-453: Undo after a copy puts each match back to what it held, and removes the copy's record.
+  const undoCopy = useMutation({
+    mutationFn: async ({ id, eventIds }: { id: string; eventIds: string[] }) => {
+      const { error } = await supabase.rpc('undo_formation_copy', { p_formation_id: id, p_event_ids: eventIds })
+      if (error) throw error
+    },
+    onSuccess: async () => {
+      await Promise.all([refresh(), client.invalidateQueries({ queryKey: ['coach', coachId, 'game-plan'] }),
+        client.invalidateQueries({ queryKey: ['coach', coachId, 'game-players'] }), client.invalidateQueries({ queryKey: ['coach', coachId, 'game-plans'] })])
+    },
+  })
   const setDefault = useMutation({
     mutationFn: async ({ id, on }: { id: string; on: boolean }) => {
       const { error } = await supabase.rpc('set_default_formation', { p_id: id, p_default: on })
@@ -93,7 +104,7 @@ export function useFormationWrites(coachId: string, squad: string) {
     },
     onSuccess: refresh,
   })
-  return { save, remove, start, use, setDefault }
+  return { save, remove, start, use, undoCopy, setDefault }
 }
 
 /** TRAK-360: which of these matches already have a saved line-up, so the coach is asked before it is replaced. */

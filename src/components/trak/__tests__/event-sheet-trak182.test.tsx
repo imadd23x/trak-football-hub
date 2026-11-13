@@ -54,7 +54,7 @@ beforeEach(() => {
       { id: 'sp-1', player_name: 'Bukayo Saka', age_group: 'U14', status: 'active' }, { id: 'sp-2', player_name: 'Beth Mead', age_group: 'U14', status: 'active' },
       { id: 'sp-3', player_name: 'Cole Palmer', age_group: 'U14', status: 'active' }, { id: 'sp-4', player_name: 'Declan Rice', age_group: 'U14', status: 'coach_departed' }])),
     http.get(endpoint('session_attendance'), () => HttpResponse.json([{ squad_player_id: 'sp-1', status: 'present' }, { squad_player_id: 'sp-3', status: 'absent' }])),
-    http.get(endpoint('event_absences'), () => HttpResponse.json([{ squad_player_id: 'sp-2', reason: 'School trip' }])),
+    http.get(endpoint('event_absences'), () => HttpResponse.json([{ squad_player_id: 'sp-2', reason: 'school' }])),
   )
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers() })
@@ -154,7 +154,7 @@ describe('TRAK-182: the event sheet', () => {
       .toEqual(['Bukayo Saka', 'Cole Palmer'])
     expect(within(sheet).getByRole('heading', { name: "Can't make it · 1" })).toBeInTheDocument()
     expect(within(sheet).getByText('Beth Mead')).toBeInTheDocument()
-    expect(within(sheet).getByText('School trip')).toBeInTheDocument()
+    expect(within(sheet).getByText('School')).toBeInTheDocument()
     await user.click(within(sheet).getByRole('button', { name: 'Edit event' }))
     expect(screen.getByTestId('where')).toHaveTextContent('/coach/schedule?edit=ev-1')
   })

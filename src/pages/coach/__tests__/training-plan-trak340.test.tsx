@@ -373,7 +373,7 @@ describe('TRAK-340: drafts and a saved plan', { timeout: 30_000 }, () => {
     cleanup()
     database([])
     renderApp('/coach/training/someone-elses/plan')
-    expect(await screen.findByText('This training isn’t on your schedule.')).toBeInTheDocument()
+    expect(await screen.findByText('This training isn’t in your events.')).toBeInTheDocument()
   })
 })
 

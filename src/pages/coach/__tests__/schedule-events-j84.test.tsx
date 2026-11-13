@@ -4,7 +4,7 @@ import { atMorningToday } from '../../../../tests/support/clock'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { chooseCardAction, endActions } from '../../../../tests/support/schedule-actions'
+import { chooseCardAction, endActions, openNewEvent } from '../../../../tests/support/schedule-actions'
 import { renderApp } from '../../../../tests/support/render-app'
 import { signInAs } from '../../../../tests/support/session'
 import { server } from '../../../../tests/msw/server'
@@ -101,7 +101,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
 
   it('creates a match with every field as a draft only the coach sees', async () => {
     await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await userEvent.click(within(sheet).getByRole('button', { name: 'Match' }))
     await userEvent.type(within(sheet).getByLabelText('Opponent'), 'Synthetic United')
@@ -147,7 +147,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
   // under it. Dora had typed "Shin guards are optional" into Kit.
   it('gives a training Kit and a note for families', async () => {
     await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await eventStep(sheet, 'When')
     await pickTime(userEvent, 'Start', '17:00')
@@ -170,7 +170,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
   it('warns as the coach types a note families won\'t see', async () => {
     server.use(table('squad_players', [{ age_group: 'U15', player_name: 'Omar Haddad', status: 'active' }]))
     await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await eventStep(sheet, 'When')
     await pickTime(userEvent, 'Start', '17:00')
@@ -191,7 +191,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
 
   it('picks a venue the coach has used before', async () => {
     await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const options = [...document.querySelectorAll('#saved-venues option')].map(o => (o as HTMLOptionElement).value)
     // Most recent first: the 18:30 match, then the 17:00 training.
     expect(options).toEqual(['Rovers Park', 'Academy Pitch 2'])
@@ -199,7 +199,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
 
   it('says what is missing and sends nothing', async () => {
     await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await userEvent.click(within(sheet).getByRole('button', { name: 'Match' }))
     // TRAK-182: Next stops on the step that can fix it, and says what's missing.
@@ -231,7 +231,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
     'keeps what was typed and says what failed when $mode ($why)', async ({ mode }) => {
       await open()
       failWrites = mode
-      await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+      await openNewEvent()
       const sheet = screen.getByRole('dialog', { name: 'New event' })
       await userEvent.type(within(sheet).getByLabelText('Venue'), 'Academy Pitch 1')
       await eventStep(sheet, 'When')
@@ -258,7 +258,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
   // TRAK-182 (Imad's 7c): Review's Publish saves, then publishes what it saved.
   it('publishes a new event from Review', async () => {
     await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await eventStep(sheet, 'When')
     await pickTime(userEvent, 'Start', '17:00')
@@ -388,14 +388,14 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
     }))
     await open()
     expect(await screen.findByText('Recovery session')).toBeInTheDocument()
-    expect(screen.queryByText(/We couldn't load your schedule/)).toBeNull()
+    expect(screen.queryByText(/We couldn't load your events/)).toBeNull()
     expect(asked.length).toBeGreaterThan(0)
   })
 
   it('says the calendar failed to load instead of showing it empty', async () => {
     server.use(http.get(EVENTS, () => HttpResponse.json({ message: 'Synthetic failure' }, { status: 500 })))
     renderApp('/coach/schedule')
-    expect(await screen.findByText(/We couldn't load your schedule/)).toBeInTheDocument()
+    expect(await screen.findByText(/We couldn't load your events/)).toBeInTheDocument()
   })
 })
 
@@ -428,7 +428,7 @@ describe('TRAK-283: a match just published offers its game plan', { timeout: 20_
 
   it("Review's Publish of a new match offers it too", async () => {
     await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await userEvent.click(within(sheet).getByRole('button', { name: 'Match' }))
     await userEvent.type(within(sheet).getByLabelText('Opponent'), 'Synthetic United')

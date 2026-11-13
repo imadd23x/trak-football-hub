@@ -253,10 +253,71 @@ SET LOCAL ROLE anon;
 SELECT pg_temp.f360check(pg_temp.f360refused('SELECT 1 FROM public.formation_copies','42501'),'7 anon can''t read the table at all');
 RESET ROLE;
 
+-- ── 8. TRAK-453: Undo puts a match back ────────────────────────────────────
+-- 520 is a fresh match; 521 has a saved line-up with jobs and a note, as 502 did. Both take a copy of 703 (its own
+-- 4-4-2: the keeper, A, B and Kostas), then Undo.
+INSERT INTO public.formations(id,coach_user_id,squad,name,format,shape) VALUES (pg_temp.f360id(703),pg_temp.f360id(10),'U16','Undo me',11,'4-4-2');
+INSERT INTO public.formation_players(formation_id,slot,squad_player_id) VALUES
+ (pg_temp.f360id(703),1,pg_temp.f360id(45)),(pg_temp.f360id(703),2,pg_temp.f360id(40)),(pg_temp.f360id(703),3,pg_temp.f360id(41)),(pg_temp.f360id(703),6,pg_temp.f360id(48));
+INSERT INTO public.coach_calendar_events(id,coach_user_id,title,event_type,opponent,starts_at,start_time,published,squad)
+ SELECT pg_temp.f360id(n), pg_temp.f360id(10), 'vs Team '||n, 'match', 'Team '||n, '2054-12-07 15:00+00'::timestamptz, '19:00', true, 'U16'
+ FROM unnest(ARRAY[520,521]) n;
+INSERT INTO public.game_plans(event_id,format,formation,strength) VALUES (pg_temp.f360id(521),7,'2-3-1','stronger');
+INSERT INTO public.game_plan_players(event_id,squad_player_id,role,slot,job,note,context,expectation) VALUES
+ (pg_temp.f360id(521),pg_temp.f360id(41),'starter',2,'Old job','','{first_start}','stretch'),
+ (pg_temp.f360id(521),pg_temp.f360id(40),'bench',NULL,'Keep this job','Proud of you','{}','usual');
+CREATE TEMP TABLE f453_before AS
+ SELECT (SELECT jsonb_agg(to_jsonb(p) ORDER BY p.squad_player_id) FROM public.game_plan_players p WHERE p.event_id = pg_temp.f360id(521)) AS players,
+        (SELECT format::text || '/' || formation FROM public.game_plans WHERE event_id = pg_temp.f360id(521)) AS plan,
+        (SELECT count(*) FROM public.formation_players WHERE formation_id = pg_temp.f360id(703)) AS saved_starters,
+        (SELECT shape FROM public.formations WHERE id = pg_temp.f360id(703)) AS saved_shape;
+GRANT SELECT ON f453_before TO authenticated;
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.f360actor(10);
+SELECT pg_temp.f360check((SELECT jsonb_array_length(public.use_formation_for_matches(pg_temp.f360id(703), ARRAY[pg_temp.f360id(520), pg_temp.f360id(521)])))=2,
+  '8 a formation is copied into a fresh match and into one with a saved line-up');
+SELECT pg_temp.f360check(pg_temp.f360line(520) <> '' AND (SELECT formation='4-4-2' FROM public.game_plans WHERE event_id=pg_temp.f360id(521)),
+  '8 both matches took it');
+SELECT pg_temp.f360check((SELECT (public.undo_formation_copy(pg_temp.f360id(703), ARRAY[pg_temp.f360id(520), pg_temp.f360id(521)])->>'undone')::int)=2,
+  '8 Undo reports both matches');
+SELECT pg_temp.f360check(pg_temp.f360line(520)='' AND NOT EXISTS (SELECT 1 FROM public.game_plans WHERE event_id=pg_temp.f360id(520)),
+  '8 the fresh match is back to no plan and no players');
+SELECT pg_temp.f360check((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.squad_player_id) FROM public.game_plan_players p WHERE p.event_id = pg_temp.f360id(521))
+  = (SELECT players FROM f453_before),
+  '8 the other match has every player row back exactly: roles, slots, jobs, notes and expectations');
+SELECT pg_temp.f360check((SELECT format::text || '/' || formation FROM public.game_plans WHERE event_id=pg_temp.f360id(521)) = (SELECT plan FROM f453_before),
+  '8 and its format and shape');
+SELECT pg_temp.f360check(NOT EXISTS (SELECT 1 FROM public.formation_copies WHERE event_id IN (pg_temp.f360id(520), pg_temp.f360id(521))),
+  '8 the copies are no longer on record');
+SELECT pg_temp.f360check((SELECT count(*) FROM public.formation_players WHERE formation_id = pg_temp.f360id(703)) = (SELECT saved_starters FROM f453_before)
+  AND (SELECT shape FROM public.formations WHERE id = pg_temp.f360id(703)) = (SELECT saved_shape FROM f453_before),
+  '8 the saved formation is left as it was');
+SELECT pg_temp.f360check(pg_temp.f360refused('SELECT 1 FROM public.formation_copy_snapshots','42501'),
+  '8 the snapshots are not readable by the app');
+SELECT pg_temp.f360check(pg_temp.f360refused('SELECT public.undo_formation_copy('''||pg_temp.f360id(703)||''', ARRAY['''||pg_temp.f360id(520)||'''::uuid])','P0001'),
+  '8 a second Undo has nothing to undo');
+SELECT pg_temp.f360check((SELECT jsonb_array_length(public.use_formation_for_matches(pg_temp.f360id(703), ARRAY[pg_temp.f360id(520)])))=1,
+  '8 a match can be copied into again after Undo');
+SELECT pg_temp.f360actor(11);
+SELECT pg_temp.f360check(pg_temp.f360refused('SELECT public.undo_formation_copy('''||pg_temp.f360id(703)||''', ARRAY['''||pg_temp.f360id(520)||'''::uuid])','42501'),
+  '8 another coach cannot undo it');
+SELECT pg_temp.f360actor(30);
+SELECT pg_temp.f360check(pg_temp.f360refused('SELECT public.undo_formation_copy('''||pg_temp.f360id(703)||''', ARRAY['''||pg_temp.f360id(520)||'''::uuid])','42501'),
+  '8 nor a guardian');
+RESET ROLE;
+-- The plan is shared after the copy: families may have read it, so Undo is refused.
+INSERT INTO public.game_shares(event_id,changed) VALUES (pg_temp.f360id(520),0);
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.f360actor(10);
+SELECT pg_temp.f360check(pg_temp.f360refused('SELECT public.undo_formation_copy('''||pg_temp.f360id(703)||''', ARRAY['''||pg_temp.f360id(520)||'''::uuid])','P0001')
+  AND pg_temp.f360line(520) <> '',
+  '8 a match whose plan has been shared cannot be undone, and keeps its copy');
+RESET ROLE;
+
 DO $$ DECLARE failures text; total integer;
 BEGIN
  SELECT count(*) INTO total FROM pg_temp.f360_results;
- IF total <> 46 THEN RAISE EXCEPTION 'Formations into matches: % checks ran; expected 46', total; END IF;
+ IF total <> 60 THEN RAISE EXCEPTION 'Formations into matches: % checks ran; expected 60', total; END IF;
  SELECT string_agg(label, E'\n') INTO failures FROM pg_temp.f360_results WHERE NOT ok;
  IF failures IS NOT NULL THEN RAISE EXCEPTION 'Formations into matches checks failed:%', E'\n' || failures; END IF;
  RAISE NOTICE 'Formations into matches: % of % passed', total, total;

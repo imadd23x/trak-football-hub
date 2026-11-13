@@ -11,8 +11,9 @@ export type DidJob = 'yes' | 'partly' | 'not_yet'
 export type Against = 'below' | 'met' | 'above'
 export type PlanWorked = 'didnt' | 'partly' | 'worked'
 export type Answer = { didJob: DidJob; against: Against; note: string }
-/** One of our goals: who scored and who assisted, by squad row; null when not recorded (an own goal, a guest). */
-export type ScoredGoal = { scorer: string | null; assist: string | null }
+/** One of our goals: who scored and who assisted, by squad row; null when not recorded (a guest). TRAK-447: `own` marks an
+ *  own goal, which credits nobody (no scorer, no assist). */
+export type ScoredGoal = { scorer: string | null; assist: string | null; own?: boolean }
 export type EvaluationForm = {
   ourScore: number; theirScore: number; goals: ScoredGoal[]; howTheyScored: string
   /** Did the plan work, for each of the plan's goals in order; null until answered. */
@@ -41,8 +42,11 @@ export const EVALUATION_LIMITS = { score: 99, howTheyScored: 2000, note: 500 }
 const MET: Answer = { didJob: 'yes', against: 'met', note: '' }
 export const answerOf = (form: EvaluationForm, id: string): Answer => form.answers[id] ?? MET
 export const hasPlayed = (form: EvaluationForm, id: string, starter: boolean) => form.played[id] ?? starter
-export const summary = (answer: Answer) =>
-  `${i18n.t(`coachMatches:didJob_${answer.didJob}_sum` as 'coachMatches:saved')} · ${i18n.t(`coachMatches:against_${answer.against}` as 'coachMatches:saved')}`
+/** TRAK-447: a player the plan gave no job has no "Did the job" to say, so the line is how they did against what was asked. */
+export const summary = (answer: Answer, hasJob = true) => {
+  const against = i18n.t(`coachMatches:against_${answer.against}` as 'coachMatches:saved')
+  return hasJob ? `${i18n.t(`coachMatches:didJob_${answer.didJob}_sum` as 'coachMatches:saved')} · ${against}` : against
+}
 
 /** Who the evaluation lists: the starters by slot, then everyone else who can be recorded and wasn't left out. */
 export function lineUpAtKickOff<P extends { id: string }>(plans: PlayerPlans, eligible: P[]) {
@@ -90,7 +94,7 @@ export function formToSave(eventId: string, form: EvaluationForm, listed: { id: 
   const who = (id: string | null) => (id && played.has(id) ? id : null)
   return {
     p_event_id: eventId, p_our_score: form.ourScore, p_their_score: form.theirScore,
-    p_goals: form.goals.map(goal => ({ scorer: who(goal.scorer), assist: who(goal.assist) })),
+    p_goals: form.goals.map(goal => goal.own ? { scorer: null, assist: null, own: true } : { scorer: who(goal.scorer), assist: who(goal.assist) }),
     p_how_they_scored: form.theirScore > 0 ? form.howTheyScored.trim() : '', p_plan_worked: form.planWorked,
     p_players: listed.map(({ id }) => {
       if (!played.has(id)) return { id, played: false }
@@ -123,7 +127,8 @@ export function previewReview(form: EvaluationForm, id: string, plans: PlayerPla
   // TRAK-319: the job, "did the job" and the note are the player's alone.
   return {
     eventId: '', sessionId: null, ourScore: form.ourScore, theirScore: form.theirScore, job: player ? plan.job : '',
-    didJob: player ? answer.didJob : null, expectation: plan.expectation, context: plan.context, against: answer.against,
+    // TRAK-447: no job in the plan, no "did the job" to read.
+    didJob: player && plan.job.trim() ? answer.didJob : null, expectation: plan.expectation, context: plan.context, against: answer.against,
     coachName, note: player && note ? note : null,
   }
 }

@@ -134,7 +134,7 @@ export function PlanView({ coachId, squad, plan, seasonObjectives }: {
       {changes.length
         ? <Alert tone="warning" title={`Not shared yet: ${changesText(changes)}.`}>They wait here until you share the changes.</Alert>
         : <Alert tone="success" title={`Shared ${shared ? shortDate(shared) : ''}.`}>
-          Players and families don’t see the season plan in the app yet. Edits wait here until you share them.
+          Edits wait here until you share them.
         </Alert>}
 
       <div className="grid items-start gap-5 laptop:grid-cols-2">

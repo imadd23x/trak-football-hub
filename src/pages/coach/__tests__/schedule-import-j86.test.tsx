@@ -103,7 +103,7 @@ describe('J8.6: league fixtures from a CSV on the schedule', () => {
     await user.upload(within(dialog).getByLabelText(/choose a csv file/i),
       csv('2099-11-14,10:00,,Rivals FC,Away,,', '2099-11-21,10:00,,Al Wasl FC,Home,,'))
     const known = await within(dialog).findByRole('listitem', { name: 'Line 2' })
-    expect(within(known).getByText(/already on your schedule/i)).toBeInTheDocument()
+    expect(within(known).getByText(/already in your events/i)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Add 1 fixture' }))
     await waitFor(() => expect(inserts).toHaveLength(1))
     expect(inserts[0].map(r => r.opponent)).toEqual(['Al Wasl FC'])

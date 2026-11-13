@@ -23,7 +23,7 @@ export default function CoachQuickMatchLog() {
   const [opponent, setOpponent] = useState('')
   const [scoreUs, setScoreUs] = useState('')
   const [scoreThem, setScoreThem] = useState('')
-  const [competition, setCompetition] = useState<'League' | 'Cup' | 'Friendly'>('League')
+  const [competition, setCompetition] = useState<'League' | 'Tournament' | 'Friendly'>('League')
   const [venue, setVenue] = useState<'Home' | 'Away'>('Home')
   const [attended, setAttended] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -283,7 +283,7 @@ export default function CoachQuickMatchLog() {
               COMPETITION
             </span>
             <div className="flex gap-2 flex-wrap">
-              {(['League', 'Cup', 'Friendly'] as const).map(c => (
+              {(['League', 'Tournament', 'Friendly'] as const).map(c => (
                 <Chip key={c} active={competition === c} onClick={() => setCompetition(c)}>{c}</Chip>
               ))}
             </div>

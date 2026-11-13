@@ -178,7 +178,8 @@ describe('TRAK-357 Squad › Formations', () => {
     expect(place(6)).toHaveAccessibleName(/^Synthetic Attacker 18, Midfielder, place 6\. Can also play here\./)
     expect(screen.queryByText(/out of position$/)).toBeNull()
     // A new shape: 5-4-1 has one place up front for three attackers, so two drop into the back line.
-    await user().click(screen.getByRole('combobox', { name: /Shape/ }))
+    // TRAK-453: format and shape are one control, the match line-up's.
+    await user().click(screen.getByRole('combobox', { name: 'Format and shape' }))
     await user().click(await screen.findByRole('option', { name: '5-4-1' }))
     expect(await screen.findByText('2 out of position')).toBeInTheDocument()
     await user().click(screen.getByRole('button', { name: 'Undo last change' }))

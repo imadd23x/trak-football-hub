@@ -125,7 +125,7 @@ type WeekRows = PromiseLike<{ data: unknown[] | null; error: unknown }>
  * only load from today). `loadKey` names whose week it is. A failed read is
  * an error with Retry, never an empty week (the J4 standard).
  */
-export function LoadedWeekStrip({ load, loadKey, renderSheet, absentFor, picker = false }: {
+export function LoadedWeekStrip({ load, loadKey, renderSheet, renderPrimary, absentFor, picker = false }: {
   load: (from: string, to: string) => WeekRows
   loadKey: string
   renderSheet: RenderEventSheet
@@ -133,6 +133,8 @@ export function LoadedWeekStrip({ load, loadKey, renderSheet, absentFor, picker 
   absentFor?: string
   /** TRAK-441: the coach's week picker, read only, with arrows to other weeks. */
   picker?: boolean
+  /** TRAK-441: beside Details in the picker, the family's one action on the chosen event (a parent's Can't make it). */
+  renderPrimary?: (event: StripEvent) => ReactNode
 }) {
   const [offset, setOffset] = useState(0)
   const dates = useMemo(() => weekDays(addDays(new Date(), offset * 7)), [offset])
@@ -165,7 +167,7 @@ export function LoadedWeekStrip({ load, loadKey, renderSheet, absentFor, picker 
     : null
   const refresh = () => setAttempt(n => n + 1)
   const show = (events: StripEvent[]) => picker
-    ? <FamilyWeekPicker dates={dates} offset={offset} onOffset={setOffset} events={events} renderSheet={renderSheet} refresh={refresh} />
+    ? <FamilyWeekPicker dates={dates} offset={offset} onOffset={setOffset} events={events} renderSheet={renderSheet} renderPrimary={renderPrimary} refresh={refresh} />
     : <WeekStrip events={events} renderSheet={renderSheet} refresh={refresh} />
   return absentFor ? <FamilyWeekStrip childId={absentFor} events={week.events}>{show}</FamilyWeekStrip> : show(week.events)
 }
@@ -191,12 +193,13 @@ function FamilyWeekStrip({ childId, events, children }: {
  * TRAK-441 (Imad, 13 Nov): a family's week in the coach's week picker. Nothing needs them; each event's line is what
  * a family needs to know (Cancelled, Can't make it, or where), and Details opens the role's own event sheet.
  */
-function FamilyWeekPicker({ dates, offset, onOffset, events, renderSheet, refresh }: {
+function FamilyWeekPicker({ dates, offset, onOffset, events, renderSheet, renderPrimary, refresh }: {
   dates: string[]
   offset: number
   onOffset: (change: (offset: number) => number) => void
   events: StripEvent[]
   renderSheet: RenderEventSheet
+  renderPrimary?: (event: StripEvent) => ReactNode
   refresh: () => void
 }) {
   const locale = dateLocale()
@@ -216,7 +219,8 @@ function FamilyWeekPicker({ dates, offset, onOffset, events, renderSheet, refres
   return <WeekPicker family key={dates[0]} title={weekTitle(offset, dates[0])}
     subtitle={`${format(parseISO(dates[0]), 'd')}–${format(parseISO(dates[6]), 'd MMMM', { locale })}`}
     days={days} onPrevWeek={() => onOffset(n => n - 1)} onNextWeek={() => onOffset(n => n + 1)}
-    renderDetails={(id, trigger) => renderSheet(byId.get(id)!, trigger, refresh)} />
+    renderDetails={(id, trigger) => renderSheet(byId.get(id)!, trigger, refresh)}
+    renderPrimary={renderPrimary && (id => renderPrimary(byId.get(id)!))} />
 }
 
 /** The events this child's family (or the child, for themselves) said they can't make: their own rows only. */

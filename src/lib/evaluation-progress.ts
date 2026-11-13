@@ -40,3 +40,14 @@ export function progressSummary(objectives: Pick<EvaluationObjective, 'status'>[
     .map(([status, n]) => `${n} ${progressLabel(status).toLowerCase()}`)
   return parts.length ? `Progress: ${parts.join(', ')}` : null
 }
+
+/** TRAK-402: the Home card line of each evaluation assessment (only those are asked for), for a child when a guardian reads. */
+export function useProgressLines(assessments: { id: string; evaluation_id?: string | null }[], child?: string) {
+  const progress = useEvaluationProgress(assessments.filter(a => a.evaluation_id).map(a => a.id), child)
+  const lines: Record<string, string> = {}
+  for (const [id, p] of progress.data ?? []) {
+    const line = progressSummary(p.objectives)
+    if (line) lines[id] = line
+  }
+  return lines
+}

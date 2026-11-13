@@ -30,6 +30,7 @@ import {
 } from '@/lib/coach-events'
 import { TRAINING_THEMES, catalogueLink, type TrainingTheme } from '@/lib/training-theme'
 import { FixtureImport } from '@/components/coach/FixtureImport'
+import { useOldLogRetired } from '@/components/coach/old-log'
 import { DatePicker } from '@/components/arc/date-picker/date-picker'
 import { Calendar } from '@/components/arc/calendar/calendar'
 import { TimePicker } from '@/components/arc/time-picker/time-picker'
@@ -144,6 +145,8 @@ export default function CoachSchedule() {
   /** The database's refusals, said in the language showing where Trak knows them. */
   const locked = (error: unknown) => lockedMessage(error) && t('coachSchedule:startedLocked')
   const games = useFeature('games')
+  const trainingOn = useFeature('training')
+  const { retired: oldLogRetired } = useOldLogRetired()
   // TRAK-289: a published evaluation is final, so its match opens the review, never the match log's editor.
   const evaluations = useGameEvaluations(games)
   const navigate = useNavigate()
@@ -303,8 +306,8 @@ export default function CoachSchedule() {
     if (parked) return comingSoon()
     if (!user || sheet.kind !== 'edit') return
     const { row: editing, form, repeat, scope } = sheet
-    const problem = formProblem(form) ?? competitionProblem(form, editing, games) ?? pastProblem(form, editing, games)
-      ?? (editing ? null : repeatProblem(form, repeat))
+    const problem = formProblem(form) ?? competitionProblem(form, editing, games) ?? pastProblem(form, editing, games, trainingOn)
+      ?? (editing || evaluate ? null : repeatProblem(form, repeat))
     if (problem) { setSheet({ ...sheet, error: problem }); return }
 
     // This and following weeks: each week keeps its own date and takes the rest.
@@ -339,7 +342,8 @@ export default function CoachSchedule() {
     if (!editing && !coachSquad.ready) { setSheet({ ...sheet, error: coachSquad.retry() }); return }
     setSaving(true)
     const fresh = newDraftFields(user.id, form.squad === undefined ? coachSquad.squad : form.squad)
-    const series = !editing && repeat.on && form.kind !== 'match'
+    // `evaluate`: a match or training already held is one event, never a series (TRAK-426).
+    const series = !editing && repeat.on && form.kind !== 'match' && !evaluate
     const rows = series
       ? seriesRows(form, repeat, crypto.randomUUID()).map(r => ({ ...r, ...fresh }))
       : [{ ...formToRow(form), ...fresh }]
@@ -386,8 +390,9 @@ export default function CoachSchedule() {
       return
     }
     askToEmailFamilies() // TRAK-135: publishing emails families too; never for one that has started
-    // TRAK-288: a game with an empty plan, straight to its evaluation.
-    if (evaluate) return navigate(`/coach/matches/${ids[0]}?tab=evaluation`)
+    // TRAK-288: a game with an empty plan, straight to its evaluation. TRAK-426: a training already held, straight to
+    // its register (Who's here) on its own page.
+    if (evaluate) return navigate(kind === 'training' ? `/coach/training/${ids[0]}/here` : `/coach/matches/${ids[0]}?tab=evaluation`)
     publishedToast(ids.length > 1 ? t('coachSchedule:publishedMany', { count: ids.length }) : t('coachHome:publishedToSquad'), ids.length === 1 && kind === 'match' ? ids[0] : undefined)
   }
 
@@ -650,15 +655,16 @@ export default function CoachSchedule() {
                 // right, the next step first and Cancel or Delete last. A phone shows the icons only; a laptop adds
                 // the words. Each keeps its full name ("Publish Shooting") as its accessible name and tooltip.
                 const items: ButtonGroupItem[] = []
+                // TRAK-426: where the old log has retired, an old log (no event behind it) is read, no longer edited.
                 if (!row) {
-                  items.push({ id: 'edit', label: t('coachSchedule:editNamed', { title: ev.title }), content: t('coachSchedule:edit'), icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${ev.id}`) })
+                  if (!oldLogRetired) items.push({ id: 'edit', label: t('coachSchedule:editNamed', { title: ev.title }), content: t('coachSchedule:edit'), icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${ev.id}`) })
                 } else {
                   if (!row.published && !cancelled) items.push({ id: 'publish', label: t('coachSchedule:publishNamed', { title: row.title }), content: t('coachHome:publish'), icon: <Send />, onSelect: () => publish(row) })
                   if (!registerProblem(row)) items.push({ id: 'register', label: t('coachSchedule:registerFor', { action: sessionId ? t('coachSchedule:editRegister') : t('coachHome:takeRegister'), title: row.title }),
                     content: sessionId ? t('coachSchedule:editRegister') : t('coachHome:takeRegister'), icon: <ClipboardCheck />, onSelect: guarded(() => setSheet({ kind: 'register', row })) })
                   if (row.event_type === 'match' && row.published && !cancelled && started) items.push(games && evaluations.data?.get(row.id)?.publishedAt
                     ? { id: 'match', label: t('coachSchedule:viewReviewOf', { title: row.title }), content: t('coachHome:viewReview'), icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
-                    : sessionId
+                    : sessionId && !oldLogRetired
                     ? { id: 'match', label: t('coachSchedule:editMatchFor', { title: row.title }), content: t('coachSchedule:editMatch'), icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${sessionId}`) }
                     // TRAK-288: where Games is on, the match's evaluation replaces the match log.
                     : games ? { id: 'match', label: t('coachSchedule:evaluateNamed', { title: row.title }), content: t('coachHome:evaluate'), icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
@@ -707,10 +713,13 @@ export default function CoachSchedule() {
                           {/* A logged session's sheet says so, shows who came and opens its record, as on coach Home. */}
                           {sheetEvent.sessionId
                             ? <>
-                                <Link to={`/coach/sessions/${sheetEvent.sessionId}`}
+                                {/* TRAK-426: where the old log has retired, a training opens on its own page; anything
+                                    else shows who came, below, and no longer opens the old editor. */}
+                                {(!oldLogRetired || row?.event_type === 'training') && <Link
+                                  to={oldLogRetired ? `/coach/training/${row!.id}` : `/coach/sessions/${sheetEvent.sessionId}`}
                                   className="flex min-h-11 w-full items-center justify-center rounded-xl bg-raised text-[14px] font-medium text-ink focus-visible:ring-2 focus-visible:ring-primary">
-                                  {t('coachSchedule:openSession')}
-                                </Link>
+                                  {oldLogRetired ? t('coachSchedule:openTraining') : t('coachSchedule:openSession')}
+                                </Link>}
                                 {user && <LoggedAttendance sessionId={sheetEvent.sessionId} coachId={user.id} />}
                               </>
                             : user && <EventSheetCoach event={sheetEvent} coachId={user.id} onChanged={() => void loadData()} />}

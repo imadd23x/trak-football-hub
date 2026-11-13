@@ -70,7 +70,8 @@ function fixtures({ evaluated = false } = {}) {
       our_score: 1, their_score: 0, goals: [], how_they_scored: '', plan_worked: [], published_at: null }] : []),
     table('game_evaluation_players', []),
     table('game_evaluation_notes', []),
-    rpc('feature_on', () => true),
+    // TRAK-426: Training off: these checks are Games'; with Training on too, the old log retires (training-log-trak426).
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'training'),
     rpc('coach_squad_player_consent_required', () => false),
   )
 }

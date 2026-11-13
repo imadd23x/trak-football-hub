@@ -611,6 +611,9 @@ test.describe('TRAK-420 Log page header', () => {
       page.on('pageerror', error => errors.push(error.message))
       await page.setViewportSize({ width, height })
       await coachBackend(context, unexpected)
+      // TRAK-426: the Log page is there only where Training or Matches is off; here Training is off.
+      await context.route('**/rest/v1/rpc/feature_on', route => route.fulfill({ contentType: 'application/json',
+        body: JSON.stringify(route.request().postDataJSON()?.p_feature !== 'training') }))
       await page.goto('/coach/sessions')
       const title = page.getByRole('heading', { name: 'What are you logging?' })
       const history = page.getByRole('button', { name: 'History' })

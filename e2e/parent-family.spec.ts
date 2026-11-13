@@ -92,8 +92,9 @@ await context.route('**/*',async route=>{
  await page.getByRole('tab',{name:'Home',exact:true}).click();
  await page.getByRole('button',{name:/^Alerts/}).click();
  const alertsSheet=page.getByRole('dialog',{name:'Alerts'});
- await expect(alertsSheet.getByText(/vs Zara Opposition/).first()).toBeVisible();
- await expect(alertsSheet.getByText(/vs Alex Opposition/)).toHaveCount(0);
+ // TRAK-436: a match reaches the bell as the coach's review, not "Match logged" (per-child scoping: unit tests).
+ await expect(alertsSheet.getByText(/^New assessment from /).first()).toBeVisible();
+ await expect(alertsSheet.getByText(/Opposition/)).toHaveCount(0);
  // TRAK-122: Escape during the sheet's opening animation can be ignored; wait for it first.
  await alertsSheet.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
  await page.keyboard.press('Escape');
@@ -253,11 +254,11 @@ test.describe('TRAK-171 Home follow-ups', () => {
         await week.getByRole('button', { name: 'Details' }).click()
         const logged = page.getByRole('dialog', { name: 'Logged set pieces' })
         await expect(logged.getByText('Logged.')).toBeVisible()
-        // Imad, 23 Oct (TRAK-278): the sheet shows the log, read only; Edit log opens the saved record.
-        await logged.getByRole('link', { name: 'Edit log' }).click()
-        await expect(page).toHaveURL(/\/coach\/sessions\/saved-session$/)
-        await page.getByRole('navigation', { name: 'Breadcrumb trail' }).getByRole('link', { name: 'Home' }).click()
-        await expect(page).toHaveURL(/\/coach\/home$/)
+        // Imad, 23 Oct (TRAK-278): the sheet shows the log, read only. TRAK-426 (Kostas, 12 Nov): with Training and
+        // Matches both on (this test answers every switch "on"), the old log retires, so there is no Edit log.
+        await expect(logged.getByRole('link', { name: 'Edit log' })).toHaveCount(0)
+        await page.keyboard.press('Escape')
+        await expect(logged).toBeHidden()
         await week.getByRole('button', { name: /Technical training/ }).click()
         await week.getByRole('button', { name: 'Details' }).click()
         const sheet = page.getByRole('dialog', { name: 'Technical training' })

@@ -80,6 +80,8 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
   const eventsOn = useFeature('events')
   // TRAK-288: where Games is on, a match is logged as a New event Match and evaluated on its game page (Imad, 28 Oct).
   const games = useFeature('games')
+  // TRAK-426: Training's way needs the schedule, so both switches.
+  const trainingOn = useFeature('training') && eventsOn
   const { comingSoon } = useParked()
   const [view, setView] = useState<View>('fab')
   const [register, setRegister] = useState<EventRow | null>(null)
@@ -140,6 +142,11 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
   const go = (to: string, options?: NavigateOptions) => { close(); navigate(to, options) }
   const moreDetails = () => go('/coach/schedule', { state: { quickEvent: eventForm() } })
   const logMatch = () => games ? go('/coach/schedule', { state: { quickEvent: { ...eventForm(), kind: 'match' } } }) : show('match')
+  // TRAK-426 (Kostas, 12 Nov): where Training is on, Log training follows Training's way, as Log match follows Matches':
+  // New event as a training; one already held is saved and opened on its register (Who's here).
+  const logTraining = (day?: string) => trainingOn
+    ? go('/coach/schedule', { state: { quickEvent: { ...eventForm(), kind: 'training', opponent: '', homeAway: '', ...(day ? { date: day } : {}) } } })
+    : go('/coach/sessions/add', day ? { state: { logDate: day } } : undefined)
   const continueMatch = () => {
     if (!opponent.trim() || scoreUs === '' || scoreThem === '') { setError(t('coachSchedule:addOpponentScore')); return }
     if (!homeAway) { setError(t('coachSchedule:sayHomeAway')); return }
@@ -150,7 +157,7 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
   const choose = (id: string) => {
     setError(null)
     if (id === 'register' && register) go(`/coach/schedule?register=${register.id}`)
-    else if (id === 'training') go('/coach/sessions/add')
+    else if (id === 'training') logTraining()
     else if (id === 'assess') go('/coach/assess')
     else if (id === 'match') logMatch()
     else if (id === 'event') { if (eventsOn) show('event'); else { close(); comingSoon() } }
@@ -195,7 +202,7 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
         <p className="text-[12px] text-danger">{datePassed}</p>
         <div className="flex gap-2">
           <Button size="md" variant="secondary" className="flex-1" onClick={logMatch}>{t('coachSchedule:logMatch')}</Button>
-          <Button size="md" variant="secondary" className="flex-1" onClick={() => go('/coach/sessions/add', { state: { logDate: date } })}>{t('coachSchedule:logTraining')}</Button>
+          <Button size="md" variant="secondary" className="flex-1" onClick={() => logTraining(date)}>{t('coachSchedule:logTraining')}</Button>
         </div>
       </div>
     ) : error && <p role="alert" className="text-[12px] text-danger">{error}</p>}

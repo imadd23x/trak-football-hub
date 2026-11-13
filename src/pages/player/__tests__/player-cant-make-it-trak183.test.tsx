@@ -50,6 +50,10 @@ function setup(age: number, consentAge: number) {
       return { required: false, age, consent_age: consentAge, threshold: 18, own_choice: true }
     }),
     http.get(`${SUPABASE_URL}/rest/v1/squad_players`, () => HttpResponse.json([{ id: 'squad-1' }])),
+    // TRAK-436: Home's bell reads his game plans and reviews.
+    http.get(`${SUPABASE_URL}/rest/v1/game_for_family`, () => HttpResponse.json([])),
+    http.get(`${SUPABASE_URL}/rest/v1/game_for_player`, () => HttpResponse.json([])),
+    http.get(`${SUPABASE_URL}/rest/v1/game_review_for_family`, () => HttpResponse.json([])),
     http.get(`${SUPABASE_URL}/rest/v1/event_absences`, () => HttpResponse.json(absent ? [{ reason: 'Exams' }] : [])),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/report_cant_make_it`, async ({ request }) => {
       reported.push(await request.json() as Record<string, unknown>)

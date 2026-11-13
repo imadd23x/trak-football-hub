@@ -20,7 +20,8 @@ describe('TRAK-193: History on the coach\'s "What are you logging?"', () => {
       table('profiles', [{ id: 'p', user_id: COACH.id, role: 'coach', full_name: 'Coach', invite_code: 'ABCD' }]),
       table('coach_sessions', []),
       table('squad_players', []),
-      rpc('feature_on', () => true),
+      // TRAK-426: Training off, so the Log page (and History) is still there.
+      rpc('feature_on', ({ p_feature }) => p_feature !== 'training'),
     )
     renderApp('/coach/sessions')
     const history = await screen.findByRole('button', { name: 'History' })

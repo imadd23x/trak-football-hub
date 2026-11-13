@@ -12,6 +12,7 @@ import { startedLocked, type EventRow } from '@/lib/coach-events'
 import { hasStarted, registerProblem } from '@/lib/event-register'
 import { shareableFromRow, squadLabelFrom, whatsAppShareText } from '@/lib/event-share'
 import { ShareEventButton, ShareIcon } from '@/components/coach/ShareEventButton'
+import { useOldLogRetired } from '@/components/coach/old-log'
 import type { StripEvent } from '@/components/trak/WeekStrip'
 import { updatedNote } from '@/lib/alert-read-state'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
@@ -109,6 +110,7 @@ export function People({ heading, people }: { heading: string; people: Person[] 
 export function EventSheetCoach({ event, coachId, onChanged }: { event: StripEvent; coachId: string; onChanged: () => void }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { retired: oldLogRetired } = useOldLogRetired()
   const client = useQueryClient()
   const [registering, setRegistering] = useState(false)
   const details = useQuery({ queryKey: ['coach', 'event', event.id], queryFn: ({ signal }) => fetchEvent(event.id, signal) })
@@ -165,7 +167,8 @@ export function EventSheetCoach({ event, coachId, onChanged }: { event: StripEve
             </ShareEventButton>
           )}
           {/* TRAK-185: a logged match is corrected from its event (score, goals, assists, cards). */}
-          {!cancelled && row?.event_type === 'match' && sessionId && (
+          {/* TRAK-426: where the old log has retired, a match is corrected in its evaluation, not here. */}
+          {!cancelled && row?.event_type === 'match' && sessionId && !oldLogRetired && (
             <button type="button" onClick={() => navigate(`/coach/sessions/${sessionId}`)} className={quiet}>
               <Pencil size={16} aria-hidden="true" />{t('coachSchedule:editMatch')}
             </button>

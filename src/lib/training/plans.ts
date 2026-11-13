@@ -1,3 +1,4 @@
+import { i18n } from '@/lib/i18n'
 import type { Tables } from '@/integrations/supabase/types'
 import { libraryOf, sessionById } from '@/lib/library/library'
 import type { DrillDraft } from './sessions'
@@ -60,7 +61,7 @@ export const plannedMinutes = (practices: Pick<Practice, 'minutes'>[]) => practi
  *  coach can keep it; this says so plainly. Null when it fits or the training has no length. */
 export function overTime(planned: number, length: number | null): string | null {
   if (!length || planned <= length) return null
-  return `You set this training for ${length} min. The plan runs ${planned - length} min over. You can keep it, or change the training's time in Events.`
+  return i18n.t('coachTraining:overTime', { length, over: planned - length })
 }
 
 /** TRAK-367: a practice on one line: its part, then its drill ("Rondo · Rondo 4 v 2 with a target"). Only the name when
@@ -82,6 +83,6 @@ export function searchSessions<T extends { title: string; practices: { name: str
 
 /** "4 practices · 90 min · Rondos 4v1, Pressing zones, 8v8, Huddle". */
 export function sessionSummary(practices: Pick<Practice, 'name' | 'minutes'>[]): string {
-  const count = `${practices.length} ${practices.length === 1 ? 'practice' : 'practices'}`
-  return [count, `${plannedMinutes(practices)} min`, practices.map(p => p.name).join(', ')].join(' · ')
+  const count = i18n.t('coachTraining:practiceCount', { count: practices.length })
+  return [count, i18n.t('coachHome:minutes', { count: plannedMinutes(practices) }), practices.map(p => p.name).join(', ')].join(' · ')
 }

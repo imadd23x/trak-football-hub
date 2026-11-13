@@ -8,6 +8,7 @@ import { useParentAssessment } from '@/hooks/useParentAssessments'
 import { EvaluationProgressCard } from '@/components/player/EvaluationProgressCard'
 import { useEvaluationProgress } from '@/lib/evaluation-progress'
 import { trackEvent } from '@/lib/telemetry'
+import { markOpened } from '@/lib/games/news'
 import { ChevronLeft } from 'lucide-react'
 
 /** TRAK-402: mounted only for an evaluation's assessment. The coach's note stays the child's: a family reads the band, the
@@ -26,7 +27,7 @@ export default function ParentAssessment() {
   const { id, sessionId } = useParams<{ id: string; sessionId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const { selectedChild } = useParentChildren()
+  const { selectedChild, parentId } = useParentChildren()
   const origin = location.state as { matchId?: unknown; childId?: unknown } | null
   const matchId = sessionId && origin?.childId === selectedChild?.id && typeof origin?.matchId === 'string'
     ? origin.matchId : null
@@ -36,6 +37,11 @@ export default function ParentAssessment() {
   useEffect(() => {
     if (shownId) void trackEvent('assessment_viewed', { assessment_id: shownId })
   }, [shownId])
+  // TRAK-441: once it shows, Home's Latest evaluation stops saying New for this parent on this device.
+  const childId = selectedChild?.id
+  useEffect(() => {
+    if (shownId && parentId && childId) markOpened(parentId, childId, 'evaluation', shownId)
+  }, [shownId, parentId, childId])
   return <MobileShell>
     <div className="pt-3 pb-4">
       {/* TRAK-204 (Kostas, 19 Oct): an event opened by mistake goes straight back, as Match details does.

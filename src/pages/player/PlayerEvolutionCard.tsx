@@ -163,11 +163,11 @@ function computePositionQuests(
     return streak
   }
 
-  // Coach's Pick — universal quest #3 for every position
+  // Coach's Choice (TRAK-454: never "pick") — universal quest #3 for every position
   const coachPickDone = awardCount > 0
   const coachPick: EvoQuest = {
     icon: Target,
-    title: "Coach's Pick",
+    title: "Coach's Choice",
     desc: 'Earn a recognition award from your coach',
     progress: coachPickDone ? 1 : 0,
     target: 1,

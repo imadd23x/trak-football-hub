@@ -185,7 +185,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     const user = userEvent.setup()
     store()
     server.use(http.post(`${SUPABASE_URL}/rest/v1/rpc/schedule_game_plan`, () =>
-      HttpResponse.json({ code: 'P0001', message: 'Pick a time before kick-off' }, { status: 400 })))
+      HttpResponse.json({ code: 'P0001', message: 'Select a time before kick-off' }, { status: 400 })))
     shareStep()
     await screen.findByRole('region', { name: 'Game plan review' })
     await user.click(screen.getByRole('checkbox', { name: /talked selection through/ }))
@@ -194,7 +194,7 @@ describe('TRAK-290: Share at…', { timeout: 30_000 }, () => {
     await pickDate(user, 'Day', '2026-11-07')
     await pickTime(user, 'Time', '11:00')
     await user.click(screen.getByRole('button', { name: 'Schedule for Sat 11:00' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Pick a time before kick-off')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Select a time before kick-off')
     expect(screen.getByRole('button', { name: 'Schedule for Sat 11:00' })).toBeEnabled()
   })
 })

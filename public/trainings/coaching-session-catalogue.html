@@ -242,7 +242,7 @@ function render() {
   const base = DATA.filter(d => !state.lib || d.library === state.lib).length;
   $("shown").textContent = rows.length;
   $("of").textContent = `of ${base} sessions shown`;
-  if (!rows.length) { $("out").innerHTML = `<p class="locked">No sessions match these filters. Clear the search or pick a different age group.</p>`; return; }
+  if (!rows.length) { $("out").innerHTML = `<p class="locked">No sessions match these filters. Clear the search or select a different age group.</p>`; return; }
   let html = "";
   for (const lib of LIBS) {
     for (const topic of TOPIC_ORDER[lib.name]) {

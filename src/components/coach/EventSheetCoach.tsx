@@ -17,6 +17,7 @@ import type { StripEvent } from '@/components/trak/WeekStrip'
 import { updatedNote } from '@/lib/alert-read-state'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { i18n, useTranslation } from '@/lib/i18n'
+import { absenceReasonWord } from '@/lib/absence-reasons'
 
 /* TRAK-182: the coach's part of the event sheet. Publish (a draft) or
    Published; after the event, Take register (J8.15). Share (the
@@ -64,7 +65,7 @@ async function fetchSquad(coachId: string, eventId: string, sessionId: string | 
   if (attendance.error) throw attendance.error
   // TRAK-176: an event for one squad lists that squad only; null is the whole roster.
   const rows = (roster.data ?? []).filter(p => eventSquad == null || p.age_group?.trim() === eventSquad)
-  const reasons = new Map((absences.data ?? []).map(a => [a.squad_player_id, a.reason as string | null]))
+  const reasons = new Map((absences.data ?? []).map(a => [a.squad_player_id, absenceReasonWord(a.reason as string | null)]))
   const current = rows.filter(p => p.status !== 'coach_departed')
   // As the register (TakeRegister): only a child whose consent is active counts
   // (Kostas, #310). A failed check counts as not confirmed.

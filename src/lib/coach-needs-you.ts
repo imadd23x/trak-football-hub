@@ -12,6 +12,8 @@ export interface NeedsYouItem {
   /** "Never assessed, 3 weeks in the squad" */
   reason: string
   urgent: boolean
+  /** TRAK-444: when the last assessment (or draft) was, for the date sort; 0 when never. */
+  at?: number
 }
 
 /**
@@ -33,10 +35,15 @@ export function needsYou({ players, waitingForParent, assessments, now, evaluate
   const detail = (p: (typeof players)[number]) => [p.position, p.shirt_number != null ? `#${p.shirt_number}` : null].filter(Boolean).join(' · ')
   const byId = new Map(players.map(p => [p.id, p]))
   const evaluated = (p: (typeof players)[number]) => !!evaluatedSquads?.has(p.age_group?.trim() ?? '')
+  const lastAssessed = new Map<string, number>()
+  for (const a of assessments) {
+    const at = Date.parse(a.created_at)
+    if (Number.isFinite(at) && at > (lastAssessed.get(a.squad_player_id) ?? 0)) lastAssessed.set(a.squad_player_id, at)
+  }
   const assess: NeedsYouItem[] = playerAttention({
     roster: players.filter(p => !evaluated(p)), waitingForParent, assessments, trainings: [], present: new Map(), absenceReasons: new Map(), now,
   }).filter(row => row.level !== 'on-track').map(row => ({
-    playerId: row.playerId, name: row.name, detail: detail(byId.get(row.playerId)!), kind: 'assess', reason: row.reasons[0], urgent: row.level === 'urgent',
+    playerId: row.playerId, name: row.name, detail: detail(byId.get(row.playerId)!), kind: 'assess', reason: row.reasons[0], urgent: row.level === 'urgent', at: lastAssessed.get(row.playerId) ?? 0,
   }))
 
   const drafts = new Map<string, string[]>()
@@ -47,7 +54,7 @@ export function needsYou({ players, waitingForParent, assessments, now, evaluate
   const draft = [...drafts].map(([id, dates]): NeedsYouItem => {
     const latest = format(new Date(dates.sort().at(-1)!), 'd MMM', { locale: dateLocale() })
     return {
-      playerId: id, name: byId.get(id)!.player_name, detail: detail(byId.get(id)!), kind: 'draft', urgent: false,
+      playerId: id, name: byId.get(id)!.player_name, detail: detail(byId.get(id)!), kind: 'draft', urgent: false, at: Date.parse(dates.at(-1)!),
       reason: dates.length === 1 ? i18n.t('coachHome:draftFrom', { day: latest }) : i18n.t('coachHome:draftsFrom', { count: dates.length, day: latest }),
     }
   }).sort((a, b) => a.name.localeCompare(b.name))

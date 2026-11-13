@@ -20,5 +20,9 @@
   "couldntConnect": "Couldn't connect",
   "loadOffline": "We can't load {{what}} without a connection. Nothing has been lost.",
   "loadFailed": "We couldn't load {{what}} just now. This isn't a change to your record.",
-  "retrying": "Retrying…"
+  "retrying": "Retrying…",
+  "reasonSchool": "School",
+  "reasonFamily": "Family",
+  "reasonTravel": "Travel",
+  "reasonOther": "Other"
 }

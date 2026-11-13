@@ -72,7 +72,7 @@ for (const role of ['player', 'coach', 'club'] as const) {
     if (role === 'coach') {
       await page.goto('/coach/squad/add')
       await expect(page).toHaveURL(/\/coach\/squad$/)
-      await expect(page.getByRole('heading', { name: 'Squad' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Squad', exact: true })).toBeVisible()
       await expect(page.getByRole('button', { name: /add player/i })).toHaveCount(0)
       await page.goto('/coach/quick-assess')
       await expect(page).toHaveURL(/\/coach\/assess$/)

@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext } from '@playwright/test'
 import { createRequire } from 'node:module'
+import { openNewEvent } from './new-event'
 
 const require = createRequire(import.meta.url)
 
@@ -53,7 +54,7 @@ async function coachBackend(context: BrowserContext, unexpected: string[], withM
       updated_at: new Date(Date.now() - 3 * 3600_000).toISOString() }
     if (withMatch && path === '/rest/v1/coach_sessions' && url.searchParams.has('event_id')) return json([])
     if (withMatch && path === '/rest/v1/coach_calendar_events') return json([match])
-    if (withMatch && path === '/rest/v1/event_absences') return json([{ squad_player_id: 'sq-3', reason: 'School trip' }])
+    if (withMatch && path === '/rest/v1/event_absences') return json([{ squad_player_id: 'sq-3', reason: 'school' }])
     if (withMatch && path.startsWith('/rest/v1/rpc/coach_squad_player_consent_required')) return json(req.postDataJSON()?.p_squad_player_id === 'sq-5')
     if (path === '/rest/v1/coach_sessions') return json([{ id: 'session-1', coach_user_id: ids.coach, title: 'Finishing', session_type: 'training', session_date: day, venue: 'Synthetic pitch' }])
     if (path === '/rest/v1/coach_calendar_events') return json([])
@@ -224,7 +225,7 @@ test.describe('TRAK-182 coach screens', () => {
     expect(listBox!.y).toBeGreaterThanOrEqual(0)
     await list.getByRole('option', { name: '5:00 PM' }).click()
     await form.getByRole('button', { name: 'Save draft' }).click()
-    await expect(page.getByText('Draft saved. Publish it from Schedule.')).toBeVisible()
+    await expect(page.getByText('Draft saved. Publish it from Events.')).toBeVisible()
     await page.waitForTimeout(300)
     await page.screenshot({ path: testInfo.outputPath('quick-add-4-check.png') })
     await expect(form).toHaveCount(0, { timeout: 3000 })
@@ -240,7 +241,7 @@ test.describe('TRAK-182 coach screens', () => {
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
     await coachBackend(context, unexpected)
     await page.goto('/coach/schedule')
-    await page.getByRole('button', { name: 'Add event' }).click()
+    await openNewEvent(page)
     const sheet = page.getByRole('dialog', { name: 'New event' })
     await sheet.getByRole('button', { name: 'Match' }).click()
     await sheet.getByLabel('Opponent').fill('Synthetic Rovers')
@@ -300,6 +301,57 @@ test.describe('TRAK-182 coach screens', () => {
 // TRAK-220 (20 Oct live run): menus and the expanded assessment card were
 // see-through on the light theme. Arc's tokens live on `.arc`; a panel Radix
 // portals to <body> has no `.arc` ancestor unless it carries the class itself.
+// TRAK-425 (Imad, 11 Nov): Assess player fills a laptop's page like the other coach pages, and its step strip goes forward
+// as well as back once a player and session are picked. Before that the form is locked, so the strip stays back-only.
+test.describe('TRAK-425 Assess player on a laptop', () => {
+  test.use({ timezoneId: 'Asia/Dubai', viewport: { width: 1440, height: 900 } })
+
+  test('fills the page, and the steps can be jumped ahead once a player is picked', async ({ page, context }, testInfo) => {
+    const unexpected: string[] = [], errors: string[] = []
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+    await coachBackend(context, unexpected)
+    await page.goto('/coach/assess')
+    const steps = page.getByRole('navigation', { name: 'Assessment steps' })
+    await expect(steps).toBeVisible()
+    // Not the old 640 px column: the page uses the room beside the side menu.
+    expect((await steps.boundingBox())!.width).toBeGreaterThan(800)
+    // Nothing picked yet: Review cannot be jumped to.
+    await expect(steps.getByRole('button', { name: /Review/ })).toBeDisabled()
+    await page.getByRole('combobox', { name: 'Player' }).selectOption({ label: 'Bukayo Saka' })
+    // A picked player shows once: the card (with Change) replaces the list.
+    await expect(page.getByRole('combobox', { name: 'Player' })).toHaveCount(0)
+    await expect(page.getByText('Bukayo Saka')).toHaveCount(1)
+    await page.getByRole('combobox', { name: 'Session' }).selectOption({ index: 1 })
+    await steps.getByRole('button', { name: /Review/ }).click()
+    await expect(page.getByRole('button', { name: 'Publish' }).or(page.getByRole('button', { name: 'Save' })).first()).toBeVisible()
+    await steps.getByRole('button', { name: /Ratings/ }).click()
+    await expect(page.getByRole('slider', { name: 'Work Rate' })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('coach-assess-laptop.png') })
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+})
+
+// TRAK-425: on a phone Assess has its own Back and Next bar, so the glass tab bar steps aside: one bar at the bottom, not two.
+test.describe('TRAK-425 Assess player on a phone', () => {
+  test.use({ timezoneId: 'Asia/Dubai', viewport: { width: 390, height: 844 } })
+
+  test('has one bar at the bottom, and its sessions read like the rest of the app', async ({ page, context }, testInfo) => {
+    const unexpected: string[] = [], errors: string[] = []
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+    await coachBackend(context, unexpected)
+    await page.goto('/coach/assess')
+    await expect(page.getByRole('button', { name: 'Next' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Coach' })).toHaveCount(0)
+    await page.getByRole('combobox', { name: 'Player' }).selectOption({ label: 'Bukayo Saka' })
+    const labels = await page.getByRole('combobox', { name: 'Session' }).locator('option').allTextContents()
+    expect(labels.slice(1).every(label => / · (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}/.test(label))).toBe(true)
+    await page.screenshot({ path: testInfo.outputPath('coach-assess-phone.png') })
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+})
+
 test.describe('TRAK-220 Arc panels opened over the page', () => {
   test.use({ timezoneId: 'Asia/Dubai', viewport: { width: 390, height: 844 } })
   // The alpha of an element's computed background colour (0 = see-through).
@@ -446,7 +498,7 @@ test.describe('TRAK-227 date and time pickers in the event form', () => {
     const unexpected: string[] = []
     await coachBackend(context, unexpected)
     await page.goto('/coach/schedule')
-    await page.getByRole('button', { name: 'Add event' }).click()
+    await openNewEvent(page)
     const sheet = page.getByRole('dialog', { name: 'New event' })
     await sheet.getByRole('button', { name: 'Next', exact: true }).click()
     // Fully inside every scroll area it sits in, and inside the screen.

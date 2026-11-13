@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowDown, ArrowUp, ChevronRight, LayoutGrid, List, Minus, Plus, Repeat } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bookmark, ChevronRight, LayoutGrid, List, Minus, Plus, Repeat } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { ON_LIBRARY, PRACTICE_KIND_COLOURS } from '@/lib/fixed-colours'
@@ -20,6 +20,7 @@ import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { Button } from '@/components/arc/button/button'
+import { EmptyState } from '@/components/arc/empty-state/empty-state'
 
 /* TRAK-387 (Drill Library 3/11, parent TRAK-384): Training › Drills is the new Library, from the 8 Nov mockup. Find a
    drill (results take the place of everything else while the coach types), My drills and All drills, then "What kind
@@ -181,6 +182,7 @@ function HomeLink({ to, icon, title, note }: { to: string; icon: ReactNode; titl
 /** The Library drills the coach bookmarked (TRAK-390), as picture cards grouped Get ready → Technical → Skill → Game
  *  related. A drill no longer in the Library is left out. */
 export function MyDrills() {
+  const navigate = useNavigate()
   const { squad, line } = useLibrarySquad()
   const bookmarks = useBookmarks()
   const mine = (bookmarks.data ?? []).flatMap(id => libraryDrill(id) ?? [])
@@ -188,7 +190,9 @@ export function MyDrills() {
     <SubPage title="My drills" intro={<>Drills you added from the Library. {mine.length ? line : ''}</>}>
       {bookmarks.error ? <LoadError what="your drills" onRetry={() => void bookmarks.refetch()} retrying={bookmarks.isFetching} />
         : !squad || bookmarks.isPending ? <LoadingSkeleton label="Loading your drills…" rows={2} />
-        : !mine.length ? <Empty>Nothing here yet. Open any drill and press Add to My drills, or tap the bookmark on its card.</Empty>
+        : !mine.length ? <div className="arc"><EmptyState icon={<Bookmark size={24} strokeWidth={1.5} />} title="Nothing in My drills yet"
+            description="Open a drill and choose Add to My drills, or use the bookmark on its card."
+            action={<Button onClick={() => navigate(allDrillsPath())}>Browse all drills</Button>} /></div>
         : <div className="grid gap-7">
           {KIND_ORDER.map(kind => {
             const drills = LIBRARY.filter(d => d.kind === kind && mine.includes(d))

@@ -15,6 +15,7 @@ import { server } from '../../../../tests/msw/server'
 import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
 import { pickDate, pickTime } from '../../../../tests/support/arc-pickers'
 import { eventStep } from '../../../../tests/support/event-steps'
+import { openNewEvent } from '../../../../tests/support/schedule-actions'
 
 const DAY = '2026-10-14'
 const YESTERDAY = '2026-10-13'
@@ -99,7 +100,7 @@ describe('TRAK-426: Log training follows Training\'s way', { timeout: 30_000 }, 
   it('a training already held is saved, published and opened on its register, never "log it instead"', async () => {
     fixtures()
     renderApp('/coach/schedule')
-    await userEvent.click(await screen.findByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await userEvent.click(within(sheet).getByRole('button', { name: 'Training' }))
     await eventStep(sheet, 'When')

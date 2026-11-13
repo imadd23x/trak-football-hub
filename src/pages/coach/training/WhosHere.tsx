@@ -1,4 +1,5 @@
-import { i18n, useTranslation } from '@/lib/i18n'
+import { useTranslation } from '@/lib/i18n'
+import { whyWord } from '@/lib/training/words'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -26,14 +27,6 @@ import SegmentedControl from '@/components/arc/segmented-control/segmented-contr
 
 const TRAINING_PATH = '/coach/training'
 type Choice = 'use' | 'keep'
-
-/** registerProblem's reason (kept in English, it is compared) in the language showing. */
-const WHY: Record<string, string> = {
-  'Only a published event has a register': 'coachTraining:why_published',
-  'This event was cancelled, so it has no register': 'coachTraining:why_cancelled',
-  'A match is recorded in the match log, with its score and minutes': 'coachTraining:why_match',
-}
-const whyWord = (why: string) => (WHY[why] ? i18n.t(WHY[why] as 'coachTraining:why_match') : why.toLowerCase())
 
 export function WhosHere({ training, plan }: { training: Training; plan: Plan | null }) {
   const { user } = useAuth()

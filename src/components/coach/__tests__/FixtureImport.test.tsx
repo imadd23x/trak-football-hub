@@ -85,7 +85,7 @@ describe('FixtureImport', () => {
     await user().upload(fileInput(), csv('2026-11-14,10:00,,Rivals FC,,,', '2026-11-21,10:00,,Other FC,,,'))
 
     const known = await screen.findByRole('listitem', { name: 'Line 2' })
-    expect(within(known).getByText(/already on your schedule/i)).toBeInTheDocument()
+    expect(within(known).getByText(/already in your events/i)).toBeInTheDocument()
     await user().click(addButton())
     expect(onConfirm.mock.calls[0][0].map(f => f.opponent)).toEqual(['Other FC'])
   })

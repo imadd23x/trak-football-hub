@@ -115,10 +115,10 @@ describe('TRAK-335: skeletons while the coach app loads', { timeout: 30_000 }, (
     await skeleton('Loading your trainings…')
   })
 
-  it('Schedule shows a skeleton for the day, not "Nothing planned", until the schedule is read', async () => {
+  it('Schedule shows a skeleton for the day, not "Nothing planned", until the events are read', async () => {
     server.use(hold('coach_calendar_events', []))
     renderApp('/coach/schedule')
-    await skeleton('Loading your schedule…')
+    await skeleton('Loading your events…')
     expect(screen.queryByText(/Nothing planned/)).toBeNull()
     release()
     expect(await screen.findByText(/Nothing planned/)).toBeInTheDocument()

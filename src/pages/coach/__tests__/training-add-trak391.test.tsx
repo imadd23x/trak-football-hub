@@ -205,6 +205,6 @@ describe('TRAK-391: Add to training', { timeout: 30_000 }, () => {
     database([])
     renderApp(drillPath(drill('Four corners').id))
     await user.click(await screen.findByRole('button', { name: 'Add to training' }))
-    expect(await screen.findByText('No trainings coming up. Add one in Schedule, then add this drill to it.')).toBeInTheDocument()
+    expect(await screen.findByText('No trainings coming up. Add one in Events, then add this drill to it.')).toBeInTheDocument()
   })
 })

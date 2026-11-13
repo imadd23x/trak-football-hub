@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { refusalWithNames, registerStart, type RegisterPlayer } from '@/lib/event-register'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { i18n, useTranslation } from '@/lib/i18n'
+import { absenceReasonWord } from '@/lib/absence-reasons'
 
 /**
  * TRAK-138 (J8.15): the register of an event that went ahead. It opens
@@ -69,7 +70,7 @@ export function TakeRegister({ eventId, coachId, sessionId, squad: eventSquad = 
         id: p.id, name: p.player_name ?? i18n.t('nav:player'), ready: required[i] === false,
         waitReason: required[i] === null ? "consent couldn't be checked" : 'waiting for a parent',
       }))
-      const familyReason = new Map((absences.data ?? []).map(a => [a.squad_player_id as string, (a.reason as string | null) ?? null]))
+      const familyReason = new Map((absences.data ?? []).map(a => [a.squad_player_id as string, absenceReasonWord(a.reason as string | null)]))
       const start = registerStart(all, familyReason.keys())
       // Taken before: reopen as saved. Otherwise the family's word decides.
       const ready = new Set(all.filter(p => p.ready).map(p => p.id))

@@ -10,11 +10,12 @@ import { motionTokens } from "../../lib/motion-tokens";
 import { CANCELLED_COLOR, EVENT_COLOR } from "@/lib/coach-events";
 import type { WeekState } from "@/lib/coach-week";
 import { useTranslation } from "@/lib/i18n";
+import { useSideMenuScreen } from "@/lib/side-menu-screen";
 import styles from "./week-picker.module.css";
 
 export interface WeekEvent {
   id: string;
-  kind: "training" | "match" | "other";
+  kind: "training" | "match" | "tournament" | "other";
   title: string;
   /** "18:00", or null for none to show. */
   time: string | null;
@@ -51,7 +52,9 @@ const fadeVariants = { enter: { opacity: 0 }, center: { opacity: 1 }, exit: { op
  * coach, the chosen day's events in the colour key, and a footer naming the chosen event with its one next step
  * beside Details. The caller renders both buttons: `renderDetails` wraps its trigger in the event sheet.
  */
-export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, renderPrimary, renderDetails }: {
+export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, renderPrimary, renderDetails, family = false }: {
+  /** A player or parent reads the week: nothing "needs you", and nothing to plan. */
+  family?: boolean;
   title: string;
   subtitle: string;
   days: WeekDay[];
@@ -62,6 +65,7 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
 }) {
   const reduce = !!useReducedMotion();
   const { t } = useTranslation();
+  const laptop = useSideMenuScreen(); // TRAK-432: a laptop has no "+", its button says Create.
   const id = useId();
   const [dayId, setDayId] = useState(days.find(day => day.today)?.id ?? days[0].id);
   const [direction, setDirection] = useState(1);
@@ -69,7 +73,7 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
   const [eventId, setEventId] = useState(firstEvent(day)?.id ?? null);
   const event = day.events.find(entry => entry.id === eventId) ?? null;
   const summary = event ? `${event.title}${event.time ? ` · ${event.time}` : ""}` : t("coachHome:nothingPlannedOn", { day: day.full.split(" ")[0] });
-  const selectionLabel = event ? event.note : t("coachHome:usePlus");
+  const selectionLabel = family ? "" : event ? event.note : t(laptop ? "coachHome:useCreate" : "coachHome:usePlus");
 
   function selectDay(index: number) {
     const next = days[index];
@@ -121,7 +125,7 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
             </AnimatePresence>
           </span>
         </h3>
-        <span className={styles.legend}><i style={{ ["--dot" as string]: EVENT_COLOR.training }} aria-hidden="true" />{t("coachHome:legendTraining")}<i style={{ ["--dot" as string]: EVENT_COLOR.match }} aria-hidden="true" />{t("coachHome:legendMatch")}<i className={styles.needs} aria-hidden="true" />{t("coachHome:needsYouTitle")}</span>
+        <span className={styles.legend}><i style={{ ["--dot" as string]: EVENT_COLOR.training }} aria-hidden="true" />{t("coachHome:legendTraining")}<i style={{ ["--dot" as string]: EVENT_COLOR.match }} aria-hidden="true" />{t("coachHome:legendMatch")}{!family && <><i className={styles.needs} aria-hidden="true" />{t("coachHome:needsYouTitle")}</>}</span>
       </div>
 
       <div className={styles.slotsStage}>
@@ -133,7 +137,7 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
               const selected = event?.id === entry.id;
               return <li key={entry.id}>
                 <button type="button" className={styles.slot} data-selected={selected || undefined} data-state={entry.state} aria-pressed={selected}
-                  aria-label={`${entry.title}, ${entry.time ?? t("coachHome:noTimeSet")}, ${t(STATE_WORD[entry.state])}`} onClick={() => setEventId(entry.id)} style={{ ["--dot" as string]: color(entry) }}>
+                  aria-label={[entry.title, entry.time ?? t("coachHome:noTimeSet"), family ? entry.note : t(STATE_WORD[entry.state])].filter(Boolean).join(", ")} onClick={() => setEventId(entry.id)} style={{ ["--dot" as string]: color(entry) }}>
                   <span className={styles.slotBar} aria-hidden="true" />
                   <span className={styles.slotTime}>{entry.time ?? (entry.state === "logged" ? t("coachHome:timeDone") : t("coachHome:timeTbc"))}</span>
                   <span className={styles.slotText}>
@@ -151,7 +155,8 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
         </AnimatePresence>
       </div>
 
-      <footer className={styles.footer}>
+      {/* Trak (TRAK-441): a family's empty day says "Nothing planned" once, in the list. */}
+      {(event || !family) && <footer className={styles.footer}>
         <div className={styles.selection}>
           <span className={styles.swap}>
             <AnimatePresence mode="popLayout" initial={false}>
@@ -168,7 +173,7 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
           {renderDetails?.(event.id, <Button variant="ghost" size="sm">{t("coachHome:details")}</Button>)}
           {renderPrimary?.(event.id)}
         </div>}
-      </footer>
+      </footer>}
     </div>
   </section>;
 }

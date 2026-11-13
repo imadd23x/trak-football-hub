@@ -319,7 +319,7 @@ async function secondChildFixture(page: Page, context: BrowserContext) {
 }
 
 // TRAK-194: parent Home lists no matches; the child's line under the header says whose Home it is.
-const homeLine = (child: { club: string }) => `Midfielder · ${child.club} · Senior`
+const homeLine = (child: { club: string }) => `${child.club} · Senior`
 
 test('existing parent accepts a second child, recovers a failed family refresh and keeps both links after reload', async ({ page, context }) => {
   const observed = await secondChildFixture(page, context);

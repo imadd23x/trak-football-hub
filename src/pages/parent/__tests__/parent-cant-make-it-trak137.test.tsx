@@ -4,7 +4,7 @@
  * optional reason, and can undo it until kickoff. The database decides who may
  * (report_cant_make_it / undo_cant_make_it); the page shows its answer.
  */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -90,24 +90,27 @@ describe('TRAK-137: Can\'t make it', () => {
     const user = userEvent.setup()
     renderEvent()
     await user.click(await screen.findByRole('button', { name: "Can't make it" }))
-    // Imad, 18 Oct: no medical details in the reason until counsel confirms (a child's health data under GDPR).
-    expect(screen.getByLabelText(/Reason/)).toHaveAccessibleName('Reason (optional, the coach sees it; no medical details)')
-    await user.type(screen.getByLabelText(/Reason/), 'School trip')
+    // TRAK-249 (Imad, 21 Oct; list 13 Nov): fixed reasons, no text box, so no health details can be typed.
+    const reasons = screen.getByRole('radiogroup', { name: 'Reason (optional, the coach sees it)' })
+    expect(within(reasons).getAllByRole('radio').map(radio => radio.getAttribute('aria-label') ?? (radio as HTMLInputElement).labels?.[0]?.textContent))
+      .toEqual(['School', 'Family', 'Travel', 'Other'])
+    expect(screen.queryByRole('textbox')).toBeNull()
+    await user.click(within(reasons).getByRole('radio', { name: 'School' }))
     await user.click(screen.getByRole('button', { name: 'Tell the coach' }))
     expect(await screen.findByText("You told the coach Alex can't make it.")).toBeInTheDocument()
-    expect(screen.getByText('School trip')).toBeInTheDocument()
-    expect(calls).toEqual([{ fn: 'report', body: { p_event_id: 'ev-1', p_child: 'Alex', p_reason: 'School trip' } }])
+    expect(screen.getByText('School')).toBeInTheDocument()
+    expect(calls).toEqual([{ fn: 'report', body: { p_event_id: 'ev-1', p_child: 'Alex', p_reason: 'school' } }])
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(await screen.findByRole('button', { name: "Can't make it" })).toBeInTheDocument()
     expect(calls[1]).toEqual({ fn: 'undo', body: { p_event_id: 'ev-1', p_child: 'Alex' } })
   })
 
   it('keeps each sibling separate: Zara\'s report never shows on Alex\'s page', async () => {
-    ABSENCES = [{ event_id: 'ev-1', squad_player_id: 'Zara-squad', reason: 'Zara reason' }]
+    ABSENCES = [{ event_id: 'ev-1', squad_player_id: 'Zara-squad', reason: 'family' }]
     renderEvent()
     expect(await screen.findByRole('button', { name: "Can't make it" })).toBeInTheDocument()
     expect(screen.queryByText(/You told the coach/)).not.toBeInTheDocument()
-    expect(screen.queryByText('Zara reason')).not.toBeInTheDocument()
+    expect(screen.queryByText('Family')).not.toBeInTheDocument()
   })
 
   it('shows the database\'s refusal and records nothing', async () => {

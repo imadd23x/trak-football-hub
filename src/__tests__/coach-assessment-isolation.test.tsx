@@ -57,6 +57,9 @@ async function chooseSessionIfNone() {
 // TRAK-182: the player is chosen on the first step; the message and note have their own.
 async function selectPlayer(player: string) {
   if (!screen.queryByRole('combobox', { name: 'Player' })) await assessStep('Player')
+  // TRAK-425: a picked player shows once, as a card; Change brings the list back.
+  const change = screen.queryByRole('button', { name: 'Change' })
+  if (change) await userEvent.click(change)
   await screen.findByRole('option', { name: 'Alex Synthetic' })
   await userEvent.selectOptions(selector(), player)
   await chooseSessionIfNone()

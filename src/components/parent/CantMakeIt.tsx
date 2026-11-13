@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { Button as ArcButton } from '@/components/arc/button/button'
 import type { PlayerEvent } from '@/lib/player-events'
+import { ABSENCE_REASONS, absenceReasonWord, type AbsenceReason } from '@/lib/absence-reasons'
 
 /* TRAK-137 (J8.14, Imad 8 Oct): like a school register, everyone counts as
    coming; a guardian reports the exception (or, since TRAK-183, a player at or
@@ -27,13 +28,13 @@ export function CantMakeIt({ event, child, self = false }: { event: PlayerEvent;
   const reasonId = useId()
   const client = useQueryClient()
   const [writing, setWriting] = useState(false)
-  const [reason, setReason] = useState('')
+  const [reason, setReason] = useState<AbsenceReason | ''>('')
   const key = ['parent', 'absence', child.id, event.id]
   const absence = useQuery({ queryKey: key, queryFn: ({ signal }) => fetchAbsence(child.id, event.id, signal) })
   const change = useMutation({
     mutationFn: async (report: boolean) => {
       const { error } = report
-        ? await supabase.rpc('report_cant_make_it', { p_event_id: event.id, p_child: child.id, p_reason: reason.trim() || undefined })
+        ? await supabase.rpc('report_cant_make_it', { p_event_id: event.id, p_child: child.id, p_reason: reason || undefined })
         : await supabase.rpc('undo_cant_make_it', { p_event_id: event.id, p_child: child.id })
       if (error) throw error
     },
@@ -54,13 +55,18 @@ export function CantMakeIt({ event, child, self = false }: { event: PlayerEvent;
       </> : absence.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading…</p>
         : absence.data ? <>
           <p className="text-sm text-foreground">You told the coach {self ? 'you' : child.name} can't make it.</p>
-          {absence.data.reason && <p className="text-sm text-muted-foreground mt-1">{absence.data.reason}</p>}
+          {absenceReasonWord(absence.data.reason) && <p className="text-sm text-muted-foreground mt-1">{absenceReasonWord(absence.data.reason)}</p>}
           <button type="button" disabled={change.isPending} onClick={() => change.mutate(false)} className={`${button} mt-3`}>Undo</button>
           {refusal}
         </> : writing ? <>
-          <label htmlFor={reasonId} className="block text-sm text-foreground mb-2">Reason (optional, the coach sees it; no medical details)</label>
-          <textarea id={reasonId} value={reason} maxLength={140} rows={2} onChange={e => setReason(e.target.value)}
-            className="w-full rounded-lg border border-border bg-background p-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-primary" />
+          {/* TRAK-249 (Imad, 21 Oct; list 13 Nov): a fixed choice, no text box, so no health details can be typed. */}
+          <p id={reasonId} className="text-sm text-ink mb-2">Reason (optional, the coach sees it)</p>
+          <div role="radiogroup" aria-labelledby={reasonId} className="flex flex-wrap gap-2">
+            {ABSENCE_REASONS.map(key => <label key={key} className={`inline-flex min-h-11 cursor-pointer items-center rounded-full border px-4 text-sm text-ink focus-within:ring-2 focus-within:ring-primary ${reason === key ? 'border-brand bg-brand/10' : 'border-line'}`}>
+              <input type="radio" name={reasonId} value={key} checked={reason === key} onChange={() => setReason(key)} className="sr-only" />
+              {absenceReasonWord(key)}
+            </label>)}
+          </div>
           <div className="flex gap-2 mt-3">
             <button type="button" disabled={change.isPending} onClick={() => change.mutate(true)} className={button}>Tell the coach</button>
             <button type="button" onClick={() => { setWriting(false); change.reset() }} className={button}>Cancel</button>

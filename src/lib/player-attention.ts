@@ -22,6 +22,7 @@
  */
 
 import { i18n } from '@/lib/i18n'
+import { absenceReasonWord } from '@/lib/absence-reasons'
 
 export type AttentionLevel = 'urgent' | 'warning' | 'on-track'
 
@@ -89,7 +90,8 @@ export function playerAttention(input: AttentionInput): AttentionRow[] {
     const missed = counted.filter(t => !present.get(t.id)!.has(p.id))
     const lastMissed = counted.length > 0 && missed[0] === counted[0]
     const cantMakeIt = lastMissed && counted[0].event_id ? absenceReasons.get(counted[0].event_id)?.get(p.id) : undefined
-    const why = cantMakeIt === undefined ? '' : cantMakeIt ? t('coachHome:cantMakeItReason', { reason: cantMakeIt }) : t('coachHome:cantMakeIt')
+    const word = absenceReasonWord(cantMakeIt)
+    const why = cantMakeIt === undefined ? '' : word ? t('coachHome:cantMakeItReason', { reason: word }) : t('coachHome:cantMakeIt')
     if (squadHasFour && missed.length >= 3) {
       reasons.push({ level: 'urgent', text: t('coachHome:missedOf', { missed: missed.length, counted: counted.length, why }), weight: 100 + missed.length })
     } else if (missed.length >= 2) {

@@ -105,5 +105,6 @@
   "messageToPlayerCaps": "ΜΗΝΥΜΑ ΠΡΟΣ ΤΟΝ ΠΑΙΚΤΗ",
   "couldntLoadMessage": "Το μήνυμα δεν φορτώθηκε. Η Δημοσίευση το στέλνει κανονικά.",
   "noMessage": "Χωρίς μήνυμα",
-  "privateNoteCaps": "ΠΡΟΣΩΠΙΚΗ ΣΗΜΕΙΩΣΗ · ΜΟΝΟ ΕΣΕΙΣ"
+  "privateNoteCaps": "ΠΡΟΣΩΠΙΚΗ ΣΗΜΕΙΩΣΗ · ΜΟΝΟ ΕΣΕΙΣ",
+  "changePlayerButton": "Αλλαγή"
 }

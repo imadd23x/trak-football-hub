@@ -105,5 +105,6 @@
   "messageToPlayerCaps": "MESSAGE TO THE PLAYER",
   "couldntLoadMessage": "Couldn't load the message. Publish still sends it.",
   "noMessage": "No message",
-  "privateNoteCaps": "PRIVATE NOTE · ONLY YOU"
+  "privateNoteCaps": "PRIVATE NOTE · ONLY YOU",
+  "changePlayerButton": "Change"
 }

@@ -91,9 +91,9 @@ describe('TRAK-197: trainings', () => {
   it("Can't make it still counts as missed, and the coach sees its reason", () => {
     const row = only(input({
       present: absentFrom('t1'),
-      absenceReasons: new Map([['e1', new Map([['a', 'Ill']])]]),
+      absenceReasons: new Map([['e1', new Map([['a', 'family']])]]),
     }))
-    expect(row).toMatchObject({ level: 'warning', reasons: ["Missed the last training (Can't make it: Ill)"] })
+    expect(row).toMatchObject({ level: 'warning', reasons: ["Missed the last training (Can't make it: Family)"] })
   })
 
   it("Can't make it with no reason given still says so", () => {

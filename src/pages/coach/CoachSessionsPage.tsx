@@ -5,7 +5,9 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell, NavBar, LoadError } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
-import { Plus } from 'lucide-react'
+import { History, Plus } from 'lucide-react'
+import { EmptyState } from '@/components/arc/empty-state/empty-state'
+import { Button } from '@/components/arc/button/button'
 import { useCoachSquad } from '@/lib/coach-squad'
 
 export default function CoachSessionsPage() {
@@ -73,7 +75,12 @@ export default function CoachSessionsPage() {
             <LoadError what="your sessions" onRetry={retry} retrying={retrying} />
           </div>
         ) : shown.length === 0 ? (
-          <p className="text-ink-3 text-sm mt-4">No sessions logged yet.</p>
+          // TRAK-432: Arc's empty state: icon, one line, and the button that logs one.
+          <div className="arc pt-6">
+            <EmptyState icon={<History size={24} strokeWidth={1.5} />} title="No sessions logged yet"
+              description="A training or match you log shows up here."
+              action={<Button onClick={() => navigate('/coach/sessions')}>Log a session</Button>} />
+          </div>
         ) : (
           <div className="space-y-0">
             {shown.map((s) => (

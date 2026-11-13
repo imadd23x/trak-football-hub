@@ -16,8 +16,8 @@ export function HomeHeader({ calendarTo, center, right, left }: { calendarTo: st
     <header className={`grid ${coach ? 'grid-cols-[1fr_minmax(0,auto)_1fr]' : 'grid-cols-[44px_minmax(0,1fr)_44px]'} items-center gap-2 mb-3`}>
       <div className="flex">{coach ? left : <CalendarLink to={calendarTo} />}</div>
       <div className="min-w-0 flex justify-center">{center}</div>
-      {/* TRAK-255: the coach's is called Schedule; players' and parents' stay Calendar. */}
-      <div className="flex justify-end gap-2">{coach && <CalendarLink to={calendarTo} label={t('nav:schedule')} />}{right}</div>
+      {/* TRAK-255: the coach's is called Events (TRAK-449); players' and parents' stay Calendar. */}
+      <div className="flex justify-end gap-2">{coach && <CalendarLink to={calendarTo} label={t('nav:events')} />}{right}</div>
     </header>
   )
 }

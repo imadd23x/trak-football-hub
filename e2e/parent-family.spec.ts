@@ -173,6 +173,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         if (url.pathname === '/rest/v1/coach_sessions' && url.searchParams.has('event_id')) return json([])
         if (url.pathname === '/rest/v1/coach_sessions') return json([{ id: 'saved-session', title: 'Logged set pieces', session_type: 'training', session_date: day, event_id: null, venue: 'Synthetic pitch' }])
         if (url.pathname === '/rest/v1/rpc/season_plan_for_player') return json([]) // TRAK-399: nothing shared
+        if (url.pathname === '/rest/v1/rpc/family_feature_on') return json(false) // TRAK-441: family_look off
         if (url.pathname === '/rest/v1/rpc/child_events') {
           const child = req.postDataJSON().p_child
           const filter = url.searchParams.get('id')
@@ -277,7 +278,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         await expect(sheet).toHaveCount(0)
         // TRAK-255: the coach's is called Schedule, and a day with a started event that has no
         // register yet also says "needs you" (by the time of day this runs).
-        await page.getByRole('link', { name: 'Schedule' }).click()
+        await page.getByRole('link', { name: 'Events' }).click()
         await expect(page.getByRole('gridcell', { name: /, 2 events(, needs you)?$/ })).toHaveAttribute('aria-selected', 'true')
         await page.screenshot({ path: testInfo.outputPath('coach-schedule-month.png'), fullPage: true })
       }

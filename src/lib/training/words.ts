@@ -9,7 +9,7 @@ export const TRAINING_WORD: Readonly<Record<string, string>> = {
   'Plan': 'coachTraining:loopPlan',
   'Who’s here': 'coachTraining:loopHere',
   'Notes': 'coachTraining:loopNotes',
-  'From the schedule': 'coachTraining:fromSchedule',
+  'From Events': 'coachTraining:fromSchedule',
   'Optional': 'coachTraining:optionalCap',
   'No plan written': 'coachTraining:noPlanWritten',
   'No register taken': 'coachTraining:noRegister',

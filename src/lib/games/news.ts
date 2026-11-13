@@ -14,7 +14,7 @@ import { rosterRows } from './shared-plans'
 export type News = { kind: 'plan' | 'plan_changed' | 'review'; eventId: string; at: string }
 /** With its match, the child's role in the plan (starter, bench, not_selected), the coach's name and the score. */
 export type NewsItem = News & { event: PlayerEvent; role: string | null; coachName: string | null; score: [number, number] | null }
-type Opened = 'plan' | 'review'
+type Opened = 'plan' | 'review' | 'evaluation'
 
 // ponytail: a fixed window, so a first visit isn't every past match; a per-reader "seen since" if families ask for older.
 const RECENT_MS = 14 * 86_400_000
@@ -49,6 +49,11 @@ function readOpened(readerId: string): Record<string, number> {
 /** The match page showed this plan or review to this reader. */
 export function markOpened(readerId: string, childId: string, what: Opened, eventId: string, now = Date.now()) {
   try { localStorage.setItem(storeKey(readerId), JSON.stringify({ ...readOpened(readerId), [openedKey(childId, what, eventId)]: now })) } catch { /* private window: it stays new */ }
+}
+
+/** TRAK-441: this reader's device has shown this thing since `at` (an evaluation's page, for Home's "New"). */
+export function wasOpened(readerId: string, childId: string, what: Opened, id: string, at: string): boolean {
+  return readOpened(readerId)[openedKey(childId, what, id)] >= Date.parse(at)
 }
 
 export function unopened<T extends News>(readerId: string, childId: string, news: T[]): T[] {

@@ -219,7 +219,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
         ? `${start.only === 'add' ? 'Add' : 'Edit'}: ${part.name}` : `Plan session: ${training.title}`}</h1>
       {/* TRAK-404 (Kostas, 10 Nov): no logistics here. Opened for one part, the training's name says which plan. */}
       {start.only && <p className="text-sm text-ink-2">{training.title}</p>}
-      {start.only && <p className="text-sm text-ink-3">{start.only === 'add' ? 'Pick a drill, then add it to the plan.'
+      {start.only && <p className="text-sm text-ink-3">{start.only === 'add' ? 'Select a drill, then add it to the plan.'
         : 'Only this part changes. The rest of the plan stays as it is.'}</p>}
     </header>
     {start.added && <p role="status" className={`rounded-xl px-4 py-3 text-sm ${start.added.how === 'full' ? 'bg-warning/15 text-ink' : 'bg-raised text-ink-2'}`}>
@@ -335,7 +335,7 @@ function Review({ parts, length, note, onNote, onEdit, onRemove, onReorder, onMo
     <div><Button size="sm" variant="secondary" onClick={onAdd}><Plus aria-hidden size={16} />Add a part</Button></div>
     {/* Kostas, 30 Oct: one optional note at the end, not one per drill. */}
     <Textarea label="A note for you (optional)" description="Anything to remember on the day. Only you see it." rows={2} maxLength={NOTE_MAX}
-      value={note} onChange={e => onNote(e.target.value)} placeholder="For example: remind the back four to talk to each other in the box" />
+      value={note} onChange={e => onNote(e.target.value)} placeholder="e.g. remind the back four to talk to each other in the box" />
     <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
       <Button variant="secondary" onClick={onBack}>Back</Button>
       {draftNote}

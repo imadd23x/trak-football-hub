@@ -121,7 +121,7 @@ describe('a new plan’s shape', () => {
 describe('saving', () => {
   it('needs a drill in every part', () => {
     const parts = partsFromShape([...standardShape(), { type: 'own', name: 'Pressing game', minutes: 20 }], PLAYERS, usageOf([]))
-    expect(planProblem(parts)).toBe('Pick a drill for Pressing game, or remove the part.')
+    expect(planProblem(parts)).toBe('Select a drill for Pressing game, or remove the part.')
     expect(planProblem([])).toBe('Add a part first.')
     expect(planProblem(parts.slice(0, 5))).toBeNull()
   })

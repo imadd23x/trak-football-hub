@@ -408,7 +408,7 @@ export function ChangePractice() {
             <PitchPicture shapes={practiceLayout(shown.key, eg)} label={`${shown.name} example: ${examples[eg].label}`} />
             <div className="grid content-start gap-3">
               <div className="arc">
-                <ChipGroup label="Pick an example" multiple={false} value={[String(eg)]}
+                <ChipGroup label="Select an example" multiple={false} value={[String(eg)]}
                   options={examples.map((x, i) => ({ value: String(i), label: x.label }))}
                   onValueChange={next => { if (next[0]) go(shown.key, Number(next[0])) }} />
               </div>

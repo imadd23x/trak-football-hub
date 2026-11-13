@@ -211,9 +211,9 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
     await next()
 
     // TRAK-157: no event saves without a start time; there is no "no time".
-    expect(timeShown('Kickoff')).toBe('Pick a start time')
+    expect(timeShown('Kickoff')).toBe('Select a start time')
     await next()
-    expect(within(sheet).getByRole('alert')).toHaveTextContent('Pick a start time')
+    expect(within(sheet).getByRole('alert')).toHaveTextContent('Select a start time')
     expect(within(sheet).queryByText(/time not set/i)).toBeNull()
 
     await pickTime(userEvent, 'Kickoff', '16:00')

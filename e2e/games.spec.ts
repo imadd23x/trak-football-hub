@@ -774,7 +774,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByRole('region', { name: 'Preview' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Who sees what' })).toHaveCount(0)
     // This match was made before New event asked the competition (Imad, 29 Oct): the Publish step asks it.
-    await expect(page.getByText('Pick the competition first.')).toBeVisible()
+    await expect(page.getByText('Select the competition first.')).toBeVisible()
     await page.getByRole('group', { name: 'Competition' }).getByText('League').click()
     await expect(page.getByRole('button', { name: 'Publish to 2 players and families' })).toBeEnabled()
     await page.waitForTimeout(500)

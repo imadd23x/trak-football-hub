@@ -328,7 +328,7 @@ function NotesForm({ training, planned, onReview, onClosed }: { training: Traini
         options={AGAIN.map(a => ({ value: a.value, label: a.label }))} onValueChange={value => setAgain(value as Again)} />
     </div>
     <Textarea label="A note for next time" rows={2} maxLength={NOTE_MAX} value={note} onChange={e => setNote(e.target.value)}
-      placeholder="For example: the rondo grids were too small for this group" />
+      placeholder="e.g. the rondo grids were too small for this group" />
     </div>
     {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
     <div className="flex flex-wrap items-center gap-3">

@@ -172,7 +172,7 @@ describe('TRAK-264: the coach\'s Library', { timeout: 20_000 }, () => {
     const sessions = await screen.findByRole('list', { name: 'Sessions' })
     expect(screen.queryByRole('table')).toBeNull()
     expect(screen.getByText('No session open')).toBeInTheDocument()
-    expect(screen.getByText('Pick a session to see it here.')).toBeInTheDocument()
+    expect(screen.getByText('Select a session to see it here.')).toBeInTheDocument()
 
     await userEvent.click(within(sessions).getByRole('button', { name: /Read and react/ }))
     const open = await screen.findByRole('article', { name: 'Read and react' })

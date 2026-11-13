@@ -103,7 +103,7 @@ export function planProblem(parts: Part[]): string | null {
   if (!parts.length) return 'Add a part first.'
   if (parts.length > PARTS_MAX) return `A plan holds at most ${PARTS_MAX} parts.`
   const empty = parts.find(p => !p.drill)
-  return empty ? `Pick a drill for ${empty.name}, or remove the part.` : null
+  return empty ? `Select a drill for ${empty.name}, or remove the part.` : null
 }
 
 /** What save_training_plan() takes: one practice per part, in order. */

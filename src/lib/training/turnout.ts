@@ -79,7 +79,7 @@ function refit(drill: PlanDrill, lib: LibraryDrill, here: number, squad: number)
   const planned: Setup = { ok: true, text: drill.numbers }
   if (here === squad) return { status: 'same', planned, now: planned, message: 'Everyone’s here. No change.' }
   if (here < PLAYERS_TODAY.min) return { status: 'swap', planned, alt: null, now: { ok: false },
-    message: `${drill.name} is set up for ${PLAYERS_TODAY.min} to ${PLAYERS_TODAY.max} players. With ${here}, pick another drill.` }
+    message: `${drill.name} is set up for ${PLAYERS_TODAY.min} to ${PLAYERS_TODAY.max} players. With ${here}, select another drill.` }
   const details = fit(lib, Math.min(PLAYERS_TODAY.max, here), drill.trak_level ?? START_LEVEL).details
   const changed = DETAILS.filter(({ key }) => details[key] !== drill[key])
   if (!changed.length) return { status: 'same', planned, now: planned, message: 'The same set-up still works.' }
@@ -101,7 +101,7 @@ export function adapt(drill: PlanDrill, here: number, squad: number): Adaptation
     const alt = swapTo ? shelfDrill(swapTo) ?? null : null
     const altNow = alt ? setupFor(alt.players, here) : null
     if (alt && altNow?.ok) return { status: 'swap', planned, alt, now: altNow, message: `${drill.name} doesn’t work well with ${here}. Swap to ${alt.name}: ${altNow.text}.` }
-    return { status: 'swap', planned, alt: null, now: { ok: false }, message: `${drill.name} doesn’t work well with ${here}. Pick another drill.` }
+    return { status: 'swap', planned, alt: null, now: { ok: false }, message: `${drill.name} doesn’t work well with ${here}. Select another drill.` }
   }
   if (planned.ok && now.text === planned.text) {
     return { status: 'same', planned, now, message: players.kind === 'any' ? 'Works with any number. No change.' : 'The same set-up still works.' }

@@ -91,7 +91,7 @@ export default function CoachSeasonPlan() {
           </div>
           {squad && !season.isPending && <p className="mt-1 text-sm text-ink-3">{squad} · {sharedOn ? `Shared ${shortDate(sharedOn)}` : season.plan ? 'Draft, only you see it' : 'Not started'}</p>}
         </header>}
-        {!squad ? <p className="text-sm text-ink-2">Pick one squad in the menu to plan its season.</p>
+        {!squad ? <p className="text-sm text-ink-2">Select one squad in the menu to plan its season.</p>
           : season.error || objectives.error ? (
             <div className="arc grid justify-items-start gap-3">
               <p className="text-sm text-ink-2">Couldn't load your season plan.</p>

@@ -156,8 +156,8 @@ function PlanRow({ part, index, count, onEdit, onRemove, onMove, onDrop, busy }:
       {players && <span className="text-[13px] text-ink-3">{players}</span>}
     </span>
     <span className="flex flex-none gap-1">
-      <Button size="sm" variant="ghost" disabled={busy} aria-label={`${part.drill ? 'Edit' : 'Pick a drill for'} ${part.name}`} onClick={onEdit}>
-        <Pencil aria-hidden size={14} />{part.drill ? 'Edit' : 'Pick a drill'}</Button>
+      <Button size="sm" variant="ghost" disabled={busy} aria-label={`${part.drill ? 'Edit' : 'Select a drill for'} ${part.name}`} onClick={onEdit}>
+        <Pencil aria-hidden size={14} />{part.drill ? 'Edit' : 'Select a drill'}</Button>
       <Button size="sm" variant="ghost" disabled={busy} aria-label={`Remove ${part.name}`} onClick={onRemove}><X aria-hidden size={16} /></Button>
     </span>
   </Reorder.Item>

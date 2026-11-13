@@ -102,7 +102,7 @@ export function WhosHere({ training, plan }: { training: Training; plan: Plan | 
             <h2 id="today" className="text-lg font-medium text-ink">{checked ? `Today’s plan for ${players(count)}` : `Your plan, for all ${size ?? 'your squad'}`}</h2>
             <p className="text-sm text-ink-3">{!checked ? 'Trak checks it once you’re done with the register.'
               : count === size ? 'Everyone’s here. Your plan works as it is.'
-              : [changes ? `${changes} ${changes === 1 ? 'part needs' : 'parts need'} a change. Pick “Use it” or “Keep” for each.` : '',
+              : [changes ? `${changes} ${changes === 1 ? 'part needs' : 'parts need'} a change. Select “Use it” or “Keep” for each.` : '',
                 stuck ? `${stuck} ${stuck === 1 ? 'part doesn’t' : 'parts don’t'} work with ${players(count)}. Change ${stuck === 1 ? 'it' : 'them'} yourself.` : '',
               ].filter(Boolean).join(' ') || 'Your plan still works.'}</p>
           </div>

@@ -293,7 +293,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByRole('heading', { name: 'Change any practice', level: 1 })).toBeVisible()
     await expect(page.getByRole('img', { name: 'Area shape and size example: 20 wide, 40 long' })).toBeVisible()
     await page.getByRole('group', { name: 'Five things that shape a practice' }).getByRole('button', { name: 'Direction' }).click()
-    await page.getByRole('group', { name: 'Pick an example' }).getByRole('button', { name: 'End line, 60x15' }).click()
+    await page.getByRole('group', { name: 'Select an example' }).getByRole('button', { name: 'End line, 60x15' }).click()
     await expect(page.getByRole('img', { name: 'Direction example: End line, 60x15' })).toBeVisible()
     await page.waitForTimeout(400)
     await page.screenshot({ path: testInfo.outputPath(`training-change-practice-${width}.png`), fullPage: true })
@@ -375,7 +375,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     // → Who's here: the Library drill is fitted again for the one who came.
     await page.goto('/coach/training/t-now/here')
     await expect(page.getByRole('heading', { name: 'Today’s plan for 1 player' })).toBeVisible()
-    await expect(page.getByText('Keep the ball is set up for 8 to 20 players. With 1, pick another drill.')).toBeVisible()
+    await expect(page.getByText('Keep the ball is set up for 8 to 20 players. With 1, select another drill.')).toBeVisible()
     expect(await sideways(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])

@@ -28,14 +28,14 @@ export function AddPartSheet({ open, onClose, onAdd }: { open: boolean; onClose:
   const add = () => {
     const own = name.trim()
     if (own) return onAdd('own', own.slice(0, PART_NAME_MAX))
-    if (!picked) return setProblem('Pick a part, or name your own.')
+    if (!picked) return setProblem('Select a part, or name your own.')
     onAdd(picked, PART_TYPES.find(p => p.key === picked)!.name)
   }
   return <BottomSheet className="arc" open={open} onOpenChange={next => { if (!next) onClose() }} detents={[0.92]} title="Add a part"
     description="It goes at the end of the session. Drag it to move it.">
     <div className="grid gap-5 pb-4">
       <fieldset className="grid gap-2">
-        <legend className="mb-2 text-sm font-medium text-ink">Pick a part</legend>
+        <legend className="mb-2 text-sm font-medium text-ink">Select a part</legend>
         <div className="grid grid-cols-1 gap-2 tablet:grid-cols-2">
           {PART_TYPES.map(type => <button key={type.key} type="button" aria-pressed={picked === type.key}
             onClick={() => { setPicked(type.key); setName(''); setProblem(null) }}
@@ -45,7 +45,7 @@ export function AddPartSheet({ open, onClose, onAdd }: { open: boolean; onClose:
           </button>)}
         </div>
       </fieldset>
-      <Input label="Or name your own" description="For example: Pressing game, Goalkeeper work, Fitness test." value={name}
+      <Input label="Or name your own" description="e.g. Pressing game, Goalkeeper work, Fitness test." value={name}
         maxLength={PART_NAME_MAX} autoComplete="off" onChange={e => { setName(e.target.value); if (e.target.value.trim()) setPicked(null); setProblem(null) }} />
       {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
       <div className="flex flex-wrap justify-end gap-2">
@@ -90,7 +90,7 @@ export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPi
     title={`Find another drill for ${part.name}`}>
     <div className="grid gap-4 pb-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px] flex-1"><SearchField label="Search drills" placeholder="For example: rondo, 4v2, pressing" value={query} onValueChange={setQuery} /></div>
+        <div className="min-w-[220px] flex-1"><SearchField label="Search drills" placeholder="e.g. rondo, 4v2, pressing" value={query} onValueChange={setQuery} /></div>
         <SegmentedControl label="Show" value={filter} onValueChange={value => setFilter(value as Filter)}
           options={[{ value: 'all', label: 'All' }, { value: 'used', label: 'You’ve used' }]} />
       </div>
@@ -110,8 +110,8 @@ export function MoreDrillsSheet({ part, players, usage, bookmarks, onClose, onPi
                   <p className="text-[13px] text-ink-3">{[d.numbers, d.area].filter(Boolean).join(' · ')}</p>
                   {tag && <p className="text-[13px] text-brand">{tag}</p>}
                 </div>
-                {picked ? <Badge tone="success"><Check aria-hidden size={14} />Picked</Badge>
-                  : <Button size="sm" variant="secondary" aria-label={`Pick ${lib.name}`} onClick={() => onPick(d)}>Pick</Button>}
+                {picked ? <Badge tone="success"><Check aria-hidden size={14} />Selected</Badge>
+                  : <Button size="sm" variant="secondary" aria-label={`Select ${lib.name}`} onClick={() => onPick(d)}>Select</Button>}
               </li>
             })}
           </ul>

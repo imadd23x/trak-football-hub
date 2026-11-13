@@ -62,6 +62,8 @@ remains hidden; the pilot uses `/coach/assess`. Existing AI handlers return
   Auth user ID. Resolve the player's squad rows before querying assessments.
 - Coach match logging uses `log_match_for_player`; direct inserts do not
   substitute for its consent and assignment checks.
+- Wording (TRAK-454, 11 Nov walk-through): write "e.g." (Greek "π.χ."), never "For example"; and "select",
+  never "pick" ("Select a date", "None selected"), in English and Greek.
 - Follow the existing mobile shell and design tokens. Use `BANDS` for band
   wording and colors; keep player-visible messages separate from private notes.
 - The roster owns the child's name. A child email is optional. Use the existing

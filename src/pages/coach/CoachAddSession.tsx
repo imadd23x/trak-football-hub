@@ -684,7 +684,7 @@ export default function CoachAddSession() {
       {/* Topbar */}
       <div className="flex items-center justify-between pt-3 pb-2 border-b border-line">
         {/* TRAK-334: the trail, in place of Back; its last crumb is the page's name. */}
-        <CoachTrail current="Full Session" />
+        <CoachTrail current="Full session" />
       </div>
 
       <div className="pt-5 pb-32 space-y-5">

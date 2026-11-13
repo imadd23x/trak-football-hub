@@ -18,6 +18,7 @@ import { LoadError } from '@/components/trak'
 import { Alert } from '@/components/arc/alert/alert'
 import { BottomSheet } from '@/components/arc/bottom-sheet/bottom-sheet'
 import { MorphSelect } from '@/components/arc/morph-select/morph-select'
+import { shapeItems } from '@/lib/games/shape-items'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/arc/tabs/tabs'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 
@@ -35,8 +36,6 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    keeps them there until the family undoes it; a report that comes after the coach placed them only flags them. */
 
 const card = 'grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-surface p-5'
-/* TRAK-407: read when shown, so "9 a side" follows the language. */
-const shapes = () => FORMATS.map(format => ({ label: i18n.t('coachSquad:fmASide', { count: format }), options: FORMATIONS[format].map(shape => ({ value: shape, label: shape })) }))
 /** A tab's name with its count under it, so three tabs fit the card on a phone and beside the pitch. The name is still
  *  "Bench · 6" to a screen reader. */
 const TabLabel = ({ name, count }: { name: string; count: number }) =>
@@ -139,7 +138,7 @@ export function LineUpAndJobs({ form, onFormChange, who, locked = false, copy = 
         <section aria-labelledby="plan-pitch" className={`${card} laptop:sticky laptop:top-[calc(var(--ph-pinned,0px)+1rem)]`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="plan-pitch" className={locked ? 'text-lg font-medium text-ink' : 'sr-only'}>{shape}</h2>
-            {!locked && <span className="arc"><MorphSelect label={t('coachHome:formation')} hideLabel items={shapes()} value={shape} onValueChange={setShape}
+            {!locked && <span className="arc"><MorphSelect label={t('coachHome:formation')} hideLabel items={shapeItems()} value={shape} onValueChange={setShape}
               searchable={false} panelWidth={200} /></span>}
             <span className="text-sm text-ink-3">{t('coachMatches:attackingUp')}</span>
           </div>

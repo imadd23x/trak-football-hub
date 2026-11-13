@@ -66,8 +66,15 @@ for (const role of ['player', 'coach', 'club'] as const) {
       await expect(page.getByRole('textbox', { name: 'Full name' })).toHaveCount(0)
     } else await expect(page.getByRole('textbox', { name: 'Full name' })).toHaveValue('Synthetic Pilot')
     await expect(page.getByRole('button', { name: 'Delete my account' })).toBeVisible()
-    await expect(page.locator('input[type=file], img')).toHaveCount(0)
-    await expect(page.getByText('Profile photos are coming soon.')).toBeVisible()
+    // TRAK-460 (Imad, 11 Nov): a coach may add their own picture; a player, guardian or club admin still may not (G7).
+    if (role === 'coach') {
+      await expect(page.locator('input[type=file]')).toHaveCount(1)
+      await expect(page.getByRole('button', { name: /^(Add|Change) photo$/ })).toBeVisible()
+      await expect(page.getByText('Profile photos are coming soon.')).toHaveCount(0)
+    } else {
+      await expect(page.locator('input[type=file], img')).toHaveCount(0)
+      await expect(page.getByText('Profile photos are coming soon.')).toBeVisible()
+    }
 
     if (role === 'coach') {
       await page.goto('/coach/squad/add')

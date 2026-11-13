@@ -65,13 +65,13 @@ await context.route('**/*',async route=>{
  const following=page.getByRole('group',{name:'Following'});
  await expect(following.getByRole('button',{name:'Alex Example'})).toBeVisible();
  // TRAK-194: Home lists no matches; each child's line says whose Home it is.
- await expect(page.getByText('Midfielder · Alex Academy · U15',{exact:true})).toBeVisible();
+ await expect(page.getByText('Alex Academy · U15',{exact:true})).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('home-mobile.png'),fullPage:true});
  await following.getByRole('button').click();
  await page.getByRole('menuitem',{name:'Zara Example'}).click();
  await expect(following.getByRole('button',{name:'Zara Example'})).toBeVisible();
- await expect(page.getByText('Midfielder · Zara Academy · U15',{exact:true})).toBeVisible();
- await expect(page.getByText('Midfielder · Alex Academy · U15',{exact:true})).toHaveCount(0);
+ await expect(page.getByText('Zara Academy · U15',{exact:true})).toBeVisible();
+ await expect(page.getByText('Alex Academy · U15',{exact:true})).toHaveCount(0);
  await page.getByRole('tab',{name:'Events',exact:true}).click();
  await expect(page.getByRole('combobox')).toHaveValue(zara);
  // TRAK-181: Trak draws the picker and its chevron, so Safari can't swap in its own grey bar.
@@ -101,8 +101,8 @@ await context.route('**/*',async route=>{
  await page.keyboard.press('Escape');
  await expect(alertsSheet).toHaveCount(0);
  await expect(following.getByRole('button',{name:'Zara Example'})).toBeVisible();
- await expect(page.getByText('Midfielder · Zara Academy · U15',{exact:true})).toBeVisible();
- await expect(page.getByText('Midfielder · Alex Academy · U15',{exact:true})).toHaveCount(0);
+ await expect(page.getByText('Zara Academy · U15',{exact:true})).toBeVisible();
+ await expect(page.getByText('Alex Academy · U15',{exact:true})).toHaveCount(0);
  await page.getByRole('tab',{name:'Profile',exact:true}).click();
  await expect(page.getByText('Parent account · 2 children linked',{exact:true})).toBeVisible();
  // TRAK-181: no "Following" picker on Profile; each child has a consent line.

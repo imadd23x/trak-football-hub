@@ -29,6 +29,7 @@ beforeEach(() => {
     table('matches', [MATCH]), table('squad_players', []),
     table('coach_assessments', []), table('coach_shared_feedback', []), table('recognition_awards', []),
     rpcRows('child_events', []),
+    rpcRows('season_plan_for_player', []), // TRAK-437: the position is the coach's, from the season plan's read
     rpc('get_player_invites_for_current_user', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),
   )
@@ -39,7 +40,7 @@ describe('TRAK-194: player Home', () => {
   it('12. shows one quiet line under the header, with no greeting or chips', async () => {
     renderApp('/player/home')
     expect(await screen.findByText('Kostas Tsimikas')).toBeInTheDocument()
-    expect(await screen.findByText('Attacker · Rehearsal Athens · U16')).toBeInTheDocument()
+    expect(await screen.findByText('Rehearsal Athens · U16')).toBeInTheDocument()
     expect(screen.queryByText(/^Good (morning|afternoon|evening)$/)).toBeNull()
     expect(screen.queryByText('Active')).toBeNull()
     expect(screen.queryByText('Rehearsal Athens U16')).toBeNull()
@@ -47,7 +48,7 @@ describe('TRAK-194: player Home', () => {
 
   it('13. has no "Recent matches"; Sessions still lists the match', async () => {
     renderApp('/player/home')
-    await screen.findByText('Attacker · Rehearsal Athens · U16')
+    await screen.findByText('Rehearsal Athens · U16')
     expect(screen.queryByText('RECENT MATCHES')).toBeNull()
     expect(screen.queryByText('vs Panathinaikos U16')).toBeNull()
     cleanup()

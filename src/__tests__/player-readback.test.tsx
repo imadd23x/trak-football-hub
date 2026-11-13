@@ -32,7 +32,8 @@ const match = (id: string, owner = account) => ({
 })
 // TRAK-194: one line under Home's header holds position, club and age group. TRAK-435 (12 Nov): Home reads no matches
 // (no card built on match ratings), so this line is how these tests see a Home load finish.
-const homeLine = (club: string) => `Defender · ${club} · U15`
+// TRAK-437: the position is the coach's (the season plan's read), nothing here, so the line is club and age group.
+const homeLine = (club: string) => `${club} · U15`
 const event = { id: 'event-a', coach_user_id: 'coach-a', title: 'Team training', event_type: 'training', published: true, event_date: '2026-09-28', starts_at: '2026-09-28T17:00:00Z', time_known: true }
 const assessment = {
   id: 'assessment-a', squad_player_id: 'squad-a', coach_user_id: 'coach-a',
@@ -99,7 +100,7 @@ beforeEach(() => {
     table('squad_players', [{ id: 'squad-a', coach_user_id: 'coach-a', linked_player_id: account }]),
     table('coach_assessments', [assessment]),
     table('coach_shared_feedback', [{ assessment_id: assessment.id, body: WORDS, published_at: '2026-09-20T10:00:00Z' }]),
-    rpcRows('child_events', []), table('recognition_awards', []),
+    rpcRows('child_events', []), rpcRows('season_plan_for_player', []), table('recognition_awards', []),
     table('player_parent_links', [{ player_user_id: CHILD_A }, { player_user_id: CHILD_B }]),
     rpc('get_player_invites_for_current_user', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),

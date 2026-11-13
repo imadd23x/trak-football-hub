@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, type NavigateOptions } from 'react-router-dom'
+import { createDay } from '@/lib/create-day'
 import { ClipboardCheck, ClipboardPen, Plus, Swords, CalendarPlus, Dumbbell } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
@@ -100,7 +101,8 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
   const [squadPick, setSquadPick] = useState<string | null | undefined>(undefined)
   const squad = squadPick === undefined ? coachSquad.squad : squadPick
 
-  const show = useCallback((next: string) => { setError(null); setView(next as View) }, [])
+  // TRAK-424: New event opens on the day picked in Schedule's calendar, else today.
+  const show = useCallback((next: string) => { setError(null); if (next === 'event') setDate(createDay() ?? localTodayISO()); setView(next as View) }, [])
   const close = () => show('fab')
 
   // Today's training whose register can open now: the menu offers it first.

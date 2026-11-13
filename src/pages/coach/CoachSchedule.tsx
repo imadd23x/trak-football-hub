@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, Pencil, Send, Trash2, Ban, X, FileUp, ExternalLink, MapPin, ClipboardCheck, ClipboardList } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Send, Trash2, Ban, X, FileUp, ExternalLink, MapPin, ClipboardCheck, ClipboardList, CalendarDays } from 'lucide-react'
+import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { ButtonGroup, type ButtonGroupItem } from '@/components/arc/button-group/button-group'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { EventSheet } from '@/components/trak/EventSheet'
@@ -8,7 +9,7 @@ import type { StripEvent } from '@/components/trak/WeekStrip'
 import { EventSheetCoach } from '@/components/coach/EventSheetCoach'
 import { LoggedAttendance } from '@/components/coach/LoggedAttendance'
 import { toPlayerEvent } from '@/lib/player-events'
-import { BackButton } from '@/pages/coach/library/parts'
+import { setCreateDay } from '@/lib/create-day'
 import { isMapsUrl, joinVenue, splitVenue, venueParts } from '@/lib/venue-link'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
@@ -164,6 +165,7 @@ export default function CoachSchedule() {
   const [viewYear,  setViewYear]  = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [selected,  setSelected]  = useState<string>(toDateStr(today))
+  useEffect(() => { setCreateDay(selected); return () => setCreateDay(null) }, [selected])
 
   // Data
   const [calEvents, setCalEvents] = useState<EventRow[]>([])
@@ -296,8 +298,6 @@ export default function CoachSchedule() {
     return days
   }, [allEvents, registerSession, noted])
 
-  const openNew = (date: string) =>
-    setSheet({ kind: 'edit', row: null, form: { ...blankForm(date), squad: coachSquad.squad }, repeat: blankRepeat(date), scope: 'one', step: 0, error: null })
   // TRAK-182 (live run 3): an edit opens on the first step, filled in, not on Review.
   const openEdit = (row: EventRow, step = 0) =>
     setSheet({ kind: 'edit', row, form: rowToForm(row), repeat: blankRepeat(''), scope: 'one', step, error: null })
@@ -556,11 +556,10 @@ export default function CoachSchedule() {
           <div className="flex items-center gap-2">
             {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
             <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
-            {/* TRAK-272: a phone has no Schedule tab, so a Back (where the coach came from, else Home). A laptop has the sidebar. */}
-            <div className="laptop:hidden"><BackButton fallback="/coach/home" label={t('common:back')} /></div>
+            {/* TRAK-424: no Back beside the avatar, as on every other main page; Schedule opens from Home's calendar icon. */}
             <h1 className="text-[22px] font-light text-ink tracking-tight"
               style={{ ...font, letterSpacing: '-0.02em' }}>
-              {t('nav:schedule')}
+              {t('nav:events')}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -572,13 +571,7 @@ export default function CoachSchedule() {
               aria-label={t('coachSchedule:importFixtures')}>
               <FileUp size={15} color="rgb(var(--t-ink))" />
             </button>}
-            {/* TRAK-270 (Tarek, 23 Oct): the one add button. It opens New event on the chosen day. */}
-            <button
-              onClick={() => openNew(selected)}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-brand"
-              aria-label={t('coachSchedule:addEvent')}>
-              <Plus size={16} color="rgb(var(--t-on-brand))" strokeWidth={2.5} />
-            </button>
+            {/* TRAK-424: no "+" of its own; the frame's "+" adds an event, on the day picked here (create-day.ts). */}
           </div>
         </div>
 
@@ -634,9 +627,10 @@ export default function CoachSchedule() {
 
           {!loaded && !loadFailed ? <LoadingSkeleton label={t('coachSchedule:scheduleLoading')} lines={2} rows={2} />
           : selectedEvents.length === 0 ? (
-            <div className="rounded-[14px] border border-line px-4 py-5 text-center"
-              style={{ background: 'rgb(var(--t-surface))' }}>
-              <p className="text-[12px] text-ink-3">{t('coachSchedule:nothingPlannedTap')}</p>
+            // TRAK-432: Arc's empty state; the frame's "+" is the button, named as this screen shows it.
+            <div className="arc">
+              <EmptyState icon={<CalendarDays size={24} strokeWidth={1.5} />} title={t('coachSchedule:nothingPlanned')}
+                description={t(wide ? 'coachSchedule:addWithCreate' : 'coachSchedule:addWithPlus')} />
             </div>
           ) : (
             <div className="space-y-2">

@@ -73,7 +73,7 @@ export function AddToTraining({ drill, players, level }: { drill: LibraryDrill; 
         {coming.error ? <LoadError what="your trainings" onRetry={coming.retry} retrying={coming.retrying} />
           : coming.pending ? <LoadingSkeleton label="Loading your trainings…" rows={2} />
           : !coming.rows.length ? <p className="rounded-xl bg-raised px-4 py-3 text-[15px] text-ink-2">
-            No trainings coming up. Add one in Schedule, then add this drill to it.</p>
+            No trainings coming up. Add one in Events, then add this drill to it.</p>
           : <ul aria-label="Trainings coming up" className="grid divide-y divide-line rounded-xl border border-line">
             {coming.rows.map(({ training, status, holds }) => {
               const { day, time } = gameWhen(training)

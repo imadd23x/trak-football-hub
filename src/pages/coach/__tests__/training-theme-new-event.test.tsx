@@ -10,6 +10,7 @@ import { localTodayISO, toInstant } from '@/lib/event-time'
 import { pickTime } from '../../../../tests/support/arc-pickers'
 import { eventStep, saveEventWith } from '../../../../tests/support/event-steps'
 import { atMorningToday } from '../../../../tests/support/clock'
+import { openNewEvent } from '../../../../tests/support/schedule-actions'
 
 /**
  * [scope] Training theme on New event: setting up a training, the coach picks
@@ -56,7 +57,7 @@ afterEach(() => { server.events.removeAllListeners(); vi.useRealTimers() })
 
 async function newEvent() {
   renderApp('/coach/schedule')
-  await userEvent.click(await screen.findByRole('button', { name: 'Add event' }))
+  await openNewEvent()
   return screen.getByRole('dialog', { name: 'New event' })
 }
 

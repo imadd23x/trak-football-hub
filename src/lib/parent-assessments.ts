@@ -46,6 +46,18 @@ export async function fetchParentAssessmentPage(childId: string, page: number, s
   return { assessments, hasMore: (data?.length ?? 0) > PAGE_SIZE }
 }
 
+/** TRAK-439: which of these sessions the coach has actually assessed this child at. Only those get a link in the history; a
+ *  training with no assessment (every one, where the coach evaluates on the season plan's cadence) opens nothing empty. */
+export async function fetchAssessedSessionIds(childId: string, sessionIds: string[], signal: AbortSignal): Promise<Set<string>> {
+  if (!sessionIds.length) return new Set()
+  const ids = await childSquadIds(childId, signal)
+  if (!ids.length) return new Set()
+  const { data, error } = await supabase.from('coach_assessments').select('session_id')
+    .in('squad_player_id', ids).in('session_id', sessionIds).abortSignal(signal).retry(false)
+  if (error) throw error
+  return new Set((data ?? []).map(row => row.session_id).filter((id): id is string => !!id))
+}
+
 /** An exact record, scoped to every roster row belonging to the selected child. */
 export async function fetchParentAssessment(childId: string, target: AssessmentTarget, signal: AbortSignal): Promise<{
   assessment: ParentAssessment | null

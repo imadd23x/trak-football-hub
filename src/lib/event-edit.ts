@@ -45,28 +45,34 @@ export const NOTE_STEP = 2
 
 /** TRAK-127: a past date on New event, or moved to on an edit. TRAK-288: where Games is on, a new match that has
  *  been played is saved to be evaluated instead (Imad, 28 Oct), so its date isn't a problem. */
-export function pastProblem(form: EventForm, editing: EventRow | null, games = false) {
-  if (playedMatch(form, editing, games)) return null
+export function pastProblem(form: EventForm, editing: EventRow | null, games = false, training = false) {
+  if (playedMatch(form, editing, games) || playedTraining(form, editing, training)) return null
   return pastDateProblem(form.date, localTodayISO(), editing ? rowToForm(editing).date : null)
 }
 export const playedMatch = (form: EventForm, editing: EventRow | null, games: boolean) =>
   games && !editing && form.kind === 'match' && pastDateProblem(form.date, localTodayISO()) !== null
+/** TRAK-426 (Kostas, 12 Nov): where Training is on, a training already held is a New event Training too, saved,
+ *  published and opened on its register (Who's here), as a played match opens on its evaluation. */
+export const playedTraining = (form: EventForm, editing: EventRow | null, training: boolean) =>
+  training && !editing && form.kind === 'training' && pastDateProblem(form.date, localTodayISO()) !== null
 
 /** TRAK-288: where Games is on, New event asks a match's competition, so publishing its evaluation can read it. */
 export const competitionProblem = (form: EventForm, editing: EventRow | null, games: boolean) =>
   games && !editing && form.kind === 'match' && !form.competition ? i18n.t('coachSchedule:problemCompetition') : null
 
 /** What stops Next on a step: only what that step can fix. */
-export function stepProblem(step: number, form: EventForm, repeat: Repeat, editing: EventRow | null, games: boolean) {
+export function stepProblem(step: number, form: EventForm, repeat: Repeat, editing: EventRow | null, games: boolean, training = false) {
   if (step === 0) return whatProblem(form) ?? competitionProblem(form, editing, games)
-  if (step === 1) return formProblem(form) ?? pastProblem(form, editing, games) ?? (editing ? null : repeatProblem(form, repeat))
+  if (step === 1) return formProblem(form) ?? pastProblem(form, editing, games, training)
+    ?? (editing || playedTraining(form, editing, training) ? null : repeatProblem(form, repeat))
   return null
 }
 
 /** How many events Review's save makes: a new weekly series is several. */
 export function seriesCount(sheet: { row: EventRow | null; form: EventForm; repeat: Repeat }) {
   const { row, form, repeat } = sheet
-  return !row && repeat.on && form.kind !== 'match' && !repeatProblem(form, repeat)
+  // A training already held (TRAK-426) is one event: Review's save never repeats it.
+  return !row && repeat.on && form.kind !== 'match' && pastDateProblem(form.date, localTodayISO()) === null && !repeatProblem(form, repeat)
     ? seriesDates(form.date, repeat.until, repeat.days).length : 1
 }
 

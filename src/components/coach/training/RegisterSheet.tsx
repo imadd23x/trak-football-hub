@@ -1,3 +1,4 @@
+import { useTranslation } from '@/lib/i18n'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
 import { TakeRegister } from '@/components/coach/TakeRegister'
@@ -13,10 +14,11 @@ export function RegisterSheet({ training, sheet, sessionId, onClose }: {
   training: Training; sheet: 'register' | 'log' | null; sessionId: string | null; onClose: () => void
 }) {
   const { user } = useAuth()
+  const { t } = useTranslation()
   const client = useQueryClient()
   if (!user) return null
   return <BottomSheet className="arc" open={!!sheet} onOpenChange={open => { if (!open) onClose() }} detents={[0.62, 0.92]}
-    title={sheet === 'log' ? 'The log' : 'Who’s here'} description={[gameWhen(training).day, training.title].join(' · ')}>
+    title={sheet === 'log' ? t('coachTraining:theLog') : t('coachTraining:loopHere')} description={[gameWhen(training).day, training.title].join(' · ')}>
     <div className="pb-4">
       {sheet === 'register' && <TakeRegister eventId={training.id} coachId={user.id} sessionId={sessionId} squad={training.squad ?? null}
         onSaved={() => {

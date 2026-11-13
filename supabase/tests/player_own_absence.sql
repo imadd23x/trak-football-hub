@@ -36,7 +36,7 @@ BEGIN
   INSERT INTO pg_temp.oa_results VALUES(label, st = '42501' AND msg ILIKE '%'||words||'%', coalesce(st||': '||msg,'unexpectedly succeeded'));
 END $$;
 CREATE FUNCTION pg_temp.oa_report(event integer, child integer) RETURNS text LANGUAGE sql AS $$
-  SELECT format('SELECT public.report_cant_make_it(%L, %L, %L)', pg_temp.oa(event), pg_temp.oa(child), 'Exams')
+  SELECT format('SELECT public.report_cant_make_it(%L, %L, %L)', pg_temp.oa(event), pg_temp.oa(child), 'school')
 $$;
 CREATE FUNCTION pg_temp.oa_undo(event integer, child integer) RETURNS text LANGUAGE sql AS $$
   SELECT format('SELECT public.undo_cant_make_it(%L, %L)', pg_temp.oa(event), pg_temp.oa(child))
@@ -128,7 +128,7 @@ SELECT pg_temp.oa_check(pg_temp.oa_seen() = 'none', '3 a 14-year-old reads no ab
 SELECT pg_temp.oa_as(3);
 SELECT pg_temp.oa_check(pg_temp.oa_seen() = '800:10,800:11', '3 the coach sees the player''s own report and the guardian''s', pg_temp.oa_seen());
 RESET ROLE;
-SELECT pg_temp.oa_check((SELECT reported_by = pg_temp.oa(10) AND reason = 'Exams' FROM public.event_absences
+SELECT pg_temp.oa_check((SELECT reported_by = pg_temp.oa(10) AND reason = 'school' FROM public.event_absences
   WHERE event_id = pg_temp.oa(800) AND squad_player_id = pg_temp.oa(30)), '3 readback: the player is recorded as the reporter');
 
 DO $$ DECLARE failures text; n integer; BEGIN

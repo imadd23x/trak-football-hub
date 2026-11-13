@@ -66,7 +66,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     expect(within(tabs).getByRole('tab', { name: 'Home' })).toHaveAttribute('aria-selected', 'true')
     const nav = tabs.closest('nav')!
     expect(within(nav).getByRole('button', { name: 'Quick add' })).toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: /Feedback|Profile|Calendar|Schedule/ })).toBeNull()
+    expect(screen.queryByRole('tab', { name: /Feedback|Profile|Calendar|Events/ })).toBeNull()
 
     await userEvent.click(within(tabs).getByRole('tab', { name: 'Library' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/trainings'))
@@ -76,14 +76,14 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     screenIs(false)
     renderApp('/coach/home')
     const header = (await screen.findByRole('button', { name: 'Open menu' })).closest('header')!
-    expect(within(header).getByRole('link', { name: 'Schedule' })).toHaveAttribute('href', '/coach/schedule') // TRAK-255
+    expect(within(header).getByRole('link', { name: 'Events' })).toHaveAttribute('href', '/coach/schedule') // TRAK-255; TRAK-449: Events
     expect(within(header).getByRole('button', { name: /^Alerts/ })).toBeInTheDocument()
 
     await userEvent.click(within(header).getByRole('button', { name: 'Open menu' }))
     const menu = await screen.findByRole('dialog', { name: 'Menu' })
     expect(await within(menu).findByText('Rehearsal FC')).toBeInTheDocument()
     // TRAK-376: the menu also holds the squad picker ("Squad: All squads…"), so each row is matched whole.
-    for (const row of ['Home', 'Schedule', 'Squad', 'Library', 'Settings']) {
+    for (const row of ['Home', 'Events', 'Squad', 'Library', 'Settings']) {
       expect(within(menu).getByRole('button', { name: new RegExp(`^${row}(,|$)`) })).toBeInTheDocument()
     }
     expect(within(menu).queryByRole('button', { name: 'U16' })).toBeNull()
@@ -114,7 +114,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     expect(screen.queryByRole('button', { name: /^Squad: / })).toBeNull()
   })
 
-  it('TRAK-376: on a phone Squad, Matches and Schedule have the avatar that opens the menu too', async () => {
+  it('TRAK-376: on a phone Squad, Matches and Events have the avatar that opens the menu too', async () => {
     screenIs(false)
     server.use(rpc('feature_on', ({ p_feature }) => p_feature === 'events' || p_feature === 'games'))
     for (const path of ['/coach/squad', '/coach/matches', '/coach/schedule']) {
@@ -129,7 +129,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     screenIs(true)
     renderApp('/coach/home')
     const sidebar = await screen.findByRole('navigation', { name: 'Rehearsal FC' })
-    for (const row of ['Home', 'Schedule', 'Squad', 'Library', 'Settings']) {
+    for (const row of ['Home', 'Events', 'Squad', 'Library', 'Settings']) {
       expect(within(sidebar).getByRole('button', { name: new RegExp(`^${row}`) })).toBeInTheDocument()
     }
     expect(within(sidebar).queryByRole('button', { name: /Feedback|Profile/ })).toBeNull()
@@ -184,10 +184,11 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     expect(window.location.pathname).toBe('/coach/feedback')
   })
 
+  // TRAK-425 (Imad, 11 Nov): Assess joined them. Its own Back and Next bar is the one bar at the bottom of a phone.
   it('keeps the phone bar off pages that had none: their own actions sit at the bottom', async () => {
-    for (const path of ['/settings', '/coach/how-trak-works', '/coach/squad/player/sp-1', '/coach/sessions/add', '/coach/sessions/quick', '/coach/sessions/abc'])
+    for (const path of ['/settings', '/coach/how-trak-works', '/coach/squad/player/sp-1', '/coach/sessions/add', '/coach/sessions/quick', '/coach/sessions/abc', '/coach/assess'])
       expect(BARLESS.test(path)).toBe(true)
-    for (const path of ['/coach/home', '/coach/sessions', '/coach/sessions/list', '/coach/assess', '/coach/squad', '/coach/trainings'])
+    for (const path of ['/coach/home', '/coach/sessions', '/coach/sessions/list', '/coach/squad', '/coach/trainings'])
       expect(BARLESS.test(path)).toBe(false)
     screenIs(false)
     renderApp('/settings')
@@ -230,7 +231,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     const sidebar = await screen.findByRole('navigation', { name: 'Rehearsal FC' })
     const games = await within(sidebar).findByRole('button', { name: /^Matches/ })
     const order = within(sidebar).getAllByRole('button').map(button => button.textContent ?? '')
-    const rows = ['Home', 'Schedule', 'Squad', 'Matches', 'Library'].map(row => order.findIndex(text => text.startsWith(row)))
+    const rows = ['Home', 'Events', 'Squad', 'Matches', 'Library'].map(row => order.findIndex(text => text.startsWith(row)))
     expect(rows.every(index => index >= 0)).toBe(true)
     expect(rows).toEqual([...rows].sort((a, b) => a - b))
     await userEvent.click(games)
@@ -279,7 +280,7 @@ describe('TRAK-259: the coach\'s frame', { timeout: 20_000 }, () => {
     expect(placeOf('/coach/trainings/defending')).toEqual({ screen: 'library', title: 'Library' })
     expect(placeOf('/coach/squad/player/abc')).toEqual({ screen: 'squad', title: 'Player' }) // TRAK-368: the only player page
     expect(placeOf('/coach/sessions/list')).toEqual({ screen: 'home', title: 'Log' })
-    expect(placeOf('/coach/schedule')).toEqual({ screen: 'calendar', title: 'Schedule' }) // TRAK-255
+    expect(placeOf('/coach/schedule')).toEqual({ screen: 'calendar', title: 'Events' }) // TRAK-255; TRAK-449
     expect(placeOf('/coach/homework')).toEqual({ screen: null, title: 'Trak' })
   })
 })

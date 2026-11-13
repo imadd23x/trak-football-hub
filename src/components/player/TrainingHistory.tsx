@@ -20,10 +20,16 @@ type State =
 const ATTENDANCE: Record<string, string> = { present: 'Present', late: 'Late', absent: 'Absent' }
 
 export function TrainingHistory({
-  playerUserId, reloadOn, assessmentHref,
+  playerUserId, reloadOn, assessmentHref, assessedSessions,
   waitingText = 'Your training history appears once your parent approves.',
-}: { playerUserId: string; reloadOn?: unknown; waitingText?: string; assessmentHref?: (sessionId: string) => string }) {
+}: {
+  playerUserId: string; reloadOn?: unknown; waitingText?: string; assessmentHref?: (sessionId: string) => string
+  /** TRAK-439: with assessmentHref, only the sessions this returns get a link. A row with none is plain text, as the player's
+   *  is, and so is every row while it loads or if it fails: never a link to an empty page. */
+  assessedSessions?: (sessionIds: string[], signal: AbortSignal) => Promise<Set<string>>
+}) {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  const [assessed, setAssessed] = useState<Set<string>>(new Set())
   const [retrying, setRetrying] = useState(false)
   // Only the newest request may write: a slow earlier one must not replace it.
   const latest = useRef(0)
@@ -38,7 +44,15 @@ export function TrainingHistory({
       setState(error.message === 'consent_required' ? { kind: 'awaiting_consent' } : { kind: 'failed' })
       return
     }
-    setState({ kind: 'ready', rows: (data as Row[] | null) ?? [] })
+    const rows = (data as Row[] | null) ?? []
+    setState({ kind: 'ready', rows })
+    setAssessed(new Set())
+    if (assessmentHref && assessedSessions && rows.length) {
+      try {
+        const found = await assessedSessions(rows.map(row => row.session_id), new AbortController().signal)
+        if (request === latest.current) setAssessed(found)
+      } catch { /* the rows stay plain text; the assessment is still on Home and All assessments */ }
+    }
   }
 
   // A new account starts from loading; a same-account refresh re-reads in the
@@ -69,7 +83,7 @@ export function TrainingHistory({
             <li key={row.session_id}
               className="rounded-[12px] border border-line"
               style={{ background: 'rgb(var(--t-surface))' }}>
-              {assessmentHref ? <Link to={assessmentHref(row.session_id)} className="flex items-center justify-between gap-3 min-h-11 px-4 py-3 rounded-[12px] focus-visible:ring-2 focus-visible:ring-primary">
+              {assessmentHref && (!assessedSessions || assessed.has(row.session_id)) ? <Link to={assessmentHref(row.session_id)} className="flex items-center justify-between gap-3 min-h-11 px-4 py-3 rounded-[12px] focus-visible:ring-2 focus-visible:ring-primary">
                 <TrainingRow row={row} />
               </Link> : <div className="flex items-center justify-between px-4 py-3"><TrainingRow row={row} /></div>}
             </li>

@@ -1,3 +1,5 @@
+import { useTranslation } from '@/lib/i18n'
+import { partName, partNote } from '@/lib/training/words'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight, Pencil, Plus, X } from 'lucide-react'
@@ -39,7 +41,6 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    there's no Save as draft: every change saves the draft by itself, so leaving never asks. */
 
 const TRAINING_PATH = '/coach/training'
-const SAVE_FAILED = 'Couldn’t save. Check your connection and try again. Nothing you changed is lost.'
 const REVIEW = 'review'
 
 type Start = { parts: Part[]; note: string; at: string; fromShape: boolean; copiedFrom: string | null; dirty: boolean
@@ -102,13 +103,14 @@ function startFrom({ state, saved, draft, past, players, usage }: {
 /** Reads what the planner needs before it starts: drafts, the coach's past plans, and how many players the training's
  *  squad has (TRAK-392: the drills are fitted to it; unknown, they're fitted to 15). */
 export function Planner({ training, saved }: { training: Training; saved: Plan | null }) {
+  const { t } = useTranslation()
   const drafts = useDrafts()
   const past = usePastSessions()
   const size = useSquadSize(training.squad)
   const reads = [drafts, past]
-  if (reads.some(r => r.error)) return <div className="pt-10"><LoadError what="your plans"
+  if (reads.some(r => r.error)) return <div className="pt-10"><LoadError what={t('coachTraining:yourPlansWhat')}
     onRetry={() => reads.forEach(r => void r.refetch())} retrying={reads.some(r => r.isFetching)} /></div>
-  if (reads.some(r => r.isPending) || size.isPending) return <LoadingSkeleton label="Loading your plans and drills…" rows={2} className="pt-6" />
+  if (reads.some(r => r.isPending) || size.isPending) return <LoadingSkeleton label={t('coachTraining:loadingPlans')} rows={2} className="pt-6" />
   const pastPlans: PastPlan[] = (past.data ?? []).filter(s => s.id !== training.id).map(s => ({ day: gameWhen(s).day, practices: s.practices }))
   return <PlannerBody training={training} saved={saved} draft={drafts.data!.get(training.id)} past={pastPlans} players={squadPlayers(size.data)} />
 }
@@ -117,6 +119,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
   training: Training; saved: Plan | null; draft: Draft | undefined; past: PastPlan[]; players: number
 }) {
   const { parked, comingSoon } = useParked()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const usage = useMemo(() => usageOf(past), [past])
@@ -149,12 +152,12 @@ function PlannerBody({ training, saved, draft, past, players }: {
     const next = parts.filter((_, i) => i !== index)
     setParts(next)
     if (gone.key === at) setAt(next[Math.min(index, next.length - 1)]?.key ?? REVIEW)
-    toast(`${gone.name} removed.`, { action: { label: 'Undo', onClick: () => {
+    toast(t('coachTraining:removed', { name: partName(gone.name) }), { action: { label: t('coachTraining:undo'), onClick: () => {
       setPartsRaw(list => list.some(p => p.key === gone.key) ? list : [...list.slice(0, index), gone, ...list.slice(index)])
     } } })
   }
   const add = (type: PartType, name: string) => {
-    if (parts.length >= PARTS_MAX) { setSheet(null); return setProblem(`A plan holds at most ${PARTS_MAX} parts.`) }
+    if (parts.length >= PARTS_MAX) { setSheet(null); return setProblem(t('coachTraining:planMax', { max: PARTS_MAX })) }
     const part: Part = { key: newKey(), type, name, minutes: partInfo(type).mins, drill: usualFor(type, candidates(type, players), usage) }
     setParts([...parts, part])
     setSheet(null)
@@ -178,7 +181,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
   const keepDraft = useRef(() => {})
   keepDraft.current = () => {
     if (!autosave || done.current) return
-    saveDraft.mutate(latest.current, { onSuccess: () => setDrafted(true), onError: () => setProblem(SAVE_FAILED) })
+    saveDraft.mutate(latest.current, { onSuccess: () => setDrafted(true), onError: () => setProblem(t('coachTraining:planSaveFailed')) })
   }
   const pending = useRef(false)
   useEffect(() => {
@@ -198,61 +201,61 @@ function PlannerBody({ training, saved, draft, past, players }: {
     done.current = true
     savePlan.mutate({ parts, note }, {
       onSuccess: () => {
-        toast.success('Plan saved')
+        toast.success(t('coachTraining:planSaved'))
         // From a saved plan's Review page, back to it; otherwise Training, which offers the next one to plan.
         if (start.only) navigate(reviewPage, { replace: true })
         else navigate(TRAINING_PATH, { replace: true, state: { savedPlan: training.id } })
       },
-      onError: error => { done.current = false; setProblem('code' in error && error.code === 'P0001' ? `${error.message}.` : SAVE_FAILED) },
+      onError: error => { done.current = false; setProblem('code' in error && error.code === 'P0001' ? `${error.message}.` : t('coachTraining:planSaveFailed')) },
     })
   }
   const leave = () => navigate(TRAINING_PATH)
   const reviewPage = `${TRAINING_PATH}/${training.id}`
 
-  const steps = [...parts.map(p => ({ id: p.key, label: p.name })), { id: REVIEW, label: 'Review' }]
+  const steps = [...parts.map(p => ({ id: p.key, label: partName(p.name) })), { id: REVIEW, label: t('coachSchedule:stepReview') }]
 
   return <div className="grid gap-5 pt-5">
     <header className="arc grid gap-2">
       {/* TRAK-367: the trail says which training; its name can be long, so by its day. */}
-      <CoachTrail current={`Plan session · ${day}`} />
+      <CoachTrail current={t('coachTraining:planSessionDay', { day })} />
       <h1 className="text-[24px] font-medium tracking-[-0.01em] text-ink break-words">{start.only && part
-        ? `${start.only === 'add' ? 'Add' : 'Edit'}: ${part.name}` : `Plan session: ${training.title}`}</h1>
+        ? t(start.only === 'add' ? 'coachTraining:addNamed' : 'coachTraining:editNamed', { part: partName(part.name) }) : t('coachTraining:planSessionTitle', { title: training.title })}</h1>
       {/* TRAK-404 (Kostas, 10 Nov): no logistics here. Opened for one part, the training's name says which plan. */}
       {start.only && <p className="text-sm text-ink-2">{training.title}</p>}
-      {start.only && <p className="text-sm text-ink-3">{start.only === 'add' ? 'Pick a drill, then add it to the plan.'
-        : 'Only this part changes. The rest of the plan stays as it is.'}</p>}
+      {start.only && <p className="text-sm text-ink-3">{start.only === 'add' ? t('coachTraining:pickThenAdd')
+        : t('coachTraining:onlyThisPart')}</p>}
     </header>
     {start.added && <p role="status" className={`rounded-xl px-4 py-3 text-sm ${start.added.how === 'full' ? 'bg-warning/15 text-ink' : 'bg-raised text-ink-2'}`}>
-      {start.added.how === 'added' ? `${start.added.name} is added at the end. Check the plan, then save it.`
-        : start.added.how === 'there' ? `${start.added.name} is already in this plan, in ${start.added.part}. It’s now set as you left it on its page.`
-        : `${start.added.name} isn’t added: a plan holds at most ${PARTS_MAX} parts. Remove one, then add it from the drill’s page.`}</p>}
+      {start.added.how === 'added' ? t('coachTraining:addedAtEnd', { name: start.added.name })
+        : start.added.how === 'there' ? t('coachTraining:alreadyIn', { name: start.added.name, part: start.added.part ? partName(start.added.part) : '' })
+        : t('coachTraining:notAddedFull', { name: start.added.name, max: PARTS_MAX })}</p>}
     {start.copiedFrom && <p role="status" className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
-      Copied from {start.copiedFrom}. Check it, change any part, then save it.</p>}
-    {!start.only && <div className="arc"><Stepper label="Planning steps" steps={steps} current={step} onStepSelect={go} jumpAhead /></div>}
+      {t('coachTraining:copiedFrom', { from: start.copiedFrom })}</p>}
+    {!start.only && <div className="arc"><Stepper label={t('coachTraining:planningSteps')} steps={steps} current={step} onStepSelect={go} jumpAhead /></div>}
     {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
 
     <div className="grid gap-5 laptop:grid-cols-[minmax(0,1fr)_360px] laptop:items-start">
-      {part ? <section aria-label={part.name} className="arc grid min-w-0 gap-5 rounded-2xl border border-line bg-surface p-5">
+      {part ? <section aria-label={partName(part.name)} className="arc grid min-w-0 gap-5 rounded-2xl border border-line bg-surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="grid min-w-0 gap-1">
-            <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">Part {step + 1} of {parts.length} · {partInfo(part.type).note}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">{t('coachTraining:partOf', { n: step + 1, total: parts.length, note: partNote(part.type) })}</p>
             {renaming !== null ? <form className="flex flex-wrap items-end gap-2" onSubmit={e => {
               e.preventDefault()
               if (renaming.trim()) update(part.key, { name: renaming.trim().slice(0, PART_NAME_MAX) })
               setRenaming(null)
             }}>
-              <div className="w-[260px]"><Input label="New name for this part" value={renaming} maxLength={PART_NAME_MAX} autoFocus
+              <div className="w-[260px]"><Input label={t('coachTraining:newPartName')} value={renaming} maxLength={PART_NAME_MAX} autoFocus
                 onChange={e => setRenaming(e.target.value)} /></div>
-              <Button size="sm" type="submit">Save name</Button>
-              <Button size="sm" variant="secondary" type="button" onClick={() => setRenaming(null)}>Cancel</Button>
+              <Button size="sm" type="submit">{t('coachTraining:saveName')}</Button>
+              <Button size="sm" variant="secondary" type="button" onClick={() => setRenaming(null)}>{t('coachSchedule:cancel')}</Button>
             </form> : <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-[22px] font-medium text-ink break-words">{part.name}</h2>
-              <Button size="sm" variant="ghost" onClick={() => setRenaming(part.name)}><Pencil aria-hidden size={14} />Rename</Button>
+              <h2 className="text-[22px] font-medium text-ink break-words">{partName(part.name)}</h2>
+              <Button size="sm" variant="ghost" onClick={() => setRenaming(partName(part.name))}><Pencil aria-hidden size={14} />{t('coachTraining:rename')}</Button>
             </div>}
           </div>
           {/* As the mockup: "How long?" on the same line as its minutes. */}
           <div className="flex flex-wrap items-center gap-2">
-            <p id="how-long" className="text-sm font-medium text-ink-2">How long?</p>
+            <p id="how-long" className="text-sm font-medium text-ink-2">{t('coachTraining:howLong')}</p>
             <div role="group" aria-labelledby="how-long" className="flex flex-wrap gap-1.5">
               {minuteOptions(part.type, part.minutes).map(m => <button key={m} type="button" aria-pressed={part.minutes === m}
                 onClick={() => update(part.key, { minutes: m })}
@@ -261,38 +264,38 @@ function PlannerBody({ training, saved, draft, past, players }: {
           </div>
         </div>
         <div className="grid gap-3">
-          <ul aria-label={`Drills for ${part.name}`} className="grid gap-3 tablet:grid-cols-2 laptop:grid-cols-4">
+          <ul aria-label={t('coachTraining:drillsFor', { part: partName(part.name) })} className="grid gap-3 tablet:grid-cols-2 laptop:grid-cols-4">
             {shownFor(part.type, part.drill, all, usage).map(d => {
               const lib = libraryOf(d)
               // The tiles in a row share one height, so their View drill links line up.
               return <li key={`${d.source}:${d.trak_drill ?? d.drill_id ?? d.name}`} className="grid grid-rows-[1fr_auto] gap-1">
                 <DrillTile drill={d} picked={isSameDrill(d, part.drill)} tag={tagFor(d, part.type, all, usage, bookmarks)} onPick={() => pick(d)} />
-                {lib && <button type="button" aria-label={`View drill: ${lib.name}`} onClick={() => setViewing(lib)}
-                  className="justify-self-start rounded px-1 py-1 text-sm font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">View drill</button>}
+                {lib && <button type="button" aria-label={t('coachTraining:viewDrillNamed', { name: lib.name })} onClick={() => setViewing(lib)}
+                  className="justify-self-start rounded px-1 py-1 text-sm font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{t('coachTraining:viewDrill')}</button>}
               </li>
             })}
             {/* TRAK-404 (Kostas, 10 Nov): a fourth choice, any drill from the Drill Library. */}
-            <li className="grid grid-rows-[1fr_auto] gap-1"><ActionTile icon="search" label="Find another drill" note="From the Drill Library" onClick={() => setSheet('more')} />
+            <li className="grid grid-rows-[1fr_auto] gap-1"><ActionTile icon="search" label={t('coachTraining:findAnother')} note={t('coachTraining:fromLibrary')} onClick={() => setSheet('more')} />
               {/* As tall as a View drill link, so this tile ends level with the others. */}
-              <span aria-hidden className="invisible px-1 py-1 text-sm">View drill</span></li>
+              <span aria-hidden className="invisible px-1 py-1 text-sm">{t('coachTraining:viewDrill')}</span></li>
           </ul>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
           {start.only ? <>
-            <Button variant="secondary" onClick={() => navigate(reviewPage)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => navigate(reviewPage)}>{t('coachSchedule:cancel')}</Button>
             <span className="flex-1" />
-            <Button loading={savePlan.isPending} onClick={save}>{start.only === 'add' ? 'Add to the plan' : 'Save and go back to Review'}</Button>
+            <Button loading={savePlan.isPending} onClick={save}>{start.only === 'add' ? t('coachTraining:addToPlan') : t('coachTraining:saveBackReview')}</Button>
           </> : fromReview ? <>
             <DraftNote saving={saveDraft.isPending} saved={drafted} />
             <span className="flex-1" />
-            <RemoveButton name={part.name} onRemove={() => remove(step)} />
-            <Button onClick={() => { setFromReview(false); go(parts.length) }}>Back to Review<ArrowRight aria-hidden size={16} /></Button>
+            <RemoveButton name={partName(part.name)} onRemove={() => remove(step)} />
+            <Button onClick={() => { setFromReview(false); go(parts.length) }}>{t('coachTraining:backToReview')}<ArrowRight aria-hidden size={16} /></Button>
           </> : <>
-            <Button variant="secondary" onClick={() => step === 0 ? leave() : go(step - 1)}>{step === 0 ? 'Cancel' : 'Back'}</Button>
+            <Button variant="secondary" onClick={() => step === 0 ? leave() : go(step - 1)}>{step === 0 ? t('coachSchedule:cancel') : t('common:back')}</Button>
             <DraftNote saving={saveDraft.isPending} saved={drafted} />
             <span className="flex-1" />
-            <RemoveButton name={part.name} onRemove={() => remove(step)} />
-            <Button onClick={() => go(step + 1)}>Next: {step + 1 < parts.length ? parts[step + 1].name : 'Review'}<ArrowRight aria-hidden size={16} /></Button>
+            <RemoveButton name={partName(part.name)} onRemove={() => remove(step)} />
+            <Button onClick={() => go(step + 1)}>{t('coachTraining:nextNamed', { name: step + 1 < parts.length ? partName(parts[step + 1].name) : t('coachSchedule:stepReview') })}<ArrowRight aria-hidden size={16} /></Button>
           </>}
         </div>
       </section> : <Review parts={parts} length={length} note={note} onNote={value => { setNote(value); setDirty(true) }}
@@ -301,7 +304,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
         onBack={() => parts.length ? go(parts.length - 1) : leave()} onSave={save}
         saving={savePlan.isPending} draftNote={autosave ? <DraftNote saving={saveDraft.isPending} saved={drafted} /> : null} />}
 
-      {part && start.only ? <OnTheDay parts={parts} title="Your session" />
+      {part && start.only ? <OnTheDay parts={parts} mode="rest" />
         : part ? <SessionCard parts={parts} length={length} current={part.key} onOpen={key => setAt(key)} onReorder={setParts}
         onMove={(i, by) => setParts(moveTo(parts, i, i + by))} onRemove={remove} onAdd={() => setSheet('add')} onStandard={toStandard}
         fromShape={start.fromShape && !dirty} standard={isStandard(parts)} />
@@ -322,52 +325,57 @@ function Review({ parts, length, note, onNote, onEdit, onRemove, onReorder, onMo
   onAdd: () => void; onBack: () => void; onSave: () => void
   saving: boolean; draftNote: ReactNode
 }) {
+  const { t } = useTranslation()
   return <section aria-labelledby="review" className="arc grid min-w-0 gap-4 rounded-2xl border border-line bg-surface p-5">
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="grid gap-1">
-        <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">Last step</p>
-        <h2 id="review" className="text-[22px] font-medium text-ink">Review</h2>
+        <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">{t('coachTraining:lastStep')}</p>
+        <h2 id="review" className="text-[22px] font-medium text-ink">{t('coachSchedule:stepReview')}</h2>
       </div>
       <TotalLine parts={parts} length={length} />
     </div>
     <TimeBar parts={parts} length={length} />
     <PlanRows parts={parts} onEdit={onEdit} onRemove={onRemove} onReorder={onReorder} onMove={onMove} />
-    <div><Button size="sm" variant="secondary" onClick={onAdd}><Plus aria-hidden size={16} />Add a part</Button></div>
+    <div><Button size="sm" variant="secondary" onClick={onAdd}><Plus aria-hidden size={16} />{t('coachTraining:addAPart')}</Button></div>
     {/* Kostas, 30 Oct: one optional note at the end, not one per drill. */}
-    <Textarea label="A note for you (optional)" description="Anything to remember on the day. Only you see it." rows={2} maxLength={NOTE_MAX}
-      value={note} onChange={e => onNote(e.target.value)} placeholder="For example: remind the back four to talk to each other in the box" />
+    <Textarea label={t('coachTraining:noteForYou')} description={t('coachTraining:noteForYouDesc')} rows={2} maxLength={NOTE_MAX}
+      value={note} onChange={e => onNote(e.target.value)} placeholder={t('coachTraining:noteForYouEx')} />
     <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
-      <Button variant="secondary" onClick={onBack}>Back</Button>
+      <Button variant="secondary" onClick={onBack}>{t('common:back')}</Button>
       {draftNote}
       <span className="flex-1" />
-      <Button size="lg" loading={saving} onClick={onSave}>Save the plan</Button>
+      <Button size="lg" loading={saving} onClick={onSave}>{t('coachTraining:savePlan')}</Button>
     </div>
   </section>
 }
 
 /** How Home's Today card will show the plan (TRAK-304): every drill and its minutes. */
-function OnTheDay({ parts, title = 'On the day' }: { parts: Part[]; title?: string }) {
+function OnTheDay({ parts, mode = 'day' }: { parts: Part[]; mode?: 'day' | 'rest' }) {
+  const { t } = useTranslation()
+  const title = mode === 'day' ? t('coachTraining:onTheDay') : t('coachTraining:yourSession')
   return <aside aria-labelledby="on-the-day" className="arc grid content-start gap-3 rounded-2xl border border-line bg-surface p-5">
     <h2 id="on-the-day" className="text-lg font-medium text-ink">{title}</h2>
-    <p className="text-sm text-ink-3">{title === 'On the day' ? 'Your Today card on Home shows the plan like this. Only you see it.'
-      : 'The rest of the plan, as it is.'}</p>
+    <p className="text-sm text-ink-3">{mode === 'day' ? t('coachTraining:todayCardNote')
+      : t('coachTraining:restOfPlan')}</p>
     <div className="grid gap-1.5 rounded-xl bg-raised p-4">
-      <p className="flex justify-between text-sm"><span className="font-medium text-ink">Training plan</span><span className="text-ink-3">{totalMinutes(parts)} min</span></p>
+      <p className="flex justify-between text-sm"><span className="font-medium text-ink">{t('coachHome:trainingPlan')}</span><span className="text-ink-3">{t('coachHome:minutes', { count: totalMinutes(parts) })}</span></p>
       {parts.filter(p => p.drill).map(p => <p key={p.key} className="flex justify-between gap-3 text-sm text-ink-2">
-        <span className="truncate">{p.name === p.drill!.name ? p.name : `${p.name} · ${p.drill!.name}`}</span><span className="flex-none">{p.minutes} min</span></p>)}
+        <span className="truncate">{p.name === p.drill!.name ? p.name : `${partName(p.name)} · ${p.drill!.name}`}</span><span className="flex-none">{t('coachHome:minutes', { count: p.minutes })}</span></p>)}
     </div>
-    <p className="text-sm text-ink-3">Planned for your whole squad.</p>
+    <p className="text-sm text-ink-3">{t('coachTraining:plannedWholeSquad')}</p>
   </aside>
 }
 
 /** TRAK-404: says quietly that the draft saved itself. */
 function DraftNote({ saving, saved }: { saving: boolean; saved: boolean }) {
-  return <span role="status" className="text-sm text-ink-3">{saving ? 'Saving draft…' : saved ? 'Draft saved' : ''}</span>
+  const { t } = useTranslation()
+  return <span role="status" className="text-sm text-ink-3">{saving ? t('coachTraining:savingDraft') : saved ? t('coachSchedule:draftSaved') : ''}</span>
 }
 
 /** TRAK-404 (Kostas, 10 Nov): × alone removes a part; its name is still read out. */
 function RemoveButton({ name, onRemove }: { name: string; onRemove: () => void }) {
-  return <button type="button" aria-label={`Remove ${name}`} title={`Remove ${name}`} onClick={onRemove}
+  const { t } = useTranslation()
+  return <button type="button" aria-label={t('coachTraining:removeNamed', { name })} title={t('coachTraining:removeNamed', { name })} onClick={onRemove}
     className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-2 hover:bg-raised hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
     <X aria-hidden size={18} /></button>
 }

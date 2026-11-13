@@ -16,6 +16,7 @@ import { server } from '../../../../tests/msw/server'
 import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
 import { pickDate, pickTime } from '../../../../tests/support/arc-pickers'
 import { eventStep } from '../../../../tests/support/event-steps'
+import { openNewEvent } from '../../../../tests/support/schedule-actions'
 
 const DAY = '2026-10-14'
 const YESTERDAY = '2026-10-13'
@@ -69,7 +70,8 @@ function fixtures({ evaluated = false } = {}) {
       our_score: 1, their_score: 0, goals: [], how_they_scored: '', plan_worked: [], published_at: null }] : []),
     table('game_evaluation_players', []),
     table('game_evaluation_notes', []),
-    rpc('feature_on', () => true),
+    // TRAK-426: Training off: these checks are Games'; with Training on too, the old log retires (training-log-trak426).
+    rpc('feature_on', ({ p_feature }) => p_feature !== 'training'),
     rpc('coach_squad_player_consent_required', () => false),
   )
 }
@@ -96,7 +98,7 @@ describe('TRAK-288: with Games on, the evaluation replaces the match log', { tim
   it('New event asks a match\'s competition before it moves on, and saves it', async () => {
     fixtures()
     renderApp('/coach/schedule')
-    await userEvent.click(await screen.findByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await userEvent.click(within(sheet).getByRole('button', { name: 'Match' }))
     await userEvent.type(within(sheet).getByLabelText('Opponent'), 'Synthetic United')
@@ -116,7 +118,7 @@ describe('TRAK-288: with Games on, the evaluation replaces the match log', { tim
   it('a match already played is saved, published and opened on its evaluation, never "log it instead"', async () => {
     fixtures()
     renderApp('/coach/schedule')
-    await userEvent.click(await screen.findByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await userEvent.click(within(sheet).getByRole('button', { name: 'Match' }))
     await userEvent.type(within(sheet).getByLabelText('Opponent'), 'Synthetic United')
@@ -138,7 +140,7 @@ describe('TRAK-288: with Games on, the evaluation replaces the match log', { tim
   it('a past training still offers only its own log', async () => {
     fixtures()
     renderApp('/coach/schedule')
-    await userEvent.click(await screen.findByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await eventStep(sheet, 'When')
     await pickDate(userEvent, 'Date', YESTERDAY)

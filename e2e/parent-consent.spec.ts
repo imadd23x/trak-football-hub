@@ -75,6 +75,7 @@ async function consentFixture(page: Page, context: BrowserContext, replies: Repl
     if (url.pathname === '/rest/v1/rpc/get_roster_children_awaiting_consent' && observed.method === 'POST') return json([])
     if (url.pathname === '/rest/v1/rpc/get_my_child_logins' && observed.method === 'POST') return json([])
     if (url.pathname === '/rest/v1/rpc/get_my_approved_children_awaiting_signup' && observed.method === 'POST') return json([])
+    if (url.pathname === '/rest/v1/rpc/family_feature_on' && observed.method === 'POST') return json(false) // TRAK-441: family_look off
     if (url.pathname === '/rest/v1/rpc/get_children_awaiting_consent' && observed.method === 'POST') {
       pending.push(observed)
       expect(observed.body).toEqual({})

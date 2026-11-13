@@ -38,7 +38,7 @@ export function PublishStep({ eventId, form, listed, goals, askCompetition, askH
   const { t } = useTranslation()
   const summary = publishSummary(form, listed)
   const answered = form.planWorked.slice(0, goals).filter(answer => answer != null).length
-  const unscored = form.goals.filter(goal => !goal.scorer).length
+  const unscored = form.goals.filter(goal => !goal.scorer && !goal.own).length
   const outcome = t(form.ourScore > form.theirScore ? 'coachMatches:resultWon' : form.ourScore === form.theirScore ? 'coachMatches:resultDrew' : 'coachMatches:resultLost', { our: form.ourScore, their: form.theirScore })
   const rows: ReviewRow[] = [
     { id: 'result', label: t('coachMatches:evStepResult'), status: unscored ? 'watch' : 'good', onEdit: () => onStep(0),

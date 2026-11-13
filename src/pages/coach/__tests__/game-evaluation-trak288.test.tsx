@@ -221,7 +221,9 @@ describe('TRAK-288: the evaluation draft', { timeout: 30_000 }, () => {
     expect(within(screen.getByRole('group', { name: 'Win the second ball' })).getByRole('radio', { name: 'Worked' })).toBeChecked()
     await next('Next: Player evaluation')
     expect(screen.getByRole('button', { name: /^Theodoros Zagorakis/ })).toHaveTextContent('Did part of the job · Above')
-    expect(screen.getByRole('button', { name: /^Angelos Charisteas/ })).toHaveTextContent('Did the job · Met')
+    // TRAK-447: no job in his plan, so the card says only how he did against what was asked.
+    expect(screen.getByRole('button', { name: /^Angelos Charisteas/ })).toHaveTextContent('Met')
+    expect(screen.getByRole('button', { name: /^Angelos Charisteas/ })).not.toHaveTextContent('Did the job')
     await user.click(screen.getByRole('button', { name: /^Theodoros Zagorakis/ }))
     expect(screen.getByRole('textbox', { name: 'Note to Theodoros' })).toHaveValue('Brave all game.')
   })

@@ -9,6 +9,7 @@ import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
 import { toInstant } from '@/lib/event-time'
 import { pickTime } from '../../../../tests/support/arc-pickers'
 import { eventStep, saveEventWith } from '../../../../tests/support/event-steps'
+import { openNewEvent } from '../../../../tests/support/schedule-actions'
 
 /**
  * TRAK-255 (Tarek, 22 Oct, from his Calendar mockups). The coach's page is
@@ -71,7 +72,7 @@ async function open() {
   await screen.findByText('vs AEK Athens U16', { selector: 'p' })
 }
 
-describe('TRAK-255: the coach\'s Schedule', { timeout: 20_000 }, () => {
+describe('TRAK-255: the coach\'s Events', { timeout: 20_000 }, () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 9, 22, 9, 0, 0))
@@ -80,9 +81,9 @@ describe('TRAK-255: the coach\'s Schedule', { timeout: 20_000 }, () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('is called Schedule, and its legend names Cancelled and Needs you', async () => {
+  it('is called Events, and its legend names Cancelled and Needs you', async () => {
     await open()
-    expect(screen.getByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Events' })).toBeInTheDocument()
     const key = screen.getByRole('group', { name: 'Colour key' })
     for (const label of ['Training', 'Match', 'Other', 'Cancelled', 'Needs you']) expect(within(key).getByText(label)).toBeInTheDocument()
   })
@@ -112,7 +113,7 @@ describe('TRAK-255: the coach\'s Schedule', { timeout: 20_000 }, () => {
 
   it('the venue is a name; a map link goes in its own box, and a saved name brings its link', async () => {
     await open()
-    await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     const venue = within(sheet).getByLabelText('Venue')
     const link = within(sheet).getByLabelText('Map link (optional)')
@@ -150,7 +151,7 @@ describe('TRAK-255: the coach\'s Schedule', { timeout: 20_000 }, () => {
  * "+ Add" by the chosen day, opening the same form. Tarek kept the green "+"; it opens New event on the
  * chosen day. And "needs you" is a clear yellow (its own token), not the warning amber.
  */
-describe('TRAK-270: one add button, and needs you in yellow', { timeout: 20_000 }, () => {
+describe('TRAK-270, TRAK-424: one add button, and needs you in yellow', { timeout: 20_000 }, () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 9, 22, 9, 0, 0))
@@ -159,15 +160,15 @@ describe('TRAK-270: one add button, and needs you in yellow', { timeout: 20_000 
   })
   afterEach(() => vi.useRealTimers())
 
-  it('has one add button, the green "+" at the top, and it opens New event on the chosen day', async () => {
+  // TRAK-424: Schedule's own green "+" and the phone's Back beside the avatar are gone; the frame's "+" is the one way
+  // to add, and it still opens New event on the day picked here.
+  it('has no add button of its own and no Back, and the frame\'s "+" opens New event on the chosen day', async () => {
     await open()
-    const adds = screen.getAllByRole('button').filter(b => /^\+?\s*add(\s+event)?$/i.test((b.getAttribute('aria-label') ?? b.textContent ?? '').trim()))
-    expect(adds).toHaveLength(1)
-    expect(adds[0]).toHaveAccessibleName('Add event')
-    // The top "+" (beside the Schedule heading), not a button by the day's heading.
-    expect(adds[0].closest('div')?.parentElement?.querySelector('h1')).toHaveTextContent('Schedule')
+    expect(screen.queryByRole('button', { name: 'Add event' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Back$/ })).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'Quick add' })).toHaveLength(1)
     await userEvent.click(cell('2026-10-21'))
-    await userEvent.click(screen.getByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await eventStep(sheet, 'When')
     expect(within(sheet).getByRole('button', { name: /^Date\b/ })).toHaveTextContent(/21 Oct/)

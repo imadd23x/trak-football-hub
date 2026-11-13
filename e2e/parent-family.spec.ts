@@ -36,6 +36,7 @@ await context.route('**/*',async route=>{
  if (u.pathname === '/rest/v1/rpc/child_events') return json([]);
  // TRAK-399: Home's Season plan card reads the selected child's plan (a read, over POST); nothing shared here.
  if (u.pathname === '/rest/v1/rpc/season_plan_for_player') return json([]);
+ if (u.pathname === '/rest/v1/rpc/family_feature_on') return json(false); // TRAK-441: family_look off
  if(u.pathname==='/rest/v1/player_parent_links') return failLinks?json({message:'Synthetic network error'},503):json([{player_user_id:alex},{player_user_id:zara}]);
  if(u.pathname==='/rest/v1/profiles') {
    const filter=u.searchParams.get('user_id')||'';
@@ -111,7 +112,7 @@ await context.route('**/*',async route=>{
  await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});
  expect(errors).toEqual([]);
  expect(unexpected).toEqual([]);
- expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/get_my_approved_children_awaiting_signup', '/rest/v1/rpc/family_training_history', '/rest/v1/rpc/child_events', '/rest/v1/rpc/season_plan_for_player', '/rest/v1/rpc/guardian_consent_applies', '/auth/v1/logout'].includes(write.path))).toBe(true);
+ expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/get_my_approved_children_awaiting_signup', '/rest/v1/rpc/family_training_history', '/rest/v1/rpc/child_events', '/rest/v1/rpc/season_plan_for_player', '/rest/v1/rpc/family_feature_on', '/rest/v1/rpc/guardian_consent_applies', '/auth/v1/logout'].includes(write.path))).toBe(true);
 });
 
 // TRAK-182: Arc's sheet springs in from JavaScript, so getAnimations() doesn't
@@ -173,6 +174,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         if (url.pathname === '/rest/v1/coach_sessions' && url.searchParams.has('event_id')) return json([])
         if (url.pathname === '/rest/v1/coach_sessions') return json([{ id: 'saved-session', title: 'Logged set pieces', session_type: 'training', session_date: day, event_id: null, venue: 'Synthetic pitch' }])
         if (url.pathname === '/rest/v1/rpc/season_plan_for_player') return json([]) // TRAK-399: nothing shared
+        if (url.pathname === '/rest/v1/rpc/family_feature_on') return json(false) // TRAK-441: family_look off
         if (url.pathname === '/rest/v1/rpc/child_events') {
           const child = req.postDataJSON().p_child
           const filter = url.searchParams.get('id')
@@ -254,11 +256,11 @@ test.describe('TRAK-171 Home follow-ups', () => {
         await week.getByRole('button', { name: 'Details' }).click()
         const logged = page.getByRole('dialog', { name: 'Logged set pieces' })
         await expect(logged.getByText('Logged.')).toBeVisible()
-        // Imad, 23 Oct (TRAK-278): the sheet shows the log, read only; Edit log opens the saved record.
-        await logged.getByRole('link', { name: 'Edit log' }).click()
-        await expect(page).toHaveURL(/\/coach\/sessions\/saved-session$/)
-        await page.getByRole('navigation', { name: 'Breadcrumb trail' }).getByRole('link', { name: 'Home' }).click()
-        await expect(page).toHaveURL(/\/coach\/home$/)
+        // Imad, 23 Oct (TRAK-278): the sheet shows the log, read only. TRAK-426 (Kostas, 12 Nov): with Training and
+        // Matches both on (this test answers every switch "on"), the old log retires, so there is no Edit log.
+        await expect(logged.getByRole('link', { name: 'Edit log' })).toHaveCount(0)
+        await page.keyboard.press('Escape')
+        await expect(logged).toBeHidden()
         await week.getByRole('button', { name: /Technical training/ }).click()
         await week.getByRole('button', { name: 'Details' }).click()
         const sheet = page.getByRole('dialog', { name: 'Technical training' })
@@ -277,7 +279,7 @@ test.describe('TRAK-171 Home follow-ups', () => {
         await expect(sheet).toHaveCount(0)
         // TRAK-255: the coach's is called Schedule, and a day with a started event that has no
         // register yet also says "needs you" (by the time of day this runs).
-        await page.getByRole('link', { name: 'Schedule' }).click()
+        await page.getByRole('link', { name: 'Events' }).click()
         await expect(page.getByRole('gridcell', { name: /, 2 events(, needs you)?$/ })).toHaveAttribute('aria-selected', 'true')
         await page.screenshot({ path: testInfo.outputPath('coach-schedule-month.png'), fullPage: true })
       }

@@ -34,7 +34,7 @@ describe('the minutes', () => {
   })
 
   it('a plan longer than the training says so plainly, and never blocks it (Kostas, 28 Oct)', () => {
-    expect(overTime(75, 60)).toBe('You set this training for 60 min. The plan runs 15 min over. You can keep it, or change the training\'s time in Schedule.')
+    expect(overTime(75, 60)).toBe('You set this training for 60 min. The plan runs 15 min over. You can keep it, or change the training\'s time in Events.')
     expect(overTime(60, 60)).toBeNull()
     expect(overTime(75, null)).toBeNull()
   })

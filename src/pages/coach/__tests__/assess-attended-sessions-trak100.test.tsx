@@ -93,8 +93,8 @@ describe('TRAK-100: the session picker offers only sessions the player attended'
     await choosePlayer('player-a')
     await screen.findByRole('option', { name: /Set Pieces Training/ })
     expect(sessionNames()).toEqual([
-      `Finishing Training · 2026-10-01 · logged ${at(LATE)}`,
-      `Set Pieces Training · 2026-10-01 · logged ${at('2026-10-01T13:09:57Z')}`,
+      `Finishing Training · Thu 1 Oct · logged ${at(LATE)}`,
+      `Set Pieces Training · Thu 1 Oct · logged ${at('2026-10-01T13:09:57Z')}`,
     ])
     // The rerun's wrong pick: same title and day, nobody present.
     expect(screen.queryByRole('option', { name: new RegExp(`logged ${at(EARLY)}`) })).toBeNull()
@@ -124,8 +124,10 @@ describe('TRAK-100: the session picker offers only sessions the player attended'
     await choosePlayer('player-a')
     await screen.findByRole('option', { name: /Set Pieces Training/ })
     await userEvent.selectOptions(select('Session'), 'session-late')
+    // TRAK-425: a picked player shows once, as a card; Change brings the list back.
+    await userEvent.click(screen.getByRole('button', { name: 'Change' }))
     await userEvent.selectOptions(select('Player'), 'player-b')
-    await waitFor(() => expect(sessionNames()).toEqual([`Set Pieces Training · 2026-10-01 · logged ${at('2026-10-01T13:09:57Z')}`]))
+    await waitFor(() => expect(sessionNames()).toEqual([`Set Pieces Training · Thu 1 Oct · logged ${at('2026-10-01T13:09:57Z')}`]))
     expect(select('Session').value).toBe('')
     expect(nextButton()).toBeDisabled()
   })

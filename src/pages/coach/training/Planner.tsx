@@ -25,6 +25,7 @@ import { Input } from '@/components/arc/input/input'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Textarea } from '@/components/arc/textarea/textarea'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { INNER_TITLE } from '@/components/coach/PageTop'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): Plan session. A plan is a list of parts; the coach goes
    through them one step each, then Review, and saves the plan whole. A new plan starts from the parts the coach saved
@@ -215,7 +216,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
     <header className="arc grid gap-2">
       {/* TRAK-367: the trail says which training; its name can be long, so by its day. */}
       <CoachTrail current={`Plan session · ${day}`} />
-      <h1 className="text-[24px] font-medium tracking-[-0.01em] text-ink break-words">{start.only && part
+      <h1 className={`${INNER_TITLE} break-words`}>{start.only && part
         ? `${start.only === 'add' ? 'Add' : 'Edit'}: ${part.name}` : `Plan session: ${training.title}`}</h1>
       {/* TRAK-404 (Kostas, 10 Nov): no logistics here. Opened for one part, the training's name says which plan. */}
       {start.only && <p className="text-sm text-ink-2">{training.title}</p>}

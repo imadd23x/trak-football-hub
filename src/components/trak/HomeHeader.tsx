@@ -12,6 +12,13 @@ export function HomeHeader({ calendarTo, center, right, left }: { calendarTo: st
   // TRAK-259: a coach's phone has the avatar on the left and the calendar beside the bell.
   const coach = left !== undefined
   const { t } = useTranslation()
+  // TRAK-422: a coach's title is the one coach page title (PageTitle), beside the avatar like every coach page.
+  if (coach) return (
+    <header className="flex items-center gap-3 mb-4">
+      <div className="flex min-w-0 flex-1 items-center gap-3 self-start">{left}{center}</div>
+      <div className="flex flex-none justify-end gap-2"><CalendarLink to={calendarTo} label={t('nav:schedule')} />{right}</div>
+    </header>
+  )
   return (
     <header className={`grid ${coach ? 'grid-cols-[1fr_minmax(0,auto)_1fr]' : 'grid-cols-[44px_minmax(0,1fr)_44px]'} items-center gap-2 mb-3`}>
       <div className="flex">{coach ? left : <CalendarLink to={calendarTo} />}</div>

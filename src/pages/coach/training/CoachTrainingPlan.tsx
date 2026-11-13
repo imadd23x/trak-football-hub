@@ -21,6 +21,7 @@ import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { INNER_TITLE } from '@/components/coach/PageTop'
 
 /* TRAK-295 (Training 2/5, spec TRAK-293, mockup boards 3A and 5): a training's plan. Write my own
    (/coach/training/:eventId/plan) types practices one at a time and saves the plan whole; the plan
@@ -69,7 +70,7 @@ function Header({ training, children }: { training: Training; children: ReactNod
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="grid gap-1">
           <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">Training</p>
-          <h1 className="text-[26px] font-medium tracking-[-0.01em] text-ink">{[day, time].filter(Boolean).join(' · ')}</h1>
+          <h1 className={INNER_TITLE}>{[day, time].filter(Boolean).join(' · ')}</h1>
           <p className="text-sm text-ink-2 break-words">{[training.title, training.venue, minutes ? `${minutes} min` : null].filter(Boolean).join(' · ')}</p>
           {academy && <p className="text-sm text-ink-3">{academy}</p>}
         </div>
@@ -249,7 +250,7 @@ function PitchView({ training, plan }: { training: Training; plan: Plan | null }
     <CoachTrail current="View" parents={[{ label: day, href: `${TRAINING_PATH}/${training.id}` }]} />
     <header className="grid gap-1">
       <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">View</p>
-      <h1 className="text-[28px] font-medium leading-tight text-ink">{[day, time].filter(Boolean).join(' · ')}</h1>
+      <h1 className={INNER_TITLE}>{[day, time].filter(Boolean).join(' · ')}</h1>
       <p className="text-base text-ink-2 break-words">{[training.title, training.venue].filter(Boolean).join(' · ')}</p>
     </header>
     {practices.length === 0 ? <p className="text-[17px] text-ink-2">Nothing planned yet. <Link to={planPath(training.id)} className={linkClass}>Plan it</Link></p>

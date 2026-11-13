@@ -53,6 +53,7 @@ import {
 import { useNotedTrainings } from '@/components/coach/training/useTraining'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { currentLanguage, i18n, useLanguage } from '@/lib/i18n'
+import { PageTitle } from '@/components/coach/PageTop'
 
 /* TRAK-127 (J8.4): the coach creates, edits and cancels events. A save is a
    draft only the coach sees; Publish sends it to families (Imad, 9 Oct). Once
@@ -544,19 +545,18 @@ export default function CoachSchedule() {
 
   return (
     <MobileShell width="wide">
-      <div className="pt-3 pb-28 space-y-4">
+      <div className="pt-5 pb-28 space-y-4">
 
-        {/* Header */}
+        {/* Header. TRAK-422: the one page title, 20 px from the top like every coach page. */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
             <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
             {/* TRAK-272: a phone has no Schedule tab, so a Back (where the coach came from, else Home). A laptop has the sidebar. */}
             <div className="laptop:hidden"><BackButton fallback="/coach/home" label={t('common:back')} /></div>
-            <h1 className="text-[22px] font-light text-ink tracking-tight"
-              style={{ ...font, letterSpacing: '-0.02em' }}>
+            <PageTitle className="self-start">
               {t('nav:schedule')}
-            </h1>
+            </PageTitle>
           </div>
           <div className="flex items-center gap-2">
             {/* TRAK-162: the CSV import is parked; no coach is offered it. */}

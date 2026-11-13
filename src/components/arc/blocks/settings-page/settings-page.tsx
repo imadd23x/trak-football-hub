@@ -84,9 +84,11 @@ function SaveBar({ state, count, onDiscard, onSave, shake, barRef }: { state: "e
  * hidden behind the menu: the menu jumps to a section and marks the one in view. The save bar appears only when
  * something changed.
  */
-export function SettingsPage({ title, sections, bar }: { title: string; sections: SettingsSection[]; bar?: SaveBarProps }) {
+/** `titleId`: the page's own title (TRAK-422, a coach's page title) labels the page instead of the sidebar's. */
+export function SettingsPage({ title, sections, bar, titleId }: { title: string; sections: SettingsSection[]; bar?: SaveBarProps; titleId?: string }) {
   const { t } = useTranslation();
   const id = useId();
+  const labelId = titleId ?? `${id}-title`;
   const navGroup = useId();
   const reduce = useReducedMotion();
   const [current, setCurrent] = useState(sections[0]?.id);
@@ -114,8 +116,8 @@ export function SettingsPage({ title, sections, bar }: { title: string; sections
   // When the bar's buttons leave (saved or discarded), keep keyboard focus in the page.
   useEffect(() => {
     if (bar?.state === "edit" || bar?.state === "saving") return;
-    if (barRef.current?.contains(document.activeElement)) document.getElementById(`${id}-title`)?.focus({ preventScroll: true });
-  }, [bar?.state, id]);
+    if (barRef.current?.contains(document.activeElement)) document.getElementById(labelId)?.focus({ preventScroll: true });
+  }, [bar?.state, labelId]);
 
   function go(next: string) {
     setCurrent(next);
@@ -134,13 +136,13 @@ export function SettingsPage({ title, sections, bar }: { title: string; sections
   }
 
   return (
-    <section className={`arc ${styles.root}`} aria-labelledby={`${id}-title`}
+    <section className={`arc ${styles.root}`} aria-labelledby={labelId}
       onKeyDown={event => { if (bar?.state === "edit" && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") { event.preventDefault(); bar.onSave(); } }}>
       <div className={styles.settings}>
         <aside className={styles.sidebar}>
-          <div className={styles.sidebarHead}>
-            <h1 id={`${id}-title`} tabIndex={-1}>{title}</h1>
-          </div>
+          {!titleId && <div className={styles.sidebarHead}>
+            <h1 id={labelId} tabIndex={-1}>{title}</h1>
+          </div>}
           <LayoutGroup id={navGroup}>
             <nav aria-label={t("common:settingsSections")}>
               <ul className={styles.navList}>

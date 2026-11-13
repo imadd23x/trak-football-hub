@@ -18,7 +18,6 @@ import { CopyTargetSheet, PastPlanSheet, type PlanToCopy } from '@/components/co
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { PitchViewRoute, PlanEditorRoute, PlanRoute, WhosHereRoute } from './CoachTrainingPlan'
 import { AllDrills, ChangePractice, DrillPage, LibraryHome, MyDrills, PracticePage } from './DrillLibrary'
-import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
@@ -30,6 +29,7 @@ import { Textarea } from '@/components/arc/textarea/textarea'
 import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-294 (Training 1/5, spec TRAK-293): Training home, behind the academy's training switch. Sessions lists the
    coach's trainings from Schedule (Coming up, then Last week); Drills holds My drills, then the Library's tiles.
@@ -83,21 +83,19 @@ export default function CoachTraining() {
 }
 
 function Page({ view, children }: { view: 'sessions' | 'drills'; children: ReactNode }) {
-  const { profile } = useAuth()
   const navigate = useNavigate()
   return (
     <div className="min-h-screen bg-ground pb-28">
       <div className={WIDE_COLUMN}>
-        <header className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-6 pb-4">
-          <CoachMenuButton name={profile?.full_name || 'Coach'} />
-          {/* Kostas, 30 Oct: "training" is too repetitive, so the page has no visible title. */}
-          <h1 className="sr-only">Training</h1>
+        {/* Kostas, 30 Oct: no visible title ("training" too repetitive). TRAK-422 (Kostas, 13 Nov): every coach page has
+            the one title, Training too, with its Sessions / Drills switch beside it. */}
+        <PageTop title="Training">
           <div className="arc">
             <SegmentedControl label="Training view" value={view}
               options={[{ value: 'sessions', label: 'Sessions' }, { value: 'drills', label: 'Drills' }]}
               onValueChange={next => navigate(next === 'drills' ? `${TRAINING_PATH}/drills` : TRAINING_PATH)} />
           </div>
-        </header>
+        </PageTop>
         {children}
       </div>
     </div>
@@ -362,11 +360,8 @@ function PastTrainings() {
   return (
     <div className="min-h-screen bg-ground pb-28">
       <div className={WIDE_COLUMN}>
-        <header className="arc grid gap-3 pt-5 pb-4">
-          <CoachTrail current="Past trainings" />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Past trainings</h1>
-          <p className="text-sm text-ink-3">Look back at a session, or copy its plan into one coming up.</p>
-        </header>
+        <PageTop className="arc" menu={false} title="Past trainings" trail={<CoachTrail current="Past trainings" />}
+          below={<p className="text-sm text-ink-3">Look back at a session, or copy its plan into one coming up.</p>} />
         {past.error ? <LoadError what="your past trainings" onRetry={() => void past.refetch()} retrying={past.isFetching} />
           : past.isPending ? <LoadingSkeleton label="Loading your past trainings…" lines={2} rows={4} className="pt-6" />
           : inView.length === 0 ? <div className="arc"><EmptyState icon={<History size={24} strokeWidth={1.5} />} title="No past trainings yet"

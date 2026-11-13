@@ -307,7 +307,7 @@ export default function PlayerHome() {
         </p>}
         <div className={look ? 'grid grid-cols-[minmax(0,1fr)] gap-5 laptop:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] laptop:items-start laptop:gap-6' : ''}>
         <div className={look ? 'grid grid-cols-[minmax(0,1fr)] content-start gap-5' : ''}>
-        {user && <LoadedWeekStrip key={user.id} loadKey={user.id} absentFor={user.id} renderSheet={(event, trigger) => <EventSheet event={event} role="player" trigger={trigger}>
+        {user && <LoadedWeekStrip key={user.id} loadKey={user.id} absentFor={user.id} picker={look} renderSheet={(event, trigger) => <EventSheet event={event} role="player" trigger={trigger}>
           {reportsForSelf && <CantMakeIt event={event} child={{ id: user.id, name: 'you' }} self />}
         </EventSheet>}
           load={(from, to) => supabase.rpc('child_events', { p_child: user.id })

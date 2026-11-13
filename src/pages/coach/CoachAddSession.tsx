@@ -31,7 +31,8 @@ type SquadPlayer = {
   age: number | null
 }
 
-type Competition = 'League' | 'Cup' | 'Friendly'
+// TRAK-438: the coach's three words everywhere (no "Cup").
+type Competition = 'League' | 'Tournament' | 'Friendly'
 type Venue      = 'Home' | 'Away'
 type CardType   = 'None' | 'Yellow' | 'Red'
 
@@ -683,7 +684,7 @@ export default function CoachAddSession() {
       {/* Topbar */}
       <div className="flex items-center justify-between pt-3 pb-2 border-b border-line">
         {/* TRAK-334: the trail, in place of Back; its last crumb is the page's name. */}
-        <CoachTrail current="Full Session" />
+        <CoachTrail current="Full session" />
       </div>
 
       <div className="pt-5 pb-32 space-y-5">
@@ -758,7 +759,7 @@ export default function CoachAddSession() {
               <div>
                 <MetadataLabel text="COMPETITION" />
                 <div className="flex gap-2 mt-2 flex-wrap">
-                  {(['League', 'Cup', 'Friendly'] as const).map(c => (
+                  {(['League', 'Tournament', 'Friendly'] as const).map(c => (
                     <Chip key={c} active={competition === c} onClick={() => setCompetition(c)}>{c}</Chip>
                   ))}
                 </div>

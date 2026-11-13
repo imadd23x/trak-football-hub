@@ -12,7 +12,7 @@ export const COACH_SCREEN_PATH: Record<CoachScreen, string> = {
 }
 
 type PlaceName = 'home' | 'events' | 'player' | 'squad' | 'matches' | 'drills' | 'training' | 'library' | 'settings'
-  | 'howTrakWorks' | 'feedback' | 'assess' | 'evaluation' | 'log'
+  | 'howTrakWorks' | 'feedback' | 'assess' | 'evaluation' | 'seasonPlan' | 'log'
 
 /** Which nav row a path belongs to, and the name in the laptop's top bar (its word in nav.json, TRAK-406). */
 const PLACES: [prefix: string, screen: CoachScreen | null, title: PlaceName][] = [
@@ -31,6 +31,8 @@ const PLACES: [prefix: string, screen: CoachScreen | null, title: PlaceName][] =
   ['/coach/assess', null, 'assess'],
   // TRAK-364: the squad's evaluation opens from Home's Needs you.
   ['/coach/evaluation', 'home', 'evaluation'],
+  // TRAK-433: the season plan opens from the same place on Home, so Home stays marked on it too.
+  ['/coach/season-plan', 'home', 'seasonPlan'],
   // TRAK-186: the log's pages open from Home, so Home stays marked on them.
   ['/coach/sessions', 'home', 'log'],
 ]

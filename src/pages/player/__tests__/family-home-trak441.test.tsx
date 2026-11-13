@@ -54,7 +54,7 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     expect(within(forYou).getByText('Your game plan is in')).toBeInTheDocument()
     // The coach's Home top: the bell is on the page; the details line is not said a second time.
     expect(screen.getByRole('button', { name: /^Alerts/ })).toBeInTheDocument()
-    expect(screen.queryByText('Defender · Rehearsal FC · U16')).toBeNull()
+    expect(screen.queryByText('Rehearsal FC · U16')).toBeNull()
     // Slice 2.5b: Season so far, counts only.
     const soFar = await screen.findByRole('region', { name: 'Season so far' })
     expect(within(soFar).getByText('Matches').nextElementSibling).toHaveTextContent('2')
@@ -67,7 +67,7 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     switchOn = false
     screenIs(false)
     renderApp('/player/home')
-    expect(await screen.findByText('Defender · Rehearsal FC · U16', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByText('Rehearsal FC · U16', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: /^For you/ })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Season so far' })).toBeNull()
   })

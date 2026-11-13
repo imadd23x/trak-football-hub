@@ -7,6 +7,9 @@ import { CardSkeleton, MatchCardSkeleton, Skeleton } from '@/components/trak'
 import { toPlayerEvent, upcomingEventsFilter, type PlayerEvent } from '@/lib/player-events'
 import { PlayerHomeBell, type PublishedAssessmentAlert } from '@/components/player/PlayerAlertsBell'
 import { HomeHeader, HomeTitle } from '@/components/trak/HomeHeader'
+import { FrameActions, useFamilyLook } from '@/components/trak/FamilyFrame'
+import { ForYou } from '@/components/trak/ForYou'
+import { Avatar } from '@/components/arc/avatar/avatar'
 import { LoadedWeekStrip } from '@/components/trak/WeekStrip'
 import { EventSheet } from '@/components/trak/EventSheet'
 import { CantMakeIt } from '@/components/parent/CantMakeIt'
@@ -21,6 +24,7 @@ import { progressSummary, useEvaluationProgress } from '@/lib/evaluation-progres
 
 export default function PlayerHome() {
   const { user, profile } = useAuth()
+  const look = useFamilyLook()
   const navigate = useNavigate()
   const location = useLocation()
   const [loading, setLoading] = useState(true)
@@ -281,19 +285,28 @@ export default function PlayerHome() {
     </MobileShell>
   )
 
+  const bell = user && <PlayerHomeBell key={user.id} userId={user.id}
+    events={loadedFor.current?.userId === user.id ? upcomingEvents : []}
+    assessment={loadFailed ? null : assessmentAlert} assessmentLoadFailed={feedbackLoadFailed || loadFailed}
+    onRetry={() => setReloadKey(k => k + 1)} />
+  const name = profile?.full_name || 'Player'
+  // TRAK-441 slice 2 (Imad, 13 Nov), behind family_look: the coach's Home. A phone: avatar, name, calendar, bell. A
+  // laptop: no header, the bell in the top bar; two columns, as the coach's Home.
+  const header = look
+    ? <FrameActions fallback={<HomeHeader calendarTo="/player/calendar" left={<span className="arc flex"><Avatar name={name} size="md" /></span>}
+        center={<HomeTitle>{name}</HomeTitle>} right={bell} />}>{bell}</FrameActions>
+    : <HomeHeader calendarTo="/player/calendar" center={<HomeTitle>{name}</HomeTitle>} right={bell} />
   return (
-    <MobileShell>
+    <MobileShell width={look ? 'wide' : 'page'}>
       <div className="pt-3 pb-4">
         {/* TRAK-163: calendar, the player's name, the bell; then the next seven days. */}
-        <HomeHeader calendarTo="/player/calendar" center={<HomeTitle>{profile?.full_name || 'Player'}</HomeTitle>}
-          right={user && <PlayerHomeBell key={user.id} userId={user.id}
-            events={loadedFor.current?.userId === user.id ? upcomingEvents : []}
-            assessment={loadFailed ? null : assessmentAlert} assessmentLoadFailed={feedbackLoadFailed || loadFailed}
-            onRetry={() => setReloadKey(k => k + 1)} />} />
+        {header}
         {/* TRAK-194 (Kostas, 16 Oct): one quiet line, as parent Home has it, not a greeting and chips that look like buttons. */}
-        {details && <p className="text-xs text-muted-foreground text-center -mt-1 pb-4">
+        {!look && details && <p className="text-xs text-muted-foreground text-center -mt-1 pb-4">
           {[details.position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
         </p>}
+        <div className={look ? 'grid grid-cols-[minmax(0,1fr)] gap-5 laptop:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] laptop:items-start laptop:gap-6' : ''}>
+        <div className={look ? 'grid grid-cols-[minmax(0,1fr)] content-start gap-5' : ''}>
         {user && <LoadedWeekStrip key={user.id} loadKey={user.id} absentFor={user.id} renderSheet={(event, trigger) => <EventSheet event={event} role="player" trigger={trigger}>
           {reportsForSelf && <CantMakeIt event={event} child={{ id: user.id, name: 'you' }} self />}
         </EventSheet>}
@@ -334,8 +347,13 @@ export default function PlayerHome() {
 
         {user && <PlayerParentInviteCard playerUserId={user.id} hideWhenLinked />}
 
+        {/* TRAK-436: what's new from the coach, one card each, before the season (the coach's "Needs you"). */}
+        {look && user && <ForYou childId={user.id} as="player" />}
+
         {/* TRAK-397: the season plan the coach shared; nothing here when there is none. */}
         {user && <MySeasonCard key={user.id} />}
+        </div>
+        <div>
 
         {/* Coach assessments: the parent's swipe cards (TRAK-172, Imad 19 Oct), each opening
             that assessment; the coach's message on the latest stays below (TRAK-71). */}
@@ -358,6 +376,8 @@ export default function PlayerHome() {
           </div>
         )}
 
+        </div>
+        </div>
         {/* TRAK-194: no "Recent matches" here; the Sessions tab lists every match. */}
       </div>
       <NavBar role="player" activeTab={location.pathname} onNavigate={navigate} />

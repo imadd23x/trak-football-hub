@@ -13,6 +13,7 @@ import { useChildrenAwaitingConsent, useParentDevelopment, useParentEvents, useP
 import { averageRecordedRating, formatParentAward, formatParentDate, matchResult } from '@/lib/parent-data'
 import { CalendarHomePrompt } from '@/components/trak/AddToCalendar'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
+import { useProgressLines } from '@/lib/evaluation-progress'
 import { FamilySeasonCard } from '@/components/parent/FamilySeasonCard'
 import { ParentConsentBar } from '@/pages/parent/ParentConsent'
 
@@ -35,6 +36,8 @@ export default function ParentHome() {
   const development = developmentQuery.data
   const award = development?.awards[0]
   const details = development?.details
+  // TRAK-402: an evaluation's card says how the objectives went; a failed read leaves the card as it was.
+  const progressLines = useProgressLines(development?.assessments.slice(0, 5) ?? [], selectedChild?.id)
   const hasError = matchQuery.isError || developmentQuery.isError
   const loading = matchQuery.isPending || developmentQuery.isPending
 
@@ -93,7 +96,7 @@ export default function ParentHome() {
                 )}
                 {development && <ParentAssessmentCarousel
                   key={`${selectedChild?.id}:${development.assessments.slice(0, 5).map(row => row.id).join(',')}`}
-                  assessments={development.assessments} />}
+                  assessments={development.assessments} progressLines={progressLines} />}
 
                 {award && <section className="mt-5" aria-label="Recognition">
                   <MetadataLabel text="RECOGNITION" />

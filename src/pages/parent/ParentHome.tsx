@@ -16,6 +16,10 @@ import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCa
 import { useProgressLines } from '@/lib/evaluation-progress'
 import { FamilySeasonCard } from '@/components/parent/FamilySeasonCard'
 import { ParentConsentBar } from '@/pages/parent/ParentConsent'
+import { FrameActions, useFamilyLook } from '@/components/trak/FamilyFrame'
+import { ForYou } from '@/components/trak/ForYou'
+import { LatestEvaluation } from '@/components/player/LatestEvaluation'
+import { SeasonSoFar } from '@/components/player/SeasonSoFar'
 
 export default function ParentHome() {
   const navigate = useNavigate()
@@ -40,12 +44,35 @@ export default function ParentHome() {
   const progressLines = useProgressLines(development?.assessments.slice(0, 5) ?? [], selectedChild?.id)
   const hasError = matchQuery.isError || developmentQuery.isError
   const loading = matchQuery.isPending || developmentQuery.isPending
+  // TRAK-441 slice 2.6 (Imad, 13 Nov), behind family_look: the coach's Home, as the player's.
+  const look = useFamilyLook()
+  const latest = development?.assessments[0]
+  const bell = <ParentAlertsBell />
+  const header = <HomeHeader calendarTo="/parent/matches" center={<ParentChildSwitcher />} right={bell} />
+  const week = selectedChild && <LoadedWeekStrip key={selectedChild.id} loadKey={selectedChild.id} absentFor={selectedChild.id} picker={look}
+    renderSheet={(event, trigger) => <EventSheet event={event} role="parent" trigger={trigger}>
+      <CantMakeIt key={selectedChild.id} event={event} child={selectedChild} />
+    </EventSheet>}
+    load={(from, to) => supabase.rpc('child_events', { p_child: selectedChild.id })
+      .gte('event_date', from).lte('event_date', to).order('event_date', { ascending: true })} />
+  const calendarPrompt = <CalendarHomePrompt hasEvents={(eventsQuery.data?.length ?? 0) > 0} />
+  const season = selectedChild && <FamilySeasonCard key={selectedChild.id} child={selectedChild} />
+  const recognition = award && <section className="mt-5" aria-label="Recognition">
+    <MetadataLabel text="RECOGNITION" />
+    <div className="rounded-xl p-4 mt-2 bg-card border border-border">
+      <p className="text-sm text-foreground">{formatParentAward(award.award_type)}</p>
+      {award.awarded_for && <p className="text-xs text-muted-foreground mt-2">{award.awarded_for}</p>}
+      {award.note && <p className="text-sm text-foreground mt-2 italic">&ldquo;{award.note}&rdquo;</p>}
+      <p className="text-xs text-muted-foreground mt-2">{formatParentDate(award.created_at)}</p>
+    </div>
+  </section>
 
   return (
-    <MobileShell>
+    <MobileShell width={look ? 'wide' : 'page'}>
       <div className="pt-3 pb-4">
-        {/* TRAK-163: calendar, the child (switcher), the bell (TRAK-74: alerts are a bell, not a tab). */}
-        <HomeHeader calendarTo="/parent/matches" center={<ParentChildSwitcher />} right={<ParentAlertsBell />} />
+        {/* TRAK-163: calendar, the child (switcher), the bell (TRAK-74: alerts are a bell, not a tab). TRAK-441: on a
+            laptop the bell is in the top bar and the child switcher in the side menu. */}
+        {look ? <FrameActions fallback={header}>{bell}</FrameActions> : header}
         {consentQuery.isError || rosterConsentQuery.isError ? (
           <ParentLoadError message="Couldn't check pending approvals." onRetry={() => { void consentQuery.refetch(); void rosterConsentQuery.refetch() }} />
         ) : waitingNames.length > 0 && parentId && (
@@ -63,21 +90,34 @@ export default function ParentHome() {
           </button>}
         <ParentFamilyContent>
           {hasError ? <ParentLoadError onRetry={() => { void matchQuery.refetch(); void developmentQuery.refetch() }} />
-            : loading ? <ParentLoading /> : (
+            : loading ? <ParentLoading /> : look ? (
+              // TRAK-441 slice 2.6: the week, For you and the season; then Latest evaluation and Season so far. No rating
+              // (TRAK-435): "Recorded matches" and the swipe cards are gone; the evaluation's page has the rest.
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-5 laptop:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] laptop:items-start laptop:gap-6">
+                <div className="grid grid-cols-[minmax(0,1fr)] content-start gap-5">
+                  {week}
+                  {calendarPrompt}
+                  {selectedChild && <ForYou key={selectedChild.id} childId={selectedChild.id} as="parent" childFirst={selectedChild.name.split(' ')[0]} />}
+                  {season}
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)] content-start gap-5">
+                  {latest && parentId && selectedChild && <LatestEvaluation assessment={latest} readerId={parentId} childId={selectedChild.id}
+                    href={`/parent/assessment/${encodeURIComponent(latest.id)}`} />}
+                  {selectedChild && <SeasonSoFar key={selectedChild.id} childId={selectedChild.id} />}
+                  {recognition}
+                </div>
+              </div>
+            ) : (
               <>
                 {details && <p className="text-xs text-muted-foreground text-center -mt-1 pb-4">
                   {[details.position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
                 </p>}
                 {/* TRAK-163: the selected child's week, Monday to Sunday, under the header. */}
-                {selectedChild && <LoadedWeekStrip key={selectedChild.id} loadKey={selectedChild.id} absentFor={selectedChild.id} renderSheet={(event, trigger) => <EventSheet event={event} role="parent" trigger={trigger}>
-                    <CantMakeIt key={selectedChild.id} event={event} child={selectedChild} />
-                  </EventSheet>}
-                  load={(from, to) => supabase.rpc('child_events', { p_child: selectedChild.id })
-                    .gte('event_date', from).lte('event_date', to).order('event_date', { ascending: true })} />}
+                {week}
                 {/* TRAK-133 (J8.10): once there are events, offer the phone calendar. */}
-                <CalendarHomePrompt hasEvents={(eventsQuery.data?.length ?? 0) > 0} />
+                {calendarPrompt}
                 {/* TRAK-399: the Season plan card for the chosen child; nothing when the coach has not shared. */}
-                {selectedChild && <FamilySeasonCard key={selectedChild.id} child={selectedChild} />}
+                {season}
                 {matches.length > 0 && (
                   <section className="rounded-xl p-5 mb-4 bg-card border border-border" aria-label="Recorded matches summary">
                     <div className="flex items-start justify-between gap-3">
@@ -98,15 +138,7 @@ export default function ParentHome() {
                   key={`${selectedChild?.id}:${development.assessments.slice(0, 5).map(row => row.id).join(',')}`}
                   assessments={development.assessments} progressLines={progressLines} />}
 
-                {award && <section className="mt-5" aria-label="Recognition">
-                  <MetadataLabel text="RECOGNITION" />
-                  <div className="rounded-xl p-4 mt-2 bg-card border border-border">
-                    <p className="text-sm text-foreground">{formatParentAward(award.award_type)}</p>
-                    {award.awarded_for && <p className="text-xs text-muted-foreground mt-2">{award.awarded_for}</p>}
-                    {award.note && <p className="text-sm text-foreground mt-2 italic">&ldquo;{award.note}&rdquo;</p>}
-                    <p className="text-xs text-muted-foreground mt-2">{formatParentDate(award.created_at)}</p>
-                  </div>
-                </section>}
+                {recognition}
                 {/* TRAK-194 (Kostas, 16 Oct): no "Recent matches" here; the Matches tab lists every match. */}
               </>
             )}

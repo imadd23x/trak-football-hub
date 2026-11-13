@@ -62,7 +62,7 @@
   "loadingUpcoming": "Loading upcoming events…",
   "noUpcoming": "No upcoming events",
   "publishToSee": "Publish a match or training and its confirmations appear here.",
-  "openSchedule": "Open schedule",
+  "openSchedule": "Open events",
   "kickOffAt": "Kick-off {{time}}",
   "startsAt": "Starts {{time}}",
   "chipEvent": "Event",

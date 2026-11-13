@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { openNewEvent } from './new-event'
 
 // Actual app routes against a synthetic intercepted backend. Database permissions
 // are separately exercised by supabase/tests/team_kits.sql, never a shared project.
@@ -68,7 +69,7 @@ test('coach saves squad kits, publishes a kit event and reopens its announcement
   })
   await page.clock.setFixedTime(clockAt)
   await page.goto('/coach/schedule')
-  await page.getByRole('button', { name: 'Add event' }).click()
+  await openNewEvent(page)
   const form = page.getByRole('dialog', { name: 'New event' })
   await form.getByRole('button', { name: 'Match', exact: true }).click()
   await form.getByLabel('Opponent').fill('Synthetic United')

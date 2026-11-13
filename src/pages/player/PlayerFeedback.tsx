@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell } from '@/components/trak'
 import { trackEvent } from '@/lib/telemetry'
+import { markOpened } from '@/lib/games/news'
 import { AssessmentBands, type AssessmentScores } from '@/components/player/AssessmentBands'
 import { EvaluationProgressCard } from '@/components/player/EvaluationProgressCard'
 import { useEvaluationProgress } from '@/lib/evaluation-progress'
@@ -77,7 +78,9 @@ function FeedbackMessage({ account, assessmentId }: { account: { id: string } | 
   useEffect(() => {
     // Count only a message that has committed to the screen, never empty/error.
     if (state.status === 'ready' && assessmentId) trackEvent('feedback_opened', { assessment_id: assessmentId })
-  }, [state, assessmentId])
+    // TRAK-441: once the evaluation shows, Home's Latest evaluation stops saying New on this device.
+    if ((state.status === 'ready' || state.status === 'empty') && account && assessmentId) markOpened(account.id, account.id, 'evaluation', assessmentId)
+  }, [state, assessmentId, account])
 
   const evaluation = (state.status === 'ready' || state.status === 'empty') && state.evaluation
   return (

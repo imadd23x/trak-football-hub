@@ -43,6 +43,8 @@ export interface TeamSwitcherProps {
   className?: string;
   /** Trak (TRAK-324): false hides Create and Join, for a list the app owns, such as a coach's squads. Defaults to true. */
   manage?: boolean;
+  /** Trak (TRAK-441): what one item is, in the spoken labels: a coach's squad, a parent's child. Defaults to squad. */
+  noun?: { one: string; many: string };
 }
 
 type Status = "idle" | "switching" | "error";
@@ -112,8 +114,9 @@ function Swap({ k, children, className, reduced }: { k: string; children: ReactN
 export function TeamSwitcher({
   workspaces: workspacesProp, value, defaultValue, onValueChange, onSwitch, onCreateWorkspace, onJoinWorkspace,
   open: openProp, defaultOpen = false, onOpenChange, globalShortcuts = false, simulatedDelay = 650, disabled = false, className,
-  manage = true,
+  manage = true, noun = { one: "squad", many: "Squads" },
 }: TeamSwitcherProps) {
+  const One = noun.one.charAt(0).toUpperCase() + noun.one.slice(1);
   const reduced = useReducedMotion() ?? false;
   const uid = useId();
   const panelId = `${uid}-panel`;
@@ -414,7 +417,7 @@ export function TeamSwitcher({
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-busy={status === "switching" || undefined}
-        aria-label={`Squad: ${shown?.name ?? "none"}. ${status === "switching" ? "Switching." : metaOf(shown ?? { id: "", name: "" })}`}
+        aria-label={`${One}: ${shown?.name ?? "none"}. ${status === "switching" ? "Switching." : metaOf(shown ?? { id: "", name: "" })}`}
         disabled={disabled}
         data-open={open || undefined}
         onClick={() => setOpen(!open)}
@@ -436,7 +439,7 @@ export function TeamSwitcher({
 
       <AnimatePresence>
         {open && (
-          <motion.div key="panel" id={panelId} role="dialog" aria-label="Switch squad" className={styles.panel} data-frame-keep="" {...panelMotion}>
+          <motion.div key="panel" id={panelId} role="dialog" aria-label={`Switch ${noun.one}`} className={styles.panel} data-frame-keep="" {...panelMotion}>
             <AnimatePresence initial={false}>
               {view === "list" ? (
                 <motion.div key="list" className={styles.view} {...viewMotion(-1)}>
@@ -449,7 +452,7 @@ export function TeamSwitcher({
                       onChange={event => onQuery(event.target.value)}
                       onKeyDown={onSearchKeyDown}
                       placeholder="Find a squad"
-                      aria-label="Find a squad"
+                      aria-label={`Find a ${noun.one}`}
                       role="combobox"
                       aria-expanded="true"
                       aria-controls={listboxId}
@@ -459,7 +462,7 @@ export function TeamSwitcher({
                       autoComplete="off"
                     />
                   </div>
-                  <div ref={listboxRef} id={listboxId} role="listbox" aria-label="Squads" className={styles.listbox}>
+                  <div ref={listboxRef} id={listboxId} role="listbox" aria-label={noun.many} className={styles.listbox}>
                     <motion.div
                       className={styles.highlight}
                       aria-hidden="true"
@@ -469,7 +472,7 @@ export function TeamSwitcher({
                       animate={{ opacity: hlShown ? 1 : 0 }}
                       transition={{ duration: .12 }}
                     />
-                    <div ref={bodyRef} role="group" aria-label="Squads" className={styles.body} style={bodyStyle} onScroll={onBodyScroll}>
+                    <div ref={bodyRef} role="group" aria-label={noun.many} className={styles.body} style={bodyStyle} onScroll={onBodyScroll}>
                       {filtered.map(ws => {
                         const key = `ws:${ws.id}`;
                         const index = workspaces.indexOf(ws);
@@ -496,7 +499,7 @@ export function TeamSwitcher({
                             </span>
                             {ws.role && <span className={styles.role}>{ws.role}</span>}
                             <span className={styles.slot}>
-                              {current ? <Check size={16} className={styles.check} aria-label="Current squad" />
+                              {current ? <Check size={16} className={styles.check} aria-label={`Current ${noun.one}`} />
                                 : manage && index < 9 ? <Kbd keys={`mod+${index + 1}`} size="sm" pressed={pressed === key} aria-hidden="true" /> : null}
                             </span>
                           </div>

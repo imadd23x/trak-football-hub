@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, Pencil, Send, Trash2, Ban, X, FileUp, ExternalLink, MapPin, ClipboardCheck, ClipboardList } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Send, Trash2, Ban, X, FileUp, ExternalLink, MapPin, ClipboardCheck, ClipboardList, CalendarDays } from 'lucide-react'
+import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { ButtonGroup, type ButtonGroupItem } from '@/components/arc/button-group/button-group'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { EventSheet } from '@/components/trak/EventSheet'
@@ -8,7 +9,7 @@ import type { StripEvent } from '@/components/trak/WeekStrip'
 import { EventSheetCoach } from '@/components/coach/EventSheetCoach'
 import { LoggedAttendance } from '@/components/coach/LoggedAttendance'
 import { toPlayerEvent } from '@/lib/player-events'
-import { BackButton } from '@/pages/coach/library/parts'
+import { setCreateDay } from '@/lib/create-day'
 import { isMapsUrl, joinVenue, splitVenue, venueParts } from '@/lib/venue-link'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
@@ -29,6 +30,7 @@ import {
 } from '@/lib/coach-events'
 import { TRAINING_THEMES, catalogueLink, type TrainingTheme } from '@/lib/training-theme'
 import { FixtureImport } from '@/components/coach/FixtureImport'
+import { useOldLogRetired } from '@/components/coach/old-log'
 import { DatePicker } from '@/components/arc/date-picker/date-picker'
 import { Calendar } from '@/components/arc/calendar/calendar'
 import { TimePicker } from '@/components/arc/time-picker/time-picker'
@@ -143,6 +145,8 @@ export default function CoachSchedule() {
   /** The database's refusals, said in the language showing where Trak knows them. */
   const locked = (error: unknown) => lockedMessage(error) && t('coachSchedule:startedLocked')
   const games = useFeature('games')
+  const trainingOn = useFeature('training')
+  const { retired: oldLogRetired } = useOldLogRetired()
   // TRAK-289: a published evaluation is final, so its match opens the review, never the match log's editor.
   const evaluations = useGameEvaluations(games)
   const navigate = useNavigate()
@@ -161,6 +165,7 @@ export default function CoachSchedule() {
   const [viewYear,  setViewYear]  = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [selected,  setSelected]  = useState<string>(toDateStr(today))
+  useEffect(() => { setCreateDay(selected); return () => setCreateDay(null) }, [selected])
 
   // Data
   const [calEvents, setCalEvents] = useState<EventRow[]>([])
@@ -293,8 +298,6 @@ export default function CoachSchedule() {
     return days
   }, [allEvents, registerSession, noted])
 
-  const openNew = (date: string) =>
-    setSheet({ kind: 'edit', row: null, form: { ...blankForm(date), squad: coachSquad.squad }, repeat: blankRepeat(date), scope: 'one', step: 0, error: null })
   // TRAK-182 (live run 3): an edit opens on the first step, filled in, not on Review.
   const openEdit = (row: EventRow, step = 0) =>
     setSheet({ kind: 'edit', row, form: rowToForm(row), repeat: blankRepeat(''), scope: 'one', step, error: null })
@@ -303,8 +306,8 @@ export default function CoachSchedule() {
     if (parked) return comingSoon()
     if (!user || sheet.kind !== 'edit') return
     const { row: editing, form, repeat, scope } = sheet
-    const problem = formProblem(form) ?? competitionProblem(form, editing, games) ?? pastProblem(form, editing, games)
-      ?? (editing ? null : repeatProblem(form, repeat))
+    const problem = formProblem(form) ?? competitionProblem(form, editing, games) ?? pastProblem(form, editing, games, trainingOn)
+      ?? (editing || evaluate ? null : repeatProblem(form, repeat))
     if (problem) { setSheet({ ...sheet, error: problem }); return }
 
     // This and following weeks: each week keeps its own date and takes the rest.
@@ -339,7 +342,8 @@ export default function CoachSchedule() {
     if (!editing && !coachSquad.ready) { setSheet({ ...sheet, error: coachSquad.retry() }); return }
     setSaving(true)
     const fresh = newDraftFields(user.id, form.squad === undefined ? coachSquad.squad : form.squad)
-    const series = !editing && repeat.on && form.kind !== 'match'
+    // `evaluate`: a match or training already held is one event, never a series (TRAK-426).
+    const series = !editing && repeat.on && form.kind !== 'match' && !evaluate
     const rows = series
       ? seriesRows(form, repeat, crypto.randomUUID()).map(r => ({ ...r, ...fresh }))
       : [{ ...formToRow(form), ...fresh }]
@@ -386,8 +390,9 @@ export default function CoachSchedule() {
       return
     }
     askToEmailFamilies() // TRAK-135: publishing emails families too; never for one that has started
-    // TRAK-288: a game with an empty plan, straight to its evaluation.
-    if (evaluate) return navigate(`/coach/matches/${ids[0]}?tab=evaluation`)
+    // TRAK-288: a game with an empty plan, straight to its evaluation. TRAK-426: a training already held, straight to
+    // its register (Who's here) on its own page.
+    if (evaluate) return navigate(kind === 'training' ? `/coach/training/${ids[0]}/here` : `/coach/matches/${ids[0]}?tab=evaluation`)
     publishedToast(ids.length > 1 ? t('coachSchedule:publishedMany', { count: ids.length }) : t('coachHome:publishedToSquad'), ids.length === 1 && kind === 'match' ? ids[0] : undefined)
   }
 
@@ -551,11 +556,10 @@ export default function CoachSchedule() {
           <div className="flex items-center gap-2">
             {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
             <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
-            {/* TRAK-272: a phone has no Schedule tab, so a Back (where the coach came from, else Home). A laptop has the sidebar. */}
-            <div className="laptop:hidden"><BackButton fallback="/coach/home" label={t('common:back')} /></div>
+            {/* TRAK-424: no Back beside the avatar, as on every other main page; Schedule opens from Home's calendar icon. */}
             <h1 className="text-[22px] font-light text-ink tracking-tight"
               style={{ ...font, letterSpacing: '-0.02em' }}>
-              {t('nav:schedule')}
+              {t('nav:events')}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -567,13 +571,7 @@ export default function CoachSchedule() {
               aria-label={t('coachSchedule:importFixtures')}>
               <FileUp size={15} color="rgb(var(--t-ink))" />
             </button>}
-            {/* TRAK-270 (Tarek, 23 Oct): the one add button. It opens New event on the chosen day. */}
-            <button
-              onClick={() => openNew(selected)}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-brand"
-              aria-label={t('coachSchedule:addEvent')}>
-              <Plus size={16} color="rgb(var(--t-on-brand))" strokeWidth={2.5} />
-            </button>
+            {/* TRAK-424: no "+" of its own; the frame's "+" adds an event, on the day picked here (create-day.ts). */}
           </div>
         </div>
 
@@ -629,9 +627,10 @@ export default function CoachSchedule() {
 
           {!loaded && !loadFailed ? <LoadingSkeleton label={t('coachSchedule:scheduleLoading')} lines={2} rows={2} />
           : selectedEvents.length === 0 ? (
-            <div className="rounded-[14px] border border-line px-4 py-5 text-center"
-              style={{ background: 'rgb(var(--t-surface))' }}>
-              <p className="text-[12px] text-ink-3">{t('coachSchedule:nothingPlannedTap')}</p>
+            // TRAK-432: Arc's empty state; the frame's "+" is the button, named as this screen shows it.
+            <div className="arc">
+              <EmptyState icon={<CalendarDays size={24} strokeWidth={1.5} />} title={t('coachSchedule:nothingPlanned')}
+                description={t(wide ? 'coachSchedule:addWithCreate' : 'coachSchedule:addWithPlus')} />
             </div>
           ) : (
             <div className="space-y-2">
@@ -656,15 +655,16 @@ export default function CoachSchedule() {
                 // right, the next step first and Cancel or Delete last. A phone shows the icons only; a laptop adds
                 // the words. Each keeps its full name ("Publish Shooting") as its accessible name and tooltip.
                 const items: ButtonGroupItem[] = []
+                // TRAK-426: where the old log has retired, an old log (no event behind it) is read, no longer edited.
                 if (!row) {
-                  items.push({ id: 'edit', label: t('coachSchedule:editNamed', { title: ev.title }), content: t('coachSchedule:edit'), icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${ev.id}`) })
+                  if (!oldLogRetired) items.push({ id: 'edit', label: t('coachSchedule:editNamed', { title: ev.title }), content: t('coachSchedule:edit'), icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${ev.id}`) })
                 } else {
                   if (!row.published && !cancelled) items.push({ id: 'publish', label: t('coachSchedule:publishNamed', { title: row.title }), content: t('coachHome:publish'), icon: <Send />, onSelect: () => publish(row) })
                   if (!registerProblem(row)) items.push({ id: 'register', label: t('coachSchedule:registerFor', { action: sessionId ? t('coachSchedule:editRegister') : t('coachHome:takeRegister'), title: row.title }),
                     content: sessionId ? t('coachSchedule:editRegister') : t('coachHome:takeRegister'), icon: <ClipboardCheck />, onSelect: guarded(() => setSheet({ kind: 'register', row })) })
                   if (row.event_type === 'match' && row.published && !cancelled && started) items.push(games && evaluations.data?.get(row.id)?.publishedAt
                     ? { id: 'match', label: t('coachSchedule:viewReviewOf', { title: row.title }), content: t('coachHome:viewReview'), icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
-                    : sessionId
+                    : sessionId && !oldLogRetired
                     ? { id: 'match', label: t('coachSchedule:editMatchFor', { title: row.title }), content: t('coachSchedule:editMatch'), icon: <Pencil />, onSelect: () => navigate(`/coach/sessions/${sessionId}`) }
                     // TRAK-288: where Games is on, the match's evaluation replaces the match log.
                     : games ? { id: 'match', label: t('coachSchedule:evaluateNamed', { title: row.title }), content: t('coachHome:evaluate'), icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
@@ -713,10 +713,13 @@ export default function CoachSchedule() {
                           {/* A logged session's sheet says so, shows who came and opens its record, as on coach Home. */}
                           {sheetEvent.sessionId
                             ? <>
-                                <Link to={`/coach/sessions/${sheetEvent.sessionId}`}
+                                {/* TRAK-426: where the old log has retired, a training opens on its own page; anything
+                                    else shows who came, below, and no longer opens the old editor. */}
+                                {(!oldLogRetired || row?.event_type === 'training') && <Link
+                                  to={oldLogRetired ? `/coach/training/${row!.id}` : `/coach/sessions/${sheetEvent.sessionId}`}
                                   className="flex min-h-11 w-full items-center justify-center rounded-xl bg-raised text-[14px] font-medium text-ink focus-visible:ring-2 focus-visible:ring-primary">
-                                  {t('coachSchedule:openSession')}
-                                </Link>
+                                  {oldLogRetired ? t('coachSchedule:openTraining') : t('coachSchedule:openSession')}
+                                </Link>}
                                 {user && <LoggedAttendance sessionId={sheetEvent.sessionId} coachId={user.id} />}
                               </>
                             : user && <EventSheetCoach event={sheetEvent} coachId={user.id} onChanged={() => void loadData()} />}

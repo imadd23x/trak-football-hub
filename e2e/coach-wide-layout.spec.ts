@@ -1,9 +1,12 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
+import { openNewEvent } from './new-event'
 
 // TRAK-199 (team decision, 21 Oct): a coach's screens use a tablet's or a laptop's
 // width; a phone, upright or sideways, keeps today's layout, and so does every
 // player and parent screen. Layout only. Production build, synthetic intercepted backend.
-const ids = { coach: '97199000-0000-4000-8000-000000000001', player: '97199000-0000-4000-8000-000000000002' }
+const ids = { coach: '97199000-0000-4000-8000-000000000001', player: '97199000-0000-4000-8000-000000000002', parent: '97199000-0000-4000-8000-000000000003' }
+// TRAK-441 slice 2: the parent's two children.
+const children = [{ user_id: 'child-199-a', full_name: 'Kostas Manolas' }, { user_id: 'child-199-b', full_name: 'Sokratis Papastathopoulos' }]
 type Role = keyof typeof ids
 const players = ['Hugo Lloris', 'Bukayo Saka', 'Beth Mead', 'Cole Palmer', 'Ella Toone', 'Declan Rice'].map((name, i) => ({
   id: `sq-${i + 1}`, coach_user_id: ids.coach, player_name: name, position: 'Defender', age_group: 'U16', shirt_number: i + 1,
@@ -28,7 +31,9 @@ async function backend(context: BrowserContext, role: Role, unexpected: string[]
     const path = url.pathname
     if (path === '/auth/v1/user') return json(user)
     if (path === '/rest/v1/telemetry_events') return route.fulfill({ status: 201, body: '' })
-    if (path === '/rest/v1/profiles') return json([{ user_id: id, id, role, full_name: role === 'coach' ? 'Synthetic Coach' : 'Synthetic Player' }])
+    if (path === '/rest/v1/profiles' && role === 'parent' && !url.searchParams.get('user_id')?.includes(id)) return json(children)
+    if (path === '/rest/v1/player_parent_links' && role === 'parent') return json(children.map(child => ({ player_user_id: child.user_id })))
+    if (path === '/rest/v1/profiles') return json([{ user_id: id, id, role, full_name: role === 'coach' ? 'Synthetic Coach' : role === 'parent' ? 'Eleni Seitaridi' : 'Synthetic Player' }])
     if (path === '/rest/v1/coach_details') return json([{ user_id: ids.coach, organization_id: 'org-199', coach_role: 'Head Coach', team: 'U16' }])
     if (path === '/rest/v1/squad_players' && role === 'coach') {
       const one = url.searchParams.get('id')?.replace(/^eq\./, '')
@@ -94,7 +99,7 @@ for (const [label, width, height, pageWidth] of [
     expect(plus.x + plus.width).toBeLessThanOrEqual(width)
     // The avatar (top left) opens the side menu; the calendar sits beside the bell.
     await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Schedule' })).toBeVisible() // TRAK-255
+    await expect(page.getByRole('link', { name: 'Events' })).toBeVisible() // TRAK-255; TRAK-449
     await page.screenshot({ path: testInfo.outputPath(`coach-home-${width}.png`) })
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
@@ -109,7 +114,7 @@ test('coach Home on a laptop: the sidebar on the left, "+ Create" at the top rig
   // TRAK-259: Arc's sidebar rail. The club, then Home, Calendar, Squad, Library; Settings and the coach at the bottom.
   const sidebar = page.getByRole('navigation', { name: 'Your academy' })
   const rows = sidebar.getByRole('button')
-  await expect(rows).toHaveText(['Home', 'Schedule', 'Squad', 'Library', 'Settings']) // TRAK-255
+  await expect(rows).toHaveText(['Home', 'Events', 'Squad', 'Library', 'Settings']) // TRAK-255; TRAK-449
   const rail = await sidebar.evaluate(el => el.closest('[id$="-sidebar"]')!.getBoundingClientRect().toJSON() as DOMRect)
   expect([rail.x, rail.y, rail.width, rail.height].map(Math.round)).toEqual([0, 0, 240, 900])
   const [first, last] = [(await rows.first().boundingBox())!, (await rows.last().boundingBox())!]
@@ -181,7 +186,7 @@ test("a coach's Settings is Arc's settings page in the wide column on a laptop",
 
 test("the Calendar's sheets stop at the Arc bottom sheet's width on a tablet", async ({ page, context }) => {
   const { unexpected } = await open(page, context, 'coach', '/coach/schedule', 820, 1180)
-  await page.getByRole('button', { name: 'Add event' }).click()
+  await openNewEvent(page)
   const sheet = (await page.getByRole('dialog', { name: 'New event' }).boundingBox())!
   expect(Math.round(sheet.width)).toBe(576)
   expect(Math.round(sheet.x + sheet.width / 2)).toBe(410)
@@ -216,6 +221,40 @@ test("a player's laptop frame, with the academy's family_look on: the side menu,
   expect(unexpected).toEqual([])
   expect(errors).toEqual([])
 })
+
+// TRAK-441 slice 2: a parent picks the child in the side menu, where the coach picks the squad.
+test("a parent's laptop frame: the child switcher in the side menu", async ({ page, context }, testInfo) => {
+  const { unexpected, errors } = await open(page, context, 'parent', '/parent/home', 1440, 900, ['events', 'family_look'])
+  await expect(page.getByRole('navigation', { name: 'Trak' }).getByRole('button', { name: /^Events/ })).toBeVisible()
+  await page.getByRole('button', { name: /^Child: Kostas Manolas/ }).click()
+  await page.getByRole('listbox', { name: 'Children' }).getByRole('option', { name: /Sokratis Papastathopoulos/ }).click()
+  await expect(page.getByRole('button', { name: /^Child: Sokratis Papastathopoulos/ })).toBeVisible()
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: testInfo.outputPath('family-frame-parent-1440.png') })
+  expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
+  expect(unexpected).toEqual([])
+  expect(errors).toEqual([])
+})
+
+// TRAK-441 slice 2 (Imad, 13 Nov): the player Home in the coach's look, behind family_look. A phone: the bell on the
+// page; a laptop: the bell in the top bar and two columns. No sideways scroll either way.
+for (const [label, width, height] of [['a phone', 390, 844], ['a laptop', 1440, 900]] as const) {
+  test(`the player Home in the coach's look on ${label}`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, 'player', '/player/home', width, height, ['events', 'family_look'])
+    const bell = page.getByRole('button', { name: /^Alerts/ })
+    await expect(bell).toBeVisible()
+    // 2.4c: the coach's week picker, not the letter strip.
+    await expect(page.getByRole('heading', { name: 'This week', level: 2 })).toBeVisible()
+    // A phone: the bell in the page's own top row, the glass tab bar. A laptop: the side menu, the bell in its top bar.
+    await expect(page.getByRole('navigation', { name: 'Trak' })).toHaveCount(width < 1024 ? 0 : 1)
+    expect((await bell.boundingBox())!.y).toBeLessThan(60)
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: testInfo.outputPath(`family-home-${width}.png`), fullPage: true })
+    expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
+    expect(unexpected).toEqual([])
+    expect(errors).toEqual([])
+  })
+}
 
 // TRAK-250: Squad is a coach workspace of views. TRAK-263 (Imad, 22 Oct): Players (Arc's team
 // directory) replaced Snapshot, and the views sit on Arc's glass segmented control. On a tablet
@@ -289,7 +328,7 @@ for (const [label, width, height, beside] of [['an upright tablet', 820, 1180, f
   test(`the Calendar on ${label}: the chosen day ${beside ? 'beside' : 'under'} the month`, async ({ page, context }) => {
     const { unexpected } = await open(page, context, 'coach', '/coach/schedule', width, height)
     const month = (await page.getByRole('grid').boundingBox())!
-    const day = (await page.getByText('Nothing planned. Tap + to schedule an event.').boundingBox())!
+    const day = (await page.getByText('Nothing planned', { exact: true }).boundingBox())!
     if (beside) {
       expect(day.x).toBeGreaterThan(month.x + month.width)
       expect(day.y).toBeLessThan(month.y + month.height)
@@ -340,15 +379,19 @@ test("a phone's sidebar sheet takes a tap: the row opens its page and the sheet 
 test("a phone's sidebar sheet closes while a page's code is still on its way", async ({ page, context }) => {
   const { unexpected, errors } = await open(page, context, 'coach', '/coach/home', 390, 844)
   await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
-  await page.route(/\/assets\/.+\.js$/, async route => { await new Promise(done => setTimeout(done, 1500)); await route.continue() })
+  // A held request can finish another way while it waits (the context's catch-all, or the page moving on): CI saw "Route is
+  // already handled!" from this continue on 11 and 12 Nov, which failed the test though the menu behaved. Only the delay matters.
+  await page.route(/\/assets\/.+\.js$/, async route => { await new Promise(done => setTimeout(done, 1500)); await route.continue().catch(() => {}) })
   await page.getByRole('button', { name: 'Open menu' }).click()
   const sheet = page.getByRole('navigation', { name: 'Your academy' })
   await sheet.getByRole('button', { name: 'Squad', exact: true }).click()
   await expect(page).toHaveURL(/\/coach\/squad$/)
   await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0, { timeout: 5000 })
   // The page's code arrives: the sheet must not slide back in, nor leave the page under it blocked.
-  await page.unrouteAll({ behavior: 'wait' })
-  await page.waitForTimeout(1200)
+  // Not 'wait': that waits for every held handler, and one whose request the page already dropped never finishes, so CI
+  // timed out here at 45 s on 11 to 13 Nov (2 in 48 locally). A held request still gets its continue when its 1.5 s is up.
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+  await page.waitForTimeout(1800)
   await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0)
   expect(await page.evaluate(() => document.body.style.pointerEvents)).toBe('')
   // The page takes taps (Home from the tab bar), and the menu still opens and closes there.
@@ -365,7 +408,7 @@ test("a phone's sidebar sheet closes while a page's code is still on its way", a
 test("a laptop's breadcrumb names the page, one title after several moves", async ({ page, context }) => {
   const { errors } = await open(page, context, 'coach', '/coach/home', 1440, 900)
   const side = page.getByRole('navigation', { name: 'Your academy' })
-  for (const name of ['Squad', 'Schedule', 'Library', 'Home']) {
+  for (const name of ['Squad', 'Events', 'Library', 'Home']) {
     await side.getByRole('button', { name, exact: true }).click()
     await page.waitForTimeout(300)
   }

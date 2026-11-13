@@ -1,3 +1,5 @@
+import { useTranslation } from '@/lib/i18n'
+import { partName, whyWord } from '@/lib/training/words'
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ClipboardList, Plus } from 'lucide-react'
@@ -38,6 +40,7 @@ const linkClass = 'rounded text-sm font-medium text-brand underline-offset-4 hov
 /** The training and its plan, read together, so the page never shows "Not planned" before the plan arrives. */
 function WithTraining({ children, wide = false }: { children: (training: Training, plan: Plan | null) => ReactNode; wide?: boolean }) {
   const { eventId } = useParams()
+  const { t } = useTranslation()
   const training = useTraining(eventId)
   const plan = usePlan(eventId)
   return (
@@ -45,12 +48,12 @@ function WithTraining({ children, wide = false }: { children: (training: Trainin
       {/* TRAK-340: Plan session takes the coach pages' width (TRAK-307), for its two columns. */}
       <div className={wide ? WIDE_COLUMN : 'mx-auto w-full max-w-[1040px] px-5 tablet:px-8'}>
         {training.error || plan.error
-          ? <div className="pt-10"><LoadError what="this training" onRetry={() => { void training.refetch(); void plan.refetch() }}
+          ? <div className="pt-10"><LoadError what={t('coachTraining:thisTrainingWhat')} onRetry={() => { void training.refetch(); void plan.refetch() }}
               retrying={training.isFetching || plan.isFetching} /></div>
-          : training.isPending || plan.isPending ? <LoadingSkeleton label="Loading the training…" lines={4} rows={2} className="pt-6" />
+          : training.isPending || plan.isPending ? <LoadingSkeleton label={t('coachTraining:loadingTraining')} lines={4} rows={2} className="pt-6" />
           : !training.data ? <div className="grid gap-3 pt-10">
-              <p className="text-[15px] text-ink-2">This training isn’t on your schedule.</p>
-              <Link to={TRAINING_PATH} className={linkClass}>Back to Training</Link>
+              <p className="text-[15px] text-ink-2">{t('coachTraining:notOnSchedule')}</p>
+              <Link to={TRAINING_PATH} className={linkClass}>{t('coachTraining:backToTraining')}</Link>
             </div>
           // Keyed by training: a route that only changes :eventId must never carry one plan's typing into another's.
           : <div key={training.data.id}>{children(training.data, plan.data)}</div>}
@@ -61,6 +64,7 @@ function WithTraining({ children, wide = false }: { children: (training: Trainin
 
 function Header({ training, children }: { training: Training; children: ReactNode }) {
   const { day, time, academy } = gameWhen(training)
+  const { t } = useTranslation()
   const minutes = trainingMinutes(training)
   return (
     <header className="arc grid gap-4 pt-5 pb-2">
@@ -68,9 +72,9 @@ function Header({ training, children }: { training: Training; children: ReactNod
       <CoachTrail current={day} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="grid gap-1">
-          <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">Training</p>
+          <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">{t('coachTraining:trainingCaps')}</p>
           <h1 className="text-[26px] font-medium tracking-[-0.01em] text-ink">{[day, time].filter(Boolean).join(' · ')}</h1>
-          <p className="text-sm text-ink-2 break-words">{[training.title, training.venue, minutes ? `${minutes} min` : null].filter(Boolean).join(' · ')}</p>
+          <p className="text-sm text-ink-2 break-words">{[training.title, training.venue, minutes ? t('coachHome:minutes', { count: minutes }) : null].filter(Boolean).join(' · ')}</p>
           {academy && <p className="text-sm text-ink-3">{academy}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">{children}</div>
@@ -91,9 +95,10 @@ const detailsLine = (practice: Practice) => DRILL_DETAILS.map(d => practice[d.ke
 /* ── Plan session (TRAK-340) ──────────────────────────────────────────────── */
 
 export function PlanEditorRoute() {
+  const { t } = useTranslation()
   return <WithTraining wide>{(training, plan) => training.status === 'cancelled'
-    ? <><Header training={training}><Badge tone="danger">Cancelled</Badge></Header>
-      <p className="pt-4 text-[15px] text-ink-2">This training was cancelled, so its plan can’t change.</p></>
+    ? <><Header training={training}><Badge tone="danger">{t('coachHome:noteCancelled')}</Badge></Header>
+      <p className="pt-4 text-[15px] text-ink-2">{t('coachTraining:cancelledCantChange')}</p></>
     : <Planner training={training} saved={plan} />}</WithTraining>
 }
 
@@ -105,6 +110,7 @@ export function PlanRoute() {
 
 function PlanView({ training, plan }: { training: Training; plan: Plan | null }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const registers = useRegisters()
   const notes = useNotes()
   const [sheet, setSheet] = useState<'register' | 'log' | null>(null)
@@ -123,39 +129,39 @@ function PlanView({ training, plan }: { training: Training; plan: Plan | null })
 
   return <>
     <Header training={training}>
-      {cancelled ? <Badge tone="danger">Cancelled</Badge>
+      {cancelled ? <Badge tone="danger">{t('coachHome:noteCancelled')}</Badge>
         : loop.closed ? <>
-          <Badge tone="success">Closed</Badge>
-          <Button variant="secondary" onClick={() => setSheet('log')}>View log</Button>
+          <Badge tone="success">{t('coachTraining:closedBadge')}</Badge>
+          <Button variant="secondary" onClick={() => setSheet('log')}>{t('coachTraining:viewLog')}</Button>
         </> : <>
-          <Badge tone={plan ? 'success' : 'warning'}>{plan ? 'Ready' : 'Not planned'}</Badge>
+          <Badge tone={plan ? 'success' : 'warning'}>{plan ? t('coachTraining:readyBadge') : t('coachTraining:notPlanned')}</Badge>
           {/* On the day, the main action is Who's here; otherwise View, the plan at the pitch side. */}
           {/* TRAK-342: Who's here is a page of its own: the register, then Trak's suggestions for the plan. */}
-          {canRegister && <Button onClick={() => navigate(herePath(training.id))}>Who’s here</Button>}
-          {plan && <Button variant={canRegister ? 'secondary' : 'primary'} onClick={view}>View</Button>}
-          {sessionId && <Button variant="ghost" onClick={() => navigate(herePath(training.id))}>Who’s here</Button>}
+          {canRegister && <Button onClick={() => navigate(herePath(training.id))}>{t('coachTraining:loopHere')}</Button>}
+          {plan && <Button variant={canRegister ? 'secondary' : 'primary'} onClick={view}>{t('coachTraining:view')}</Button>}
+          {sessionId && <Button variant="ghost" onClick={() => navigate(herePath(training.id))}>{t('coachTraining:loopHere')}</Button>}
           {/* TRAK-341: a saved plan is changed part by part below (Kostas, 30 Oct), so no Change the plan up here. */}
-          {!plan && <Button variant={canRegister ? 'secondary' : 'primary'} onClick={planIt}>Plan session</Button>}
+          {!plan && <Button variant={canRegister ? 'secondary' : 'primary'} onClick={planIt}>{t('coachTraining:planSession')}</Button>}
         </>}
     </Header>
     {!cancelled && <div className="grid gap-2 pt-2">
       <LoopStrip state={loop} note={loopNote(loop, started)} />
-      {registers.error ? <p role="alert" className="text-sm text-danger">Couldn’t check the register. <button type="button"
-        className={`min-h-11 ${linkClass}`} onClick={() => void registers.refetch()}>Try again</button></p>
+      {registers.error ? <p role="alert" className="text-sm text-danger">{t('coachTraining:couldntCheckRegister')} <button type="button"
+        className={`min-h-11 ${linkClass}`} onClick={() => void registers.refetch()}>{t('coachTraining:tryAgain')}</button></p>
         : !sessionId && registerWhy && <p className="text-sm text-ink-3">{registerWhy === 'The register opens once the event has started'
-          ? 'Who’s here opens when the training starts.' : `Who’s here: ${registerWhy.toLowerCase()}.`}</p>}
+          ? t('coachTraining:hereOpens') : t('coachTraining:hereWhy', { why: whyWord(registerWhy) })}</p>}
     </div>}
 
     {plan && plan.practices.length ? <SavedReview training={training} plan={plan} cancelled={cancelled} />
       : <section aria-labelledby="practices" className="mt-6 grid max-w-[720px] gap-2.5">
-        <h2 id="practices" className="sr-only">Practices</h2>
+        <h2 id="practices" className="sr-only">{t('coachTraining:practices')}</h2>
         <div className="arc">
-          <EmptyState icon={<ClipboardList size={24} strokeWidth={1.5} />} title={cancelled ? 'This training was cancelled' : 'Not planned yet'}
-            description={cancelled ? 'It had no plan.' : 'Plan it your way. Only you see the plan.'}
-            action={cancelled ? undefined : <Button onClick={planIt}>Plan session</Button>} />
+          <EmptyState icon={<ClipboardList size={24} strokeWidth={1.5} />} title={cancelled ? t('coachTraining:wasCancelled') : t('coachTraining:notPlannedYet')}
+            description={cancelled ? t('coachTraining:hadNoPlan') : t('coachTraining:planYourWay')}
+            action={cancelled ? undefined : <Button onClick={planIt}>{t('coachTraining:planSession')}</Button>} />
         </div>
       </section>}
-    <Link to={`/coach/schedule?event=${training.id}`} className={`mt-4 inline-block ${linkClass}`}>Open in Schedule</Link>
+    <Link to={`/coach/schedule?event=${training.id}`} className={`mt-4 inline-block ${linkClass}`}>{t('coachTraining:openInSchedule')}</Link>
 
     <RegisterSheet training={training} sheet={sheet} sessionId={sessionId} onClose={() => setSheet(null)} />
   </>
@@ -175,6 +181,7 @@ export function WhosHereRoute() {
 function SavedReview({ training, plan, cancelled }: { training: Training; plan: Plan; cancelled: boolean }) {
   const navigate = useNavigate()
   const save = useSavePlan(training.id)
+  const { t } = useTranslation()
   const [adding, setAdding] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   // Read once per saved plan, and each part keeps its key when the plan comes back saved: a part just moved stays the
@@ -186,18 +193,18 @@ function SavedReview({ training, plan, cancelled }: { training: Training; plan: 
   const over = overTime(totalMinutes(parts), length)
   const edit = (index: number) => navigate(planPath(training.id), { state: { editPart: index } satisfies PlannerState })
   const remove = (index: number) => {
-    if (parts.length === 1) return setProblem('A plan needs at least one part. Edit this one instead, or add another first.')
+    if (parts.length === 1) return setProblem(t('coachTraining:needsOnePart'))
     setProblem(null)
     const gone = parts[index]
     save.mutate({ parts: parts.filter((_, i) => i !== index), note: plan.note }, {
-      onSuccess: () => toast(`${gone.name} removed.`, { action: { label: 'Undo', onClick: () => save.mutate({ parts, note: plan.note }) } }),
-      onError: () => setProblem('Couldn’t remove it. Check your connection and try again.'),
+      onSuccess: () => toast(t('coachTraining:removed', { name: partName(gone.name) }), { action: { label: t('coachTraining:undo'), onClick: () => save.mutate({ parts, note: plan.note }) } }),
+      onError: () => setProblem(t('coachTraining:couldntRemove')),
     })
   }
   const saveOrder = (next: Part[]) => {
     setProblem(null)
     save.mutate({ parts: next, note: plan.note }, {
-      onError: () => { setParts(keepKeys(next, partsFromSaved(plan.practices))); setProblem('Couldn’t move it. Check your connection and try again.') },
+      onError: () => { setParts(keepKeys(next, partsFromSaved(plan.practices))); setProblem(t('coachTraining:couldntMove')) },
     })
   }
   const move = (index: number, by: -1 | 1) => {
@@ -210,22 +217,22 @@ function SavedReview({ training, plan, cancelled }: { training: Training; plan: 
   return <div className="mt-6 grid gap-5 laptop:grid-cols-[minmax(0,1fr)_320px] laptop:items-start">
     <section aria-labelledby="review" className="arc grid min-w-0 gap-4 rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 id="review" className="text-[22px] font-medium text-ink">Review</h2>
+        <h2 id="review" className="text-[22px] font-medium text-ink">{t('coachSchedule:stepReview')}</h2>
         <TotalLine parts={parts} length={length} />
       </div>
       <TimeBar parts={parts} length={length} />
       {over && !cancelled && <OverTime text={over} />}
       {problem && <p role="alert" className="text-[15px] text-danger">{problem}</p>}
       {cancelled
-        ? <ol aria-label="The plan" className="grid divide-y divide-line">{parts.map((part, i) => <li key={part.key} className="py-3 text-[15px] text-ink">
-            {part.minutes} min · {part.drill?.name}</li>)}</ol>
+        ? <ol aria-label={t('coachMatches:thePlan')} className="grid divide-y divide-line">{parts.map((part, i) => <li key={part.key} className="py-3 text-[15px] text-ink">
+            {t('coachHome:minutes', { count: part.minutes })} · {part.drill?.name}</li>)}</ol>
         : <PlanRows parts={parts} onEdit={edit} onRemove={remove} onReorder={setParts} onMove={move} onDrop={drop} busy={save.isPending} />}
-      {!cancelled && <div><Button size="sm" variant="secondary" onClick={() => setAdding(true)}><Plus aria-hidden size={16} />Add a part</Button></div>}
-      {plan.note && <div className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2"><span className="font-medium text-ink">Your note:</span> {plan.note}</div>}
+      {!cancelled && <div><Button size="sm" variant="secondary" onClick={() => setAdding(true)}><Plus aria-hidden size={16} />{t('coachTraining:addAPart')}</Button></div>}
+      {plan.note && <div className="rounded-xl bg-raised px-4 py-3 text-sm text-ink-2"><span className="font-medium text-ink">{t('coachTraining:yourNote')}</span> {plan.note}</div>}
     </section>
     <aside aria-labelledby="players" className="arc grid content-start gap-3 rounded-2xl border border-line bg-surface p-5">
-      <h2 id="players" className="text-lg font-medium text-ink">Players</h2>
-      <p className="text-sm text-ink-2">Planned for your whole squad. On the day, take the register with Who’s here at the top.</p>
+      <h2 id="players" className="text-lg font-medium text-ink">{t('coachTraining:players')}</h2>
+      <p className="text-sm text-ink-2">{t('coachTraining:plannedSquadHere')}</p>
     </aside>
     <AddPartSheet open={adding} onClose={() => setAdding(false)}
       onAdd={(type, name) => { setAdding(false); navigate(planPath(training.id), { state: { addPart: { type, name } } satisfies PlannerState }) }} />
@@ -241,18 +248,19 @@ export function PitchViewRoute() {
 /** The plan at the pitch side, on a phone: big type, one practice per row, when each starts and how long it runs. */
 function PitchView({ training, plan }: { training: Training; plan: Plan | null }) {
   const practices = fromSaved(plan?.practices ?? [])
+  const { t } = useTranslation()
   const { day, time } = gameWhen(training)
   const starts = practiceStarts(time || null, practices)
   return <div className="mx-auto grid max-w-[720px] gap-5 pt-5">
     {/* TRAK-334: opened from Training home's View plan, the trail goes back there; from the training's page, to that,
         which is also where it sits when opened from a link. */}
-    <CoachTrail current="View" parents={[{ label: day, href: `${TRAINING_PATH}/${training.id}` }]} />
+    <CoachTrail current={t('coachTraining:view')} parents={[{ label: day, href: `${TRAINING_PATH}/${training.id}` }]} />
     <header className="grid gap-1">
-      <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">View</p>
+      <p className="text-[11px] font-medium uppercase tracking-[.09em] text-brand">{t('coachTraining:view')}</p>
       <h1 className="text-[28px] font-medium leading-tight text-ink">{[day, time].filter(Boolean).join(' · ')}</h1>
       <p className="text-base text-ink-2 break-words">{[training.title, training.venue].filter(Boolean).join(' · ')}</p>
     </header>
-    {practices.length === 0 ? <p className="text-[17px] text-ink-2">Nothing planned yet. <Link to={planPath(training.id)} className={linkClass}>Plan it</Link></p>
+    {practices.length === 0 ? <p className="text-[17px] text-ink-2">{t('coachTraining:nothingPlannedYet')} <Link to={planPath(training.id)} className={linkClass}>{t('coachTraining:planIt')}</Link></p>
       : <ol aria-label="Practices to run" className="grid gap-3">
         {practices.map((practice, i) => {
           const details = detailsLine(practice)
@@ -260,11 +268,11 @@ function PitchView({ training, plan }: { training: Training; plan: Plan | null }
             <div className="w-16 flex-none text-center">
               {starts[i] && <p className="text-[15px] font-medium text-brand">{starts[i]}</p>}
               <p className="text-[28px] font-medium leading-none text-ink">{practice.minutes}</p>
-              <p className="text-[13px] text-ink-3">min</p>
+              <p className="text-[13px] text-ink-3">{t('coachTraining:minShort')}</p>
             </div>
             <div className="grid min-w-0 flex-1 content-start gap-1.5">
               {/* TRAK-341: the part it fills, when it isn't named after the drill. */}
-              {practice.part && practice.part !== practice.name && <p className="text-[15px] font-medium text-brand break-words">{practice.part}</p>}
+              {practice.part && practice.part !== practice.name && <p className="text-[15px] font-medium text-brand break-words">{partName(practice.part)}</p>}
               <p className="text-[22px] font-medium leading-snug text-ink break-words">{practice.name}</p>
               {practice.tell.trim() && <p className="text-[19px] leading-snug text-ink break-words">“{practice.tell.trim()}”</p>}
               {details && <p className="text-[17px] text-ink-2 break-words">{details}</p>}

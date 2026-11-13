@@ -17,6 +17,10 @@ import { LoadedWeekStrip, WeekStrip, weekDays, type StripEvent } from '@/compone
 import { EventSheet } from '@/components/trak/EventSheet'
 import { EventSheetCoach } from '@/components/coach/EventSheetCoach'
 
+// TRAK-426: the sheet asks whether the old log has retired (Training and Matches both on). Rendered here without the
+// signed-in frame, so it answers "not retired": these checks are about the sheet, not the switches.
+vi.mock('@/components/coach/old-log', () => ({ useOldLogRetired: () => ({ retired: false, known: true }) }))
+
 const endpoint = (name: string) => `${SUPABASE_URL}/rest/v1/${name}`
 const today = new Date()
 const day = weekDays(today).find(d => d >= today.toLocaleDateString('en-CA')) ?? weekDays(today)[6]

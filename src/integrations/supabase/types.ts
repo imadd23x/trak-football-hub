@@ -2165,6 +2165,10 @@ export type Database = {
       }
       revoke_my_calendar_link: { Args: never; Returns: boolean }
       feature_on: { Args: { p_feature: string }; Returns: boolean }
+      family_academy: {
+        Args: { p_child: string }
+        Returns: { logo_url: string | null; name: string }[]
+      }
       family_feature_on: { Args: { p_feature: string }; Returns: boolean }
       game_plan_changes: {
         Args: { p_event_ids: string[] }

@@ -2121,6 +2121,10 @@ export type Database = {
           family_note: string | null
         }[]
       }
+      child_training_attendance: {
+        Args: { p_child: string }
+        Returns: { attended: number; total: number }[]
+      }
       coach_match_score_clash: {
         Args: {
           p_assists?: number

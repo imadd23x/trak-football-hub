@@ -1,3 +1,4 @@
+import { useTranslation } from '@/lib/i18n'
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { LayoutGroup } from 'motion/react'
@@ -21,17 +22,19 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
    TRAK-197 rules (player-attention.ts). With two squads it follows the squad
    picked here, on Home or in Squad (TRAK-176). */
 
-const LEVEL: Record<AttentionLevel, { word: string; color: string }> = {
-  urgent: { word: 'Urgent', color: 'rgb(var(--t-danger))' },
-  warning: { word: 'Warning', color: 'rgb(var(--t-warning))' },
-  'on-track': { word: 'On track', color: 'rgb(var(--t-success))' },
-}
+/* TRAK-407: `word` is a word key, read in the language showing. */
+const LEVEL = {
+  urgent: { word: 'coachAssess:levelUrgent', color: 'rgb(var(--t-danger))' },
+  warning: { word: 'coachAssess:levelWarning', color: 'rgb(var(--t-warning))' },
+  'on-track': { word: 'coachAssess:levelOnTrack', color: 'rgb(var(--t-success))' },
+} as const satisfies Record<AttentionLevel, { word: string; color: string }>
 
 /** `squad` is the one it was read for: after a switch, the other squad's rows never show. */
 type Overview = { squad: string | null; rows: AttentionRow[]; players: number }
 
 export default function CoachFeedbackPage() {
   const { user, profile } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const coachSquad = useCoachSquad(user?.id)
@@ -125,26 +128,26 @@ export default function CoachFeedbackPage() {
       <div className="px-5 pt-4 pb-40">
         {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
         <div className="flex items-center gap-3">
-          <CoachMenuButton name={profile?.full_name || 'Coach'} />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Feedback and assessment</h1>
+          <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
+          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">{t('coachAssess:fbTitle')}</h1>
         </div>
 
-        <section aria-label="Feedback and assessment" className="rounded-[18px] border border-line p-4 mt-3" style={{ background: 'rgb(var(--t-surface))' }}>
+        <section aria-label={t('coachAssess:fbTitle')} className="rounded-[18px] border border-line p-4 mt-3" style={{ background: 'rgb(var(--t-surface))' }}>
           {failed ? (
             <p role="alert" className="text-[12px] text-ink-2" style={{ fontFamily: 'var(--t-font)' }}>
-              Couldn't load your players.{' '}
-              <button type="button" onClick={retry} className="underline text-brand">Retry</button>
+              {t('coachAssess:couldntLoadPlayers')}{' '}
+              <button type="button" onClick={retry} className="underline text-brand">{t('common:retry')}</button>
             </p>
           ) : !overview ? (
-            <LoadingSkeleton label="Loading your players…" lines={2} avatar rows={4} />
+            <LoadingSkeleton label={t('coachAssess:loadingPlayers')} lines={2} avatar rows={4} />
           ) : overview.players === 0 ? (
             <div>
-              <p className="text-[13px] font-medium text-ink-2" style={{ fontFamily: 'var(--t-font)' }}>Your squad is being prepared</p>
-              <p className="text-[10px] mt-0.5 text-ink-3" style={{ fontFamily: 'var(--t-font-mono)' }}>Your academy will add players to this squad.</p>
+              <p className="text-[13px] font-medium text-ink-2" style={{ fontFamily: 'var(--t-font)' }}>{t('coachSquad:preparingTitle')}</p>
+              <p className="text-[10px] mt-0.5 text-ink-3" style={{ fontFamily: 'var(--t-font-mono)' }}>{t('coachSquad:preparingBody')}</p>
             </div>
           ) : overview.rows.length === 0 ? (
             // Everyone left is waiting for a parent: nothing can be said about them yet.
-            <p className="text-[12px] text-ink-2" style={{ fontFamily: 'var(--t-font)' }}>Your players are waiting for a parent's approval.</p>
+            <p className="text-[12px] text-ink-2" style={{ fontFamily: 'var(--t-font)' }}>{t('coachAssess:waitingApproval')}</p>
           ) : (
             asTable ? <FeedbackTable rows={overview.rows} show={show} onShow={setShow}
               onOpen={id => navigate(`/coach/squad/player/${id}`)}
@@ -156,14 +159,14 @@ export default function CoachFeedbackPage() {
                   className="flex items-center gap-3 rounded-[10px] py-2.5 px-3 cursor-pointer active:scale-[0.99] transition-transform"
                   style={{ background: 'rgb(var(--t-raised))', borderLeft: `3px solid ${LEVEL[row.level].color}` }}
                   // TRAK-179: the player's profile, as Squad → Open profile.
-                  {...openable(`Open ${row.name}'s profile: ${LEVEL[row.level].word}`, () => navigate(`/coach/squad/player/${row.playerId}`))}>
+                  {...openable(t('coachAssess:openProfileLevel', { name: row.name, level: t(LEVEL[row.level].word) }), () => navigate(`/coach/squad/player/${row.playerId}`))}>
                   <PlayerFace name={row.name} size="sm" className="arc flex-shrink-0" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-[13px] font-medium text-ink" style={{ fontFamily: 'var(--t-font)' }}>{row.name}</span>
                       {/* The word, never colour alone. */}
                       <span className="flex-shrink-0 text-[9px] font-medium uppercase tracking-[0.08em]"
-                        style={{ fontFamily: 'var(--t-font-mono)', color: LEVEL[row.level].color }}>{LEVEL[row.level].word}</span>
+                        style={{ fontFamily: 'var(--t-font-mono)', color: LEVEL[row.level].color }}>{t(LEVEL[row.level].word)}</span>
                     </p>
                     {row.reasons.map(reason => (
                       <p key={reason} className="text-[11px] text-ink-2 mt-[2px]" style={{ fontFamily: 'var(--t-font)' }}>{reason}</p>
@@ -187,33 +190,34 @@ function FeedbackTable({ rows, show, onShow, onOpen, onAssess }: {
   rows: AttentionRow[]; show: 'all' | AttentionLevel; onShow: (level: 'all' | AttentionLevel) => void
   onOpen: (playerId: string) => void; onAssess: (playerId: string) => void
 }) {
+  const { t } = useTranslation()
   const count = (level: AttentionLevel) => rows.filter(row => row.level === level).length
   const options = [
-    { value: 'all', label: `All ${rows.length}` },
-    ...(Object.keys(LEVEL) as AttentionLevel[]).map(level => ({ value: level, label: `${LEVEL[level].word} ${count(level)}` })),
+    { value: 'all', label: t('coachAssess:fbAll', { count: rows.length }) },
+    ...(Object.keys(LEVEL) as AttentionLevel[]).map(level => ({ value: level, label: `${t(LEVEL[level].word)} ${count(level)}` })),
   ]
   const shown = show === 'all' ? rows : rows.filter(row => row.level === show)
   return (
     <div className="space-y-3">
       <LayoutGroup id="feedback-level">
         <div className="arc flex">
-          <SegmentedControl label="Show" value={show} onValueChange={value => onShow(value as 'all' | AttentionLevel)} options={options} />
+          <SegmentedControl label={t('coachAssess:show')} value={show} onValueChange={value => onShow(value as 'all' | AttentionLevel)} options={options} />
         </div>
       </LayoutGroup>
       <table className="w-full text-left" style={{ fontFamily: 'var(--t-font)' }}>
         <thead>
           <tr className="text-[11px] uppercase tracking-[0.08em] text-ink-3">
-            <th className="font-medium py-2 pr-3">Player</th>
-            <th className="font-medium py-2 pr-3">Status</th>
-            <th className="font-medium py-2 pr-3">Why</th>
-            <th className="py-2"><span className="sr-only">Assess</span></th>
+            <th className="font-medium py-2 pr-3">{t('nav:player')}</th>
+            <th className="font-medium py-2 pr-3">{t('coachAssess:status')}</th>
+            <th className="font-medium py-2 pr-3">{t('coachAssess:why')}</th>
+            <th className="py-2"><span className="sr-only">{t('coachHome:assess')}</span></th>
           </tr>
         </thead>
         <tbody>
           {shown.map(row => (
             <tr key={row.playerId} className="border-t border-line hover:bg-raised">
               <td className="py-2.5 pr-3">
-                <button type="button" onClick={() => onOpen(row.playerId)} aria-label={`Open ${row.name}'s profile`}
+                <button type="button" onClick={() => onOpen(row.playerId)} aria-label={t('coachAssess:openProfile', { name: row.name })}
                   className="flex items-center gap-3 text-left text-[13px] font-medium text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
                   <PlayerFace name={row.name} size="sm" className="arc flex-shrink-0" aria-hidden />
                   {row.name}
@@ -221,14 +225,14 @@ function FeedbackTable({ rows, show, onShow, onOpen, onAssess }: {
               </td>
               <td className="py-2.5 pr-3">
                 <span className="text-[11px] font-medium uppercase tracking-[0.08em]" style={{ fontFamily: 'var(--t-font-mono)', color: LEVEL[row.level].color }}>
-                  {LEVEL[row.level].word}
+                  {t(LEVEL[row.level].word)}
                 </span>
               </td>
               <td className="py-2.5 pr-3 text-[12px] text-ink-2">{row.reasons.join(' · ')}</td>
               <td className="py-2.5 text-right">
                 <button type="button" onClick={() => onAssess(row.playerId)}
                   className="rounded-[10px] px-3 py-1.5 text-[12px] font-medium border border-line text-ink hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                  Assess
+                  {t('coachHome:assess')}
                 </button>
               </td>
             </tr>

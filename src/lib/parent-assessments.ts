@@ -2,11 +2,13 @@ import { supabase } from '@/integrations/supabase/client'
 import type { Tables } from '@/integrations/supabase/types'
 
 /** Parent readers never request the coach's message or private note. */
-export const PARENT_ASSESSMENT_COLUMNS = 'id, session_id, created_at, coach_user_id, coach_rating, work_rate, tactical, attitude, technical, physical, coachability' as const
+export const PARENT_ASSESSMENT_COLUMNS = 'id, session_id, evaluation_id, created_at, coach_user_id, coach_rating, work_rate, tactical, attitude, technical, physical, coachability' as const
 export type ParentAssessment = Pick<Tables<'coach_assessments'>,
   'id' | 'created_at' | 'coach_rating' | 'work_rate' | 'tactical' | 'attitude' | 'technical' | 'physical' | 'coachability'> & {
     coach_user_id: string | null
     session_id?: string | null
+    /** TRAK-402: set when this assessment closed a season evaluation. */
+    evaluation_id?: string | null
   }
 export type AssessmentTarget = { kind: 'assessment' | 'session'; id: string }
 export interface ParentAssessmentPage {

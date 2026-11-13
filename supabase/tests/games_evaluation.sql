@@ -145,6 +145,32 @@ SELECT pg_temp.g288check((SELECT count(*) FROM public.game_evaluation_players WH
   AND (SELECT jsonb_array_length(goals)=1 FROM public.game_evaluations WHERE event_id=pg_temp.g288id(500)),
   '4 a refused save changes nothing');
 
+-- ── 4b. TRAK-447: an own goal credits nobody, and says so ──────────────────
+SELECT pg_temp.g288check(pg_temp.g288runs(pg_temp.g288save(500,2,1,
+    jsonb_build_array(jsonb_build_object('scorer',NULL,'assist',NULL,'own',true),pg_temp.g288goal(40)),
+    jsonb_build_array(pg_temp.g288p(40,true),pg_temp.g288p(41,false)))),
+  '4b an own goal saves beside a goal with a scorer, and the score still adds up');
+SELECT pg_temp.g288check((SELECT goals->0->>'own'='true' AND goals->0->>'scorer' IS NULL AND goals->0->>'assist' IS NULL
+    AND goals->1->>'scorer'=pg_temp.g288id(40)::text FROM public.game_evaluations WHERE event_id=pg_temp.g288id(500)),
+  '4b it is kept as an own goal, not as a goal with no scorer recorded');
+SELECT pg_temp.g288check(pg_temp.g288refused(pg_temp.g288save(500,2,1,
+    jsonb_build_array(jsonb_build_object('scorer',pg_temp.g288id(40),'assist',NULL,'own',true)),
+    jsonb_build_array(pg_temp.g288p(40,true))),'23514'),
+  '4b an own goal has no scorer');
+SELECT pg_temp.g288check(pg_temp.g288refused(pg_temp.g288save(500,2,1,
+    jsonb_build_array(jsonb_build_object('scorer',NULL,'assist',pg_temp.g288id(40),'own',true)),
+    jsonb_build_array(pg_temp.g288p(40,true))),'23514'),
+  '4b and no assist');
+SELECT pg_temp.g288check(pg_temp.g288refused(pg_temp.g288save(500,2,1,
+    jsonb_build_array(jsonb_build_object('scorer',NULL,'assist',NULL,'own','yes')),
+    jsonb_build_array(pg_temp.g288p(40,true))),'23514'),
+  '4b the flag is true or false, nothing else');
+-- Put the draft back as section 2 saved it, so what follows reads what it always did.
+SELECT pg_temp.g288check(pg_temp.g288runs(pg_temp.g288save(500,2,1,jsonb_build_array(pg_temp.g288goal(40)),
+    jsonb_build_array(pg_temp.g288p(40,true,'{"note":"  You did your job.  "}'),pg_temp.g288p(41,false)),
+    'A set piece and a counter.',ARRAY['worked',NULL])),
+  '4b the draft is back as it was');
+
 -- ── 5. Only the coach reads it, and nobody writes it but the save ─────────
 SELECT pg_temp.g288check((SELECT count(*) FROM public.game_evaluations)=1 AND (SELECT count(*) FROM public.game_evaluation_players)=2
   AND (SELECT count(*) FROM public.game_evaluation_notes)=1,
@@ -212,7 +238,7 @@ RESET ROLE;
 DO $$ DECLARE failures text; total integer;
 BEGIN
  SELECT count(*) INTO total FROM pg_temp.g288_results;
- IF total <> 33 THEN RAISE EXCEPTION 'Games evaluation: % checks ran; expected 33', total; END IF;
+ IF total <> 39 THEN RAISE EXCEPTION 'Games evaluation: % checks ran; expected 39', total; END IF;
  SELECT string_agg(label, E'\n') INTO failures FROM pg_temp.g288_results WHERE NOT ok;
  IF failures IS NOT NULL THEN RAISE EXCEPTION 'Games evaluation checks failed:%', E'\n' || failures; END IF;
  RAISE NOTICE 'Games evaluation: % of % passed', total, total;

@@ -2121,6 +2121,10 @@ export type Database = {
           family_note: string | null
         }[]
       }
+      child_training_attendance: {
+        Args: { p_child: string }
+        Returns: { attended: number; total: number }[]
+      }
       coach_match_score_clash: {
         Args: {
           p_assists?: number
@@ -2328,6 +2332,7 @@ export type Database = {
       load_default_formation: { Args: { p_event_id: string }; Returns: Json }
       set_default_formation: { Args: { p_default: boolean; p_id: string }; Returns: undefined }
       use_formation_for_matches: { Args: { p_event_ids: string[]; p_formation_id: string }; Returns: Json }
+      undo_formation_copy: { Args: { p_event_ids: string[]; p_formation_id: string }; Returns: Json }
       save_formation: {
         Args: {
           p_format: number

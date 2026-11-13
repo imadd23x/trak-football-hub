@@ -9,6 +9,7 @@ import { table, rpc, SUPABASE_URL } from '../../../../tests/msw/supabase'
 import { eventStep, saveEventWith } from '../../../../tests/support/event-steps'
 import { pickTime } from '../../../../tests/support/arc-pickers'
 import { logStep, saveLog } from '../../../../tests/support/log-steps'
+import { openNewEvent } from '../../../../tests/support/schedule-actions'
 
 // The import is parked for coaches (schedule-import-parked-j86); switched on here, as schedule-import-j86 does.
 vi.mock('@/lib/fixture-import', async importOriginal => ({
@@ -83,7 +84,7 @@ describe('TRAK-176: the squad picked is saved on every way an event is made', { 
   it("Schedule's Save draft saves the squad picked", async () => {
     fixtures()
     renderApp('/coach/schedule')
-    await userEvent.click(await screen.findByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     await eventStep(sheet, 'When')
     await pickTime(userEvent, 'Start', '17:30')
@@ -95,7 +96,7 @@ describe('TRAK-176: the squad picked is saved on every way an event is made', { 
   it("Imad, 24 Oct: New event names its squad, and saves the one chosen in the form (here every squad)", async () => {
     fixtures()
     renderApp('/coach/schedule')
-    await userEvent.click(await screen.findByRole('button', { name: 'Add event' }))
+    await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
     const squads = within(sheet).getByRole('group', { name: 'Squad' })
     // It starts on the squad picked last.

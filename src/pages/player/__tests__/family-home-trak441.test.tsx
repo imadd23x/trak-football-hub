@@ -37,7 +37,7 @@ beforeEach(() => {
     table('coach_shared_feedback', []),
     table('game_for_family', [{ event_id: 'parkview', shared_at: new Date(Date.now() - 3_600_000).toISOString(), changed_at: null, role: 'starter', coach_name: 'Otto Rehhagel' }]),
     table('game_for_player', []), table('game_review_for_family', []), table('matches', [{ id: 'm1' }, { id: 'm2' }]),
-    rpcRows('child_events', [MATCH]), rpcRows('season_plan_for_player', []), rpcRows('family_academy', [{ name: 'Rehearsal FC', logo_url: null }]),
+    rpcRows('child_events', [MATCH]), rpcRows('season_plan_for_player', []), rpcRows('family_academy', [{ name: 'Rehearsal FC', logo_url: null }]), rpcRows('child_training_attendance', [{ attended: 5, total: 6 }]),
     rpc('get_player_invites_for_current_user', () => []),
     rpc('my_consent_status', () => ({ required: false, invited_parent: null })),
     rpc('family_feature_on', ({ p_feature }) => switchOn && p_feature === 'family_look'),
@@ -58,6 +58,7 @@ describe('TRAK-441: the player Home in the coach\'s look', () => {
     // Slice 2.5b: Season so far, counts only.
     const soFar = await screen.findByRole('region', { name: 'Season so far' })
     expect(within(soFar).getByText('Matches').nextElementSibling).toHaveTextContent('2')
+    expect(within(soFar).getByText('Training').nextElementSibling).toHaveTextContent('5/6')
     await userEvent.click(within(forYou).getByRole('button', { name: 'Open game plan' }))
     await waitFor(() => expect(window.location.pathname + window.location.hash).toBe('/player/event/parkview#game-plan'))
   })

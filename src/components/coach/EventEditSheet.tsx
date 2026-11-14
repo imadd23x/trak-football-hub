@@ -24,12 +24,30 @@ import { DatePicker } from '@/components/arc/date-picker/date-picker'
 import { TimePicker } from '@/components/arc/time-picker/time-picker'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Button } from '@/components/arc/button/button'
+import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { currentLanguage, useLanguage, useTranslation } from '@/lib/i18n'
 
 /* TRAK-182 (Imad's 7c): the event form one step per screen, related fields together, then Review with Publish or Save
    draft. An edit opens on What, where each step can be reopened from the stepper. TRAK-331 (Imad, 2 Nov): moved out of
    Schedule as it was, so a match page pulls up the same bottom sheet to edit its logistics in place. The page that
    opens it keeps the sheet's state and does the saving; everything typed on the way lives here. */
+
+/* TRAK-427: the event form's choices are Arc's chip group, as on the newer pages, in place of the hand-made chips below.
+   One choice, which cannot be cleared unless `clearable` (Home or Away can be left unset); or several toggles. A chip is
+   still a pressed or unpressed button named by its words. */
+/** The squad chip for "all squads" (there is no squad name to key it by). */
+const ALL_SQUADS = '__all'
+
+function Choice({ label, options, value, onChange, clearable = false }: {
+  label: string; options: { value: string; label: string }[]; value: string | null; onChange: (value: string | null) => void; clearable?: boolean
+}) {
+  return (
+    <div className="arc">
+      <ChipGroup label={label} multiple={false} options={options} value={value === null ? [] : [value]}
+        onValueChange={([next]) => { if (next !== undefined) onChange(next); else if (clearable) onChange(null) }} />
+    </div>
+  )
+}
 
 export function Chip({ on, color = 'rgb(var(--t-brand))', onClick, children }: { on: boolean; color?: string; onClick: () => void; children: ReactNode }) {
   return (
@@ -114,10 +132,8 @@ function ArcField({ children }: { children: ReactNode }) {
 export function ScopeChoice({ scope, onChange }: { scope: Scope; onChange: (s: Scope) => void }) {
   const { t } = useTranslation()
   return (
-    <div className="flex gap-2 flex-wrap" role="group" aria-label={t('coachSchedule:whichWeeks')}>
-      <Chip on={scope === 'one'} onClick={() => onChange('one')}>{t('coachSchedule:onlyThisWeek')}</Chip>
-      <Chip on={scope === 'following'} onClick={() => onChange('following')}>{t('coachSchedule:thisAndFollowing')}</Chip>
-    </div>
+    <Choice label={t('coachSchedule:whichWeeks')} value={scope} onChange={next => { if (next) onChange(next as Scope) }}
+      options={[{ value: 'one', label: t('coachSchedule:onlyThisWeek') }, { value: 'following', label: t('coachSchedule:thisAndFollowing') }]} />
   )
 }
 
@@ -224,24 +240,15 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
             <ScopeChoice scope={sheet.scope}
               onChange={scope => onChange(s => ({ ...s, scope, error: null }))} />
           )}
-          <div className="flex gap-2 flex-wrap" role="group" aria-label={t('coachSchedule:eventType')}>
-            {EVENT_KINDS.map(kind => (
-              <Chip key={kind} on={sheet.form.kind === kind} color={EVENT_COLOR[kind]} onClick={() => setForm({ kind })}>
-                {t(KIND_WORD[kind])}
-              </Chip>
-            ))}
-          </div>
+          <Choice label={t('coachSchedule:eventType')} value={sheet.form.kind} onChange={next => { if (next) setForm({ kind: next as typeof sheet.form.kind }) }}
+            options={EVENT_KINDS.map(kind => ({ value: kind, label: t(KIND_WORD[kind]) }))} />
 
           {/* Imad, 24 Oct: which squad a new event is for, never silently the last pill tapped. A saved event keeps
               its squad: moving a published one would change which families have it. */}
           {!sheet.row && coachSquad.squads.length >= 2 && (
-            <div className="flex gap-2 flex-wrap" role="group" aria-label={t('nav:squad')}>
-              {[...coachSquad.squads, null].map(squad => (
-                <Chip key={squad ?? 'all'} on={(sheet.form.squad === undefined ? coachSquad.squad : sheet.form.squad) === squad} onClick={() => setForm({ squad })}>
-                  {squadName(squad)}
-                </Chip>
-              ))}
-            </div>
+            <Choice label={t('nav:squad')} value={(sheet.form.squad === undefined ? coachSquad.squad : sheet.form.squad) ?? ALL_SQUADS}
+              onChange={next => { if (next) setForm({ squad: next === ALL_SQUADS ? null : next }) }}
+              options={[...coachSquad.squads, null].map(squad => ({ value: squad ?? ALL_SQUADS, label: squadName(squad) }))} />
           )}
 
           {sheet.form.kind === 'training' && (
@@ -254,14 +261,12 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
                 <input value={sheet.form.opponent} onChange={e => setForm({ opponent: e.target.value })}
                   placeholder={t('coachSchedule:opponentExample')} className={inputClass} style={font} />
               </Field>
-              <div className="flex gap-2" role="group" aria-label={t('coachSchedule:homeOrAway')}>
-                <Chip on={sheet.form.homeAway === 'home'} onClick={() => setForm({ homeAway: sheet.form.homeAway === 'home' ? '' : 'home' })}>{t('coachSchedule:home')}</Chip>
-                <Chip on={sheet.form.homeAway === 'away'} onClick={() => setForm({ homeAway: sheet.form.homeAway === 'away' ? '' : 'away' })}>{t('coachSchedule:away')}</Chip>
-              </div>
+              <Choice label={t('coachSchedule:homeOrAway')} clearable value={sheet.form.homeAway || null}
+                onChange={next => setForm({ homeAway: (next ?? '') as typeof sheet.form.homeAway })}
+                options={[{ value: 'home', label: t('coachSchedule:home') }, { value: 'away', label: t('coachSchedule:away') }]} />
               {/* TRAK-288: asked here, so publishing the evaluation reads it from the match (Imad, 28 Oct). */}
-              {games && <div className="flex gap-2 flex-wrap" role="group" aria-label={t('coachSchedule:competition')}>
-                {COMPETITIONS.map(c => <Chip key={c.value} on={sheet.form.competition === c.value} onClick={() => setForm({ competition: c.value })}>{c.value in COMPETITION_WORD ? t(COMPETITION_WORD[c.value as keyof typeof COMPETITION_WORD]) : c.label}</Chip>)}
-              </div>}
+              {games && <Choice label={t('coachSchedule:competition')} value={sheet.form.competition || null} onChange={next => { if (next) setForm({ competition: next as typeof sheet.form.competition }) }}
+                options={COMPETITIONS.map(c => ({ value: c.value, label: c.value in COMPETITION_WORD ? t(COMPETITION_WORD[c.value as keyof typeof COMPETITION_WORD]) : c.label }))} />}
             </>
           )}
 
@@ -325,22 +330,22 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
 
           <div className="space-y-1">
             <span className="text-[9px] tracking-[0.1em] uppercase text-ink-3" style={mono}>{t('coachSchedule:length')}</span>
-            <div className="flex gap-2 flex-wrap" role="group" aria-label={t('coachSchedule:length')}>
-              {DURATIONS.map(d => (
-                <Chip key={d} on={sheet.form.duration === d} onClick={() => setForm({ duration: d })}>{t('coachSchedule:lengthMinutes', { count: d })}</Chip>
-              ))}
-            </div>
+            <Choice label={t('coachSchedule:length')} value={String(sheet.form.duration)} onChange={next => { if (next) setForm({ duration: Number(next) as typeof sheet.form.duration }) }}
+              options={DURATIONS.map(d => ({ value: String(d), label: t('coachSchedule:lengthMinutes', { count: d }) }))} />
           </div>
 
           {!sheet.row && sheet.form.kind !== 'match' && !heldTraining && (
             <div className="space-y-2">
-              <Chip on={sheet.repeat.on} onClick={() => setRepeat({ on: !sheet.repeat.on })}>{t('coachSchedule:repeatsWeekly')}</Chip>
+              <div className="arc">
+                <ChipGroup label={t('coachSchedule:repeatsWeekly')} options={[{ value: 'on', label: t('coachSchedule:repeatsWeekly') }]}
+                  value={sheet.repeat.on ? ['on'] : []} onValueChange={next => setRepeat({ on: next.includes('on') })} />
+              </div>
               {sheet.repeat.on && (
                 <>
-                  <div className="flex gap-1.5 flex-wrap" role="group" aria-label={t('coachSchedule:repeatOn')}>
-                    {WEEKDAYS.map((label, day) => (
-                      <Chip key={label} on={sheet.repeat.days.includes(day)} onClick={() => toggleDay(day)}>{t(WEEKDAY_WORD[day])}</Chip>
-                    ))}
+                  <div className="arc">
+                    <ChipGroup label={t('coachSchedule:repeatOn')} options={WEEKDAYS.map((label, day) => ({ value: String(day), label: t(WEEKDAY_WORD[day]) }))}
+                      value={sheet.repeat.days.map(String)}
+                      onValueChange={next => { const changed = [...next.filter(d => !sheet.repeat.days.map(String).includes(d)), ...sheet.repeat.days.map(String).filter(d => !next.includes(d))][0]; if (changed !== undefined) toggleDay(Number(changed)) }} />
                   </div>
                   <ArcField>
                     <DatePicker label={t('coachSchedule:endsOn')} className="arc-trak-field"

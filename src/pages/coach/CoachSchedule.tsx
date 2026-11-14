@@ -49,6 +49,7 @@ import { EventSummary } from '@/components/coach/EventSummary'
 import { describeEventKit } from '@/lib/kit-templates'
 import { withAlpha } from '@/lib/with-alpha'
 import { Chip, EventEditSheet, Field, ScopeChoice } from '@/components/coach/EventEditSheet'
+import { Badge } from '@/components/arc/badge/badge'
 import {
   KIND_LABEL, competitionProblem, failed, font, inSeries, inputClass, mono, pastProblem, type EditSheet, type Scope, NOTE_STEP,
 } from '@/lib/event-edit'
@@ -748,10 +749,9 @@ export default function CoachSchedule() {
                       )}
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         {state && (
-                          <span className={`block w-fit rounded-full px-2 py-[1px] text-[11px] font-medium ${cancelled ? 'text-danger' : ''}`}
-                            style={{ color: state.color, background: state.fill, border: `1px ${row && !row.published && !cancelled ? 'dashed' : 'solid'} ${'edge' in state ? state.edge : state.color}`, ...font }}>
-                            {state.text}
-                          </span>
+                          // TRAK-427: Arc's badge, as on the newer pages: Published in the app's green, a draft outlined and
+                          // quiet (only the coach sees it), a started event quiet, a cancelled one in the danger red.
+                          <span className="arc"><Badge size="sm" pill tone={cancelled ? 'danger' : !row?.published || startedLocked(row) ? 'neutral' : 'success'} outline={!row?.published && !cancelled}>{state.text}</Badge></span>
                         )}
                         {!row && (
                           <span className="block w-fit rounded-full px-2 py-[1px] text-[11px] font-medium text-ink-2 bg-raised" style={font}>{t('coachHome:logged')}</span>

@@ -36,7 +36,11 @@ test.describe('TRAK-172 parent assessment history', () => {
         const child = params.get('squad_player_id')?.includes(zara) ? zara : alex
         let rows = records(child)
         if (params.has('id')) rows = rows.filter(row => `eq.${row.id}` === params.get('id'))
-        if (params.has('session_id')) rows = rows.filter(row => `eq.${row.session_id}` === params.get('session_id'))
+        // TRAK-439: the training history asks which of its sessions have an assessment with in.(a,b).
+        if (params.has('session_id')) {
+          const asked = params.get('session_id')!
+          rows = rows.filter(row => `eq.${row.session_id}` === asked || (asked.startsWith('in.(') && asked.slice(4, -1).replace(/"/g, '').split(',').includes(row.session_id)))
+        }
         const offset = Number(params.get('offset') ?? 0), limit = Number(params.get('limit') ?? rows.length)
         return json(rows.slice(offset, offset + limit))
       }
@@ -58,6 +62,7 @@ test.describe('TRAK-172 parent assessment history', () => {
         })).filter(row => !id || row.id === id))
       }
       if (['player_details', 'recognition_awards', 'game_for_family', 'game_review_for_family'] /* TRAK-286, TRAK-289: no shared plan, no review */.some(name => url.pathname === `/rest/v1/${name}`)) return json([])
+      if (url.pathname === '/rest/v1/rpc/family_feature_on') return json(false) // TRAK-441: family_look off
       if (['child_events', 'season_plan_for_player', 'get_children_awaiting_consent', 'get_roster_children_awaiting_consent', 'get_my_child_logins', 'get_my_approved_children_awaiting_signup'].some(name => url.pathname === `/rest/v1/rpc/${name}`)) return json([])
       if (url.pathname === '/rest/v1/telemetry_events') return route.fulfill({ status: 201, body: '' })
       unexpected.push(`${req.method()} ${url.pathname}`)

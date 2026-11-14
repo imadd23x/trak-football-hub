@@ -87,7 +87,7 @@ for (const [width, height] of [[1280, 800], [390, 844]] as const) {
     // Step 4: what goes out, and Share waits for the tick.
     await expect(page.getByRole('heading', { name: 'What goes out' })).toBeVisible()
     await expect(page.getByText('1 of 4 players has one or two')).toBeVisible()
-    await expect(page.getByText('Only you, for now. Players and families don’t see the season plan in the app yet.')).toBeVisible()
+    await expect(page.getByText(/don.t see the season plan/)).toHaveCount(0)
     const share = page.getByRole('button', { name: 'Share now' })
     await expect(share).toBeDisabled()
     await page.getByRole('checkbox', { name: 'I’ve talked objectives through with the players, face to face' }).click()

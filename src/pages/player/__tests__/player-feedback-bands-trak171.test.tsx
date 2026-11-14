@@ -4,7 +4,7 @@
  * were on Home alone, so it looked as if they hadn't loaded. The screen now
  * shows that assessment's six bands under the message, as Home does.
  */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +12,7 @@ import { server } from '../../../../tests/msw/server'
 import { SUPABASE_URL } from '../../../../tests/msw/supabase'
 import { supabase } from '@/integrations/supabase/client'
 import PlayerFeedback from '../PlayerFeedback'
+import { wasOpened } from '@/lib/games/news'
 
 vi.mock('@/lib/telemetry', () => ({ trackEvent: vi.fn() }))
 const auth = vi.hoisted(() => ({ user: { id: '98171000-0000-4000-8000-000000000001' } }))
@@ -59,5 +60,25 @@ describe('TRAK-171: the assessment screen shows its bands', () => {
     renderAt()
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load feedback")
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+  })
+})
+
+describe("TRAK-441: Home's Latest evaluation stops saying New once this page shows it", () => {
+  const opened = () => wasOpened(auth.user.id, auth.user.id, 'evaluation', assessmentId, '2026-01-01T00:00:00Z')
+
+  it('marks it opened when the evaluation shows', async () => {
+    localStorage.clear()
+    renderAt()
+    await screen.findByRole('list', { name: 'Your bands' })
+    // The mark is written in an effect after the bands commit; a slow CI runner can check first.
+    await waitFor(() => expect(opened()).toBe(true))
+  })
+
+  it('not when it could not load', async () => {
+    localStorage.clear()
+    assessmentReply = { status: 500, body: { message: 'boom' } }
+    renderAt()
+    await screen.findByRole('alert')
+    expect(opened()).toBe(false)
   })
 })

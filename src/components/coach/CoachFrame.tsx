@@ -17,6 +17,7 @@ import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { BARLESS, COACH_SCREEN_PATH, placeOf, tabOf, type CoachScreen } from '@/lib/coach-places'
 import { CoachTrailProvider, TrailLink, type Trail } from '@/components/coach/CoachTrail'
 import { useTranslation } from '@/lib/i18n'
+import { useOwnAvatarUrl } from '@/hooks/use-own-avatar-url'
 import { FamilyFrame } from '@/components/trak/FamilyFrame'
 
 /* TRAK-259 (Imad, 22 Oct): the coach's frame, around every coach page.
@@ -72,6 +73,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
   const { t } = useTranslation()
   const wide = useSideMenuScreen()
   const identity = useCoachIdentity(userId).data
+  const photo = useOwnAvatarUrl() // TRAK-460
   const games = useFeature('games')
   const training = useFeature('training')
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -94,7 +96,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
 
   const items: RailEntry[] = [
     { id: 'home', label: t('nav:home'), icon: House },
-    { id: 'calendar', label: t('nav:schedule'), icon: CalendarDays }, // TRAK-255: the coach's is called Schedule
+    { id: 'calendar', label: t('nav:events'), icon: CalendarDays }, // TRAK-255, TRAK-449: the coach's is called Events, as the parent's is
     { id: 'squad', label: t('nav:squad'), icon: Users },
     // TRAK-306 (Kostas, 28 Oct): Imad's pitch (TRAK-265) for Games; a cone for Training, and for Library in its place.
     ...(games ? [{ id: 'games', label: t('nav:matches'), icon: PitchIcon }] : []),
@@ -114,7 +116,7 @@ function Framed({ userId, name }: { userId: string; name: string }) {
       trail={trail?.crumbs.map(crumb => <TrailLink key={crumb.href} crumb={crumb} />)} sheetOpen={sheetOpen} onSheetOpenChange={setSheetOpen} onWidthChange={setRail}
       brand={{ name: club, logo: <Avatar name={club} src={identity?.logo ?? undefined} size="sm" /> }}
       items={items} footerItem={{ id: 'settings', label: t('nav:settings'), icon: Settings }}
-      profile={{ name, detail: identity?.role ?? undefined, avatar: <Avatar name={name} size="sm" /> }}
+      profile={{ name, detail: identity?.role ?? undefined, avatar: <Avatar name={name} src={photo ?? undefined} size="sm" /> }}
       active={screen ?? ''} onSelect={select}
       afterBrand={switcher}
       actions={<><CoachAlertsBell coachId={userId} /><CoachCreate placement="top" onSaved={saved} /></>}>
@@ -139,9 +141,10 @@ export function CoachMenuButton({ name }: { name: string }) {
   const wide = useSideMenuScreen()
   const frame = useCoachFrame()
   const { t } = useTranslation()
+  const photo = useOwnAvatarUrl() // TRAK-460
   if (wide || !frame) return null
   return <button type="button" onClick={frame.openMenu} aria-label={t('nav:openMenu')} aria-haspopup="dialog"
     className="arc flex-none rounded-full transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-    <Avatar name={name} size="md" />
+    <Avatar name={name} src={photo ?? undefined} size="md" />
   </button>
 }

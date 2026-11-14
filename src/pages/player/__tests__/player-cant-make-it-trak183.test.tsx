@@ -54,7 +54,7 @@ function setup(age: number, consentAge: number) {
     http.get(`${SUPABASE_URL}/rest/v1/game_for_family`, () => HttpResponse.json([])),
     http.get(`${SUPABASE_URL}/rest/v1/game_for_player`, () => HttpResponse.json([])),
     http.get(`${SUPABASE_URL}/rest/v1/game_review_for_family`, () => HttpResponse.json([])),
-    http.get(`${SUPABASE_URL}/rest/v1/event_absences`, () => HttpResponse.json(absent ? [{ reason: 'Exams' }] : [])),
+    http.get(`${SUPABASE_URL}/rest/v1/event_absences`, () => HttpResponse.json(absent ? [{ reason: 'school' }] : [])),
     http.post(`${SUPABASE_URL}/rest/v1/rpc/report_cant_make_it`, async ({ request }) => {
       reported.push(await request.json() as Record<string, unknown>)
       absent = true
@@ -75,9 +75,9 @@ describe('TRAK-183: a player who consents for themselves says Can\'t make it', (
     const attendance = await screen.findByRole('region', { name: 'Attendance' })
     expect(await within(attendance).findByText("Everyone counts as coming. Only say if you can't.")).toBeInTheDocument()
     await user.click(within(attendance).getByRole('button', { name: "Can't make it" }))
-    await user.type(within(attendance).getByLabelText(/Reason/), 'Exams')
+    await user.click(within(attendance).getByRole('radio', { name: 'School' }))
     await user.click(within(attendance).getByRole('button', { name: 'Tell the coach' }))
-    await waitFor(() => expect(reported).toEqual([{ p_event_id: 'ev-1', p_child: PLAYER.id, p_reason: 'Exams' }]))
+    await waitFor(() => expect(reported).toEqual([{ p_event_id: 'ev-1', p_child: PLAYER.id, p_reason: 'school' }]))
     expect(await within(attendance).findByText("You told the coach you can't make it.")).toBeInTheDocument()
   })
 

@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { fetchWaitReason, waitText, type WaitReason } from '@/lib/wait-reason'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
+import { format, parseISO } from 'date-fns'
 import { MobileShell, BandPill, NavBar } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
 import { SliderInput } from '@/components/trak/SliderInput'
@@ -316,7 +317,8 @@ function CoachAssessmentForm() {
   // TRAK-100: the time it was logged tells two same-day, same-title sessions apart.
   const loggedAt = (s: any) => s.created_at
     ? t('coachAssess:logged', { time: new Date(s.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }) : ''
-  const sessionLabel = (s: any) => `${s.title || t('coachAssess:sessionFallback')}${s.session_date ? ` · ${s.session_date}` : ''}${loggedAt(s)}`
+  // TRAK-425: the day reads "Mon 9 Nov" as everywhere else; the logged time still tells two same-day, same-title sessions apart (TRAK-100).
+  const sessionLabel = (s: any) => `${s.title || t('coachAssess:sessionFallback')}${s.session_date ? ` · ${format(parseISO(s.session_date), 'EEE d MMM')}` : ''}${loggedAt(s)}`
   const message = shared.trim()
   // True only while the box holds exactly what the family can already read.
   const liveUnchanged = sharedPublished && publishedBody !== null && message === publishedBody.trim()
@@ -328,6 +330,8 @@ function CoachAssessmentForm() {
      from a raw row-level-security error after. The database stays the gate:
      if this check fails we do not block on a guess. */
   const [consentWait, setConsentWait] = useState(false)
+  // TRAK-425: step 1 is done once a player and session can be assessed; only then may the steps be jumped (ahead as well as back).
+  const playerReady = !!playerId && formReady && !consentWait && (isTraining || !!appearance)
   // TRAK-182 (Imad, 15 Oct): one step per screen; the review step saves.
   const [step, setStep] = useState(0)
   useEffect(() => {
@@ -565,8 +569,9 @@ function CoachAssessmentForm() {
   }
 
   /* ---- render ---- */
+  // TRAK-425: the page width every coach page uses (a laptop filled, not a 640 px column); a phone is unchanged.
   return (
-    <div className="flex flex-col mx-auto trak-read bg-ground h-dvh">
+    <div className="flex flex-col mx-auto w-full trak-wide bg-ground h-dvh">
       {/* ---- header: always visible, never scrolls ---- */}
       <div className="flex items-center gap-3 px-5 py-3 shrink-0"
         style={{ borderBottom: '1px solid rgb(var(--t-line))' }}>
@@ -578,8 +583,8 @@ function CoachAssessmentForm() {
 
       {/* ---- scrollable content ---- */}
       <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-5 pt-4">
-        <div className="arc">
-          <Stepper label={t('coachAssess:assessmentSteps')} steps={steps} current={step} onStepSelect={setStep} />
+        <div className="arc pb-2">
+          <Stepper label={t('coachAssess:assessmentSteps')} steps={steps} current={step} onStepSelect={setStep} jumpAhead={playerReady} />
         </div>
 
         {/* Shown on every step: a refused save (consent withdrawn mid-edit) says why where the coach is. */}
@@ -597,7 +602,7 @@ function CoachAssessmentForm() {
         {selectedPlayer ? (
           <div className="flex items-center gap-3 p-3 rounded-[12px] bg-surface border border-line">
             <PlayerFace name={selectedPlayer.player_name} size="md" className="arc" aria-hidden />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[15px] font-medium text-ink truncate">
                 {selectedPlayer.player_name}
               </p>
@@ -608,12 +613,16 @@ function CoachAssessmentForm() {
                 {selectedPlayer.squad_number ? ` \u00B7 #${selectedPlayer.squad_number}` : ''}
               </p>
             </div>
+            {/* TRAK-425: a picked player shows once, here; Change brings the list back. */}
+            <div className="arc shrink-0">
+              <Button size="sm" variant="secondary" disabled={saving || choicesLoading} onClick={() => setPlayerId('')}>{t('coachAssess:changePlayerButton')}</Button>
+            </div>
           </div>
         ) : null}
 
 
-        {/* player selector dropdown */}
-        <div className="space-y-1.5">
+        {/* player selector dropdown: only until a player is picked (TRAK-425) */}
+        {!selectedPlayer && <div className="space-y-1.5">
           <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-ink-3" style={{ fontFamily: 'var(--t-font-mono)' }}>
             {t('coachAssess:playerCaps')}
           </span>
@@ -625,7 +634,7 @@ function CoachAssessmentForm() {
               onChange={e => setPlayerId(e.target.value)}
               className="w-full px-4 py-3 pr-10 rounded-[10px] bg-surface border border-line text-sm text-ink outline-none appearance-none"
             >
-              <option value="">{selectedPlayer ? t('coachAssess:changePlayer') : t('coachAssess:selectPlayer')}</option>
+              <option value="">{t('coachAssess:selectPlayer')}</option>
               {players.filter(p => inSquad(p.age_group) || p.id === playerId).map(p => (
                 <option key={p.id} value={p.id}>
                   {p.player_name}
@@ -634,7 +643,7 @@ function CoachAssessmentForm() {
             </select>
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-3 pointer-events-none" />
           </div>
-        </div>
+        </div>}
 
         {/* ---- 3. session selector (required, TRAK-68) ----
             Outside the locked fieldset: the form stays locked until a session
@@ -718,7 +727,7 @@ function CoachAssessmentForm() {
         </>}
         {step === 1 && <>
         {/* ---- 5. sliders on a light card (TRAK-229); each fill takes its band's colour ---- */}
-        <div className="rounded-[14px] bg-surface border border-line p-[14px_16px] space-y-5">
+        <div className="rounded-[14px] bg-surface border border-line p-[14px_16px] space-y-5 tablet:space-y-0 tablet:grid tablet:grid-cols-2 tablet:gap-x-10 tablet:gap-y-5">
           <SliderInput label={t('coachAssess:sliderWorkRate')} value={workRate}     onChange={setWorkRate} disabled={!formReady || saving || consentWait} />
           <SliderInput label={t('coachHome:attributeTactical')} value={tactical}     onChange={setTactical} disabled={!formReady || saving || consentWait} />
           <SliderInput label={t('coachHome:attributeAttitude')} value={attitude}     onChange={setAttitude} disabled={!formReady || saving || consentWait} />
@@ -866,9 +875,9 @@ function CoachAssessmentForm() {
         ) : null}
       </div>
 
-      {/* Above the floating glass tab bar (TRAK-259: 62px, 12px off the bottom, plus the home indicator's inset),
-          so Back and Next are never under it. TRAK-199: beside a laptop's sidebar there is no bar, so no room (trak-bar-room). */}
-      <div className="trak-bar-room arc flex gap-2 px-5 pb-3 pt-2 mb-[calc(84px+env(safe-area-inset-bottom))] shrink-0 border-t border-line">
+      {/* TRAK-425: on a phone this page has its own Back and Next bar and the glass tab bar steps aside (BARLESS), as on Add
+          session: one bar at the bottom, not two stacked. It clears the home indicator's inset. */}
+      <div className="arc flex gap-2 px-5 pb-3 pt-2 mb-[env(safe-area-inset-bottom)] shrink-0 border-t border-line">
         {step === STEPS.length - 1 ? <>
           {/* Review: the decision sits where the thumb is; Back shrinks to an icon. */}
           <Button size="lg" variant="secondary" aria-label={t('coachSchedule:backTo', { step: steps[step - 1].label })} onClick={() => setStep(step - 1)}><ChevronLeft size={18} aria-hidden="true" /></Button>
@@ -890,7 +899,7 @@ function CoachAssessmentForm() {
           {step > 0 && <Button size="lg" variant="secondary" className="flex-1" aria-label={t('coachSchedule:backTo', { step: steps[step - 1].label })}
             onClick={() => setStep(step - 1)}>{t('common:back')}</Button>}
           {/* The first step opens only once the player can be assessed: the form below it stays locked otherwise. */}
-          <Button size="lg" className="flex-1" disabled={step === 0 && (!playerId || !formReady || consentWait || (!isTraining && !appearance))}
+          <Button size="lg" className="flex-1" disabled={step === 0 && !playerReady}
             onClick={() => setStep(step + 1)}>{t('coachSchedule:next')}</Button>
         </>}
       </div>

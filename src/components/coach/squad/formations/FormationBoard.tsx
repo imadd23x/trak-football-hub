@@ -205,7 +205,8 @@ export function FormationBoard({ title, shape, format, starters, players, bench,
           className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-brand disabled:text-ink-3 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           <Undo2 size={16} aria-hidden="true" />{t('coachSquad:fmUndo')}</button>
       </div>
-      <p role="status" className="min-h-5 text-sm text-ink-2">{selected ? (selectedName
+      {/* TRAK-452: the "selected" line is for screen readers only; on screen the selected place is marked. */}
+      <p role="status" className="sr-only">{selected ? (selectedName
         ? t(selected.startsWith('bench:') ? 'coachSquad:fmSelectedBench' : 'coachSquad:fmSelectedPitch', { name: selectedName })
         : t('coachSquad:fmSelectedEmpty')) : ''}</p>
     </div>

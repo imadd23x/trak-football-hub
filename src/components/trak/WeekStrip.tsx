@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { addDays, format, parseISO, startOfWeek } from 'date-fns'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { ChevronRight } from 'lucide-react'
 import { LoadError } from '@/components/trak/LoadError'
+import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { WeekPicker, type WeekDay } from '@/components/arc/blocks/availability-picker/week-picker'
+import { dateLocale, i18n } from '@/lib/i18n'
 import { eventHeading, toPlayerEvent, type PlayerEvent } from '@/lib/player-events'
 // The coach calendar's colours (TRAK-159, founders 12 Oct): one constant everywhere.
 import { CANCELLED_COLOR, EVENT_COLOR } from '@/lib/coach-events'
@@ -30,6 +33,11 @@ export function weekDays(today: Date): string[] {
   const monday = startOfWeek(today, { weekStartsOn: 1 })
   return Array.from({ length: 7 }, (_, i) => format(addDays(monday, i), 'yyyy-MM-dd'))
 }
+
+/** The week picker's title: This week, Next week, Last week, or the week of its Monday. */
+export const weekTitle = (offset: number, monday: string) =>
+  offset === 0 ? i18n.t('coachHome:thisWeek') : offset === 1 ? i18n.t('coachHome:nextWeek') : offset === -1 ? i18n.t('coachHome:lastWeek')
+    : i18n.t('coachHome:weekOf', { day: format(parseISO(monday), 'd MMMM', { locale: dateLocale() }) })
 
 /** How a role opens an event: a sheet around the row's trigger (TRAK-182), given a refresh for after a change. */
 export type RenderEventSheet = (event: StripEvent, trigger: ReactElement, refresh: () => void) => ReactNode
@@ -117,14 +125,20 @@ type WeekRows = PromiseLike<{ data: unknown[] | null; error: unknown }>
  * only load from today). `loadKey` names whose week it is. A failed read is
  * an error with Retry, never an empty week (the J4 standard).
  */
-export function LoadedWeekStrip({ load, loadKey, renderSheet, absentFor }: {
+export function LoadedWeekStrip({ load, loadKey, renderSheet, renderPrimary, absentFor, picker = false }: {
   load: (from: string, to: string) => WeekRows
   loadKey: string
   renderSheet: RenderEventSheet
   /** TRAK-231: a family strip, for this child: mark the events their family said they can't make. */
   absentFor?: string
+  /** TRAK-441: the coach's week picker, read only, with arrows to other weeks. */
+  picker?: boolean
+  /** TRAK-441: beside Details in the picker, the family's one action on the chosen event (a parent's Can't make it). */
+  renderPrimary?: (event: StripEvent) => ReactNode
 }) {
-  const [events, setEvents] = useState<StripEvent[] | null>(null)
+  const [offset, setOffset] = useState(0)
+  const dates = useMemo(() => weekDays(addDays(new Date(), offset * 7)), [offset])
+  const [week, setWeek] = useState<{ monday: string; events: StripEvent[] } | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const loadRef = useRef(load)
@@ -132,36 +146,37 @@ export function LoadedWeekStrip({ load, loadKey, renderSheet, absentFor }: {
 
   useEffect(() => {
     let cancelled = false
-    const days = weekDays(new Date())
     setFailed(false)
     // A reload (after Publish in the sheet) keeps the week on screen, so an open
     // sheet stays open. Another person's week remounts: callers key by loadKey.
-    loadRef.current(days[0], days[6]).then(({ data, error }) => {
+    loadRef.current(dates[0], dates[6]).then(({ data, error }) => {
       if (cancelled) return
       if (error) { setFailed(true); return }
-      setEvents((data ?? []).flatMap(row => {
+      setWeek({ monday: dates[0], events: (data ?? []).flatMap(row => {
         const event = toPlayerEvent(row as Record<string, unknown>)
         const source = row as { published?: boolean; sessionId?: string }
         return event ? [{ ...event, draft: source.published === false, sessionId: source.sessionId }] : []
-      }))
+      }) })
     }, () => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
-  }, [loadKey, attempt])
+  }, [loadKey, attempt, dates])
 
   if (failed) return <div className="mb-4"><LoadError what="this week" onRetry={() => setAttempt(n => n + 1)} /></div>
-  if (!events) return null
+  if (!week || week.monday !== dates[0]) return picker
+    ? <LoadingSkeleton label={i18n.t('coachHome:weekLoading')} lines={4} rows={2} className="h-[320px] content-start rounded-2xl border border-line bg-surface p-5" />
+    : null
   const refresh = () => setAttempt(n => n + 1)
-  return absentFor
-    ? <FamilyWeekStrip childId={absentFor} events={events} renderSheet={renderSheet} refresh={refresh} />
+  const show = (events: StripEvent[]) => picker
+    ? <FamilyWeekPicker dates={dates} offset={offset} onOffset={setOffset} events={events} renderSheet={renderSheet} renderPrimary={renderPrimary} refresh={refresh} />
     : <WeekStrip events={events} renderSheet={renderSheet} refresh={refresh} />
+  return absentFor ? <FamilyWeekStrip childId={absentFor} events={week.events}>{show}</FamilyWeekStrip> : show(week.events)
 }
 
-/** TRAK-231: a family's strip, with the events their child can't make marked. A failed read marks none. */
-function FamilyWeekStrip({ childId, events, renderSheet, refresh }: {
+/** TRAK-231: a family's week, with the events their child can't make marked. A failed read marks none. */
+function FamilyWeekStrip({ childId, events, children }: {
   childId: string
   events: StripEvent[]
-  renderSheet: RenderEventSheet
-  refresh: () => void
+  children: (events: StripEvent[]) => ReactNode
 }) {
   const eventIds = events.map(event => event.id)
   // Keyed under CantMakeIt's ['parent', 'absence', child], so a report or an undo in the sheet refreshes it.
@@ -171,8 +186,41 @@ function FamilyWeekStrip({ childId, events, renderSheet, refresh }: {
     enabled: eventIds.length > 0,
   })
   const absent = absences.data
-  return <WeekStrip events={absent ? events.map(event => ({ ...event, absent: absent.has(event.id) })) : events}
-    renderSheet={renderSheet} refresh={refresh} />
+  return <>{children(absent ? events.map(event => ({ ...event, absent: absent.has(event.id) })) : events)}</>
+}
+
+/**
+ * TRAK-441 (Imad, 13 Nov): a family's week in the coach's week picker. Nothing needs them; each event's line is what
+ * a family needs to know (Cancelled, Can't make it, or where), and Details opens the role's own event sheet.
+ */
+function FamilyWeekPicker({ dates, offset, onOffset, events, renderSheet, renderPrimary, refresh }: {
+  dates: string[]
+  offset: number
+  onOffset: (change: (offset: number) => number) => void
+  events: StripEvent[]
+  renderSheet: RenderEventSheet
+  renderPrimary?: (event: StripEvent) => ReactNode
+  refresh: () => void
+}) {
+  const locale = dateLocale()
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const byId = new Map(events.map(event => [event.id, event]))
+  const days: WeekDay[] = dates.map(date => ({
+    id: date,
+    short: format(parseISO(date), 'EEE', { locale }),
+    date: format(parseISO(date), 'd'),
+    full: format(parseISO(date), 'EEEE d MMMM', { locale }),
+    today: date === today,
+    events: events.filter(event => event.date === date).sort((a, b) => (a.time ?? '99').localeCompare(b.time ?? '99'))
+      .map(event => ({ id: event.id, kind: event.kind, title: eventHeading(event), time: event.time,
+        state: event.status === 'cancelled' ? 'cancelled' : 'published',
+        note: event.status === 'cancelled' ? i18n.t('coachHome:noteCancelled') : event.absent ? "Can't make it" : event.venue ?? '' })),
+  }))
+  return <WeekPicker family key={dates[0]} title={weekTitle(offset, dates[0])}
+    subtitle={`${format(parseISO(dates[0]), 'd')}–${format(parseISO(dates[6]), 'd MMMM', { locale })}`}
+    days={days} onPrevWeek={() => onOffset(n => n - 1)} onNextWeek={() => onOffset(n => n + 1)}
+    renderDetails={(id, trigger) => renderSheet(byId.get(id)!, trigger, refresh)}
+    renderPrimary={renderPrimary && (id => renderPrimary(byId.get(id)!))} />
 }
 
 /** The events this child's family (or the child, for themselves) said they can't make: their own rows only. */

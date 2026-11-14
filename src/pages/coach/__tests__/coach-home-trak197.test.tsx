@@ -102,10 +102,10 @@ describe('TRAK-211: the Feedback and assessment tab', { timeout: 20_000 }, () =>
       players: [player('a', 'Ade Okafor')],
       assessments: [{ squad_player_id: 'a', created_at: daysAgo(2) }],
       present: [['t1', 'x'], ['t2', 'a'], ['t3', 'a'], ['t4', 'a']],
-      absences: [{ event_id: 'e1', squad_player_id: 'a', reason: 'Ill' }],
+      absences: [{ event_id: 'e1', squad_player_id: 'a', reason: 'family' }],
     })
     renderApp('/coach/feedback')
-    expect(await within(await region()).findByText("Missed the last training (Can't make it: Ill)")).toBeInTheDocument()
+    expect(await within(await region()).findByText("Missed the last training (Can't make it: Family)")).toBeInTheDocument()
   })
 
   it('lists every player, not just the first 5', async () => {

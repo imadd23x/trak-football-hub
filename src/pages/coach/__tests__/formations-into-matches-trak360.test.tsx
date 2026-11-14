@@ -131,7 +131,7 @@ beforeEach(() => {
       { ...match('m-none', 'Nosquad', 'U16', 6 * DAY), squad: null },
     ]),
     http.get(`${SUPABASE_URL}/rest/v1/game_plan_players`, () => HttpResponse.json([{ event_id: 'm-beta' }])),
-    ...['use_formation_for_matches', 'set_default_formation'].map(name => http.post(`${SUPABASE_URL}/rest/v1/rpc/${name}`, async ({ request }) => {
+    ...['use_formation_for_matches', 'undo_formation_copy', 'set_default_formation'].map(name => http.post(`${SUPABASE_URL}/rest/v1/rpc/${name}`, async ({ request }) => {
       calls.push({ rpc: name, body: await request.json() as Record<string, unknown> })
       return HttpResponse.json([])
     })),
@@ -148,7 +148,7 @@ describe('TRAK-360 Squad › Formations into matches', () => {
     seeded()
     const u = user()
     await openFormations()
-    await u.click(await screen.findByRole('button', { name: 'Use for matches' }))
+    await u.click(await screen.findByRole('button', { name: 'Use for a match' }))
     const list = await screen.findByRole('group', { name: 'Upcoming matches' })
     expect(within(list).getAllByRole('checkbox').map(box => box.getAttribute('id') && (box.closest('div')?.textContent ?? ''))).toHaveLength(3)
     expect(within(list).getByText(/vs Nosquad/)).toBeInTheDocument()
@@ -165,18 +165,52 @@ describe('TRAK-360 Squad › Formations into matches', () => {
     await u.click(screen.getByRole('button', { name: 'Replace and copy' }))
     await waitFor(() => expect(calls).toHaveLength(1))
     expect(calls[0]).toEqual({ rpc: 'use_formation_for_matches', body: { p_formation_id: 'f1', p_event_ids: ['m-alpha', 'm-beta'] } })
-    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/ copied to 2 matches\.$/)))
+    // TRAK-453: the message stays on the page, with an Undo button and a way to close it.
+    const banner = await screen.findByText(/ copied to 2 matches\.$/)
+    expect(banner).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
   }, 30_000)
 
   it('copying into a match with no saved line-up asks nothing', async () => {
     seeded()
     const u = user()
     await openFormations()
-    await u.click(await screen.findByRole('button', { name: 'Use for matches' }))
+    await u.click(await screen.findByRole('button', { name: 'Use for a match' }))
     await u.click(await screen.findByRole('checkbox', { name: /vs Alpha/ }))
     await u.click(screen.getByRole('button', { name: 'Copy to 1 match' }))
     await waitFor(() => expect(calls).toEqual([{ rpc: 'use_formation_for_matches', body: { p_formation_id: 'f1', p_event_ids: ['m-alpha'] } }]))
-    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/ copied to 1 match\.$/)))
+    expect(await screen.findByText(/ copied to 1 match\.$/)).toBeInTheDocument()
+  }, 30_000)
+
+  // TRAK-453: the page keeps the message with an Undo button that sends the same matches back, and says it was undone.
+  it('Undo, on the page after a copy, sends the same matches to undo_formation_copy and clears the message', async () => {
+    vi.mocked(toast).mockClear()
+    seeded()
+    const u = user()
+    await openFormations()
+    await u.click(await screen.findByRole('button', { name: 'Use for a match' }))
+    await u.click(await screen.findByRole('checkbox', { name: /vs Alpha/ }))
+    await u.click(screen.getByRole('button', { name: 'Copy to 1 match' }))
+    await screen.findByText(/ copied to 1 match\.$/)
+    await u.click(screen.getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(calls.at(-1)).toEqual({ rpc: 'undo_formation_copy', body: { p_formation_id: 'f1', p_event_ids: ['m-alpha'] } }))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/^Undone\. /)))
+    await waitFor(() => expect(screen.queryByText(/ copied to 1 match\.$/)).toBeNull())
+  }, 30_000)
+
+  it('the copy message stays until it is closed, and closing it keeps the copy', async () => {
+    seeded()
+    const u = user()
+    await openFormations()
+    await u.click(await screen.findByRole('button', { name: 'Use for a match' }))
+    await u.click(await screen.findByRole('checkbox', { name: /vs Alpha/ }))
+    await u.click(screen.getByRole('button', { name: 'Copy to 1 match' }))
+    await screen.findByText(/ copied to 1 match\.$/)
+    await new Promise(resolve => setTimeout(resolve, 1500)) // no timer takes it away
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: /^Dismiss: / }))
+    await waitFor(() => expect(screen.queryByText(/ copied to 1 match\.$/)).toBeNull())
+    expect(calls.some(call => call.rpc === 'undo_formation_copy')).toBe(false)
   }, 30_000)
 
   it('Make default sets it for the format', async () => {
@@ -204,10 +238,12 @@ describe('TRAK-360 Squad › Formations into matches', () => {
     expect(within(section).getByText(/vs Alpha · copied Sat 7 Nov · 2 players not coming · 1 skipped/)).toBeInTheDocument()
   })
 
-  it('Set for matchday says so when nothing was copied, and Use for matches waits for unsaved changes', async () => {
+  // TRAK-452 (11 Nov walk-through): no Set for matchday block until the formation has been copied to a match.
+  it('Set for matchday stays hidden when nothing was copied; Use for a match is ready', async () => {
     seeded()
     await openFormations()
-    expect(await screen.findByText(/Not copied to a match yet/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Use for matches' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Use for a match' })).toBeEnabled()
+    expect(screen.queryByRole('region', { name: 'Set for matchday' })).toBeNull()
+    expect(screen.queryByText(/Not copied to a match yet/)).toBeNull()
   })
 })

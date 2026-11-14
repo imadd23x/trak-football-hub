@@ -7,20 +7,27 @@ import { CardSkeleton, MatchCardSkeleton, Skeleton } from '@/components/trak'
 import { toPlayerEvent, upcomingEventsFilter, type PlayerEvent } from '@/lib/player-events'
 import { PlayerHomeBell, type PublishedAssessmentAlert } from '@/components/player/PlayerAlertsBell'
 import { HomeHeader, HomeTitle } from '@/components/trak/HomeHeader'
+import { FrameActions, useFamilyLook } from '@/components/trak/FamilyFrame'
+import { ForYou } from '@/components/trak/ForYou'
+import { Avatar } from '@/components/arc/avatar/avatar'
 import { LoadedWeekStrip } from '@/components/trak/WeekStrip'
 import { EventSheet } from '@/components/trak/EventSheet'
-import { CantMakeIt } from '@/components/parent/CantMakeIt'
+import { CantMakeIt, CantMakeItButton } from '@/components/parent/CantMakeIt'
 import { CalendarHomePrompt } from '@/components/trak/AddToCalendar'
 import { trackEvent } from '@/lib/telemetry'
 import { PlayerParentInviteCard } from '@/components/player/PlayerParentInviteCard'
 import { OwnConsentCard } from '@/components/player/OwnConsentCard'
 import { MySeasonCard } from '@/components/player/MySeasonCard'
+import { LatestEvaluation } from '@/components/player/LatestEvaluation'
+import { SeasonSoFar } from '@/components/player/SeasonSoFar'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
 import { progressSummary, useEvaluationProgress } from '@/lib/evaluation-progress'
+import { useMySeason } from '@/lib/my-season'
 
 
 export default function PlayerHome() {
   const { user, profile } = useAuth()
+  const look = useFamilyLook()
   const navigate = useNavigate()
   const location = useLocation()
   const [loading, setLoading] = useState(true)
@@ -75,7 +82,8 @@ export default function PlayerHome() {
 
   // J7 counts published messages the player opens. The message is read here now
   // (TRAK-71), not behind a tap, so showing it is opening it.
-  const shownAssessmentId = coachAssessmentNote && !feedbackLoadFailed ? coachAssessment?.id : undefined
+  // TRAK-441: the new Home doesn't show the message (it's on the evaluation's page), so it doesn't count it.
+  const shownAssessmentId = !look && coachAssessmentNote && !feedbackLoadFailed ? coachAssessment?.id : undefined
   useEffect(() => {
     if (shownAssessmentId) trackEvent('feedback_opened', { assessment_id: shownAssessmentId })
   }, [shownAssessmentId])
@@ -84,6 +92,8 @@ export default function PlayerHome() {
   // failed read leaves the card as it was (the evaluation page says it when it can't load).
   const evaluationIds = recentAssessments.filter(a => a.evaluation_id).map(a => a.id as string)
   const evaluationProgress = useEvaluationProgress(evaluationIds)
+  // TRAK-437: the position is the one the coach set (the season plan's read, shared with the My season card), nothing if none; never the sign-up value.
+  const position = useMySeason().data?.position
   const progressLines: Record<string, string> = {}
   for (const [id, p] of evaluationProgress.data ?? []) {
     const line = progressSummary(p.objectives)
@@ -122,7 +132,7 @@ export default function PlayerHome() {
       setUpcomingEvents([])
     }
 
-    const detailsRequest = supabase.from('player_details').select('position, current_club, age_group').eq('user_id', user.id).maybeSingle()
+    const detailsRequest = supabase.from('player_details').select('current_club, age_group').eq('user_id', user.id).maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return
         // These sibling reads used to destructure only `data`, so a failure
@@ -281,22 +291,32 @@ export default function PlayerHome() {
     </MobileShell>
   )
 
+  const bell = user && <PlayerHomeBell key={user.id} userId={user.id}
+    events={loadedFor.current?.userId === user.id ? upcomingEvents : []}
+    assessment={loadFailed ? null : assessmentAlert} assessmentLoadFailed={feedbackLoadFailed || loadFailed}
+    onRetry={() => setReloadKey(k => k + 1)} />
+  const name = profile?.full_name || 'Player'
+  // TRAK-441 slice 2 (Imad, 13 Nov), behind family_look: the coach's Home. A phone: avatar, name, calendar, bell. A
+  // laptop: no header, the bell in the top bar; two columns, as the coach's Home.
+  const header = look
+    ? <FrameActions fallback={<HomeHeader calendarTo="/player/calendar" left={<span className="arc flex"><Avatar name={name} size="md" /></span>}
+        center={<HomeTitle>{name}</HomeTitle>} right={bell} />}>{bell}</FrameActions>
+    : <HomeHeader calendarTo="/player/calendar" center={<HomeTitle>{name}</HomeTitle>} right={bell} />
   return (
-    <MobileShell>
+    <MobileShell width={look ? 'wide' : 'page'}>
       <div className="pt-3 pb-4">
         {/* TRAK-163: calendar, the player's name, the bell; then the next seven days. */}
-        <HomeHeader calendarTo="/player/calendar" center={<HomeTitle>{profile?.full_name || 'Player'}</HomeTitle>}
-          right={user && <PlayerHomeBell key={user.id} userId={user.id}
-            events={loadedFor.current?.userId === user.id ? upcomingEvents : []}
-            assessment={loadFailed ? null : assessmentAlert} assessmentLoadFailed={feedbackLoadFailed || loadFailed}
-            onRetry={() => setReloadKey(k => k + 1)} />} />
+        {header}
         {/* TRAK-194 (Kostas, 16 Oct): one quiet line, as parent Home has it, not a greeting and chips that look like buttons. */}
-        {details && <p className="text-xs text-muted-foreground text-center -mt-1 pb-4">
-          {[details.position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
+        {!look && details && <p className="text-xs text-muted-foreground text-center -mt-1 pb-4">
+          {[position, details.current_club, details.age_group].filter(Boolean).join(' · ')}
         </p>}
-        {user && <LoadedWeekStrip key={user.id} loadKey={user.id} absentFor={user.id} renderSheet={(event, trigger) => <EventSheet event={event} role="player" trigger={trigger}>
+        <div className={look ? 'grid grid-cols-[minmax(0,1fr)] gap-5 laptop:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] laptop:items-start laptop:gap-6' : ''}>
+        <div className={look ? 'grid grid-cols-[minmax(0,1fr)] content-start gap-5' : ''}>
+        {user && <LoadedWeekStrip key={user.id} loadKey={user.id} absentFor={user.id} picker={look} renderSheet={(event, trigger) => <EventSheet event={event} role="player" trigger={trigger}>
           {reportsForSelf && <CantMakeIt event={event} child={{ id: user.id, name: 'you' }} self />}
         </EventSheet>}
+          renderPrimary={reportsForSelf ? event => <CantMakeItButton event={event} child={{ id: user.id, name: 'you' }} self /> : undefined}
           load={(from, to) => supabase.rpc('child_events', { p_child: user.id })
             .gte('event_date', from).lte('event_date', to).order('event_date', { ascending: true })} />}
         {/* TRAK-133 (J8.10): once there are events, offer the phone calendar. */}
@@ -334,12 +354,20 @@ export default function PlayerHome() {
 
         {user && <PlayerParentInviteCard playerUserId={user.id} hideWhenLinked />}
 
+        {/* TRAK-436: what's new from the coach, one card each, before the season (the coach's "Needs you"). */}
+        {look && user && <ForYou childId={user.id} as="player" />}
+
         {/* TRAK-397: the season plan the coach shared; nothing here when there is none. */}
         {user && <MySeasonCard key={user.id} />}
+        </div>
+        <div className={look ? 'grid grid-cols-[minmax(0,1fr)] content-start gap-5' : ''}>
 
         {/* Coach assessments: the parent's swipe cards (TRAK-172, Imad 19 Oct), each opening
             that assessment; the coach's message on the latest stays below (TRAK-71). */}
-        {coachAssessment && (
+        {/* TRAK-441 slice 2.5: the coach's look shows the latest evaluation's bands; its note is on its own page. */}
+        {look && user && coachAssessment && <LatestEvaluation assessment={coachAssessment} readerId={user.id} />}
+        {look && user && <SeasonSoFar key={user.id} childId={user.id} />}
+        {!look && coachAssessment && (
           <div className="mt-5">
             <ParentAssessmentCarousel key={recentAssessments.map(a => a.id).join(',')} assessments={recentAssessments}
               allHref={null} openHref={id => `/player/feedback/${encodeURIComponent(id)}`} progressLines={progressLines} />
@@ -358,6 +386,8 @@ export default function PlayerHome() {
           </div>
         )}
 
+        </div>
+        </div>
         {/* TRAK-194: no "Recent matches" here; the Sessions tab lists every match. */}
       </div>
       <NavBar role="player" activeTab={location.pathname} onNavigate={navigate} />

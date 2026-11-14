@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import { useNavigate, useLocation, useMatch, useSearchParams } from 'react-router-dom'
 import { Users } from 'lucide-react'
+import { EmptyState } from '@/components/arc/empty-state/empty-state'
 import { GlassSegmented } from '@/components/arc/glass-segmented/glass-segmented'
 import { NavBar, WIDE_COLUMN } from '@/components/trak'
 import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
@@ -95,15 +96,9 @@ export default function CoachSquadPage() {
 function PreparingSquad() {
   const { t } = useTranslation()
   return (
-    <div className="flex flex-col items-center text-center pt-14 px-6">
-      <div
-        className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
-        style={{ background: 'rgb(var(--t-brand) / 0.08)', border: '1px solid rgb(var(--t-brand) / 0.15)' }}
-      >
-        <Users size={22} className="text-brand" strokeWidth={1.5} />
-      </div>
-      <p className="text-[15px] text-ink-2 font-medium mb-1">{t('coachSquad:preparingTitle')}</p>
-      <p className="text-[12px] text-ink-3 leading-relaxed mb-5">{t('coachSquad:preparingBody')}</p>
+    // TRAK-432: the same Arc empty state as Matches and Training.
+    <div className="arc pt-10 px-6">
+      <EmptyState icon={<Users size={24} strokeWidth={1.5} />} title={t('coachSquad:preparingTitle')} description={t('coachSquad:preparingBody')} />
     </div>
   )
 }

@@ -102,7 +102,7 @@ const CoachSessions = () => {
                 {sessionType === 'match' && (
                   <>
                     <div className="grid grid-cols-2 gap-1.5">
-                      {['League', 'Cup', 'Tournament', 'Friendly'].map(c => (
+                      {['League', 'Tournament', 'Friendly'].map(c => (
                         <button key={c} onClick={() => setCompetition(c)}
                           className={`border rounded-lg py-2 text-[11px] font-medium transition-colors
                             ${competition === c ? 'border-primary bg-primary/15 text-primary' : 'border-border bg-secondary text-muted-foreground'}`}>

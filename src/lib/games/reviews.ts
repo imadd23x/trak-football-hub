@@ -32,7 +32,7 @@ type PlayerRow = Pick<Tables<'game_review_for_player'>, 'note' | 'job' | 'did_jo
 
 export const reviewOf = (row: FamilyRow, player: PlayerRow | null): Review => ({
   eventId: row.event_id, sessionId: row.session_id, ourScore: row.our_score, theirScore: row.their_score,
-  job: player?.job ?? '', didJob: (player?.did_job ?? null) as DidJob | null,
+  job: player?.job ?? '', didJob: (player?.job?.trim() ? player.did_job : null) as DidJob | null, // TRAK-447: no job, no "did the job"
   expectation: row.expectation as Expectation, context: row.context, against: row.against_expectation as Against,
   coachName: row.coach_name.trim() || null, note: player?.note || null,
 })

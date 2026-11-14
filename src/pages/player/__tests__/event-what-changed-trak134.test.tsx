@@ -43,7 +43,7 @@ function setup(event: Record<string, unknown>) {
     rpcRows('child_events', [event]),
     // 16 at a consent-age-15 academy, and has told the coach they can't make it.
     rpc('my_consent_status', () => ({ required: false, age: 16, consent_age: 15, threshold: 18, own_choice: true })),
-    http.get(`${SUPABASE_URL}/rest/v1/event_absences`, () => HttpResponse.json([{ reason: 'Ill' }])),
+    http.get(`${SUPABASE_URL}/rest/v1/event_absences`, () => HttpResponse.json([{ reason: 'family' }])),
   )
 }
 

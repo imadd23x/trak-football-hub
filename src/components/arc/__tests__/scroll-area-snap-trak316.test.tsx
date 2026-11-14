@@ -29,4 +29,18 @@ describe('TRAK-316: rows snap on touch only', () => {
     render(<ScrollArea orientation="horizontal" snap="x mandatory" label="Your matches"><div /></ScrollArea>)
     expect(screen.getByRole('region', { name: 'Your matches' }).style.scrollSnapType).toBe('x mandatory')
   })
+
+  // Imad, 13 Nov (coach Home's Needs you on his phone): a card snapped to the edge sat under the edge fade, so its border
+  // was faded away. A snapped card now rests the fade's length in from the edge; a mouse row has no snap and no padding.
+  it("on touch, a snapped card rests clear of the edge fade, so its border isn't cut", async () => {
+    const ScrollArea = await scrollArea(false)
+    render(<ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="What needs you"><div /></ScrollArea>)
+    expect(screen.getByRole('region', { name: 'What needs you' }).style.scrollPadding).toBe('24px')
+  })
+
+  it('with a mouse or trackpad, no snap padding', async () => {
+    const ScrollArea = await scrollArea(true)
+    render(<ScrollArea orientation="horizontal" snap="x mandatory" fade={24} label="What needs you"><div /></ScrollArea>)
+    expect(screen.getByRole('region', { name: 'What needs you' }).style.scrollPadding).toBe('')
+  })
 })

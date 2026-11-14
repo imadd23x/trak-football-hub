@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
-import { HomeHeader, HomeTitle } from '@/components/trak/HomeHeader'
+import { HomeHeader } from '@/components/trak/HomeHeader'
 import { CoachAlertsBell } from '@/components/coach/CoachAlertsBell'
 import { CoachWeekStrip, NextStep } from '@/components/coach/CoachWeekStrip'
 import { squadName } from '@/lib/coach-week'
@@ -37,6 +37,7 @@ import { Button } from '@/components/arc/button/button'
 import { squadShape } from '@/lib/squad/shape'
 import { localParts, localTodayISO } from '@/lib/event-time'
 import { dateLocale, useLanguage } from '@/lib/i18n'
+import { PageTitle, PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-262 (Imad, 22 Oct): coach Home on Arc. Squad pills (each squad, then All, which is Home's only); the week
    in Tarek's colour key with one next step per event; the Squad shape radar; Needs you. "Assess a player" and
@@ -126,8 +127,7 @@ export default function CoachHomePage() {
       reason: item.step === 'evaluate' ? t('coachHome:owedEvaluate') : item.step === 'publish-evaluation' ? t('coachHome:owedEvaluationDraft')
         : item.kind === 'match' ? t('coachHome:owedLog') : t('coachHome:owedRegister'),
       action: <NextStep item={item} coachId={user.id} roster={undefined} onChanged={owedChanged} />,
-      // TRAK-444: a match's log or evaluation, or a training's register, for the type filter and the date sort.
-      kind: item.kind === 'match' ? 'match' : 'training',
+      // TRAK-444: when it is about, so the newest come first.
       at: Date.parse(`${item.date}T${/^\d{2}:\d{2}/.test(item.time ?? '') ? item.time!.slice(0, 5) : '00:00'}`),
       // TRAK-290: from 09:00 the morning after the draft was saved (the academy's clock), worked out as Home is read.
       urgent: remindAt !== undefined && Date.now() >= Date.parse(remindAt),
@@ -146,7 +146,7 @@ export default function CoachHomePage() {
       reason: state === 'changes' ? t('coachHome:changesNotShared', { count: changed }) : t('coachHome:planNotShared'),
       // TRAK-333 (Imad, 2 Nov): every match action is a split button, with the match's other pages behind its chevron.
       action: <MatchAction state={state} eventId={game.id} />,
-      kind: 'match', at: Date.parse(game.starts_at),
+      at: Date.parse(game.starts_at),
     }]
   })
   // TRAK-364: one Evaluation due card per squad whose evaluation is due, in place of its per-player Assess cards. A
@@ -159,7 +159,7 @@ export default function CoachHomePage() {
     reason: due.since! < evaluations.today ? t('coachHome:evaluationDueSince', { day: evalDay(due.since!) })
       : t('coachHome:evaluationDueNow'),
     urgent: due.since! < evaluations.today,
-    kind: 'assessment', at: Date.parse(`${due.since}T00:00`),
+    at: Date.parse(`${due.since}T00:00`),
     action: <span className="arc"><Button size="sm" onClick={() => { if (everySquad) coachSquad.pick(squad); navigate('/coach/evaluation') }}>{t('coachHome:evaluate')}</Button></span>,
   }))
   // TRAK-352: where the season plan is on, one card per squad with consented players still to place. A newly
@@ -206,11 +206,13 @@ export default function CoachHomePage() {
 
   return (
     <MobileShell width="wide">
-      <div className="pt-3 pb-24">
+      <div className="pt-5 pb-24">
         {/* TRAK-259: on a phone the avatar opens the menu and the calendar sits beside the bell; a laptop has both
             in the frame (the sidebar, the top bar). */}
         {!wide && <HomeHeader calendarTo="/coach/schedule" left={<CoachMenuButton name={profile?.full_name || t('nav:coach')} />}
-          center={<HomeTitle>{profile?.full_name || t('nav:coach')}</HomeTitle>} right={user && <CoachAlertsBell coachId={user.id} />} />}
+          center={<PageTitle><span className="truncate">{profile?.full_name || t('nav:coach')}</span></PageTitle>} right={user && <CoachAlertsBell coachId={user.id} />} />}
+        {/* TRAK-422 (Kostas, 13 Nov): Home keeps the coach's name as its title, on a laptop too. */}
+        {wide && <PageTop className="pt-0" menu={false} title={profile?.full_name || t('nav:coach')} />}
 
         <div className={wide ? 'grid grid-cols-[minmax(0,7fr)_minmax(0,5fr)] items-start gap-6' : 'grid gap-5'}>
           {user && <CoachWeekStrip coachId={user.id} version={weekVersion} everySquad={everySquad} />}

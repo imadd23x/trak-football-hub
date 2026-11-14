@@ -99,6 +99,7 @@ function installFamily() {
     http.post(endpoint('rpc/family_training_history'), () => HttpResponse.json([])),
     // J8.8 (TRAK-131): Home and Matches read the selected child's events.
     http.post(endpoint('rpc/child_events'), () => HttpResponse.json([])),
+    http.post(endpoint('rpc/season_plan_for_player'), () => HttpResponse.json([])), // TRAK-437: the position is the coach's
   )
 }
 
@@ -138,10 +139,10 @@ describe('parent family navigation', () => {
     const user = userEvent.setup()
     renderFamily()
     // TRAK-194: Home lists no matches; the child's line and award show whose Home it is.
-    expect(await screen.findByText('mid · Alex academy · U15')).toBeInTheDocument()
+    expect(await screen.findByText('Alex academy · U15')).toBeInTheDocument()
     await followChild('Zara')
-    expect(screen.queryByText('mid · Alex academy · U15')).not.toBeInTheDocument()
-    expect(await screen.findByText('mid · Zara academy · U15')).toBeInTheDocument()
+    expect(screen.queryByText('Alex academy · U15')).not.toBeInTheDocument()
+    expect(await screen.findByText('Zara academy · U15')).toBeInTheDocument()
     expect(screen.getByText('Zara teamwork')).toBeInTheDocument()
     expect(screen.queryByText('Alex teamwork')).not.toBeInTheDocument()
 
@@ -431,10 +432,10 @@ describe('J7 parent open', () => {
 
   it('records the shown assessment once, and the sibling\'s when the parent switches child', async () => {
     renderFamily()
-    expect(await screen.findByText('mid · Alex academy · U15')).toBeInTheDocument()
+    expect(await screen.findByText('Alex academy · U15')).toBeInTheDocument()
     await waitFor(async () => expect(await views()).toEqual([{ assessment_id: 'assessment-Alex' }]))
     await followChild('Zara')
-    expect(await screen.findByText('mid · Zara academy · U15')).toBeInTheDocument()
+    expect(await screen.findByText('Zara academy · U15')).toBeInTheDocument()
     await waitFor(async () => expect(await views()).toEqual([{ assessment_id: 'assessment-Alex' }, { assessment_id: 'assessment-Zara' }]))
   })
 
@@ -576,5 +577,30 @@ describe('truthful parent ratings', () => {
     const development = screen.getByRole('region', { name: 'Latest coach assessment' })
     expect(within(development).getAllByText('Difficult')).toHaveLength(7)
     expect(screen.queryByText('Steady')).not.toBeInTheDocument()
+  })
+})
+
+/** TRAK-437: the position under the child's name is the one the coach set, never the one saved at sign-up. */
+describe('TRAK-437: the parent Home shows the coach\'s position', () => {
+  const plan = (position: string | null) => ({
+    squad_player_id: 'squad-Alex', squad: 'U15', coach_name: 'Coach Rami', time_zone: 'Asia/Dubai', starts_on: '2026-09-01', ends_on: '2027-06-30',
+    eval_every: 'month', eval_day: 0, last_evaluation_on: null, position, also_plays: [], roles: [], season_objectives: [], objectives: [],
+    is_new: false, shared_at: '2026-11-01T10:00:00Z',
+  })
+
+  it('shows the position the coach set for the selected child', async () => {
+    server.use(http.post(endpoint('rpc/season_plan_for_player'), async ({ request }) => {
+      const { p_child: child } = await request.json() as { p_child?: string }
+      return HttpResponse.json(child === 'Alex' ? [plan('Midfielder')] : [])
+    }))
+    renderFamily()
+    expect(await screen.findByText('Midfielder · Alex academy · U15')).toBeInTheDocument()
+    expect(screen.queryByText(/^mid · /)).toBeNull()
+  })
+
+  it('shows no position when the coach has set none', async () => {
+    server.use(http.post(endpoint('rpc/season_plan_for_player'), () => HttpResponse.json([plan(null)])))
+    renderFamily()
+    expect(await screen.findByText('Alex academy · U15')).toBeInTheDocument()
   })
 })

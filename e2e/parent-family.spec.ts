@@ -36,6 +36,7 @@ await context.route('**/*',async route=>{
  if (u.pathname === '/rest/v1/rpc/child_events') return json([]);
  // TRAK-399: Home's Season plan card reads the selected child's plan (a read, over POST); nothing shared here.
  if (u.pathname === '/rest/v1/rpc/season_plan_for_player') return json([]);
+ if (u.pathname === '/rest/v1/rpc/family_feature_on') return json(false); // TRAK-441: family_look off
  if(u.pathname==='/rest/v1/player_parent_links') return failLinks?json({message:'Synthetic network error'},503):json([{player_user_id:alex},{player_user_id:zara}]);
  if(u.pathname==='/rest/v1/profiles') {
    const filter=u.searchParams.get('user_id')||'';
@@ -64,13 +65,13 @@ await context.route('**/*',async route=>{
  const following=page.getByRole('group',{name:'Following'});
  await expect(following.getByRole('button',{name:'Alex Example'})).toBeVisible();
  // TRAK-194: Home lists no matches; each child's line says whose Home it is.
- await expect(page.getByText('Midfielder · Alex Academy · U15',{exact:true})).toBeVisible();
+ await expect(page.getByText('Alex Academy · U15',{exact:true})).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('home-mobile.png'),fullPage:true});
  await following.getByRole('button').click();
  await page.getByRole('menuitem',{name:'Zara Example'}).click();
  await expect(following.getByRole('button',{name:'Zara Example'})).toBeVisible();
- await expect(page.getByText('Midfielder · Zara Academy · U15',{exact:true})).toBeVisible();
- await expect(page.getByText('Midfielder · Alex Academy · U15',{exact:true})).toHaveCount(0);
+ await expect(page.getByText('Zara Academy · U15',{exact:true})).toBeVisible();
+ await expect(page.getByText('Alex Academy · U15',{exact:true})).toHaveCount(0);
  await page.getByRole('tab',{name:'Events',exact:true}).click();
  await expect(page.getByRole('combobox')).toHaveValue(zara);
  // TRAK-181: Trak draws the picker and its chevron, so Safari can't swap in its own grey bar.
@@ -100,8 +101,8 @@ await context.route('**/*',async route=>{
  await page.keyboard.press('Escape');
  await expect(alertsSheet).toHaveCount(0);
  await expect(following.getByRole('button',{name:'Zara Example'})).toBeVisible();
- await expect(page.getByText('Midfielder · Zara Academy · U15',{exact:true})).toBeVisible();
- await expect(page.getByText('Midfielder · Alex Academy · U15',{exact:true})).toHaveCount(0);
+ await expect(page.getByText('Zara Academy · U15',{exact:true})).toBeVisible();
+ await expect(page.getByText('Alex Academy · U15',{exact:true})).toHaveCount(0);
  await page.getByRole('tab',{name:'Profile',exact:true}).click();
  await expect(page.getByText('Parent account · 2 children linked',{exact:true})).toBeVisible();
  // TRAK-181: no "Following" picker on Profile; each child has a consent line.
@@ -111,7 +112,7 @@ await context.route('**/*',async route=>{
  await page.screenshot({path:testInfo.outputPath('connections-mobile.png'),fullPage:true});
  expect(errors).toEqual([]);
  expect(unexpected).toEqual([]);
- expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/get_my_approved_children_awaiting_signup', '/rest/v1/rpc/family_training_history', '/rest/v1/rpc/child_events', '/rest/v1/rpc/season_plan_for_player', '/rest/v1/rpc/guardian_consent_applies', '/auth/v1/logout'].includes(write.path))).toBe(true);
+ expect(writes.every(write => ['/rest/v1/telemetry_events', '/rest/v1/rpc/get_children_awaiting_consent', '/rest/v1/rpc/get_roster_children_awaiting_consent', '/rest/v1/rpc/get_my_child_logins', '/rest/v1/rpc/get_my_child_credentials', '/rest/v1/rpc/get_my_approved_children_awaiting_signup', '/rest/v1/rpc/family_training_history', '/rest/v1/rpc/child_events', '/rest/v1/rpc/season_plan_for_player', '/rest/v1/rpc/family_feature_on', '/rest/v1/rpc/guardian_consent_applies', '/auth/v1/logout'].includes(write.path))).toBe(true);
 });
 
 // TRAK-182: Arc's sheet springs in from JavaScript, so getAnimations() doesn't

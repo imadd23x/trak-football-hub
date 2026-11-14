@@ -11,7 +11,6 @@ import {
 import { NavBar, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { CoachTrail } from '@/components/coach/CoachTrail'
-import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { Alert } from '@/components/arc/alert/alert'
 import { Button } from '@/components/arc/button/button'
 import { DatePicker } from '@/components/arc/date-picker/date-picker'
@@ -25,6 +24,7 @@ import { SeasonObjectivesEditor } from '@/components/coach/season-plan/SeasonObj
 import { EvaluationRhythm } from '@/components/coach/season-plan/EvaluationRhythm'
 import { firstDateLine, rhythmOf, type EvalEvery } from '@/lib/evaluation'
 import { localTodayISO } from '@/lib/event-time'
+import { PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-350 (Season plan 2/18, spec TRAK-348): the season plan's set-up, step 1. The season's dates and up to three
    season objectives (the mockup's six, or the coach's own), each editable and deletable. It saves as a draft only the
@@ -61,7 +61,7 @@ const savedKey = (plan: SeasonPlan | null, saved: SeasonObjective[]) =>
 export default function CoachSeasonPlan() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const squad = planSquad(useCoachSquad(user?.id))
   const season = useSeasonPlan(user?.id, squad)
   const objectives = useQuery({
@@ -81,16 +81,11 @@ export default function CoachSeasonPlan() {
   return (
     <div className="min-h-screen bg-ground pb-24">
       <div className={WIDE_COLUMN}>
-        <CoachTrail className="mt-5" current="Season plan" />
-        {/* An edit screen has its own heading, and Cancel as its way out. */}
-        {!(shared && editing) && <header className="pt-4 pb-4">
-          <div className="flex items-center gap-2">
-            {/* TRAK-378: on a phone the avatar opens the side menu, where the squad picker is (TRAK-376). */}
-            <CoachMenuButton name={profile?.full_name || 'Coach'} />
-            <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Season plan</h1>
-          </div>
-          {squad && !season.isPending && <p className="mt-1 text-sm text-ink-3">{squad} · {sharedOn ? `Shared ${shortDate(sharedOn)}` : season.plan ? 'Draft, only you see it' : 'Not started'}</p>}
-        </header>}
+        {/* An edit screen has its own heading, and Cancel as its way out (TRAK-422: under the same trail, 20 px down). */}
+        {shared && editing ? <CoachTrail className="mt-5" current="Season plan" />
+          // TRAK-378: on a phone the avatar opens the side menu, where the squad picker is (TRAK-376).
+          : <PageTop title="Season plan" trail={<CoachTrail current="Season plan" />}
+            below={squad && !season.isPending && <p className="-mt-2 text-sm text-ink-3">{squad} · {sharedOn ? `Shared ${shortDate(sharedOn)}` : season.plan ? 'Draft, only you see it' : 'Not started'}</p>} />}
         {!squad ? <p className="text-sm text-ink-2">Select one squad in the menu to plan its season.</p>
           : season.error || objectives.error ? (
             <div className="arc grid justify-items-start gap-3">

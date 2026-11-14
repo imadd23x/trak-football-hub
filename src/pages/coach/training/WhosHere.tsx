@@ -17,6 +17,7 @@ import { CoachTrail } from '@/components/coach/CoachTrail'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
+import { INNER_TITLE } from '@/components/coach/PageTop'
 
 /* TRAK-342 (Training redo 4/5, spec TRAK-338, 2 Nov prototype): Who's here. The coach takes the register first (the
    existing one, TRAK-138; several names a row so a squad fits a laptop screen, Kostas 2 Nov). Once it's saved, and only
@@ -72,7 +73,7 @@ export function WhosHere({ training, plan }: { training: Training; plan: Plan | 
   return <div className="grid gap-5 pt-5">
     <header className="arc grid gap-2">
       <CoachTrail current={t('coachTraining:loopHere')} parents={[{ label: day, href: page }]} />
-      <h1 className="text-[24px] font-medium tracking-[-0.01em] text-ink">{t('coachTraining:whosHereQ')}</h1>
+      <h1 className={INNER_TITLE}>{t('coachTraining:whosHereQ')}</h1>
       <p className="text-sm text-ink-2">{[training.title, day, time, training.venue].filter(Boolean).join(' · ')}</p>
     </header>
 

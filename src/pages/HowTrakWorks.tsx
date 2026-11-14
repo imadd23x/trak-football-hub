@@ -50,7 +50,7 @@ export default function HowTrakWorks() {
           <ArrowLeft size={14} />
         </button>
         <span className="text-[16px] font-medium text-ink" style={{ fontFamily: 'var(--t-font)' }}>
-          How TRAK works
+          How Trak works
         </span>
       </div>
 

@@ -191,7 +191,8 @@ export const ScrollArea = forwardRef<HTMLDivElement, ScrollAreaProps>(function S
 
   return <div ref={rootRef} className={[styles.root, className].filter(Boolean).join(" ")} data-orientation={orientation} data-scrollbars={scrollbars} {...rest}>
     <div ref={viewport} className={[styles.viewport, viewportClassName].filter(Boolean).join(" ")} data-fade={fade > 0 ? orientation : undefined}
-      style={{ maxHeight, scrollSnapType: FINE_POINTER ? undefined : snap, ...viewportStyle }} tabIndex={0} role={label ? "region" : undefined} aria-label={label} onScroll={handleScroll}>
+      // Trak: a snapped card rests clear of the edge fade, so its border is never faded away (Imad, 13 Nov).
+      style={{ maxHeight, scrollSnapType: FINE_POINTER ? undefined : snap, scrollPadding: snap && !FINE_POINTER ? fade : undefined, ...viewportStyle }} tabIndex={0} role={label ? "region" : undefined} aria-label={label} onScroll={handleScroll}>
       {children}
     </div>
     {vertical && bar("y")}

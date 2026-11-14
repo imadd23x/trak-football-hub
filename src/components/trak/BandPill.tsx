@@ -9,16 +9,15 @@ export const BandPill = memo(
         ref={ref}
         className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-full"
         style={{
-          // TRAK-229: the band's light tint with a dot in its colour; the word in Trak's ink.
-          color: 'rgb(var(--t-ink))',
-          background: config.bg,
+          // TRAK-458 (Kostas, 13 Nov): the band's bright colour, its darker edge, the word in black (5:1 or more).
+          color: 'rgb(var(--t-on-bright))',
+          background: config.color,
           border: `1px solid ${config.border}`,
           fontFamily: 'var(--t-font)',
-          fontWeight: 400,
+          fontWeight: 500,
           letterSpacing: '-0.03em',
         }}
       >
-        <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: config.color }} />
         {config.word}
       </span>
     )

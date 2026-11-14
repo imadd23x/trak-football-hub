@@ -4,7 +4,7 @@
  * were on Home alone, so it looked as if they hadn't loaded. The screen now
  * shows that assessment's six bands under the message, as Home does.
  */
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -70,7 +70,8 @@ describe("TRAK-441: Home's Latest evaluation stops saying New once this page sho
     localStorage.clear()
     renderAt()
     await screen.findByRole('list', { name: 'Your bands' })
-    expect(opened()).toBe(true)
+    // The mark is written in an effect after the bands commit; a slow CI runner can check first.
+    await waitFor(() => expect(opened()).toBe(true))
   })
 
   it('not when it could not load', async () => {

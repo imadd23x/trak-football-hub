@@ -253,7 +253,9 @@ authenticated roles, with controls proving the protected data exists.
 - **G6:** withdrawal stops processing and family access; event/calendar access
   must also satisfy J8's next-request check.
 - **G7:** AI processing, player passport/export/sharing, child photos and avatars
-  remain disabled in both UI and backend. Account deletion and access to account
+  remain disabled in both UI and backend. One exception (TRAK-460, Imad, 11 Nov): a
+  coach may keep their own profile picture, visible only to them; the database lets
+  no other role store, set or read a photo. Account deletion and access to account
   data are separate rights. `export_my_account()` exists; a self-service export
   screen is not established by this audit (TRAK-81).
 

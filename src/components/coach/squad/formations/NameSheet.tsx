@@ -33,8 +33,7 @@ export function NameSheet({ mode, problem, saving, onClose, onDone }: {
     onDone({ name: trimmed, format, shape })
   }
   const error = empty ? t('coachSquad:fmNameMissing') : problem
-  return <BottomSheet className="arc" open onOpenChange={open => { if (!open) onClose() }} title={mode.kind === 'new' ? t('coachSquad:fmNew') : t('coachSquad:fmRename')}
-    description={mode.kind === 'new' ? t('coachSquad:fmNewDescription') : undefined}>
+  return <BottomSheet className="arc" open onOpenChange={open => { if (!open) onClose() }} title={mode.kind === 'new' ? t('coachSquad:fmNew') : t('coachSquad:fmRename')}>
     <form onSubmit={submit} className="grid gap-4 pb-4">
       <label className="grid gap-2">
         <span className="text-sm font-medium text-ink">{t('coachSquad:fmName')}</span>

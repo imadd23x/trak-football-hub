@@ -102,7 +102,7 @@ describe('TRAK-107: /auth/code', () => {
   // link, and Microsoft pressed its button. Nothing may serve it any more.
   it('the old /auth/continue page is gone', async () => {
     renderApp(`/auth/continue?type=invite&token=${'a'.repeat(56)}&redirect_to=${encodeURIComponent(`${origin()}/onboarding/parent`)}`)
-    expect(await screen.findByRole('heading', { name: '404' }, { timeout: 4000 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: "We can't find that page" }, { timeout: 4000 })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Continue' })).toBeNull()
   })
 })

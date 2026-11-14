@@ -8,13 +8,13 @@ import { NavBar, WIDE_COLUMN } from '@/components/trak'
 import { LoadError } from '@/components/trak/LoadError'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { CoachTrail } from '@/components/coach/CoachTrail'
-import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { Alert } from '@/components/arc/alert/alert'
 import { Button } from '@/components/arc/button/button'
 import { useSquadRoster } from '@/components/coach/squad/useSquadRoster'
 import { useSquadEvaluations } from '@/components/coach/season-plan/useEvaluation'
 import { EvaluationSteps } from '@/components/coach/season-plan/Evaluation'
 import { usePlayerObjectives } from '@/components/coach/season-plan/usePlayerObjectives'
+import { PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-364 (Season plan 16/18, spec TRAK-348): the squad's evaluation, behind the season plan's switch (App.tsx). It
    opens on its due date, once the plan is shared, and stays open until it's published (a missed date stays due). Home's
@@ -24,7 +24,7 @@ import { usePlayerObjectives } from '@/components/coach/season-plan/usePlayerObj
 export default function CoachEvaluation() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const squad = planSquad(useCoachSquad(user?.id))
   const season = useSeasonPlan(user?.id, squad)
   const squads = useMemo(() => (squad ? [squad] : []), [squad])
@@ -77,14 +77,8 @@ export default function CoachEvaluation() {
   return (
     <div className="min-h-screen bg-ground pb-24">
       <div className={WIDE_COLUMN}>
-        <CoachTrail className="mt-5" current="Evaluation" />
-        <header className="pt-4 pb-4">
-          <div className="flex items-center gap-2">
-            <CoachMenuButton name={profile?.full_name || 'Coach'} />
-            <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">Evaluation</h1>
-          </div>
-          {squad && due?.dueOn && <p className="mt-1 text-sm text-ink-3">{squad} · due {evalDay(due.dueOn)} · only you see it until you publish</p>}
-        </header>
+        <PageTop title="Evaluation" trail={<CoachTrail current="Evaluation" />}
+          below={squad && due?.dueOn && <p className="-mt-2 text-sm text-ink-3">{squad} · due {evalDay(due.dueOn)} · only you see it until you publish</p>} />
         {body}
       </div>
       <NavBar role="coach" activeTab={location.pathname} onNavigate={navigate} />

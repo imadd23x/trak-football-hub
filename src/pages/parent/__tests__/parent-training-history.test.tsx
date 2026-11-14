@@ -4,7 +4,7 @@
  * focus labels and that child's attendance only. Sibling switching must stay
  * scoped, including when an earlier sibling's response arrives late.
  */
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -124,5 +124,42 @@ describe('TRAK-77: parent training history', () => {
     fail = false
     await user.click(screen.getAllByRole('button', { name: 'Retry' }).at(-1)!)
     expect(await screen.findByText('Technical · Tactical')).toBeInTheDocument()
+  })
+})
+
+/** TRAK-439: a training with no assessment is plain text; one the coach assessed still opens it. */
+describe('TRAK-439: a training row opens an assessment only when there is one', () => {
+  it('shows an unassessed training as plain text, and links one that has an assessment', async () => {
+    server.use(
+      http.post(RPC, () => HttpResponse.json([
+        { session_id: 's-assessed', session_date: '2026-09-20', focus: ['Finishing'], attendance: 'present' },
+        { session_id: 's-plain', session_date: '2026-09-21', focus: ['Passing'], attendance: 'present' },
+      ])),
+      http.get(endpoint('squad_players'), () => HttpResponse.json([{ id: 'sq-alex' }])),
+      http.get(endpoint('coach_assessments'), ({ request }) => {
+        const asked = new URL(request.url).searchParams.get('session_id') ?? ''
+        // Only the session with an assessment comes back, and only its id was asked for as a column.
+        expect(new URL(request.url).searchParams.get('select')).toBe('session_id')
+        return HttpResponse.json(asked.includes('s-assessed') ? [{ session_id: 's-assessed' }] : [])
+      }),
+    )
+    renderMatches()
+    const training = await screen.findByRole('region', { name: 'Training' })
+    expect(await within(training).findByRole('link', { name: /Finishing/ })).toHaveAttribute('href', '/parent/session/s-assessed/assessment')
+    expect(within(training).getByText('Passing')).toBeInTheDocument()
+    expect(within(training).queryByRole('link', { name: /Passing/ })).toBeNull()
+  })
+
+  it('shows every training as plain text when the assessments cannot be read', async () => {
+    server.use(
+      http.post(RPC, () => HttpResponse.json([{ session_id: 's-1', session_date: '2026-09-20', focus: ['Finishing'], attendance: 'present' }])),
+      http.get(endpoint('squad_players'), () => HttpResponse.json([{ id: 'sq-alex' }])),
+      http.get(endpoint('coach_assessments'), () => HttpResponse.json({ message: 'boom' }, { status: 500 })),
+    )
+    renderMatches()
+    const training = await screen.findByRole('region', { name: 'Training' })
+    expect(await within(training).findByText('Finishing')).toBeInTheDocument()
+    await new Promise(done => setTimeout(done, 200))
+    expect(within(training).queryByRole('link')).toBeNull()
   })
 })

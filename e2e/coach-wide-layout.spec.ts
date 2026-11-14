@@ -55,6 +55,9 @@ async function backend(context: BrowserContext, role: Role, unexpected: string[]
     ] : [])
     if (['/rest/v1/coach_sessions', '/rest/v1/session_attendance', '/rest/v1/rpc/coach_squad_season', '/rest/v1/coach_calendar_events',
       '/rest/v1/event_confirmations', '/rest/v1/event_absences'].includes(path)) return json([])
+    // TRAK-441: a family's week has today's match, so the picker's footer shows Details (and a parent's red Can't make it).
+    if (path === '/rest/v1/rpc/child_events') return json([{ id: 'ev-199', event_type: 'match', title: 'League', opponent: 'Rivals FC',
+      event_date: new Date().toLocaleDateString('en-CA'), start_time: '23:30:00', status: 'scheduled', sequence: 0, updated_at: '2026-11-01T00:00:00Z' }])
     // Layout only: every other read is empty.
     if (path.startsWith('/rest/v1/')) return json(req.method() === 'GET' || path.startsWith('/rest/v1/rpc/') ? [] : null)
     unexpected.push(`${req.method()} ${path}`)
@@ -236,20 +239,23 @@ test("a parent's laptop frame: the child switcher in the side menu", async ({ pa
   expect(errors).toEqual([])
 })
 
-// TRAK-441 slice 2 (Imad, 13 Nov): the player Home in the coach's look, behind family_look. A phone: the bell on the
-// page; a laptop: the bell in the top bar and two columns. No sideways scroll either way.
-for (const [label, width, height] of [['a phone', 390, 844], ['a laptop', 1440, 900]] as const) {
-  test(`the player Home in the coach's look on ${label}`, async ({ page, context }, testInfo) => {
-    const { unexpected, errors } = await open(page, context, 'player', '/player/home', width, height, ['events', 'family_look'])
+// TRAK-441 slice 2 (Imad, 13 Nov): the player Home in the coach's look, behind family_look; the parent's too (2.6). A
+// phone: the bell on the page; a laptop: the bell in the top bar and two columns. No sideways scroll either way.
+for (const who of ['player', 'parent'] as const) for (const [label, width, height] of [['a phone', 390, 844], ['a laptop', 1440, 900]] as const) {
+  test(`the ${who} Home in the coach's look on ${label}`, async ({ page, context }, testInfo) => {
+    const { unexpected, errors } = await open(page, context, who, `/${who}/home`, width, height, ['events', 'family_look'])
     const bell = page.getByRole('button', { name: /^Alerts/ })
     await expect(bell).toBeVisible()
     // 2.4c: the coach's week picker, not the letter strip.
     await expect(page.getByRole('heading', { name: 'This week', level: 2 })).toBeVisible()
+    // 2.6b: today's match, Details beside a red Can't make it for a parent; a player under the consent age has none.
+    await expect(page.getByRole('button', { name: 'Details' })).toBeVisible()
+    await expect(page.getByRole('button', { name: "Can't make it" })).toHaveCount(who === 'parent' ? 1 : 0)
     // A phone: the bell in the page's own top row, the glass tab bar. A laptop: the side menu, the bell in its top bar.
     await expect(page.getByRole('navigation', { name: 'Trak' })).toHaveCount(width < 1024 ? 0 : 1)
     expect((await bell.boundingBox())!.y).toBeLessThan(60)
     await page.waitForTimeout(400)
-    await page.screenshot({ path: testInfo.outputPath(`family-home-${width}.png`), fullPage: true })
+    await page.screenshot({ path: testInfo.outputPath(`family-home-${who}-${width}.png`), fullPage: true })
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0)
     expect(unexpected).toEqual([])
     expect(errors).toEqual([])
@@ -532,3 +538,39 @@ test('TRAK-463: Squad lists its players in columns on a 2,560 px monitor, one co
   expect(unexpected).toEqual([])
   expect(errors).toEqual([])
 })
+
+// TRAK-422 (Kostas, 13 Nov): ONE page title on every coach page, Squad's and Matches' style (22 px on a phone, 26 px on a
+// laptop, medium), and the same gap above it on every page of the same kind: 20 px from the top of a phone (60 px on a
+// sub-page, under its trail), 20 px under a laptop's top bar. Before, there were six sizes and gaps from 72 to 97 px.
+const TITLED_PAGES = [
+  ['Home', '/coach/home', 'menu'], ['Schedule', '/coach/schedule', 'menu'], ['Squad', '/coach/squad', 'menu'],
+  ['Matches', '/coach/matches', 'menu'], ['Training', '/coach/training', 'menu'], ['Drills', '/coach/training/drills', 'menu'],
+  ['Feedback', '/coach/feedback', 'menu'], ['Settings', '/settings', 'menu'],
+  ['Season plan', '/coach/season-plan', 'sub'], ['Evaluation', '/coach/evaluation', 'sub'], ['Past trainings', '/coach/training/past', 'sub'],
+  ['My drills', '/coach/training/drills/mine', 'sub'], ['All drills', '/coach/training/drills/all', 'sub'], ['How Trak works', '/coach/how-trak-works', 'sub'],
+] as const
+for (const [label, width, height, size, menuTop, subTop] of [['a phone', 390, 844, 22, 20, 60], ['a laptop', 1440, 900, 26, 80, 80]] as const) {
+  test(`TRAK-422: every coach page has the one title, at the same height, on ${label}`, async ({ browser }) => {
+    const found: Record<string, string> = {}, wanted: Record<string, string> = {}
+    for (const [name, path, kind] of TITLED_PAGES) {
+      // A fresh coach for each page: the app keeps a switch's answer for 30 s.
+      const context = await browser.newContext()
+      const page = await context.newPage()
+      const { unexpected, errors } = await open(page, context, 'coach', path, width, height, ['events', 'games', 'training', 'season_plan'])
+      const title = page.locator('h1:visible').first()
+      await expect(title).toBeVisible()
+      await page.waitForLoadState('networkidle')
+      await page.waitForTimeout(300) // let the page settle
+      const { px, weight, top } = await title.evaluate(el => {
+        const style = getComputedStyle(el)
+        return { px: parseFloat(style.fontSize), weight: style.fontWeight, top: Math.round(el.getBoundingClientRect().top) }
+      })
+      found[name] = `${px} px, weight ${weight}, ${top} px from the top`
+      wanted[name] = `${size} px, weight 500, ${kind === 'menu' ? menuTop : subTop} px from the top`
+      expect(unexpected).toEqual([])
+      expect(errors).toEqual([])
+      await context.close()
+    }
+    expect(found).toEqual(wanted)
+  })
+}

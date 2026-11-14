@@ -103,6 +103,35 @@ describe("TRAK-441: the parent Home in the coach's look", () => {
     expect(screen.queryByRole('button', { name: "Can't make it" })).toBeNull()
   }, 15_000)
 
+  // Slice 2.7 (spec: "Never the job, never the note" on a parent's screen, nor a line saying they exist). The reads
+  // answer with the job and the notes, as if a later change asked for them: Home still shows none of it.
+  it("privacy: a shared plan, a published review and an evaluation never put the job or the coach's note on Home", async () => {
+    screenIs(false)
+    const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toLocaleDateString('en-CA')
+    const match = (id: string, opponent: string, date: string) => ({ id, event_type: 'match', title: 'League', opponent, event_date: date,
+      start_time: '23:30:00', status: 'scheduled', sequence: 0, updated_at: '2026-11-01T00:00:00Z' })
+    const recent = new Date(Date.now() - 3_600_000).toISOString()
+    server.use(
+      rpcRows('child_events', [match('ev-plan', 'Rivals FC', day(0)), match('ev-review', 'Olympiacos', day(-1))]),
+      table('event_absences', []),
+      table('game_for_family', [{ event_id: 'ev-plan', squad_player_id: 'sq-441', shared_at: recent, changed_at: null, role: 'starter',
+        coach_name: 'Otto Rehhagel', job: 'Shadow their number nine', has_note: true, note: 'Keep him calm early' }]),
+      table('game_review_for_family', [{ event_id: 'ev-review', squad_player_id: 'sq-441', published_at: recent, our_score: 2, their_score: 1,
+        coach_name: 'Otto Rehhagel', job: 'Win every header', did_job: 'partly', has_note: true, note: 'Switched off late' }]),
+      table('coach_assessments', [{ id: 'eval-441', session_id: null, created_at: '2026-11-08T10:00:00Z', coach_user_id: 'coach-441',
+        coach_rating: 7.5, work_rate: 8, tactical: 7, attitude: 8, technical: 7, physical: 6, coachability: 9, private_note: 'Tires after an hour' }]),
+    )
+    renderApp('/parent/home')
+    const forYou = await screen.findByRole('region', { name: /^For you/ }, { timeout: 5000 })
+    expect(within(forYou).getByText('Giourkas starts')).toBeInTheDocument()
+    expect(within(forYou).getByText('How Giourkas’s match went')).toBeInTheDocument()
+    await screen.findByRole('region', { name: 'Latest evaluation' })
+    await screen.findByRole('region', { name: 'Season so far' })
+    const shown = document.body.textContent ?? ''
+    for (const secret of ['Shadow their number nine', 'Keep him calm early', 'Win every header', 'Switched off late', 'Tires after an hour']) expect(shown).not.toContain(secret)
+    expect(shown).not.toMatch(/\b(jobs?|notes?)\b/i)
+  }, 15_000)
+
   it('a laptop: the bell is in the top bar, outside the page, and there is one', async () => {
     screenIs(true)
     renderApp('/parent/home')

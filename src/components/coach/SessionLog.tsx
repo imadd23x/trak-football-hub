@@ -1,15 +1,14 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { dateLocale, i18n, useTranslation } from '@/lib/i18n'
-import { Pencil } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { LoadError } from '@/components/trak/LoadError'
 import { LoggedAttendance } from '@/components/coach/LoggedAttendance'
 import { useOldLogRetired } from '@/components/coach/old-log'
 import { parseTrainingNotes, parseTrainingTitle } from '@/lib/session-form'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { EditIcon } from '@/components/trak/IconAction'
 
 /* Imad, 23 Oct: "View log" on Home shows the log, read only; Edit log opens the edit page. A training: its focus,
    length, intensity and notes, and who came. A match: the score and each player's goals, assists and card, from
@@ -103,11 +102,8 @@ function cardWord(card: string) {
 function EditLog({ sessionId }: { sessionId: string }) {
   const { t } = useTranslation()
   // TRAK-426: where the old log has retired, a training is changed on its own page (Who's here, notes) and a match in
-  // its evaluation; Edit session is gone.
+  // its evaluation; Edit session is gone. TRAK-455: a pencil, its name read out.
   const { retired } = useOldLogRetired()
   if (retired) return null
-  return <Link to={`/coach/sessions/${sessionId}`}
-    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-raised text-[14px] font-medium text-ink focus-visible:ring-2 focus-visible:ring-primary">
-    <Pencil size={16} aria-hidden="true" />{t('coachSchedule:editLog')}
-  </Link>
+  return <EditIcon label={t('coachSchedule:editLog')} to={`/coach/sessions/${sessionId}`} />
 }

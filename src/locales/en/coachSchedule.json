@@ -51,6 +51,7 @@
   "editNamed": "Edit {{title}}",
   "publishNamed": "Publish {{title}}",
   "editRegister": "Edit register",
+  "register": "Register",
   "registerFor": "{{action}} for {{title}}",
   "viewReviewOf": "View review of {{title}}",
   "editMatch": "Edit match",

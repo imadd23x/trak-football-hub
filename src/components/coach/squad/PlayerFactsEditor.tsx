@@ -7,6 +7,7 @@ import { PLAYER_TRAIT_GROUPS, toggleTrait, type PreferredFoot } from '@/lib/play
 import { useSavePlayerFacts, type PlayerFacts } from './usePlayerFacts'
 import { useTranslation } from '@/lib/i18n'
 import { TRAIT_GROUP_WORD, TRAIT_WORD, shown } from '@/lib/squad/trait-words'
+import { Pencil } from 'lucide-react'
 
 const FEET = [
   { value: null, label: 'coachSchedule:notSet' }, { value: 'left', label: 'coachSquad:footLeft' }, { value: 'right', label: 'coachSquad:footRight' }, { value: 'both', label: 'coachSquad:footBoth' },
@@ -33,7 +34,9 @@ export function PlayerFactsEditor({ playerId, name, coachId, facts }: { playerId
   }
 
   return <BottomSheet className="arc" open={open} onOpenChange={onOpenChange} title={t('coachSquad:profileTitle', { name: first })} description={t('coachSquad:onlyYou')}
-    trigger={<button type="button" className="min-h-11 text-[15px] font-medium text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">{t('coachSquad:editProfile')}</button>}>
+    // TRAK-455: a pencil (the sheet's trigger takes a plain button), its full name read out.
+    trigger={<button type="button" aria-label={t('coachSquad:editProfileOf', { name: first })} title={t('coachSquad:editProfileOf', { name: first })}
+      className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-brand hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Pencil aria-hidden size={18} strokeWidth={1.75} /></button>}>
     <form onSubmit={submit} className="grid gap-6 pb-4">
       <fieldset className="grid gap-2">
         <legend className="mb-2 text-sm font-medium text-ink">{t('coachSquad:preferredFoot')}</legend>

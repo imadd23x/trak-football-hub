@@ -32,6 +32,7 @@ import { Textarea } from '@/components/arc/textarea/textarea'
 import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { EditIcon } from '@/components/trak/IconAction'
 import { PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-294 (Training 1/5, spec TRAK-293): Training home, behind the academy's training switch. Sessions lists the
@@ -260,7 +261,9 @@ function NextTraining({ training, phase, planned, draft, sessionId, onStart, onC
           {(message || !locked) && <p className="flex items-start gap-2 rounded-xl bg-raised px-4 py-3 text-sm text-ink-2">
             <Info aria-hidden size={16} className="mt-0.5 flex-none text-ink-3" />
             <span className="min-w-0 flex-1 break-words"><span className="font-medium text-ink">{t('coachSchedule:messageToPlayers')}{message && ':'}</span> {message}</span>
-            {!locked && <Link to={`/coach/schedule?edit=${training.id}&step=${NOTE_STEP}`} className={linkClass}>{message ? t('coachSchedule:edit') : t('coachTraining:addMessage')}</Link>}
+            {/* TRAK-455: editing the message is a pencil; adding one keeps its words. */}
+            {!locked && (message ? <EditIcon label={t('coachTraining:editMessage')} to={`/coach/schedule?edit=${training.id}&step=${NOTE_STEP}`} className="-my-2.5" />
+              : <Link to={`/coach/schedule?edit=${training.id}&step=${NOTE_STEP}`} className={linkClass}>{t('coachTraining:addMessage')}</Link>)}
           </p>}
           <div className="flex flex-wrap items-center gap-3">
             {phase === 'day' ? <>
@@ -269,7 +272,7 @@ function NextTraining({ training, phase, planned, draft, sessionId, onStart, onC
                 : <Button size="lg" variant="secondary" onClick={plan}>{t('coachTraining:planSession')}</Button>}
             </> : planned ? <>
               <Button size="lg" onClick={review}>{t('coachTraining:reviewPlan')}</Button>
-              <Button variant="ghost" onClick={plan}>{t('coachTraining:editPlan')}</Button>
+              <EditIcon label={t('coachTraining:editPlan')} onClick={plan} />
             </> : draft ? <>
               <Button size="lg" onClick={plan}>{t('coachTraining:continuePlan')}</Button>
             </> : <>

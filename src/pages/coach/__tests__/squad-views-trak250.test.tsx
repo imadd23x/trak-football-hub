@@ -319,7 +319,7 @@ describe('TRAK-263: Players view', { timeout: 20_000 }, () => {
     renderApp('/coach/squad')
     const panel = await view('Players')
     await user.click(await within(panel).findByRole('button', { name: /^Sami K\./ }))
-    await user.click(await within(panel).findByRole('button', { name: 'Edit profile' }))
+    await user.click(await within(panel).findByRole('button', { name: /^Edit .+'s profile$/ }))
     const sheet = await screen.findByRole('dialog', { name: "Sami's profile" })
     expect(within(sheet).getByRole('button', { name: 'Dives into tackles' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(within(sheet).getByRole('button', { name: 'Does not dive into tackles' }))
@@ -341,7 +341,7 @@ describe('TRAK-263: Players view', { timeout: 20_000 }, () => {
     expect(row(panel, 'Newcomer R.')).toHaveTextContent('Waiting for consent')
     await user.click(row(panel, 'Newcomer R.'))
     expect(await within(panel).findByText(/Newcomer is waiting for consent/)).toBeInTheDocument()
-    expect(within(panel).queryByRole('button', { name: 'Edit profile' })).toBeNull()
+    expect(within(panel).queryByRole('button', { name: /^Edit .+'s profile$/ })).toBeNull()
   })
 
   it("a failed profile read says so, never \"Not set\", and Back still finds the whole squad", async () => {

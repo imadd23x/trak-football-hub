@@ -106,7 +106,7 @@ describe('TRAK-341: a saved plan’s Review page', { timeout: 30_000 }, () => {
     database([training('soon', onTheMinute(Date.now() + DAY))], SAVED)
     renderApp('/coach/training/soon')
     expect(await screen.findByRole('heading', { name: 'Review' })).toBeInTheDocument()
-    expect(plan()).toEqual([expect.stringMatching(/^10min1 · Dry warm-upDynamic warm-upAny numberEdit$/), expect.stringMatching(/^15min2 · RondoRondo 4 v 2Groups of 6 · 4 v 2Edit$/)])
+    expect(plan()).toEqual([expect.stringMatching(/^10min1 · Dry warm-upDynamic warm-upAny number$/), expect.stringMatching(/^15min2 · RondoRondo 4 v 2Groups of 6 · 4 v 2$/)])
     expect(screen.getByRole('button', { name: 'Edit Rondo' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remove Rondo' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add a part' })).toBeInTheDocument()
@@ -187,7 +187,7 @@ describe('TRAK-341: a saved plan’s Review page', { timeout: 30_000 }, () => {
     database([training('old', onTheMinute(Date.now() + DAY))], { old: [practice(1, 'Technique'), practice(2, 'Progressing to the target', { minutes: 20 })] })
     renderApp('/coach/training/old')
     await screen.findByRole('heading', { name: 'Review' })
-    expect(plan()).toEqual([expect.stringMatching(/^15min1TechniqueEdit$/), expect.stringMatching(/^20min2Progressing to the targetEdit$/)])
+    expect(plan()).toEqual([expect.stringMatching(/^15min1Technique$/), expect.stringMatching(/^20min2Progressing to the target$/)])
   })
 })
 

@@ -23,6 +23,7 @@ import { useTranslation } from '@/lib/i18n'
 import { POSITION_WORD } from '@/lib/position-words'
 import { ATTRIBUTE_WORD } from '@/lib/squad/attribute-words'
 import { ROLE_WORD, TRAIT_WORD, shown } from '@/lib/squad/trait-words'
+import { EditIcon } from '@/components/trak/IconAction'
 import { bandConfig } from '@/lib/types'
 import { scoreToBand } from '@/lib/rating-engine'
 
@@ -181,8 +182,7 @@ function PositionAndRoles({ coachId, id, name, position }: { coachId: string; id
   return <section aria-labelledby={`position-${id}`} className="grid gap-2">
     <div className="flex items-baseline justify-between gap-3">
       <h4 id={`position-${id}`} className="text-base font-medium text-ink">{t('coachSquad:positionAndRoles')}</h4>
-      <button type="button" onClick={() => setEditing(true)} aria-label={t('coachSquad:editPositionRoles', { name: first })} aria-haspopup="dialog"
-        className="min-h-11 rounded-md text-[15px] font-medium text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{t('coachSchedule:edit')}</button>
+      <EditIcon label={t('coachSquad:editPositionRoles', { name: first })} haspopup onClick={() => setEditing(true)} />
     </div>
     {roles.isError ? <LoadError what={t('coachSquad:rolesWhat', { name: first })} onRetry={() => { void roles.refetch() }} />
       : !roles.data ? <LoadingSkeleton label={t('coachSquad:loadingRoles', { name: first })} lines={2} />

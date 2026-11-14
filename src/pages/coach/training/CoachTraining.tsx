@@ -21,7 +21,6 @@ import { CopyTargetSheet, PastPlanSheet, type PlanToCopy } from '@/components/co
 import { CoachTrail } from '@/components/coach/CoachTrail'
 import { PitchViewRoute, PlanEditorRoute, PlanRoute, WhosHereRoute } from './CoachTrainingPlan'
 import { AllDrills, ChangePractice, DrillPage, LibraryHome, MyDrills, PracticePage } from './DrillLibrary'
-import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
@@ -33,6 +32,7 @@ import { Textarea } from '@/components/arc/textarea/textarea'
 import { SearchField } from '@/components/arc/search-field/search-field'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-294 (Training 1/5, spec TRAK-293): Training home, behind the academy's training switch. Sessions lists the
    coach's trainings from Schedule (Coming up, then Last week); Drills holds My drills, then the Library's tiles.
@@ -86,22 +86,20 @@ export default function CoachTraining() {
 }
 
 function Page({ view, children }: { view: 'sessions' | 'drills'; children: ReactNode }) {
-  const { profile } = useAuth()
   const { t } = useTranslation()
   const navigate = useNavigate()
   return (
     <div className="min-h-screen bg-ground pb-28">
       <div className={WIDE_COLUMN}>
-        <header className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-6 pb-4">
-          <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
-          {/* Kostas, 30 Oct: "training" is too repetitive, so the page has no visible title. */}
-          <h1 className="sr-only">{t('nav:training')}</h1>
+        {/* Kostas, 30 Oct: no visible title ("training" too repetitive). TRAK-422 (Kostas, 13 Nov): every coach page has
+            the one title, Training too, with its Sessions / Drills switch beside it. */}
+        <PageTop title={t('nav:training')}>
           <div className="arc">
             <SegmentedControl label={t('coachTraining:trainingView')} value={view}
               options={[{ value: 'sessions', label: t('coachTraining:tabSessions') }, { value: 'drills', label: t('nav:drills') }]}
               onValueChange={next => navigate(next === 'drills' ? `${TRAINING_PATH}/drills` : TRAINING_PATH)} />
           </div>
-        </header>
+        </PageTop>
         {children}
       </div>
     </div>
@@ -207,7 +205,6 @@ function SessionsView() {
           <div className="arc flex flex-wrap items-center gap-3 border-t border-line pt-5">
             <Button variant="secondary" onClick={() => navigate(PAST_PATH)}><History aria-hidden size={16} />{t('coachTraining:pastTrainings')}
               {past.data && <Badge size="sm">{pastInView.length}</Badge>}</Button>
-            <span className="text-sm text-ink-3">{t('coachTraining:lookBack')}</span>
           </div>
         </div>}
     </Page>
@@ -373,11 +370,7 @@ function PastTrainings() {
   return (
     <div className="min-h-screen bg-ground pb-28">
       <div className={WIDE_COLUMN}>
-        <header className="arc grid gap-3 pt-5 pb-4">
-          <CoachTrail current={t('coachTraining:pastTrainings')} />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">{t('coachTraining:pastTrainings')}</h1>
-          <p className="text-sm text-ink-3">{t('coachTraining:pastSub')}</p>
-        </header>
+        <PageTop className="arc" menu={false} title={t('coachTraining:pastTrainings')} trail={<CoachTrail current={t('coachTraining:pastTrainings')} />} />
         {past.error ? <LoadError what={t('coachTraining:pastWhat')} onRetry={() => void past.refetch()} retrying={past.isFetching} />
           : past.isPending ? <LoadingSkeleton label={t('coachTraining:loadingPast')} lines={2} rows={4} className="pt-6" />
           : inView.length === 0 ? <div className="arc"><EmptyState icon={<History size={24} strokeWidth={1.5} />} title={t('coachTraining:noPastYet')}

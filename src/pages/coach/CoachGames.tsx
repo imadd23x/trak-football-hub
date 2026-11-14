@@ -4,7 +4,6 @@ import type { Scorer } from '@/lib/games/scorers'
 import { Link, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
-import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { actionLink, type GameAction, type GameState, type PlanProgress, gameState, gameStatus, orderGames } from '@/lib/games/loop'
 import { gameTitle, gameWhen, useGameEvaluations, useGamePlanChanges, useGamePlans, useGameShares, useGames, useScorers, type Game } from '@/components/coach/games/useGames'
@@ -22,6 +21,7 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { dateLocale, i18n, useTranslation } from '@/lib/i18n'
 import { COMPETITION_WORD, MATCH_WORD } from '@/lib/games/match-words'
 import { shown } from '@/lib/squad/trait-words'
+import { PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-283 (Games 1/8): Games home. The next game with where it is in its loop and its one next action, the open
    drafts, and every match of the squad in view. Cards follow Home's Needs you pattern (Imad, 27 Oct). TRAK-320 (Imad,
@@ -38,7 +38,7 @@ const details = (game: Game, time: string | null) => [
 ].filter(Boolean).join(' · ')
 
 export default function CoachGames() {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const { t } = useTranslation()
   const coachSquad = useCoachSquad(user?.id)
   const navigate = useNavigate()
@@ -76,11 +76,8 @@ export default function CoachGames() {
   return (
     <div className="min-h-screen bg-ground pb-24">
       <div className={WIDE_COLUMN}>
-        <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-5 pb-3">
-          {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
-          <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">{t('nav:matches')}</h1>
-        </header>
+        {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. TRAK-422: PageTop. */}
+        <PageTop title={t('nav:matches')} />
 
         {games.error || plans.error || shares.error || evaluations.error
             ? <LoadError what={t('coachMatches:matchesWhat')} onRetry={() => { void games.refetch(); void plans.refetch(); void shares.refetch(); void evaluations.refetch() }}

@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { MobileShell } from '@/components/trak'
 import { QuickAdd } from '@/components/coach/QuickAdd'
-import { HomeHeader, HomeTitle } from '@/components/trak/HomeHeader'
+import { HomeHeader } from '@/components/trak/HomeHeader'
 import { CoachAlertsBell } from '@/components/coach/CoachAlertsBell'
 import { CoachWeekStrip, NextStep } from '@/components/coach/CoachWeekStrip'
 import { squadName } from '@/lib/coach-week'
@@ -37,6 +37,7 @@ import { Button } from '@/components/arc/button/button'
 import { squadShape } from '@/lib/squad/shape'
 import { localParts, localTodayISO } from '@/lib/event-time'
 import { dateLocale, useLanguage } from '@/lib/i18n'
+import { PageTitle, PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-262 (Imad, 22 Oct): coach Home on Arc. Squad pills (each squad, then All, which is Home's only); the week
    in Tarek's colour key with one next step per event; the Squad shape radar; Needs you. "Assess a player" and
@@ -205,11 +206,13 @@ export default function CoachHomePage() {
 
   return (
     <MobileShell width="wide">
-      <div className="pt-3 pb-24">
+      <div className="pt-5 pb-24">
         {/* TRAK-259: on a phone the avatar opens the menu and the calendar sits beside the bell; a laptop has both
             in the frame (the sidebar, the top bar). */}
         {!wide && <HomeHeader calendarTo="/coach/schedule" left={<CoachMenuButton name={profile?.full_name || t('nav:coach')} />}
-          center={<HomeTitle>{profile?.full_name || t('nav:coach')}</HomeTitle>} right={user && <CoachAlertsBell coachId={user.id} />} />}
+          center={<PageTitle><span className="truncate">{profile?.full_name || t('nav:coach')}</span></PageTitle>} right={user && <CoachAlertsBell coachId={user.id} />} />}
+        {/* TRAK-422 (Kostas, 13 Nov): Home keeps the coach's name as its title, on a laptop too. */}
+        {wide && <PageTop className="pt-0" menu={false} title={profile?.full_name || t('nav:coach')} />}
 
         <div className={wide ? 'grid grid-cols-[minmax(0,7fr)_minmax(0,5fr)] items-start gap-6' : 'grid gap-5'}>
           {user && <CoachWeekStrip coachId={user.id} version={weekVersion} everySquad={everySquad} />}

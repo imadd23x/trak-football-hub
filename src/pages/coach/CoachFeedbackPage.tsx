@@ -4,7 +4,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { LayoutGroup } from 'motion/react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { MobileShell, NavBar } from '@/components/trak'
 import { PlayerFace } from '@/components/trak/PlayerFace'
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
@@ -16,6 +15,7 @@ import { openable } from '@/lib/openable'
 import { remember, remembered } from '@/lib/screen-memory'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-211: who needs attention moved off coach Home into its own coach tab,
    "Feedback and assessment". It lists every player, most urgent first, on the
@@ -33,7 +33,7 @@ const LEVEL = {
 type Overview = { squad: string | null; rows: AttentionRow[]; players: number }
 
 export default function CoachFeedbackPage() {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
@@ -125,14 +125,12 @@ export default function CoachFeedbackPage() {
 
   return (
     <MobileShell width="wide">
-      <div className="px-5 pt-4 pb-40">
-        {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
-        <div className="flex items-center gap-3">
-          <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">{t('coachAssess:fbTitle')}</h1>
-        </div>
+      <div className="pb-40">
+        {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. TRAK-422: PageTop,
+            in the page's own column (MobileShell already gives it its sides). */}
+        <PageTop title={t('coachAssess:fbTitle')} className="pb-3" />
 
-        <section aria-label={t('coachAssess:fbTitle')} className="rounded-[18px] border border-line p-4 mt-3" style={{ background: 'rgb(var(--t-surface))' }}>
+        <section aria-label={t('coachAssess:fbTitle')} className="rounded-[18px] border border-line p-4" style={{ background: 'rgb(var(--t-surface))' }}>
           {failed ? (
             <p role="alert" className="text-[12px] text-ink-2" style={{ fontFamily: 'var(--t-font)' }}>
               {t('coachAssess:couldntLoadPlayers')}{' '}

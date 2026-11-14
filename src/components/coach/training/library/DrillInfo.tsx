@@ -9,14 +9,16 @@ export const CHIP = 'rounded-full border border-line bg-raised px-2.5 py-0.5 tex
 export const SIDE_HEADING = 'text-xs font-medium uppercase tracking-[0.08em] text-ink-3'
 
 /** What the last press changed, or what pressing does. */
-export function ChangeNote({ changed, idle }: { changed: Changed | null; idle: string }) {
+export function ChangeNote({ changed }: { changed: Changed | null }) {
+  /* TRAK-457 (11 Nov walk-through): no line until the coach presses Easier or Harder ("Set for 20 players. Press Easier or
+     Harder…" is gone). The empty status region stays, out of the layout, so the change is still read out when it comes. */
   return changed ? <div role="status" className="grid gap-1.5 rounded-xl bg-warning/15 px-3.5 py-3 text-[15px] text-ink">
       <p className="font-medium">{changed.title}</p>
       {changed.items.length ? <ul className="grid gap-1">{changed.items.map(c =>
         <li key={c.key}>{c.name}: {c.from} to {c.to}.{c.why ? ` ${c.why}` : ''}</li>)}</ul>
         : <p>Nothing changes with that many.</p>}
     </div>
-    : <p role="status" className="rounded-xl bg-raised px-3.5 py-3 text-[15px] text-ink-2">{idle}</p>
+    : <p role="status" className="sr-only" />
 }
 
 /** The five details, the ones the last press changed marked. */

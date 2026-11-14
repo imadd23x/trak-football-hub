@@ -145,7 +145,7 @@ describe('TRAK-342: Who’s here', { timeout: 30_000 }, () => {
     expect(column('Rondo')).toHaveTextContent('Trak suggests: Change to 1 grid of 5 (4 v 1).')
     // Free play needs two teams of at least 8 players: too few, and nothing to swap to.
     expect(column('Game')).toHaveTextContent('Free play doesn’t work well with 5.')
-    expect(screen.getByText('1 part needs a change. Pick “Use it” or “Keep” for each. 1 part doesn’t work with 5 players. Change it yourself.')).toBeInTheDocument()
+    expect(screen.getByText('1 part needs a change. Select “Use it” or “Keep” for each. 1 part doesn’t work with 5 players. Change it yourself.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save today’s plan' }))
     await waitFor(() => expect(saves).toHaveLength(1))
     expect(sent(saves[0])).toEqual(['Dynamic warm-up', 'Rondo 4 v 2 (1 grid of 5 (4 v 1))', 'Free play'])

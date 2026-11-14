@@ -4,6 +4,7 @@ import { CoachTrail } from '@/components/coach/CoachTrail'
 import { useFeature } from '@/components/trak/parked'
 import { useTranslation } from '@/lib/i18n'
 import type words from '@/locales/en/coachHowTrakWorks.json'
+import { PageTop } from '@/components/coach/PageTop'
 
 /* TRAK-418 (11 Nov review; Kostas, 12 Nov: option A, a coach's own page). Settings › How Trak works opened a page
    written for players (a rating engine, "how honestly you self-rated"), and an older coach manual (awards, a Recognition
@@ -63,11 +64,8 @@ export default function CoachHowTrakWorks() {
   return (
     <div className="min-h-screen bg-ground pb-28">
       <div className={WIDE_COLUMN}>
-        <header className="arc grid gap-3 pt-5 pb-4">
-          <CoachTrail current={t('coachHowTrakWorks:title')} />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink">{t('coachHowTrakWorks:title')}</h1>
-          <p className="max-w-[60ch] text-[15px] text-ink-2">{t('coachHowTrakWorks:intro')}</p>
-        </header>
+        <PageTop className="arc" menu={false} title={t('coachHowTrakWorks:title')} trail={<CoachTrail current={t('coachHowTrakWorks:title')} />}
+          below={<p className="max-w-[60ch] text-[15px] text-ink-2">{t('coachHowTrakWorks:intro')}</p>} />
         <div className="grid gap-8">
           <Stage id="how-before" step={1} title="beforeTitle">
             <div className="rounded-2xl border border-line bg-surface p-4 tablet:p-5">

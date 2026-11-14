@@ -4,7 +4,7 @@
  * page never asks for it. It's the section the coach's Publish step previews as the parent. The event card says
  * Coach's review. Test people are named after footballers.
  */
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
@@ -98,7 +98,8 @@ describe('TRAK-289: After the match on a guardian\'s event page', () => {
     expect(unopened('dellas', 'zagorakis', news)).toHaveLength(1)
     renderParent(<ParentEvent />)
     await screen.findByRole('region', { name: 'After the match' })
-    expect(unopened('dellas', 'zagorakis', news)).toEqual([])
+    // Marked in an effect after the review commits; a slow CI runner can check first.
+    await waitFor(() => expect(unopened('dellas', 'zagorakis', news)).toEqual([]))
     expect(unopened('dellas', 'another-child', news)).toHaveLength(1)
   })
 

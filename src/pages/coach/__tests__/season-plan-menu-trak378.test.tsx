@@ -46,7 +46,7 @@ describe('TRAK-378 Season plan on a phone', () => {
   it('has the avatar that opens the side menu, and a squad picked there changes the plan', async () => {
     screenIs(false)
     renderApp('/coach/season-plan')
-    expect(await screen.findByText('Pick one squad in the menu to plan its season.')).toBeInTheDocument()
+    expect(await screen.findByText('Select one squad in the menu to plan its season.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     expect(await screen.findByRole('dialog', { name: 'Menu' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Close menu' }))

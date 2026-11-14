@@ -88,8 +88,8 @@ function Picker({ coachId, player, first, seasonObjectives, saved, saveLabel, sa
 
   return <form onSubmit={submit} className="grid gap-5 pb-4">
     <div className="grid gap-1">
-      <h3 className="text-base font-medium text-ink">Pick one or two objectives for {first}</h3>
-      <p className="text-sm text-ink-3">Six for {AS[player.position]}. {picked.length} of {MAX_PLAYER_OBJECTIVES} picked.</p>
+      <h3 className="text-base font-medium text-ink">Select one or two objectives for {first}</h3>
+      <p className="text-sm text-ink-3">Six for {AS[player.position]}. {picked.length} of {MAX_PLAYER_OBJECTIVES} selected.</p>
     </div>
     <div role="group" aria-label={`Objectives for ${first}`} className="grid gap-2 laptop:grid-cols-2">
       {library.map(o => {

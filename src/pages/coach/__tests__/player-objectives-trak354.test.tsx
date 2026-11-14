@@ -96,7 +96,7 @@ describe('TRAK-354 player objectives', () => {
     await user().click(option(pat, 'Holds the line together'))
     expect(option(pat, 'Holds the line together')).toHaveAttribute('aria-pressed', 'false')
     expect(within(pat).getByText('Up to two at once. Untick one first.')).toHaveAttribute('role', 'status')
-    expect(within(pat).getByText('2 of 2 picked.', { exact: false })).toBeInTheDocument()
+    expect(within(pat).getByText('2 of 2 selected.', { exact: false })).toBeInTheDocument()
 
     await user().click(within(pat).getByRole('button', { name: 'Save · next: Synthetic Bo Midfielder' }))
     await waitFor(() => expect(saves).toEqual([{ p_squad_player_id: 'p1', p_objectives: [lib('Steps in to win it the moment we lose it', 'so-press'), lib('Wins their headers')] }]))
@@ -123,7 +123,7 @@ describe('TRAK-354 player objectives', () => {
     const section = await screen.findByRole('region', { name: 'Objectives' })
     await waitFor(() => expect(within(section).getByText('Shoots early from the edge')).toBeInTheDocument())
     expect(within(section).getByText('Your own · since 5 Nov')).toBeInTheDocument()
-    await user().click(within(section).getByRole('button', { name: 'Edit objectives' }))
+    await user().click(within(section).getByRole('button', { name: /^Edit .+'s objectives$/ }))
     const again = await sheet()
     expect(within(again).getByRole('button', { name: 'Save' })).toBeDisabled()
     // Edit: swap the coach's own for one from the library. Delete: untick it.
@@ -146,7 +146,7 @@ describe('TRAK-354 player objectives', () => {
     held = [{ ...lib('Wins their headers'), id: 'o1', squad_player_id: 'p1', created_at: '2026-11-04T10:00:00Z' }]
     renderApp('/coach/squad/player/p1')
     const section = await screen.findByRole('region', { name: 'Objective' })
-    await user().click(await within(section).findByRole('button', { name: 'Edit objective' }))
+    await user().click(await within(section).findByRole('button', { name: /^Edit .+'s objective$/ }))
     const pat = await sheet()
     await user().click(option(pat, 'Wins their headers'))
     await user().click(within(pat).getByRole('button', { name: 'Save' }))

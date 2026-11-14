@@ -41,8 +41,8 @@ describe('weekly series dates', () => {
 
 describe('what the coach is told before a series saves', () => {
   it('needs a weekday and an end date on or after the start', () => {
-    expect(repeatProblem(training, repeat({ days: [] }))).toBe('Pick at least one day of the week')
-    expect(repeatProblem(training, repeat({ until: '' }))).toBe('Pick the date the series ends')
+    expect(repeatProblem(training, repeat({ days: [] }))).toBe('Select at least one day of the week')
+    expect(repeatProblem(training, repeat({ until: '' }))).toBe('Select the date the series ends')
     expect(repeatProblem(training, repeat({ until: '2026-10-11' }))).toBe('The series has to end on or after its first date')
     expect(repeatProblem(training, repeat({ until: '2026-10-13', days: [WED] })))
       .toBe('None of those days fall between the start and end dates')

@@ -56,6 +56,7 @@ import {
 import { useNotedTrainings } from '@/components/coach/training/useTraining'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { currentLanguage, i18n, useLanguage } from '@/lib/i18n'
+import { PageTitle } from '@/components/coach/PageTop'
 
 /* TRAK-127 (J8.4): the coach creates, edits and cancels events. A save is a
    draft only the coach sees; Publish sends it to families (Imad, 9 Oct). Once
@@ -550,18 +551,17 @@ export default function CoachSchedule() {
 
   return (
     <MobileShell width="wide">
-      <div className="pt-3 pb-28 space-y-4">
+      <div className="pt-5 pb-28 space-y-4">
 
-        {/* Header */}
+        {/* Header. TRAK-422: the one page title, 20 px from the top like every coach page. */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* TRAK-376 (Imad, 5 Nov): on a phone the avatar opens the side menu, where the squad picker is. */}
             <CoachMenuButton name={profile?.full_name || t('nav:coach')} />
             {/* TRAK-424: no Back beside the avatar, as on every other main page; Schedule opens from Home's calendar icon. */}
-            <h1 className="text-[22px] font-light text-ink tracking-tight"
-              style={{ ...font, letterSpacing: '-0.02em' }}>
+            <PageTitle className="self-start">
               {t('nav:events')}
-            </h1>
+            </PageTitle>
           </div>
           <div className="flex items-center gap-2">
             {/* TRAK-162: the CSV import is parked; no coach is offered it. */}
@@ -662,7 +662,7 @@ export default function CoachSchedule() {
                 } else {
                   if (!row.published && !cancelled) items.push({ id: 'publish', label: t('coachSchedule:publishNamed', { title: row.title }), content: t('coachHome:publish'), icon: <Send />, onSelect: () => publish(row) })
                   if (!registerProblem(row)) items.push({ id: 'register', label: t('coachSchedule:registerFor', { action: sessionId ? t('coachSchedule:editRegister') : t('coachHome:takeRegister'), title: row.title }),
-                    content: sessionId ? t('coachSchedule:editRegister') : t('coachHome:takeRegister'), icon: <ClipboardCheck />, onSelect: guarded(() => setSheet({ kind: 'register', row })) })
+                    content: sessionId ? t('coachSchedule:register') : t('coachHome:takeRegister'), icon: <ClipboardCheck />, onSelect: guarded(() => setSheet({ kind: 'register', row })) })
                   if (row.event_type === 'match' && row.published && !cancelled && started) items.push(games && evaluations.data?.get(row.id)?.publishedAt
                     ? { id: 'match', label: t('coachSchedule:viewReviewOf', { title: row.title }), content: t('coachHome:viewReview'), icon: <ClipboardList />, onSelect: () => navigate(`/coach/matches/${row.id}?tab=evaluation`) }
                     : sessionId && !oldLogRetired
@@ -682,7 +682,8 @@ export default function CoachSchedule() {
                     icon: <Ban color="rgb(var(--t-danger))" />, onSelect: () => setSheet({ kind: 'cancel', row, reason: '', scope: 'one', error: null }) })
                 }
                 // TRAK-275: icons alone on a phone (content would show the word, so it goes too).
-                const groupItems = items.map(item => (wide ? item : { ...item, iconOnly: true, content: undefined }))
+                // TRAK-455: Edit is a pencil everywhere, on a laptop too (no "Edit" word).
+                const groupItems = items.map(item => (wide && item.icon && !(item.content === t('coachSchedule:edit') || item.content === t('coachSchedule:editMatch')) ? item : { ...item, iconOnly: true, content: undefined }))
                 // TRAK-272: the card opens the same event sheet as coach Home's week (CoachWeekStrip).
                 const sheetSource = row ?? { id: `session:${ev.id}`, published: true, title: ev.title, event_date: ev.date, event_type: ev.type, ...(ev.venue && { venue: ev.venue }) }
                 const base = toPlayerEvent(sheetSource as unknown as Record<string, unknown>)

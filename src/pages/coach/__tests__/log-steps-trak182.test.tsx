@@ -38,7 +38,7 @@ describe('TRAK-182: the session log in steps', { timeout: 20_000 }, () => {
     renderApp('/coach/sessions/add')
     await screen.findByText('SESSION FOCUS')
     expect(next()).toBeDisabled()
-    expect(screen.getByText('Pick a session focus.')).toBeInTheDocument()
+    expect(screen.getByText('Select a session focus.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^Technical/ }))
     await user.type(screen.getByPlaceholderText(/Pressing triggers/), 'Rondos')

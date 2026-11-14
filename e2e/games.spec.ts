@@ -262,7 +262,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   test(`a game's logistics at ${width} px: Edit pulls up the event's sheet on the match page`, async ({ page, context }, testInfo) => {
     const { unexpected, errors } = await open(page, context, '/coach/matches/m-next', width, height)
     await expect(page.getByText('Shared', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await page.getByRole('button', { name: 'Edit event', exact: true }).click()
     const sheet = page.getByRole('dialog', { name: 'Edit event' })
     await expect(sheet).toBeVisible()
     await expect(sheet.getByRole('navigation', { name: 'Event steps' })).toBeVisible()
@@ -774,7 +774,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await expect(page.getByRole('region', { name: 'Preview' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Who sees what' })).toHaveCount(0)
     // This match was made before New event asked the competition (Imad, 29 Oct): the Publish step asks it.
-    await expect(page.getByText('Pick the competition first.')).toBeVisible()
+    await expect(page.getByText('Select the competition first.')).toBeVisible()
     await page.getByRole('group', { name: 'Competition' }).getByText('League').click()
     await expect(page.getByRole('button', { name: 'Publish to 2 players and families' })).toBeEnabled()
     await page.waitForTimeout(500)
@@ -872,9 +872,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     // A tab while compact keeps the compact row and shows the top of the new tab.
     await tabs.getByRole('tab', { name: /^Logistics/ }).click()
     await expect(compact).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeInViewport()
+    await expect(page.getByRole('button', { name: 'Edit event', exact: true })).toBeInViewport()
     const pinnedTabs = (await tabs.boundingBox())!
-    expect((await page.getByRole('button', { name: 'Edit', exact: true }).boundingBox())!.y).toBeGreaterThan(pinnedTabs.y + pinnedTabs.height)
+    expect((await page.getByRole('button', { name: 'Edit event', exact: true }).boundingBox())!.y).toBeGreaterThan(pinnedTabs.y + pinnedTabs.height)
     // The compact title goes back to the top.
     await compact.click()
     await expect(header.getByRole('heading', { level: 1 })).toBeInViewport()

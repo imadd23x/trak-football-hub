@@ -39,7 +39,7 @@ BEGIN
  BEGIN EXECUTE statement;
  EXCEPTION WHEN OTHERS THEN st := SQLSTATE; msg := SQLERRM;
  END;
- INSERT INTO pg_temp.s157_results VALUES(label, st = '23514' AND msg = 'Pick a start time: every event needs one.', coalesce(st||': '||msg,'no error'));
+ INSERT INTO pg_temp.s157_results VALUES(label, st = '23514' AND msg = 'Select a start time: every event needs one.', coalesce(st||': '||msg,'no error'));
 END $$;
 -- An insert of one of the coach's events in 5 days, as the app writes it.
 CREATE FUNCTION pg_temp.s157event(n integer, starts time, published boolean) RETURNS text LANGUAGE sql AS $$

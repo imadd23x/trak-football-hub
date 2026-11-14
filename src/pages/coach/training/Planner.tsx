@@ -2,7 +2,7 @@ import { useTranslation } from '@/lib/i18n'
 import { partName, partNote } from '@/lib/training/words'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ArrowRight, Pencil, Plus, X } from 'lucide-react'
+import { ArrowRight, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { trainingMinutes } from '@/lib/training/sessions'
 import { libraryDrill, squadPlayers, type LibraryDrill } from '@/lib/training/library'
@@ -27,6 +27,8 @@ import { Input } from '@/components/arc/input/input'
 import { Stepper } from '@/components/arc/stepper/stepper'
 import { Textarea } from '@/components/arc/textarea/textarea'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
+import { RemoveIcon } from '@/components/trak/IconAction'
+import { INNER_TITLE } from '@/components/coach/PageTop'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): Plan session. A plan is a list of parts; the coach goes
    through them one step each, then Review, and saves the plan whole. A new plan starts from the parts the coach saved
@@ -218,7 +220,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
     <header className="arc grid gap-2">
       {/* TRAK-367: the trail says which training; its name can be long, so by its day. */}
       <CoachTrail current={t('coachTraining:planSessionDay', { day })} />
-      <h1 className="text-[24px] font-medium tracking-[-0.01em] text-ink break-words">{start.only && part
+      <h1 className={`${INNER_TITLE} break-words`}>{start.only && part
         ? t(start.only === 'add' ? 'coachTraining:addNamed' : 'coachTraining:editNamed', { part: partName(part.name) }) : t('coachTraining:planSessionTitle', { title: training.title })}</h1>
       {/* TRAK-404 (Kostas, 10 Nov): no logistics here. Opened for one part, the training's name says which plan. */}
       {start.only && <p className="text-sm text-ink-2">{training.title}</p>}
@@ -275,7 +277,7 @@ function PlannerBody({ training, saved, draft, past, players }: {
               </li>
             })}
             {/* TRAK-404 (Kostas, 10 Nov): a fourth choice, any drill from the Drill Library. */}
-            <li className="grid grid-rows-[1fr_auto] gap-1"><ActionTile icon="search" label={t('coachTraining:findAnother')} note={t('coachTraining:fromLibrary')} onClick={() => setSheet('more')} />
+            <li className="grid grid-rows-[1fr_auto] gap-1"><ActionTile icon="search" label={t('coachTraining:findAnother')} onClick={() => setSheet('more')} />
               {/* As tall as a View drill link, so this tile ends level with the others. */}
               <span aria-hidden className="invisible px-1 py-1 text-sm">{t('coachTraining:viewDrill')}</span></li>
           </ul>
@@ -338,7 +340,7 @@ function Review({ parts, length, note, onNote, onEdit, onRemove, onReorder, onMo
     <PlanRows parts={parts} onEdit={onEdit} onRemove={onRemove} onReorder={onReorder} onMove={onMove} />
     <div><Button size="sm" variant="secondary" onClick={onAdd}><Plus aria-hidden size={16} />{t('coachTraining:addAPart')}</Button></div>
     {/* Kostas, 30 Oct: one optional note at the end, not one per drill. */}
-    <Textarea label={t('coachTraining:noteForYou')} description={t('coachTraining:noteForYouDesc')} rows={2} maxLength={NOTE_MAX}
+    <Textarea label={t('coachTraining:noteForYou')} rows={2} maxLength={NOTE_MAX}
       value={note} onChange={e => onNote(e.target.value)} placeholder={t('coachTraining:noteForYouEx')} />
     <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
       <Button variant="secondary" onClick={onBack}>{t('common:back')}</Button>
@@ -355,14 +357,13 @@ function OnTheDay({ parts, mode = 'day' }: { parts: Part[]; mode?: 'day' | 'rest
   const title = mode === 'day' ? t('coachTraining:onTheDay') : t('coachTraining:yourSession')
   return <aside aria-labelledby="on-the-day" className="arc grid content-start gap-3 rounded-2xl border border-line bg-surface p-5">
     <h2 id="on-the-day" className="text-lg font-medium text-ink">{title}</h2>
-    <p className="text-sm text-ink-3">{mode === 'day' ? t('coachTraining:todayCardNote')
-      : t('coachTraining:restOfPlan')}</p>
+    {/* TRAK-457: no "Your Today card on Home shows the plan like this" line. */}
+    {mode !== 'day' && <p className="text-sm text-ink-3">{t('coachTraining:restOfPlan')}</p>}
     <div className="grid gap-1.5 rounded-xl bg-raised p-4">
       <p className="flex justify-between text-sm"><span className="font-medium text-ink">{t('coachHome:trainingPlan')}</span><span className="text-ink-3">{t('coachHome:minutes', { count: totalMinutes(parts) })}</span></p>
       {parts.filter(p => p.drill).map(p => <p key={p.key} className="flex justify-between gap-3 text-sm text-ink-2">
         <span className="truncate">{p.name === p.drill!.name ? p.name : `${partName(p.name)} · ${p.drill!.name}`}</span><span className="flex-none">{t('coachHome:minutes', { count: p.minutes })}</span></p>)}
     </div>
-    <p className="text-sm text-ink-3">{t('coachTraining:plannedWholeSquad')}</p>
   </aside>
 }
 
@@ -372,10 +373,8 @@ function DraftNote({ saving, saved }: { saving: boolean; saved: boolean }) {
   return <span role="status" className="text-sm text-ink-3">{saving ? t('coachTraining:savingDraft') : saved ? t('coachSchedule:draftSaved') : ''}</span>
 }
 
-/** TRAK-404 (Kostas, 10 Nov): × alone removes a part; its name is still read out. */
+/** TRAK-404 (Kostas, 10 Nov): an icon alone removes a part; its name is still read out. TRAK-455: a bin, not an ×. */
 function RemoveButton({ name, onRemove }: { name: string; onRemove: () => void }) {
   const { t } = useTranslation()
-  return <button type="button" aria-label={t('coachTraining:removeNamed', { name })} title={t('coachTraining:removeNamed', { name })} onClick={onRemove}
-    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-2 hover:bg-raised hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-    <X aria-hidden size={18} /></button>
+  return <RemoveIcon label={t('coachTraining:removeNamed', { name })} onClick={onRemove} className="rounded-full" />
 }

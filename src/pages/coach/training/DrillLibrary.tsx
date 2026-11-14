@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCoachSquad } from '@/lib/coach-squad'
 import { ON_LIBRARY, PRACTICE_KIND_COLOURS } from '@/lib/fixed-colours'
 import {
-  CHANGE_PRACTICE_PATH, CHARACTERISTICS, KINDS, KIND_ORDER, LIBRARY, MY_DRILLS_PATH, PLAYERS_TODAY, START_LEVEL, allDrillsPath, alsoCalled, anotherDrill,
+  CHANGE_PRACTICE_PATH, CHARACTERISTICS, KINDS, KIND_ORDER, LIBRARY, MY_DRILLS_PATH, PLAYERS_TODAY, START_LEVEL, allDrillsPath, anotherDrill,
   changedBy, characteristic, drillPath, fit, foundAs, squadPlayers, type Changed, kindInfo, kindPath, libraryDrill, nextLevel, practiceKey, practiceLayout, refit, searchDrills, step, typesOf, type Change,
   type Kind, type LibraryDrill, type Squad,
 } from '@/lib/training/library'
@@ -20,6 +20,7 @@ import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { Button } from '@/components/arc/button/button'
+import { PageTop } from '@/components/coach/PageTop'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 
 /* TRAK-387 (Drill Library 3/11, parent TRAK-384): Training › Drills is the new Library, from the 8 Nov mockup. Find a
@@ -58,11 +59,8 @@ function SubPage({ title, intro, children }: { title: string; intro: ReactNode; 
   return (
     <div className="min-h-screen bg-ground pb-28">
       <div className={WIDE_COLUMN}>
-        <header className="arc grid gap-3 pt-5 pb-4">
-          <CoachTrail current={title} />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink tablet:text-[28px]">{title}</h1>
-          <p className="max-w-[60ch] text-[15px] text-ink-2">{intro}</p>
-        </header>
+        <PageTop className="arc" menu={false} title={title} trail={<CoachTrail current={title} />}
+          below={<p className="max-w-[60ch] text-[15px] text-ink-2">{intro}</p>} />
         {children}
       </div>
     </div>
@@ -306,15 +304,14 @@ export function DrillPage() {
   </SubPage>
 }
 
+/** TRAK-457: the drill's other names ("Also called") aren't shown; search still finds the drill by them. */
 function DrillHead({ drill }: { drill: LibraryDrill }) {
-  const also = alsoCalled(drill)
   return <span className="grid gap-2">
     <span className="flex flex-wrap gap-1.5">
       <span className={CHIP}>{kindInfo(drill.kind).name}</span>
       {drill.kind !== 'warmup' && <span className={CHIP}>{drill.type}</span>}
       {drill.focus !== 'team' && <span className={CHIP}>{drill.focus === 'individual' ? 'Individual' : 'Goalkeeping'}</span>}
     </span>
-    {also.length > 0 && <span className="text-sm text-ink-3">Also called: {also.join(', ')}</span>}
   </span>
 }
 
@@ -359,7 +356,7 @@ function DrillBody({ drill, start, squadName }: { drill: LibraryDrill; start: Sq
         <Button variant="secondary" disabled={nextLevel(drill, players, level, 1) === null} onClick={() => press(1)}><ArrowUp aria-hidden size={16} />Harder</Button>
         {another && <span className="col-span-2 grid tablet:col-span-1"><Button variant="secondary" onClick={() => navigate(drillPath(another.id))}><Repeat aria-hidden size={16} />Another drill</Button></span>}
       </div>
-      <ChangeNote changed={changed} idle={`Set for ${squadName ? `your ${squadName}s` : 'your squad'}. Press Easier or Harder and Trak shows what it changed and why.`} />
+      <ChangeNote changed={changed} />
       <DetailList details={fitted.details} changed={changed} />
     </div>
     <div className="grid gap-5 rounded-2xl border border-line bg-surface p-4">
@@ -412,7 +409,7 @@ export function ChangePractice() {
             <PitchPicture shapes={practiceLayout(shown.key, eg)} label={`${shown.name} example: ${examples[eg].label}`} />
             <div className="grid content-start gap-3">
               <div className="arc">
-                <ChipGroup label="Pick an example" multiple={false} value={[String(eg)]}
+                <ChipGroup label="Select an example" multiple={false} value={[String(eg)]}
                   options={examples.map((x, i) => ({ value: String(i), label: x.label }))}
                   onValueChange={next => { if (next[0]) go(shown.key, Number(next[0])) }} />
               </div>

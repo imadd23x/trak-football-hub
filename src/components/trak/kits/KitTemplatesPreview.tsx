@@ -52,7 +52,7 @@ export function KitTemplatesPreview() {
     </header>
     <main id="top">
       <section className="kit-room-intro">
-        <div><p className="kit-kicker">ONE TEAM. EVERY COLOUR.</p><h1>Ready to wear.</h1><p className="kit-intro-copy">A clear kit for every fixture.<br />Pick your colours. Let the whole team know.</p></div>
+        <div><p className="kit-kicker">ONE TEAM. EVERY COLOUR.</p><h1>Ready to wear.</h1><p className="kit-intro-copy">A clear kit for every fixture.<br />Select your colours. Let the whole team know.</p></div>
         <div className="kit-intro-note"><span>01 — 03</span><p>Home. Away. Alternate.<br />All part of the same team.</p><ArrowDown size={20} strokeWidth={1.5} /></div>
       </section>
       <div className="kit-workspace">
@@ -113,7 +113,7 @@ export function KitTemplatesPreview() {
         </aside>
       </div>
       <section className="kit-family-preview" aria-labelledby="family-preview-heading">
-        <div><p className="kit-kicker">ON THE SAME PAGE</p><h2 id="family-preview-heading">No more <br />“which kit?”</h2><p>The coach picks it once. Players and parents see the same complete kit, with colours written out for clarity.</p><span>Made for the event bottom sheet <ChevronRight size={14} /></span></div>
+        <div><p className="kit-kicker">ON THE SAME PAGE</p><h2 id="family-preview-heading">No more <br />“which kit?”</h2><p>The coach selects it once. Players and parents see the same complete kit, with colours written out for clarity.</p><span>Made for the event bottom sheet <ChevronRight size={14} /></span></div>
         <KitAnnouncement key={selected} kit={kit} slot={selected} />
       </section>
       <footer className="kit-room-footer"><span>trak. <span>SHOW UP READY.</span></span><span>6 styles · 24 colours · endless combinations</span></footer>

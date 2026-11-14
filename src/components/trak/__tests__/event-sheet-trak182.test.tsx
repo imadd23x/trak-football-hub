@@ -105,7 +105,7 @@ describe('TRAK-182: the event sheet', () => {
     expect(within(sheet).queryByRole('link', { name: 'Share' })).toBeNull()
     expect(within(sheet).queryByRole('button', { name: 'Cancel event' })).toBeNull()
     // TRAK-230: an event still to come is edited from here.
-    expect(within(sheet).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'Edit event' })).toBeInTheDocument()
     // TRAK-135: publishing emails families, so the app asks the server to send.
     let nudges = 0
     server.use(http.post(`${SUPABASE_URL}/functions/v1/send-event-emails`, () => { nudges++; return HttpResponse.json({ accepted: true }, { status: 202 }) }))
@@ -155,7 +155,7 @@ describe('TRAK-182: the event sheet', () => {
     expect(within(sheet).getByRole('heading', { name: "Can't make it · 1" })).toBeInTheDocument()
     expect(within(sheet).getByText('Beth Mead')).toBeInTheDocument()
     expect(within(sheet).getByText('School')).toBeInTheDocument()
-    await user.click(within(sheet).getByRole('button', { name: 'Edit' }))
+    await user.click(within(sheet).getByRole('button', { name: 'Edit event' }))
     expect(screen.getByTestId('where')).toHaveTextContent('/coach/schedule?edit=ev-1')
   })
 
@@ -180,7 +180,7 @@ describe('TRAK-182: the event sheet', () => {
     expect(await within(sheet).findByRole('heading', { name: 'Attended · 1' })).toBeInTheDocument()
     await user.click(within(sheet).getByRole('button', { name: 'Show names: Attended' }))
     expect(within(within(sheet).getByRole('list', { name: 'Attended' })).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Bukayo Saka'])
-    expect(within(sheet).getByRole('button', { name: 'Edit register' })).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'Register' })).toBeInTheDocument()
     expect(within(sheet).queryByRole('button', { name: 'Cancel event' })).toBeNull()
     expect(within(sheet).queryByRole('link', { name: 'Share' })).toBeNull()
   })
@@ -195,7 +195,7 @@ describe('TRAK-182: the event sheet', () => {
     expect(within(sheet).queryByRole('button', { name: 'Cancel event' })).toBeNull()
     // TRAK-230 (Kostas, 21 Oct, option A): started, so its details are fixed and there's no Edit.
     expect(within(sheet).getByText('It has started, so its details are fixed.')).toBeInTheDocument()
-    expect(within(sheet).queryByRole('button', { name: 'Edit' })).toBeNull()
+    expect(within(sheet).queryByRole('button', { name: 'Edit event' })).toBeNull()
     expect(within(sheet).queryByRole('link', { name: 'Share' })).toBeNull()
     expect(await within(sheet).findByRole('heading', { name: 'Attended · 2' })).toBeInTheDocument()
     // Decided 16 Oct: a past event's sheet has no meet time and no family note; the kit stays.

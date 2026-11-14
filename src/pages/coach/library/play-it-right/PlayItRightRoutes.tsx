@@ -141,7 +141,7 @@ function PartPage() {
                 ? <BesideList label="Match moments" items={moments} open={open}
                     row={(m, selected) => <MomentRow moment={m} part={part} selected={selected} onSelect={() => select(m.id)} />}
                     view={m => <MomentView key={m.id} moment={m} pane onClose={() => select(null)} />}
-                    empty={{ title: 'No moment open', hint: 'Pick a match moment to see it here.' }} />
+                    empty={{ title: 'No moment open', hint: 'Select a match moment to see it here.' }} />
                 : <ul aria-label="Match moments" className="grid gap-1 tablet:grid-cols-2 tablet:gap-x-2">
                     {moments.map(m => <li key={m.id} className="min-w-0"><MomentRow moment={m} part={part} /></li>)}
                   </ul>}

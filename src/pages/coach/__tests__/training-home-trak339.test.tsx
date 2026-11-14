@@ -102,14 +102,15 @@ describe('TRAK-339: the Next training card', { timeout: 30_000 }, () => {
       training('later', onTheMinute(Date.now() + 4 * DAY))])
     renderApp('/coach/training')
     const card = await nextCard('Pressing triggers')
-    // Kostas, 30 Oct: no visible "Training" or "Next training" title; the name leads the card.
-    expect(screen.getByRole('heading', { level: 1, name: 'Training' })).toHaveClass('sr-only')
+    // Kostas, 30 Oct: no "Next training" title; the name leads the card. TRAK-422 (Kostas, 13 Nov): the page has the one
+    // coach page title, "Training", like every coach page.
+    expect(screen.getByRole('heading', { level: 1, name: 'Training' })).not.toHaveClass('sr-only')
     expect(within(card).queryByText('Next training')).toBeNull()
     expect(within(card).getByText('Plan not written')).toBeInTheDocument()
     expect(within(card).getByText(/Pitch 2 · 90 min/)).toBeInTheDocument()
     for (const step of ['Logistics', 'Plan', 'Who’s here', 'Notes']) expect(within(card).getAllByText(step).length).toBeGreaterThan(0)
     expect(within(card).getByText('Bring shin pads.')).toBeInTheDocument()
-    expect(within(card).getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/coach/schedule?edit=soon&step=2')
+    expect(within(card).getByRole('link', { name: 'Edit the message to players' })).toHaveAttribute('href', '/coach/schedule?edit=soon&step=2')
     expect(within(card).getByRole('button', { name: 'Use a past plan' })).toBeInTheDocument()
     await user.click(within(card).getByRole('button', { name: 'Plan session' }))
     await waitFor(() => expect(window.location.pathname).toBe('/coach/training/soon/plan'))

@@ -7,6 +7,7 @@ import { isPosition } from '@/lib/positions'
 import { loadSeasonObjectives, seasonObjectivesKey, useSeasonPlan } from '@/lib/season-plan'
 import { PlayerObjectivesSheet } from './PlayerObjectivesSheet'
 import { usePlayerObjectives } from './usePlayerObjectives'
+import { EditIcon } from '@/components/trak/IconAction'
 
 /* TRAK-354 (Season plan 6/18): a player's objectives on their own page, with one edit for both, under the same rules
    as step 3. Each says which season objective it supports, or whose it is, and since when. No position, no
@@ -34,13 +35,15 @@ export function PlayerObjectivesSection({ coachId, id, name, position, squad }: 
   const gone = objectives.removedOf(id)
   const shared = !!season.plan?.shared_at
   const placed = isPosition(position)
-  const action = !placed ? null : held.length > 1 ? 'Edit objectives' : held.length ? 'Edit objective' : `Give ${first} an objective`
+  const action = !placed ? null : held.length > 1 ? `Edit ${first}'s objectives` : held.length ? `Edit ${first}'s objective` : `Give ${first} an objective`
 
   return <section aria-labelledby={`objectives-${id}`} className="my-3 grid gap-2">
     <div className="flex items-baseline justify-between gap-3">
       <h4 id={`objectives-${id}`} className="text-base font-medium text-ink">{held.length > 1 ? 'Objectives' : 'Objective'}</h4>
-      {action && <button type="button" onClick={() => setEditing(true)} aria-haspopup="dialog"
-        className="min-h-11 rounded-md text-[15px] font-medium text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{action}</button>}
+      {/* TRAK-455: once there are objectives, editing them is a pencil; giving the first one keeps its words. */}
+      {action && (held.length ? <EditIcon label={action} haspopup onClick={() => setEditing(true)} />
+        : <button type="button" onClick={() => setEditing(true)} aria-haspopup="dialog"
+          className="min-h-11 rounded-md text-[15px] font-medium text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{action}</button>)}
     </div>
     {objectives.isError || seasonObjectives.isError ? <LoadError what={`${first}'s objectives`} onRetry={() => { void objectives.refetch(); void seasonObjectives.refetch() }} />
       : objectives.isPending ? <LoadingSkeleton label={`Loading ${first}'s objectives…`} lines={2} />

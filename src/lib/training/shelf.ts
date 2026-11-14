@@ -15,7 +15,7 @@ export const PART_TYPES = [
   { key: 'rondo', name: 'Rondo', note: 'Keep the ball', mins: 15, options: [10, 15, 20],
     guide: 'Keep the ball under pressure. Whoever loses it goes in the middle.' },
   { key: 'functional', name: 'Functional drills', note: 'Passing and finishing', mins: 25, options: [20, 25, 30],
-    guide: 'Passing that ends in a shot. Pick one with a transition if you want them to react the moment the ball is lost.' },
+    guide: 'Passing that ends in a shot. Select one with a transition if you want them to react the moment the ball is lost.' },
   { key: 'game', name: 'Game', note: 'Everyone plays', mins: 25, options: [20, 25, 30],
     guide: 'Finish with a game. On the day, Trak splits the teams from who is here.' },
   { key: 'setpieces', name: 'Set pieces', note: 'Corners and free kicks', mins: 15, options: [10, 15, 20],
@@ -31,7 +31,7 @@ export type PartType = ShelfPart | 'own'
 
 /** A part the coach named: any drill fits it. */
 export const OWN_PART = { key: 'own', name: 'Your own part', note: 'Your own part', mins: 15, options: [10, 15, 20, 25],
-  guide: 'This part is yours. Pick any drill from the Library.' } as const
+  guide: 'This part is yours. Select any drill from the Library.' } as const
 
 /** Trak's session, the first time: its first five parts. */
 export const STANDARD: ShelfPart[] = ['warmup', 'passing', 'rondo', 'functional', 'game']

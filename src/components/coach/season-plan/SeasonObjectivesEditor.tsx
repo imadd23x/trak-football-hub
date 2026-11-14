@@ -28,12 +28,12 @@ export function SeasonObjectivesEditor({ objectives, focusKey, removeWord, onCha
         <h2 id="season-objectives" className="text-lg font-medium text-ink">Season objectives</h2>
         <span className="text-sm text-ink-3">{objectives.length} of {MAX_SEASON_OBJECTIVES}</span>
       </div>
-      {objectives.length === 0 && <p className="text-sm text-ink-3">None yet. Pick from the list or write your own.</p>}
+      {objectives.length === 0 && <p className="text-sm text-ink-3">None yet. Select from the list or write your own.</p>}
       <ol className="grid gap-4">
         {objectives.map((o, index) => (
           <li key={o.key} className="grid gap-2 rounded-xl border border-line p-3">
             <Input label={`Objective ${index + 1}`} value={o.title} maxLength={OBJECTIVE_TITLE_MAX} autoFocus={o.key === focusKey}
-              placeholder="For example: Win the second ball" onChange={event => set(o.key, { title: event.target.value })} />
+              placeholder="e.g. Win the second ball" onChange={event => set(o.key, { title: event.target.value })} />
             <Textarea label="What it looks like" value={o.looksLike} maxLength={OBJECTIVE_LINE_MAX} rows={2}
               onChange={event => set(o.key, { looksLike: event.target.value })} />
             <span className="justify-self-end">

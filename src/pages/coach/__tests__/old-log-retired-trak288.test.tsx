@@ -105,7 +105,7 @@ describe('TRAK-288: with Games on, the evaluation replaces the match log', { tim
     const competition = within(sheet).getByRole('group', { name: 'Competition' })
     expect(within(competition).getAllByRole('button').map(b => b.textContent)).toEqual(['League', 'Tournament', 'Friendly'])
     await userEvent.click(within(sheet).getByRole('button', { name: 'Next' }))
-    expect(await within(sheet).findByText('Pick the competition')).toBeInTheDocument()
+    expect(await within(sheet).findByText('Select the competition')).toBeInTheDocument()
     await userEvent.click(within(competition).getByRole('button', { name: 'Tournament' }))
     await eventStep(sheet, 'When')
     await pickTime(userEvent, 'Kickoff', '19:00')

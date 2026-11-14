@@ -37,7 +37,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals() })
 
 const things = () => screen.getByRole('group', { name: 'Five things that shape a practice' })
-const examples = () => screen.getByRole('group', { name: 'Pick an example' })
+const examples = () => screen.getByRole('group', { name: 'Select an example' })
 
 describe('TRAK-394: Change any practice', { timeout: 20_000 }, () => {
   it('opens from the Drills tab on Area shape and size, with a picture, what changes and the key', async () => {

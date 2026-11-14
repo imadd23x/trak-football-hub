@@ -7,7 +7,7 @@ export const HOW_IT_WORKS: [when: string, what: string][] = [
   ['Each week', 'Ten match moments, all on one part of the code. Week 1 is Commitment, week 2 Behaviour and attitude, and so on, so every six weeks cover the whole code and each part comes round three times in 18 weeks.'],
   ['Mon–Fri', 'Players aim for two moments a day, about five minutes.'],
   ['Any time', 'Players read a short strip, make their call, then see what the coach saw. Some moments ask them to rank three options instead.'],
-  ['Huddle', 'Pick a moment from this week’s part, ideally one the squad found hard, and talk it through together.'],
+  ['Huddle', 'Select a moment from this week’s part, ideally one the squad found hard, and talk it through together.'],
   ['All week', 'Catch teachable moments in training and name the part (“That was part 4”).'],
 ]
 

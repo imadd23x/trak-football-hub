@@ -2,10 +2,11 @@ import { i18n, useTranslation } from '@/lib/i18n'
 import { partName } from '@/lib/training/words'
 import type { KeyboardEvent } from 'react'
 import { Reorder, useDragControls, type DragControls } from 'motion/react'
-import { Check, GripVertical, Pencil, Plus, Search, X } from 'lucide-react'
+import { Check, GripVertical, Plus, Search } from 'lucide-react'
 import { fitLine, partColour, partLine, playersLine, totalMinutes, type Part, type PlanDrill } from '@/lib/training/parts'
 import { Badge } from '@/components/arc/badge/badge'
 import { Button } from '@/components/arc/button/button'
+import { EditIcon, RemoveIcon } from '@/components/trak/IconAction'
 
 /* TRAK-340 (Training redo 2/5, spec TRAK-338, 2 Nov prototype): the planner's pieces. A drill tile (its name only since
    TRAK-404), the time bar, and Your session: the whole session at a glance, where the coach shapes
@@ -72,7 +73,8 @@ export function SessionCard({ parts, length, current, onOpen, onReorder, onMove,
     </div>
     <TimeBar parts={parts} length={length} current={current} />
     {fit && <p className={`text-sm ${length && totalMinutes(parts) > length ? 'text-warning' : 'text-ink-3'}`}>{fit}</p>}
-    <p className="text-[12px] text-ink-3">{t('coachTraining:dragHint')}</p>
+    {/* TRAK-457: the drag line is gone; a keyboard user still hears how to move a part. */}
+    <p className="sr-only">{t('coachTraining:dragHint')}</p>
     <Reorder.Group as="ol" axis="y" values={parts} onReorder={onReorder} aria-label={t('coachTraining:partsOfSession')} className="grid gap-1.5">
       {parts.map((part, i) => <SessionRow key={part.key} part={part} index={i} count={parts.length}
         state={part.key === current ? 'now' : at >= 0 && i < at ? 'done' : 'next'}
@@ -127,14 +129,12 @@ function SessionRow({ part, index, count, state, onOpen, onMove, onRemove }: {
       </span>
       <span className="flex-none text-[13px] text-ink-2">{t('coachHome:minutes', { count: part.minutes })}</span>
     </button>
-    <button type="button" aria-label={t('coachTraining:removeNamed', { name: partName(part.name) })} title={t('coachTraining:removeNamed', { name: partName(part.name) })} onClick={onRemove}
-      className="inline-flex h-11 w-9 flex-none items-center justify-center rounded-lg text-ink-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-      <X aria-hidden size={16} /></button>
+    <RemoveIcon label={t('coachTraining:removeNamed', { name: partName(part.name) })} onClick={onRemove} />
   </Reorder.Item>
 }
 
 
-/** The plan as a list: each part's minutes, name, drill and players, with Edit (or Pick a drill) and ×. TRAK-341: the
+/** The plan as a list: each part's minutes, name, drill and players, with Edit (or Select a drill) and Remove (TRAK-455: a pencil and a bin). TRAK-341: the
  *  planner's Review step and a saved plan's Review page show the same list. TRAK-367 (Kostas, 3 Nov): a part moves here
  *  as it does in Your session. `onDrop` is the end of a drag. */
 export function PlanRows({ parts, onEdit, onRemove, onReorder, onMove, onDrop, busy = false }: {
@@ -166,9 +166,10 @@ function PlanRow({ part, index, count, onEdit, onRemove, onMove, onDrop, busy }:
       {players && <span className="text-[13px] text-ink-3">{players}</span>}
     </span>
     <span className="flex flex-none gap-1">
-      <Button size="sm" variant="ghost" disabled={busy} aria-label={t(part.drill ? 'coachTraining:editPartNamed' : 'coachTraining:pickDrillForNamed', { name: partName(part.name) })} onClick={onEdit}>
-        <Pencil aria-hidden size={14} />{part.drill ? t('coachSchedule:edit') : t('coachTraining:pickADrill')}</Button>
-      <Button size="sm" variant="ghost" disabled={busy} aria-label={t('coachTraining:removeNamed', { name: partName(part.name) })} onClick={onRemove}><X aria-hidden size={16} /></Button>
+      {/* TRAK-455: Edit is a pencil; with no drill yet, Select a drill keeps its words (it isn't an edit). */}
+      {part.drill ? <EditIcon label={t('coachTraining:editPartNamed', { name: partName(part.name) })} disabled={busy} onClick={onEdit} />
+        : <Button size="sm" variant="ghost" disabled={busy} aria-label={t('coachTraining:pickDrillForNamed', { name: partName(part.name) })} onClick={onEdit}>{t('coachTraining:pickADrill')}</Button>}
+      <RemoveIcon label={t('coachTraining:removeNamed', { name: partName(part.name) })} disabled={busy} onClick={onRemove} />
     </span>
   </Reorder.Item>
 }

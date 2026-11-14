@@ -173,7 +173,7 @@ describe('TRAK-350 the season plan, step 1', () => {
     await user().click(saveDraft())
     await waitFor(() => expect(saveDraft()).toHaveTextContent('Saved'))
     expect(objectives).toEqual([])
-    expect(screen.getByText('None yet. Pick from the list or write your own.')).toBeInTheDocument()
+    expect(screen.getByText('None yet. Select from the list or write your own.')).toBeInTheDocument()
   })
 
   it('refuses a season that ends before it starts, saying why', async () => {

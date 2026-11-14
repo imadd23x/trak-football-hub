@@ -51,6 +51,7 @@
   "editNamed": "Επεξεργασία: {{title}}",
   "publishNamed": "Δημοσίευση: {{title}}",
   "editRegister": "Αλλαγή παρουσιών",
+  "register": "Παρουσίες",
   "registerFor": "{{action}}: {{title}}",
   "viewReviewOf": "Ανασκόπηση: {{title}}",
   "editMatch": "Επεξεργασία αγώνα",

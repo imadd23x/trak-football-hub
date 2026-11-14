@@ -83,7 +83,7 @@ export const LIBRARY: readonly LibraryDrill[] = [
     id: 'lib-tag-games', name: 'Tag games', kind: 'warmup', type: 'Dry warm-up', focus: 'team', template: 'warm',
     rule: PACE,
     why: 'A game gets players moving and laughing without them noticing the work.',
-    how: ['Everyone inside the box. Pick two taggers.', 'A tagged player stands still until a teammate frees them.', 'Three rounds of 90 seconds.'],
+    how: ['Everyone inside the box. Select two taggers.', 'A tagged player stands still until a teammate frees them.', 'Three rounds of 90 seconds.'],
     watch: ['Players look up and change direction.', 'Change the taggers every round.'],
     topics: 'warm-up tag fun stuck in the mud chain tag sharks and fish cat and mouse',
   },

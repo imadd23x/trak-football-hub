@@ -43,12 +43,15 @@ const picture = () => screen.getByRole('img', { name: /set-up\./ })
 const detail = (name: string) => screen.getByText(name, { selector: 'dt' }).closest('div')!
 
 describe('TRAK-389: a drill’s page', { timeout: 20_000 }, () => {
-  it('says its kind, type and other names, and starts at the standard level for the squad', async () => {
+  it('says its kind and type, not its other names (TRAK-457), and starts at the standard level for the squad', async () => {
     open('Keep the ball')
     expect(await screen.findByRole('heading', { name: 'Keep the ball', level: 1 })).toBeInTheDocument()
-    expect(screen.getByText('Also called: piggy in the middle, keep ball, toro')).toBeInTheDocument()
+    // TRAK-457 (11 Nov walk-through): the other names stay for search (library.test), but aren't shown on the drill.
+    expect(screen.queryByText(/Also called/)).toBeNull()
     expect(await screen.findByRole('img', { name: /Area shape and size: 13x13 m\. Numbers: 12 players, 9v3\./ })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Set for your squad. Press Easier or Harder and Trak shows what it changed and why.')
+    // TRAK-457: no line until Easier or Harder is pressed.
+    expect(screen.getByRole('status')).toHaveTextContent('')
+    expect(screen.queryByText(/Press Easier or Harder/)).toBeNull()
     // Add to training is TRAK-391's (training-add-trak391); Add to My drills is TRAK-390's.
     expect(screen.getByRole('button', { name: /Add to training/ })).toBeTruthy()
   })
@@ -109,7 +112,7 @@ describe('TRAK-389: a drill’s page', { timeout: 20_000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Harder' }))
     await user.click(screen.getByRole('button', { name: 'Another drill' }))
     expect(await screen.findByRole('heading', { name: 'Four corners', level: 1 })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(/^Set for your squad/)
+    expect(screen.getByRole('status')).toHaveTextContent('') // fresh: no change note (TRAK-457)
     window.history.back()
     expect(await screen.findByRole('heading', { name: 'Keep the ball', level: 1 })).toBeInTheDocument()
     await waitFor(() => expect(window.location.pathname).toBe(`/coach/training/drills/d/${drill('Keep the ball').id}`))

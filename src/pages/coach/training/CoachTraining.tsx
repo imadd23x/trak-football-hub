@@ -205,7 +205,6 @@ function SessionsView() {
           <div className="arc flex flex-wrap items-center gap-3 border-t border-line pt-5">
             <Button variant="secondary" onClick={() => navigate(PAST_PATH)}><History aria-hidden size={16} />{t('coachTraining:pastTrainings')}
               {past.data && <Badge size="sm">{pastInView.length}</Badge>}</Button>
-            <span className="text-sm text-ink-3">{t('coachTraining:lookBack')}</span>
           </div>
         </div>}
     </Page>
@@ -371,8 +370,7 @@ function PastTrainings() {
   return (
     <div className="min-h-screen bg-ground pb-28">
       <div className={WIDE_COLUMN}>
-        <PageTop className="arc" menu={false} title={t('coachTraining:pastTrainings')} trail={<CoachTrail current={t('coachTraining:pastTrainings')} />}
-          below={<p className="text-sm text-ink-3">{t('coachTraining:pastSub')}</p>} />
+        <PageTop className="arc" menu={false} title={t('coachTraining:pastTrainings')} trail={<CoachTrail current={t('coachTraining:pastTrainings')} />} />
         {past.error ? <LoadError what={t('coachTraining:pastWhat')} onRetry={() => void past.refetch()} retrying={past.isFetching} />
           : past.isPending ? <LoadingSkeleton label={t('coachTraining:loadingPast')} lines={2} rows={4} className="pt-6" />
           : inView.length === 0 ? <div className="arc"><EmptyState icon={<History size={24} strokeWidth={1.5} />} title={t('coachTraining:noPastYet')}

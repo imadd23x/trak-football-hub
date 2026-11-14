@@ -2,9 +2,6 @@
   "allSquads": "All squads",
   "yourSquad": "Your squad",
   "needsYouTitle": "Needs you",
-  "swipeForMore": "Swipe",
-  "scrollForMore": "Scroll",
-  "forMore": " for more",
   "needsYouWhat": "who needs you",
   "needsYouLoading": "Loading who needs you",
   "needsYouNone": "Every register and log is in, every player is assessed and no draft is waiting.",
@@ -96,8 +93,6 @@
   "noteClosed": "Closed",
   "noteRegister": "Take the register",
   "session": "Session",
-  "nothingPlannedOn": "Nothing planned on {{day}}",
-  "usePlus": "Use + to plan an event",
   "previousWeek": "Previous week",
   "nextWeekButton": "Next week",
   "dayToday": ", today",
@@ -127,7 +122,6 @@
   "assessedAgo_other": "Assessed {{count}} days ago",
   "draftFrom": "Draft from {{day}}: families can't see it yet",
   "draftsFrom": "{{count}} drafts, the latest from {{day}}: families can't see them yet",
-  "useCreate": "Use Create to plan an event",
   "showAll": "Show all {{count}}",
   "showFewer": "Show fewer"
 }

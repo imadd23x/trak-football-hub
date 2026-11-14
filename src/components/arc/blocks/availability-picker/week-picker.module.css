@@ -69,7 +69,6 @@
 /* Footer: the chosen event and its next step. */
 .footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--border-subtle); background: var(--surface-muted); }
 .selection { display: grid; gap: 2px; min-width: 0; }
-.selectionLabel { min-width: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
 .selectionValue { min-width: 0; overflow: hidden; line-height: var(--leading-body); font-size: var(--text-sm); font-weight: 500; font-variant-numeric: tabular-nums; text-overflow: ellipsis; }
 .footerActions { display: flex; flex: none; align-items: center; gap: 6px; }
 .primaryButton { min-width: 128px; }

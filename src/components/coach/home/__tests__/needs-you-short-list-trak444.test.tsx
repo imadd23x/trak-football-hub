@@ -38,6 +38,12 @@ describe('TRAK-444: Needs you with a lot owed', () => {
     expect(titles()).toHaveLength(FIRST_CARDS)
   })
 
+  // TRAK-443 (walk-through of 11 Nov): no "Swipe for more" / "Scroll for more" beside the heading.
+  it('has no "for more" hint', () => {
+    show([event(1), event(2)])
+    expect(screen.queryByText(/for more/)).toBeNull()
+  })
+
   it('puts the urgent cards first, then the newest', () => {
     show([event(1), event(9, { urgent: true }), event(2), event(3), event(4), event(5), event(20, { urgent: true })])
     expect(titles().map(text => text.match(/Event \d+/)![0])).toEqual(['Event 9', 'Event 20', 'Event 1', 'Event 2', 'Event 3'])

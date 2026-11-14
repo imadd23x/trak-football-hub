@@ -40,7 +40,6 @@ export function NeedsYou({ items, events = [], failed, onRetry, onOpen }: {
   return <section aria-labelledby="needs-you-title">
     <div className="mb-2 flex items-baseline justify-between gap-3">
       <h2 id="needs-you-title" className="text-lg font-medium text-ink">{t('coachHome:needsYouTitle')} {count !== null && <span className="text-ink-3 font-normal">{count}</span>}</h2>
-      {count !== null && count > 1 && <span className="text-sm text-ink-3"><span className="[@media(pointer:fine)]:hidden">{t('coachHome:swipeForMore')}</span><span className="[@media(pointer:coarse)]:hidden">{t('coachHome:scrollForMore')}</span>{t('coachHome:forMore')}</span>}
     </div>
     {failed ? <LoadError what={t('coachHome:needsYouWhat')} onRetry={onRetry} />
       : !items ? <LoadingSkeleton label={t('coachHome:needsYouLoading')} lines={2} rows={2} className="h-[148px] content-start overflow-hidden rounded-2xl border border-line bg-surface p-5" />

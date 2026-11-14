@@ -10,7 +10,6 @@ import { motionTokens } from "../../lib/motion-tokens";
 import { CANCELLED_COLOR, EVENT_COLOR } from "@/lib/coach-events";
 import type { WeekState } from "@/lib/coach-week";
 import { useTranslation } from "@/lib/i18n";
-import { useSideMenuScreen } from "@/lib/side-menu-screen";
 import styles from "./week-picker.module.css";
 
 export interface WeekEvent {
@@ -65,15 +64,12 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
 }) {
   const reduce = !!useReducedMotion();
   const { t } = useTranslation();
-  const laptop = useSideMenuScreen(); // TRAK-432: a laptop has no "+", its button says Create.
   const id = useId();
   const [dayId, setDayId] = useState(days.find(day => day.today)?.id ?? days[0].id);
   const [direction, setDirection] = useState(1);
   const day = days.find(entry => entry.id === dayId) ?? days[0];
   const [eventId, setEventId] = useState(firstEvent(day)?.id ?? null);
   const event = day.events.find(entry => entry.id === eventId) ?? null;
-  const summary = event ? `${event.title}${event.time ? ` · ${event.time}` : ""}` : t("coachHome:nothingPlannedOn", { day: day.full.split(" ")[0] });
-  const selectionLabel = family ? "" : event ? event.note : t(laptop ? "coachHome:useCreate" : "coachHome:usePlus");
 
   function selectDay(index: number) {
     const next = days[index];
@@ -155,24 +151,20 @@ export function WeekPicker({ title, subtitle, days, onPrevWeek, onNextWeek, rend
         </AnimatePresence>
       </div>
 
-      {/* Trak (TRAK-441): a family's empty day says "Nothing planned" once, in the list. */}
-      {(event || !family) && <footer className={styles.footer}>
+      {/* Trak (TRAK-443): the chosen event's title and its buttons; its line is on its row. An empty day has no bar:
+          the list says "Nothing planned" once. */}
+      {event && <footer className={styles.footer}>
         <div className={styles.selection}>
           <span className={styles.swap}>
             <AnimatePresence mode="popLayout" initial={false}>
-              <motion.span key={selectionLabel} className={styles.selectionLabel} {...swap} transition={swapTransition}>{selectionLabel}</motion.span>
-            </AnimatePresence>
-          </span>
-          <span className={styles.swap}>
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.strong key={summary} className={styles.selectionValue} {...swap} transition={swapTransition}>{summary}</motion.strong>
+              <motion.strong key={event.id} className={styles.selectionValue} {...swap} transition={swapTransition}>{event.title}{event.time ? ` · ${event.time}` : ""}</motion.strong>
             </AnimatePresence>
           </span>
         </div>
-        {event && <div className={styles.footerActions}>
+        <div className={styles.footerActions}>
           {renderDetails?.(event.id, <Button variant="ghost" size="sm">{t("coachHome:details")}</Button>)}
           {renderPrimary?.(event.id)}
-        </div>}
+        </div>
       </footer>}
     </div>
   </section>;

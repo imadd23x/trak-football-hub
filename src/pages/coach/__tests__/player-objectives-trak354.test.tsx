@@ -96,7 +96,7 @@ describe('TRAK-354 player objectives', () => {
     await user().click(option(pat, 'Holds the line together'))
     expect(option(pat, 'Holds the line together')).toHaveAttribute('aria-pressed', 'false')
     expect(within(pat).getByText('Up to two at once. Untick one first.')).toHaveAttribute('role', 'status')
-    expect(within(pat).getByText('2 of 2 picked.', { exact: false })).toBeInTheDocument()
+    expect(within(pat).getByText('2 of 2 selected.', { exact: false })).toBeInTheDocument()
 
     await user().click(within(pat).getByRole('button', { name: 'Save · next: Synthetic Bo Midfielder' }))
     await waitFor(() => expect(saves).toEqual([{ p_squad_player_id: 'p1', p_objectives: [lib('Steps in to win it the moment we lose it', 'so-press'), lib('Wins their headers')] }]))

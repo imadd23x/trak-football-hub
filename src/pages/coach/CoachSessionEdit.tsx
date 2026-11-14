@@ -327,7 +327,7 @@ export default function CoachSessionEdit() {
         {/* TRAK-157: the same Arc picker as the logs; a day after today isn't offered. */}
         <div className="arc" style={{ fontFamily: 'var(--t-font)' }}>
           <DatePicker label="Session date" className="arc-trak-field" value={dayAsDate(date)} clearable={false}
-            maxDate={dayAsDate(localTodayISO())} onChange={d => { if (d) setDate(dateAsDay(d)) }} placeholder="Pick a date"
+            maxDate={dayAsDate(localTodayISO())} onChange={d => { if (d) setDate(dateAsDay(d)) }} placeholder="Select a date"
             format={{ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }} locale="en-GB" />
         </div>
 

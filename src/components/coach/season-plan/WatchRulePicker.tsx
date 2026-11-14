@@ -27,7 +27,7 @@ export function WatchRulePicker({ coachId, squad, plan, label = 'Remind me' }: {
       {rulesFor(hasTrainings).map(rule => <button key={rule.value} type="button" aria-pressed={current === rule.value} className={chip(current === rule.value)}
         disabled={set.isPending} onClick={() => set.mutate({ planId: plan?.id ?? null, rule: rule.value })}>{rule.label}</button>)}
     </div>
-    <p className="text-sm text-ink-3">{hasTrainings ? "Trainings count each player's own, from your register. " : ''}Whatever you pick, Trak reminds you after 4 weeks at the latest.</p>
+    <p className="text-sm text-ink-3">{hasTrainings ? "Trainings count each player's own, from your register. " : ''}Whatever you select, Trak reminds you after 4 weeks at the latest.</p>
     {set.isError && <Alert tone="danger" title="Couldn't save the reminder. Check your connection and try again." />}
   </div>
 }

@@ -160,7 +160,7 @@ describe('TRAK-361 the Season plan card', () => {
     await user().click(fold(u14))
     expect(fold(u14)).toHaveAttribute('aria-expanded', 'true')
     expect(fold(u16)).toHaveAttribute('aria-expanded', 'false')
-    expect(await within(u14).findByText('None picked.')).toBeInTheDocument()
+    expect(await within(u14).findByText('None selected.')).toBeInTheDocument()
     expect(within(u16).queryByText('Stay compact')).toBeNull()
     // Opening U14's plan picks U14 first.
     await user().click(within(u14).getByRole('button', { name: 'View plan' }))
@@ -176,7 +176,7 @@ describe('TRAK-361 the Season plan card', () => {
     await user().click(await screen.findByRole('button', { name: 'Set up' }))
     await waitFor(() => expect(window.location.pathname).toMatch(/^\/coach\/season-plan/))
     expect(await screen.findByText(/^U14 · /)).toBeInTheDocument()
-    expect(screen.queryByText('Pick one squad in the menu to plan its season.')).toBeNull()
+    expect(screen.queryByText('Select one squad in the menu to plan its season.')).toBeNull()
   }, 30_000)
 
   it('shows a skeleton first, never "Not started" for a plan it hasn’t read', async () => {

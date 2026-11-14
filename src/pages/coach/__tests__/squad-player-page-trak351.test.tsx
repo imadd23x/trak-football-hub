@@ -109,6 +109,6 @@ describe('TRAK-351 a player\'s full page', () => {
     localStorage.setItem(`trak:coach-squad:${COACH.id}`, 'U14')
     renderApp('/coach/squad/player/sq-ada')
     const panel = await view()
-    expect(await within(panel).findByText(/isn't in the squad you're looking at\. Pick All at the top/)).toBeInTheDocument()
+    expect(await within(panel).findByText(/isn't in the squad you're looking at\. Select All at the top/)).toBeInTheDocument()
   })
 })

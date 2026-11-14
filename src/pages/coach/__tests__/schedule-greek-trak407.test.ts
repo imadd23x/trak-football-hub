@@ -26,7 +26,7 @@ describe('TRAK-407: the coach\'s Schedule in Greek', () => {
 
   it('says what is wrong with the event form in the language showing', async () => {
     const form = { ...blankForm('2026-11-12'), time: '' }
-    expect(formProblem(form)).toBe('Pick a start time')
+    expect(formProblem(form)).toBe('Select a start time')
     expect(pastDateProblem('2026-11-01', '2026-11-11')).toBe(PAST_DATE_PROBLEM)
     await showLanguage('el')
     expect(formProblem(form)).toBe('Διαλέξτε ώρα έναρξης')

@@ -154,7 +154,7 @@ function SessionBrowser({ sessions, open, onOpen, onClose }: {
   return <BesideList label="Sessions" items={sessions} open={open}
     row={(s, selected) => <SessionRow session={s} selected={selected} onSelect={() => onOpen(s.id)} />}
     view={s => <OpenSession session={s} onClose={onClose} />}
-    empty={{ title: 'No session open', hint: 'Pick a session to see it here.' }} />
+    empty={{ title: 'No session open', hint: 'Select a session to see it here.' }} />
 }
 
 /** The session a laptop's list opened: the same name block and details as its own page. */

@@ -146,7 +146,7 @@ describe('TRAK-289: publishing the evaluation', { timeout: 30_000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Next: Player evaluation' }))
     await user.click(screen.getByRole('button', { name: 'Next: Publish' }))
     expect(publishButton()).toBeDisabled()
-    expect(screen.getByText('Pick the competition first.')).toBeInTheDocument()
+    expect(screen.getByText('Select the competition first.')).toBeInTheDocument()
     await user.click(within(screen.getByRole('group', { name: 'Competition' })).getByRole('radio', { name: 'Friendly' }))
     expect(screen.getByText('Say whether it was home or away first.')).toBeInTheDocument()
     await user.click(within(screen.getByRole('group', { name: 'Home or away' })).getByRole('radio', { name: 'Away' }))

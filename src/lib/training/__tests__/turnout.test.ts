@@ -46,7 +46,7 @@ describe('what Trak suggests', () => {
   it('too few for the drill: swap to the one Trak pairs it with, or say to pick another', () => {
     const swap = adapt(trak('r3'), 5, 18) // Rondo 6 v 3 needs 8–10 a box; swaps to Rondo 4 v 2
     expect(swap).toMatchObject({ status: 'swap', message: 'Rondo 6 v 3, two boxes doesn’t work well with 5. Swap to Rondo 4 v 2: 1 grid of 5 (4 v 1).' })
-    expect(adapt(trak('g4'), 3, 18)).toMatchObject({ status: 'swap', alt: null, message: 'Small-sided games to mini goals doesn’t work well with 3. Pick another drill.' })
+    expect(adapt(trak('g4'), 3, 18)).toMatchObject({ status: 'swap', alt: null, message: 'Small-sided games to mini goals doesn’t work well with 3. Select another drill.' })
   })
 
   it('a drill nobody said the numbers of: Trak says so', () => {
@@ -94,7 +94,7 @@ describe('a Library drill on the day', () => {
 
   it('everyone here: no change; fewer than 8: pick another; more than 20 fits as 20', () => {
     expect(adapt(planned, 15, 15)).toMatchObject({ status: 'same', message: 'Everyone’s here. No change.' })
-    expect(adapt(planned, 6, 15)).toMatchObject({ status: 'swap', alt: null, message: 'Keep the ball is set up for 8 to 20 players. With 6, pick another drill.' })
+    expect(adapt(planned, 6, 15)).toMatchObject({ status: 'swap', alt: null, message: 'Keep the ball is set up for 8 to 20 players. With 6, select another drill.' })
     const big = adapt(planned, 24, 15)
     expect(big.status === 'adjust' && big.details).toEqual(fit(keep, 20, level).details)
   })

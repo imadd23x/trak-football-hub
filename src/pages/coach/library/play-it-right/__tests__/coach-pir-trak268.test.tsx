@@ -180,7 +180,7 @@ describe('TRAK-268: the coach\'s Play It Right', { timeout: 20_000 }, () => {
     renderApp('/coach/trainings/play-it-right/commit')
     const moments = await screen.findByRole('list', { name: 'Match moments' })
     expect(screen.getByText('No moment open')).toBeInTheDocument()
-    expect(screen.getByText('Pick a match moment to see it here.')).toBeInTheDocument()
+    expect(screen.getByText('Select a match moment to see it here.')).toBeInTheDocument()
 
     await userEvent.click(within(moments).getByRole('button', { name: /Double-session Thursday/ }))
     const open = await screen.findByRole('article', { name: 'Double-session Thursday' })

@@ -39,7 +39,7 @@ export default function CoachEvaluation() {
   const due = mine?.due ?? null
 
   let body
-  if (!squad) body = <p className="text-sm text-ink-2">Pick one squad in the menu to evaluate it.</p>
+  if (!squad) body = <p className="text-sm text-ink-2">Select one squad in the menu to evaluate it.</p>
   else if (season.error) body = <LoadError what="your season plan" onRetry={season.retry} />
   else if (season.isPending) body = <LoadingSkeleton label="Loading your evaluation…" lines={3} className="pt-2" />
   else if (!plan?.shared_at) {

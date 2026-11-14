@@ -36,11 +36,11 @@ export function StuckSheet({ coachId, target, onClose, onSwapped }: {
         {easier === null ? (
           <div className="grid gap-3">
             <Button onClick={() => setEasier(target.objective)}>Make it simpler</Button>
-            <p className="-mt-1 text-sm text-ink-3">An easier version takes its place, for example 5 seconds becomes 8.</p>
+            <p className="-mt-1 text-sm text-ink-3">An easier version takes its place, e.g. 5 seconds becomes 8.</p>
             <Button variant="secondary" loading={resolve.isPending} onClick={() => choose({ choice: 'keep_going' }, 'Keeping going')}>Keep going</Button>
             <p className="-mt-1 text-sm text-ink-3">It stays as it is. It comes back only after three more Not yets in a row.</p>
             <Button variant="secondary" loading={resolve.isPending} onClick={() => choose({ choice: 'swap' }, 'Objective swapped', () => onSwapped(target.playerId))}>Swap it</Button>
-            <p className="-mt-1 text-sm text-ink-3">It closes, and you pick another on {first}’s page.</p>
+            <p className="-mt-1 text-sm text-ink-3">It closes, and you select another on {first}’s page.</p>
           </div>
         ) : (
           <form className="grid gap-4" onSubmit={event => { event.preventDefault(); if (title) choose({ choice: 'simpler', title }, 'Easier version saved') }}>

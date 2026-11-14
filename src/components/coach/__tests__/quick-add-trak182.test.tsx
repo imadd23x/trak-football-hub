@@ -110,7 +110,7 @@ describe('TRAK-182: the quick-add button', { timeout: 20_000 }, () => {
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'New event' }))
     const form = await screen.findByRole('dialog', { name: 'New event' })
     await userEvent.click(within(form).getByRole('button', { name: 'Save draft' }))
-    expect(within(form).getByRole('alert')).toHaveTextContent('Pick a start time')
+    expect(within(form).getByRole('alert')).toHaveTextContent('Select a start time')
     expect(inserted).toEqual([])
     await pickTime(userEvent, 'Start', '17:30')
     await userEvent.click(within(form).getByRole('button', { name: 'Save draft' }))

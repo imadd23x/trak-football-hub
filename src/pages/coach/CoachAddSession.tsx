@@ -383,7 +383,7 @@ export default function CoachAddSession() {
   // What the first step still needs, said under Next rather than left to guess.
   const firstStepMissing = isMatch
     ? (!opponent.trim() || scoreUs === '' || scoreThem === '' ? 'Add the opponent and the score.' : null)
-    : type === 'training' ? (trainingFocus.size === 0 ? 'Pick a session focus.' : null)
+    : type === 'training' ? (trainingFocus.size === 0 ? 'Select a session focus.' : null)
     : (!title.trim() ? 'Add a title.' : null)
   const rosterReady = !rosterLoading && !rosterFailed
   // Each step's share of canSave: Next stays shut until that part is right.
@@ -777,7 +777,7 @@ export default function CoachAddSession() {
             {/* Date: the same Arc picker as Log training (TRAK-157, Imad 17 Oct: one picker everywhere). */}
             <div className="arc" style={{ fontFamily: 'var(--t-font)' }}>
               <DatePicker label="Session date" className="arc-trak-field" value={dayAsDate(date)} clearable={false}
-                maxDate={dayAsDate(localTodayISO())} onChange={d => { if (d) setDate(dateAsDay(d)) }} placeholder="Pick a date"
+                maxDate={dayAsDate(localTodayISO())} onChange={d => { if (d) setDate(dateAsDay(d)) }} placeholder="Select a date"
                 format={{ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }} locale="en-GB" />
             </div>
 
@@ -1108,7 +1108,7 @@ export default function CoachAddSession() {
             {/* Date: Arc's picker, as the event form (TRAK-157, 16 Oct: the native box was too big). Days after today can't be picked. */}
             {step === 0 && <div className="arc" style={{ fontFamily: 'var(--t-font)' }}>
               <DatePicker label="Session date" className="arc-trak-field" value={dayAsDate(date)} clearable={false}
-                maxDate={dayAsDate(localTodayISO())} onChange={d => { if (d) setDate(dateAsDay(d)) }} placeholder="Pick a date"
+                maxDate={dayAsDate(localTodayISO())} onChange={d => { if (d) setDate(dateAsDay(d)) }} placeholder="Select a date"
                 format={{ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }} locale="en-GB" />
             </div>}
 
@@ -1176,7 +1176,7 @@ export default function CoachAddSession() {
             {/* Date: the same Arc picker as Log training (TRAK-157). */}
             {step === 0 && <div className="arc" style={{ fontFamily: 'var(--t-font)' }}>
               <DatePicker label="Session date" className="arc-trak-field" value={dayAsDate(date)} clearable={false}
-                maxDate={dayAsDate(localTodayISO())} onChange={d => { if (d) setDate(dateAsDay(d)) }} placeholder="Pick a date"
+                maxDate={dayAsDate(localTodayISO())} onChange={d => { if (d) setDate(dateAsDay(d)) }} placeholder="Select a date"
                 format={{ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }} locale="en-GB" />
             </div>}
 

@@ -318,7 +318,7 @@
   "fmBenchPlayerNumber": "{{name}}, πάγκος, νούμερο {{shirt}}, {{where}}.",
   "fmNameMissing": "Δώστε όνομα στο σύστημα.",
   "fmName": "Όνομα συστήματος",
-  "fmNameExample": "Για παράδειγμα: Κλειστή άμυνα",
+  "fmNameExample": "π.χ. Κλειστή άμυνα",
   "fmCreate": "Δημιουργία συστήματος",
   "fmRenameButton": "Μετονομασία",
   "fmUseTitle": "Χρήση σε αγώνα: {{name}}",

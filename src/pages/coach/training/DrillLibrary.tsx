@@ -20,6 +20,7 @@ import { LoadError, WIDE_COLUMN } from '@/components/trak'
 import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { ChipGroup } from '@/components/arc/chip-group/chip-group'
 import { Button } from '@/components/arc/button/button'
+import { PageTop } from '@/components/coach/PageTop'
 import { EmptyState } from '@/components/arc/empty-state/empty-state'
 
 /* TRAK-387 (Drill Library 3/11, parent TRAK-384): Training › Drills is the new Library, from the 8 Nov mockup. Find a
@@ -58,11 +59,8 @@ function SubPage({ title, intro, children }: { title: string; intro: ReactNode; 
   return (
     <div className="min-h-screen bg-ground pb-28">
       <div className={WIDE_COLUMN}>
-        <header className="arc grid gap-3 pt-5 pb-4">
-          <CoachTrail current={title} />
-          <h1 className="text-[22px] font-medium tracking-[-0.01em] text-ink tablet:text-[28px]">{title}</h1>
-          <p className="max-w-[60ch] text-[15px] text-ink-2">{intro}</p>
-        </header>
+        <PageTop className="arc" menu={false} title={title} trail={<CoachTrail current={title} />}
+          below={<p className="max-w-[60ch] text-[15px] text-ink-2">{intro}</p>} />
         {children}
       </div>
     </div>

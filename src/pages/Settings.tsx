@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
@@ -10,7 +10,6 @@ import { RouteGuard } from '@/components/layout/RouteGuard'
 import { assertSettingsAccount, getSettingsAccount } from '@/lib/settings-account'
 import { supabase } from '@/integrations/supabase/client'
 import { isTechnicalChildAddress, childUsername } from '@/lib/child-login'
-import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { WIDE_COLUMN } from '@/components/trak/MobileShell'
 import { CalendarSettings } from '@/components/trak/AddToCalendar'
 import { OwnConsentSettings } from '@/components/player/OwnConsentCard'
@@ -30,6 +29,7 @@ import { SettingsPage, SettingsRow, SettingsRows, type SettingsSection } from '@
 import SegmentedControl from '@/components/arc/segmented-control/segmented-control'
 import { i18n, isLanguage, LANGUAGES, showLanguage, useLanguage, useTranslation } from '@/lib/i18n'
 import { COACH_HOW_PATH } from '@/lib/coach-places'
+import { PageTop } from '@/components/coach/PageTop'
 
 // TRAK-406: the messages are words in settings.json, read when shown, so they are in the language showing.
 const nameSchema = z
@@ -241,7 +241,7 @@ function AccountSettings({ userId }: { userId: string }) {
     finally { finish() }
   }
 
-  const wide = useSideMenuScreen()
+  const titleId = useId()
   const consent = useQuery({
     queryKey: ['settings', userId, 'own-consent'],
     enabled: role === 'player',
@@ -372,16 +372,19 @@ function AccountSettings({ userId }: { userId: string }) {
     <div className="min-h-screen" style={{ background: 'rgb(var(--t-ground))', fontFamily: 'var(--t-font)' }}>
       {/* TRAK-307: a coach's Settings is a page in their menu, so it takes the menu pages' one column (a phone's is the
           phone column, as for everyone). */}
-      <div className={`${role === 'coach' ? WIDE_COLUMN : 'mx-auto trak-read px-5'} pt-5 pb-12`}>
-        {/* A phone's way back; a coach's laptop has the frame's side menu and top bar (TRAK-259). */}
-        {!(role === 'coach' && wide) && <div className="relative flex items-center justify-center mb-4 h-10">
+      <div className={`${role === 'coach' ? WIDE_COLUMN : 'mx-auto trak-read px-5 pt-5'} pb-12`}>
+        {/* TRAK-422 (Kostas, 13 Nov): a coach's Settings has the one coach page title, with the avatar that opens the
+            menu on a phone, like every page in the menu. */}
+        {role === 'coach' && <PageTop title={t('settings:title')} titleId={titleId} />}
+        {/* A player's or parent's phone: their way back (TRAK-259). */}
+        {role !== 'coach' && <div className="relative flex items-center justify-center mb-4 h-10">
           <button onClick={() => navigate(-1)} aria-label={t('common:back')}
             className="absolute left-0 flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-ink">
             <ArrowLeft size={16} />
           </button>
           <span aria-hidden="true" className="text-[17px] text-ink">{t('settings:title')}</span>
         </div>}
-        <SettingsPage title={t('settings:title')} sections={sections} bar={named ? {
+        <SettingsPage title={t('settings:title')} titleId={role === 'coach' ? titleId : undefined} sections={sections} bar={named ? {
           state: pending === 'name' ? 'saving' : nameChanged ? 'edit' : justSaved ? 'saved' : null,
           count: nameChanged ? 1 : 0,
           onSave: () => { void saveName() },

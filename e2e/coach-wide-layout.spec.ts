@@ -538,3 +538,39 @@ test('TRAK-463: Squad lists its players in columns on a 2,560 px monitor, one co
   expect(unexpected).toEqual([])
   expect(errors).toEqual([])
 })
+
+// TRAK-422 (Kostas, 13 Nov): ONE page title on every coach page, Squad's and Matches' style (22 px on a phone, 26 px on a
+// laptop, medium), and the same gap above it on every page of the same kind: 20 px from the top of a phone (60 px on a
+// sub-page, under its trail), 20 px under a laptop's top bar. Before, there were six sizes and gaps from 72 to 97 px.
+const TITLED_PAGES = [
+  ['Home', '/coach/home', 'menu'], ['Schedule', '/coach/schedule', 'menu'], ['Squad', '/coach/squad', 'menu'],
+  ['Matches', '/coach/matches', 'menu'], ['Training', '/coach/training', 'menu'], ['Drills', '/coach/training/drills', 'menu'],
+  ['Feedback', '/coach/feedback', 'menu'], ['Settings', '/settings', 'menu'],
+  ['Season plan', '/coach/season-plan', 'sub'], ['Evaluation', '/coach/evaluation', 'sub'], ['Past trainings', '/coach/training/past', 'sub'],
+  ['My drills', '/coach/training/drills/mine', 'sub'], ['All drills', '/coach/training/drills/all', 'sub'], ['How Trak works', '/coach/how-trak-works', 'sub'],
+] as const
+for (const [label, width, height, size, menuTop, subTop] of [['a phone', 390, 844, 22, 20, 60], ['a laptop', 1440, 900, 26, 80, 80]] as const) {
+  test(`TRAK-422: every coach page has the one title, at the same height, on ${label}`, async ({ browser }) => {
+    const found: Record<string, string> = {}, wanted: Record<string, string> = {}
+    for (const [name, path, kind] of TITLED_PAGES) {
+      // A fresh coach for each page: the app keeps a switch's answer for 30 s.
+      const context = await browser.newContext()
+      const page = await context.newPage()
+      const { unexpected, errors } = await open(page, context, 'coach', path, width, height, ['events', 'games', 'training', 'season_plan'])
+      const title = page.locator('h1:visible').first()
+      await expect(title).toBeVisible()
+      await page.waitForLoadState('networkidle')
+      await page.waitForTimeout(300) // let the page settle
+      const { px, weight, top } = await title.evaluate(el => {
+        const style = getComputedStyle(el)
+        return { px: parseFloat(style.fontSize), weight: style.fontWeight, top: Math.round(el.getBoundingClientRect().top) }
+      })
+      found[name] = `${px} px, weight ${weight}, ${top} px from the top`
+      wanted[name] = `${size} px, weight 500, ${kind === 'menu' ? menuTop : subTop} px from the top`
+      expect(unexpected).toEqual([])
+      expect(errors).toEqual([])
+      await context.close()
+    }
+    expect(found).toEqual(wanted)
+  })
+}

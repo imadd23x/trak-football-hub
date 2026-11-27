@@ -47,7 +47,7 @@ async function playerBackend(context: BrowserContext, hasMatches: boolean, unexp
     if (path === '/rest/v1/rpc/my_session_is_live' || path === '/rest/v1/rpc/feature_on') return json(true)
     // TRAK-441: the academy's family_look switch, off: today's Home.
     if (path === '/rest/v1/rpc/family_feature_on') return json(false)
-    if (['child_events', 'get_player_invites_for_current_user', 'season_plan_for_player', 'my_tasks'].some(rpc => path === `/rest/v1/rpc/${rpc}`)) return json([])
+    if (['child_events', 'get_player_invites_for_current_user', 'season_plan_for_player', 'my_tasks', 'my_training_plans'].some(rpc => path === `/rest/v1/rpc/${rpc}`)) return json([])
     unexpected.push(`${req.method()} ${path}`)
     return route.fulfill({ status: 500, body: 'Unmocked request blocked' })
   })

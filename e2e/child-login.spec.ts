@@ -62,6 +62,7 @@ async function loginFixture(page: Page, context: BrowserContext, role: 'parent' 
     if (url.pathname === '/rest/v1/rpc/get_player_invites_for_current_user') return json([])
     if (url.pathname === '/rest/v1/rpc/season_plan_for_player') return json([]) // TRAK-397: no shared plan
     if (url.pathname === '/rest/v1/rpc/my_tasks') return json([]) // TRAK-579: nothing to answer
+    if (url.pathname === '/rest/v1/rpc/my_training_plans') return json([]) // TRAK-601: no plans
     if (url.pathname === '/rest/v1/telemetry_events') return json(null, 201)
     if (request.method() === 'GET' && url.pathname.startsWith('/rest/v1/')) return json([])
     unexpected.push(`${request.method()} ${url.pathname}`)

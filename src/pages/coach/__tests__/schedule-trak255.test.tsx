@@ -115,8 +115,8 @@ describe('TRAK-255: the coach\'s Events', { timeout: 20_000 }, () => {
     await open()
     await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
-    const venue = within(sheet).getByLabelText('Venue')
-    const link = within(sheet).getByLabelText('Map link (optional)')
+    const venue = within(sheet).getByLabelText('Venue (Optional)')
+    const link = within(sheet).getByLabelText('Map link (Optional)')
 
     // Saved venues are offered by name, never as a bare link.
     const offered = [...document.querySelectorAll('#saved-venues option')].map(o => o.getAttribute('value'))

@@ -126,7 +126,7 @@ type WeekRows = PromiseLike<{ data: unknown[] | null; error: unknown }>
  * only load from today). `loadKey` names whose week it is. A failed read is
  * an error with Retry, never an empty week (the J4 standard).
  */
-export function LoadedWeekStrip({ load, loadKey, renderSheet, renderPrimary, absentFor, picker = false, changed }: {
+export function LoadedWeekStrip({ load, loadKey, renderSheet, renderPrimary, absentFor, picker = false, changed, planned }: {
   load: (from: string, to: string) => WeekRows
   loadKey: string
   renderSheet: RenderEventSheet
@@ -138,6 +138,8 @@ export function LoadedWeekStrip({ load, loadKey, renderSheet, renderPrimary, abs
   renderPrimary?: (event: StripEvent) => ReactNode
   /** TRAK-580: the player's events changed since they last opened them, said "Changed" in the picker. */
   changed?: ReadonlyMap<string, unknown>
+  /** TRAK-601: the player's trainings with a plan, said "Plan ready" in the picker. */
+  planned?: ReadonlySet<string>
 }) {
   const [offset, setOffset] = useState(0)
   const dates = useMemo(() => weekDays(addDays(new Date(), offset * 7)), [offset])
@@ -170,7 +172,7 @@ export function LoadedWeekStrip({ load, loadKey, renderSheet, renderPrimary, abs
     : null
   const refresh = () => setAttempt(n => n + 1)
   const show = (events: StripEvent[]) => picker
-    ? <FamilyWeekPicker dates={dates} offset={offset} onOffset={setOffset} events={events} renderSheet={renderSheet} renderPrimary={renderPrimary} refresh={refresh} changed={changed} />
+    ? <FamilyWeekPicker dates={dates} offset={offset} onOffset={setOffset} events={events} renderSheet={renderSheet} renderPrimary={renderPrimary} refresh={refresh} changed={changed} planned={planned} />
     : <WeekStrip events={events} renderSheet={renderSheet} refresh={refresh} />
   return absentFor ? <FamilyWeekStrip childId={absentFor} events={week.events}>{show}</FamilyWeekStrip> : show(week.events)
 }
@@ -196,7 +198,7 @@ function FamilyWeekStrip({ childId, events, children }: {
  * TRAK-441 (Imad, 13 Nov): a family's week in the coach's week picker. Nothing needs them; each event's line is what
  * a family needs to know (Cancelled, Can't make it, or where), and Details opens the role's own event sheet.
  */
-function FamilyWeekPicker({ dates, offset, onOffset, events, renderSheet, renderPrimary, refresh, changed }: {
+function FamilyWeekPicker({ dates, offset, onOffset, events, renderSheet, renderPrimary, refresh, changed, planned }: {
   dates: string[]
   offset: number
   onOffset: (change: (offset: number) => number) => void
@@ -205,6 +207,7 @@ function FamilyWeekPicker({ dates, offset, onOffset, events, renderSheet, render
   renderPrimary?: (event: StripEvent) => ReactNode
   refresh: () => void
   changed?: ReadonlyMap<string, unknown>
+  planned?: ReadonlySet<string>
 }) {
   const locale = dateLocale()
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -219,7 +222,7 @@ function FamilyWeekPicker({ dates, offset, onOffset, events, renderSheet, render
       .map(event => ({ id: event.id, kind: event.kind, title: eventHeading(event), time: event.time,
         state: event.status === 'cancelled' ? 'cancelled' : 'published',
         note: event.status === 'cancelled' ? i18n.t('coachHome:noteCancelled') : changed?.has(event.id) ? i18n.t('common:changed')
-          : event.absent ? "Can't make it" : venueName(event.venue) })),
+          : event.absent ? "Can't make it" : planned?.has(event.id) ? i18n.t('common:planReady') : venueName(event.venue) })),
   }))
   return <WeekPicker family key={dates[0]} title={weekTitle(offset, dates[0])}
     subtitle={`${format(parseISO(dates[0]), 'd')}–${format(parseISO(dates[6]), 'd MMMM', { locale })}`}

@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { Link } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/arc/button/button'
@@ -71,7 +72,11 @@ function TaskCard({ task, offline, onAnswer }: { task: MyTask; offline: boolean;
       <div className="grid gap-2">
         {task.outdated && <span className="w-fit rounded-full px-[9px] py-[3px] text-[12px] font-semibold uppercase tracking-[0.04em]"
           style={{ color: 'rgb(var(--t-brand))', background: 'rgb(var(--t-brand) / 0.12)' }}>Updated</span>}
-        <h3 className="text-base font-medium text-ink">{task.title}</h3>
+        {/* TRAK-601: a training plan's Got it opens the plan to read first. */}
+        <h3 className="text-base font-medium text-ink">{task.source_type === 'training_plan' && task.source_id
+          ? <Link to={`/player/event/${task.source_id}`} state={{ from: '/player/home' }}
+            className="rounded-md underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-brand">{task.title}</Link>
+          : task.title}</h3>
         <p className="text-sm text-ink-3">{['From Coach', task.due_at && dueLabel(task.due_at, task.time_zone)].filter(Boolean).join(' · ')}</p>
       </div>
       {asks

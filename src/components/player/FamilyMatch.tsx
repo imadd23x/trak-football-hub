@@ -38,7 +38,7 @@ const col = 'grid grid-cols-[minmax(0,1fr)] gap-4 laptop:gap-6'
 const meta = { size: 14, strokeWidth: 1.75, 'aria-hidden': true } as const
 const RouterLink = ({ href, ...props }: { href: string; children?: ReactNode }) => <Link to={href} {...props} />
 
-export function FamilyMatch({ event, changes, child, as, back, cantMakeIt }: {
+export function FamilyMatch({ event, changes, child, as, back, cantMakeIt, children }: {
   event: PlayerEvent
   /** TRAK-134: what moved since this device last saw it. */
   changes: string[]
@@ -48,6 +48,8 @@ export function FamilyMatch({ event, changes, child, as, back, cantMakeIt }: {
   /** Where the trail's first crumb goes: the page this one was opened from. */
   back: { href: string; go: () => void }
   cantMakeIt?: ReactNode
+  /** TRAK-601: under the logistics, a training's plan. */
+  children?: ReactNode
 }) {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -88,13 +90,13 @@ export function FamilyMatch({ event, changes, child, as, back, cantMakeIt }: {
     : undefined
   // An alert opens the page at the plan (#game-plan); otherwise at the latest thing the coach sent.
   const first: Tab = hash === '#game-plan' && asPlayer && plan.data ? 'plan' : review.data ? 'evaluation' : asPlayer && plan.data ? 'plan' : 'logistics'
-  const logistics = <div className="grid gap-4 pt-4"><EventDetails event={event} changes={changes} bare />{cantMakeIt}</div>
+  const logistics = <div className="grid gap-4 pt-4"><EventDetails event={event} changes={changes} bare />{cantMakeIt}{children}</div>
 
   return <ArcProvider link={RouterLink}>
     {/* On a laptop the trail is the top bar's and a family page has no actions, so the header's own top row folds away. */}
     <PageHeader className="[--ph-bleed:1.25rem] tablet:[--ph-bleed:2rem] laptop:![--ph-bar:0px]" top={wide ? `${TOP_BAR}px` : '0px'}
       title={title} status={status}
-      crumbs={inTopBar ? undefined : <Breadcrumb items={[{ label: t(back.href.endsWith('/home') ? 'nav:home' : asPlayer ? 'nav:matches' : 'nav:events'), href: back.href,
+      crumbs={inTopBar ? undefined : <Breadcrumb items={[{ label: t(back.href.endsWith('/home') ? 'nav:home' : back.href.endsWith('/trainings') ? 'nav:trainings' : asPlayer ? 'nav:matches' : 'nav:events'), href: back.href,
         onClick: click => { click.preventDefault(); back.go() } }, { label: title }]} />}
       details={<>
         <span><CalendarDays {...meta} /><strong>{eventDay(event)}</strong></span>

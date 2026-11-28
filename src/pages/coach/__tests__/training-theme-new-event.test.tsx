@@ -64,7 +64,7 @@ async function newEvent() {
 describe('Training theme on New event', { timeout: 30_000 }, () => {
   it('a training offers the seven themes as radio buttons, none picked', async () => {
     const sheet = await newEvent()
-    const group = within(sheet).getByRole('radiogroup', { name: 'Theme' })
+    const group = within(sheet).getByRole('radiogroup', { name: 'Theme (Optional)' })
     const radios = within(group).getAllByRole('radio')
     expect(radios).toHaveLength(7)
     for (const name of ['Technical', 'Attacking', 'Defending', 'Transition', 'Goalkeeping', 'Physical & movement', 'Psychological & social']) {
@@ -90,7 +90,7 @@ describe('Training theme on New event', { timeout: 30_000 }, () => {
     signInAs({ id: 'coach-theme-training' })
     server.use(table('profiles', [{ id: 'p', user_id: 'coach-theme-training', role: 'coach', full_name: 'Coach', invite_code: 'ABCD' }]))
     const sheet = await newEvent()
-    const group = within(sheet).getByRole('radiogroup', { name: 'Theme' })
+    const group = within(sheet).getByRole('radiogroup', { name: 'Theme (Optional)' })
     // The switch answers after the sheet opens.
     expect(await within(sheet).findByRole('link', { name: /Training › Drills/ })).toHaveTextContent('Browse all drills in Training › Drills')
     const link = () => within(sheet).getByRole('link', { name: /Training › Drills/ })
@@ -110,9 +110,9 @@ describe('Training theme on New event', { timeout: 30_000 }, () => {
   it('a match or other event has no theme', async () => {
     const sheet = await newEvent()
     await userEvent.click(within(sheet).getByRole('button', { name: 'Match' }))
-    expect(within(sheet).queryByRole('radiogroup', { name: 'Theme' })).toBeNull()
+    expect(within(sheet).queryByRole('radiogroup', { name: 'Theme (Optional)' })).toBeNull()
     await userEvent.click(within(sheet).getByRole('button', { name: 'Other' }))
-    expect(within(sheet).queryByRole('radiogroup', { name: 'Theme' })).toBeNull()
+    expect(within(sheet).queryByRole('radiogroup', { name: 'Theme (Optional)' })).toBeNull()
   })
 
   it('saves the picked theme and shows it on Review', async () => {

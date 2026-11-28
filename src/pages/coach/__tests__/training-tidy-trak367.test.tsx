@@ -169,7 +169,7 @@ describe('TRAK-367: the message to players', { timeout: 30_000 }, () => {
     database([training('soon', onTheMinute(Date.now() + 2 * DAY), { family_note: 'Bring shin pads.' })])
     renderApp('/coach/schedule?edit=soon&step=2')
     // Kostas, 3 Nov: one name for it, here and on Training's card.
-    expect(await screen.findByLabelText('Message to players', {}, { timeout: 8000 })).toHaveValue('Bring shin pads.')
+    expect(await screen.findByLabelText('Message to players (Optional)', {}, { timeout: 8000 })).toHaveValue('Bring shin pads.')
   })
 })
 

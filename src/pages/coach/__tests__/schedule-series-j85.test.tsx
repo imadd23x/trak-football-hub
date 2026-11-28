@@ -96,7 +96,7 @@ describe('J8.5: a weekly training series', { timeout: 20_000 }, () => {
     await open()
     await openNewEvent()
     const sheet = screen.getByRole('dialog', { name: 'New event' })
-    await userEvent.type(within(sheet).getByLabelText('Venue'), 'Academy Pitch 2')
+    await userEvent.type(within(sheet).getByLabelText('Venue (Optional)'), 'Academy Pitch 2')
     await eventStep(sheet, 'When')
     await pickDate(userEvent, 'Date', MONDAY)
     await pickTime(userEvent, 'Start', '18:00')

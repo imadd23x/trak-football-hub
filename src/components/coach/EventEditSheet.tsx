@@ -86,7 +86,7 @@ function ThemeChoice({ theme, onChange }: { theme: TrainingTheme | ''; onChange:
   const themeName = picked ? t(THEME_WORD[picked.key]) : ''
   return (
     <div className="space-y-2">
-      <span id="training-theme" className="block text-[9px] tracking-[0.1em] uppercase text-ink-3" style={mono}>{t('coachSchedule:theme')}</span>
+      <span id="training-theme" className="block text-[9px] tracking-[0.1em] uppercase text-ink-3" style={mono}>{t('coachSchedule:themeOptional')}</span>
       <div role="radiogroup" aria-labelledby="training-theme" className="grid grid-cols-2 gap-2">
         {TRAINING_THEMES.map(option => {
           const on = option.key === theme
@@ -262,7 +262,7 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
                 <input value={sheet.form.opponent} onChange={e => setForm({ opponent: e.target.value })}
                   placeholder={t('coachSchedule:opponentExample')} className={inputClass} style={font} />
               </Field>
-              <Choice label={t('coachSchedule:homeOrAway')} clearable value={sheet.form.homeAway || null}
+              <Choice label={t('coachSchedule:homeOrAwayOptional')} clearable value={sheet.form.homeAway || null}
                 onChange={next => setForm({ homeAway: (next ?? '') as typeof sheet.form.homeAway })}
                 options={[{ value: 'home', label: t('coachSchedule:home') }, { value: 'away', label: t('coachSchedule:away') }]} />
               {/* TRAK-288: asked here, so publishing the evaluation reads it from the match (Imad, 28 Oct). */}
@@ -278,7 +278,7 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
           </Field>
 
           {/* TRAK-255: a venue is a name everyone reads; its map link has a box of its own. */}
-          <Field label={t('coachSchedule:venue')}>
+          <Field label={t('coachSchedule:venueOptional')}>
             <input value={splitVenue(sheet.form.venue).name} onChange={e => setVenueName(e.target.value)}
               list="saved-venues" placeholder={t('coachSchedule:venuePlaceholder')} className={inputClass} style={font} />
             <datalist id="saved-venues">
@@ -314,7 +314,7 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
 
           {/* Optional: empty means meet at the start time. */}
           <ArcField>
-            <TimePicker label={t('coachSchedule:meetTimeEarlier')} className="arc-trak-field"
+            <TimePicker label={t('coachSchedule:meetTimeOptional')} className="arc-trak-field"
               value={sheet.form.meetTime} onChange={meetTime => setForm({ meetTime })}
               minuteStep={5} format="24h" placeholder={t('coachSchedule:sameAsStart')} emptyAt={halfHourBefore(sheet.form.time)}
               disabled={!sheet.form.time} />
@@ -372,13 +372,13 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
         </div>
         {sheet.step === 2 && <>
           {/* TRAK-161: kit and a family note on every kind of event. */}
-          {!sheet.form.kitSnapshot && <Field label={t('coachSchedule:kit')}>
+          {!sheet.form.kitSnapshot && <Field label={t('coachSchedule:kitOptional')}>
             <input value={sheet.form.kit} onChange={e => setForm({ kit: e.target.value })}
               placeholder={sheet.form.kind === 'match' ? t('coachSchedule:kitExampleMatch') : t('coachSchedule:kitExampleTraining')} className={inputClass} style={font} />
           </Field>}
 
           <div className="space-y-1">
-            <Field label={t('coachSchedule:messageToPlayers')}>
+            <Field label={t('coachSchedule:messageToPlayersOptional')}>
               <input value={sheet.form.familyNote} onChange={e => setForm({ familyNote: e.target.value })}
                 maxLength={FAMILY_NOTE_MAX} aria-describedby={noteProblem ? "family-note-hint family-note-problem" : "family-note-hint"}
                 placeholder={t('coachSchedule:messageExample')} className={inputClass} style={font} />

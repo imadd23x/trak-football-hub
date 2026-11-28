@@ -182,7 +182,7 @@ describe('TRAK-283: a game\'s page', { timeout: 20_000 }, () => {
     renderApp('/coach/matches/g1')
     await user.click(await screen.findByRole('button', { name: 'Edit event' }))
     const sheet = await screen.findByRole('dialog', { name: 'Edit event' })
-    const venue = within(sheet).getByLabelText('Venue')
+    const venue = within(sheet).getByLabelText('Venue (Optional)')
     await user.clear(venue)
     await user.type(venue, 'Al Barsha Pitch 2')
     for (let step = 0; step < 3; step++) await user.click(within(sheet).getByRole('button', { name: 'Next' }))

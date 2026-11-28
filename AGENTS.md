@@ -67,6 +67,8 @@ remains hidden; the pilot uses `/coach/assess`. Existing AI handlers return
   never "pick" ("Select a date", "None selected"), in English and Greek.
 - New and changed screens follow the design standard in `docs/design-system/`
   (colour, type, spacing, and the shared pieces in `src/components/trak/standard/`).
+  [DESIGN.md](DESIGN.md) is the entry point: intent, each key screen's eye order,
+  restraint budgets and the audit report format. The standard wins on any value.
 - Follow the existing mobile shell and design tokens. Use `BANDS` for band
   wording and colors; keep player-visible messages separate from private notes.
 - Spacing and corners follow [docs/design-system/spacing-and-corners.md](docs/design-system/spacing-and-corners.md)

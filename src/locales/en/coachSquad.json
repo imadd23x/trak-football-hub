@@ -385,5 +385,21 @@
   "openReportName": "Open {{name}}’s {{month}} report",
   "reportNote": "Note from the coach",
   "reportNotFound": "This report isn’t here.",
-  "reportMovedUp": "Moved up: {{areas}}"
+  "reportMovedUp": "Moved up: {{areas}}",
+  "avatarTitle": "{{name}}'s avatar",
+  "editAvatarOf": "Edit {{name}}'s avatar",
+  "avatarOnlyYou": "A drawing, never a photo. Only you see it.",
+  "avatarPreview": "{{name}}'s avatar",
+  "avatarAutomatic": "Automatic",
+  "hairStyle": "Hair",
+  "hairCrop": "Crop",
+  "hairShort": "Short",
+  "hairCurls": "Curls",
+  "hairColour": "Hair colour",
+  "hairBlack": "Black",
+  "hairDarkBrown": "Dark brown",
+  "hairBrown": "Brown",
+  "hairLightBrown": "Light brown",
+  "hairCharcoal": "Charcoal",
+  "savedAvatar": "Saved {{name}}'s avatar"
 }

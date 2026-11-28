@@ -95,7 +95,9 @@ const CoachPastMatches = lazy(() => import("./pages/coach/CoachGames").then(m =>
 // TRAK-350: the season plan, parked until the academy's season_plan switch is on.
 const CoachSeasonPlan = lazy(() => import("./pages/coach/CoachSeasonPlan"));
 const CoachEvaluation = lazy(() => import("./pages/coach/CoachEvaluation"));
-const CoachGame = lazy(() => import("./pages/coach/CoachGame"));
+// TRAK-602: a coach's announcements to a squad, parked until the academy's announcements switch is on.
+const CoachAnnouncements = lazy(() => import("./pages/coach/CoachAnnouncements"));
+const CoachGame =lazy(() => import("./pages/coach/CoachGame"));
 const CoachTraining = lazy(() => import("./pages/coach/training/CoachTraining"));
 const CoachRecognition = lazy(() => import("./pages/coach/CoachRecognition"));
 const CoachAwardPlayer = lazy(() => import("./pages/coach/CoachAwardPlayer"));
@@ -218,6 +220,7 @@ const App = () => (
             <Route path="/coach/season-plan/*" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="season_plan"><CoachSeasonPlan /></ParkedScreen></RouteGuard>} />
             {/* TRAK-364: the squad's evaluation, where the season plan is on; Home's Evaluation due card opens it. */}
             <Route path="/coach/evaluation" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="season_plan"><CoachEvaluation /></ParkedScreen></RouteGuard>} />
+            <Route path="/coach/announcements" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="announcements"><CoachAnnouncements /></ParkedScreen></RouteGuard>} />
             {/* TRAK-592: played matches, behind Matches' Past matches button. */}
             <Route path="/coach/matches/past" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="games"><CoachPastMatches /></ParkedScreen></RouteGuard>} />
             <Route path="/coach/matches/:eventId" element={<RouteGuard allowedRole="coach"><ParkedScreen unless="games"><CoachGame /></ParkedScreen></RouteGuard>} />

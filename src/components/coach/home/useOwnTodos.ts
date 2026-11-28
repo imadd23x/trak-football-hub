@@ -15,22 +15,25 @@ export function useOwnTodos(coachId: string | undefined) {
     enabled: !!coachId,
     queryFn: async (): Promise<HomeOwnTodo[]> => {
       const since = new Date(Date.now() - 2 * DAY).toISOString()
-      const { data, error } = await supabase.from('coach_todos').select('id, title, due_on, urgent, done_at, created_at')
+      const { data, error } = await supabase.from('coach_todos').select('id, title, due_on, urgent, done_at, created_at, calendar_event_id')
         // A value with ':' or '.' is quoted inside or(), as PostgREST asks.
         .or(`done_at.is.null,done_at.gte."${since}"`).order('created_at')
       if (error) throw error
-      return (data ?? []).map(row => ({ id: row.id, title: row.title, dueOn: row.due_on, urgent: row.urgent, doneAt: row.done_at, createdAt: row.created_at }))
+      return (data ?? []).map(row => ({ id: row.id, title: row.title, dueOn: row.due_on, urgent: row.urgent, doneAt: row.done_at, createdAt: row.created_at,
+        // TRAK-622: the event it's for, when it was added from one.
+        eventId: row.calendar_event_id ?? null }))
     },
   })
 }
 
-/** Adds a to-do for an academy day (YYYY-MM-DD). */
+/** Adds a to-do for an academy day (YYYY-MM-DD). Linked to an event, it fails with 23505 while that event has one open. */
 export function useAddTodo() {
   const { user } = useAuth()
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ title, dueOn, urgent }: { title: string; dueOn: string; urgent: boolean }) => {
-      const { error } = await supabase.from('coach_todos').insert({ title: title.trim(), due_on: dueOn, urgent })
+    /** `eventId` (TRAK-622): the coach's own event it's for, from Add to To-do. */
+    mutationFn: async ({ title, dueOn, urgent, eventId }: { title: string; dueOn: string; urgent: boolean; eventId?: string }) => {
+      const { error } = await supabase.from('coach_todos').insert({ title: title.trim(), due_on: dueOn, urgent, ...(eventId && { calendar_event_id: eventId }) })
       if (error) throw error
     },
     onSuccess: () => client.invalidateQueries({ queryKey: key(user?.id) }),

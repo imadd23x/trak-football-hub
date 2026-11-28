@@ -604,7 +604,7 @@ function CoachAssessmentForm() {
         {/* ---- 2. player card (sq-item) ---- */}
         {selectedPlayer ? (
           <div className="flex items-center gap-3 p-3 rounded-xl bg-surface border border-line">
-            <PlayerFace name={selectedPlayer.player_name} size="md" className="arc" aria-hidden />
+            <PlayerFace name={selectedPlayer.player_name} playerId={selectedPlayer.id} size="md" className="arc" aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="text-[15px] font-medium text-ink truncate">
                 {selectedPlayer.player_name}

@@ -363,7 +363,7 @@ export function PlanView({ coachId, squad, plan, seasonObjectives }: {
                       <button type="button" aria-haspopup="dialog" onClick={() => setOpenId(p.id)}
                         className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-raised/60 ${FOCUS}`}>
                         <span className="flex items-center gap-3">
-                          <PlayerFace name={p.player_name} size="sm" />
+                          <PlayerFace name={p.player_name} playerId={p.id} size="sm" />
                           <span className="grid">
                             <span className="text-sm font-extrabold text-ink">{p.player_name}</span>
                             <span className="text-xs font-semibold text-ink-3">{!isPosition(p.position) ? 'No position yet' : !pitch ? p.position : starter ? 'Starting XI' : 'Bench'}</span>
@@ -445,7 +445,7 @@ export function PlanView({ coachId, squad, plan, seasonObjectives }: {
         <ul className="m-0 list-none divide-y-2 divide-line-soft p-0">{watched.map(player => {
           const w = watchOf.get(player.id)!
           return <li key={player.id} className="flex items-center gap-3 py-2.5">
-            <PlayerFace name={player.player_name} size="sm" />
+            <PlayerFace name={player.player_name} playerId={player.id} size="sm" />
             <span className="grid min-w-0 flex-1">
               <span className="truncate text-sm font-extrabold text-ink">{player.player_name}</span>
               <span className="text-xs font-semibold text-ink-2">{w.ready ? `${w.why}: time to set them up` : `Since ${shortDate(w.since)} · ${w.progress}`}</span>

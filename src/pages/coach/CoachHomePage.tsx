@@ -170,7 +170,7 @@ export default function CoachHomePage() {
             onOpenReports={squad => { if (everySquad && squad) coachSquad.pick(squad); navigate('/coach/evaluation') }}
             nextStep={nextStep} playerJob={playerJob} today={todos.day?.today ?? null} onMove={move} onSetUrgent={onSetUrgent} onRemove={onRemove} />}
           {/* TRAK-611 (New Home 5/8): Upcoming in the week strip's place; Schedule keeps the strip. */}
-          {user && <UpcomingWeek week={todos.week} inTodo={todoKeys} coachId={user.id} showSquad={everySquad && coachSquad.squads.length >= 2}
+          {user && <UpcomingWeek week={todos.week} others={todos.others} inTodo={todoKeys} coachId={user.id} showSquad={everySquad && coachSquad.squads.length >= 2}
             onChanged={todosChanged} matchesOn={gamesOn} trainingOn={trainingOn} />}
         </div>
         {/* TRAK-350: the season plan, where the academy's switch is on; TRAK-361: the card that folds, one per squad under All. */}

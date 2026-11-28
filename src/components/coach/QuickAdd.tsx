@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, type NavigateOptions } from 'react-router-dom'
 import { createDay } from '@/lib/create-day'
-import { ClipboardPen, Plus, CalendarPlus, ListChecks } from 'lucide-react'
+import { ClipboardPen, Plus, CalendarPlus, ListChecks, Megaphone } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
@@ -81,6 +81,8 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
   const eventsOn = useFeature('events')
   // Coach–player P18: Send a task only where the academy's tasks switch is on.
   const tasksOn = useFeature('tasks')
+  // TRAK-602: Post announcement only where the announcements switch is on; it opens its own page.
+  const announcementsOn = useFeature('announcements')
   const { comingSoon } = useParked()
   const [view, setView] = useState<View>('fab')
   const bar = placement === 'bar'
@@ -132,12 +134,14 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
     if (id === 'assess') go('/coach/assess')
     else if (id === 'event') { if (eventsOn) show('event'); else { close(); comingSoon() } }
     else if (id === 'task') show('task')
+    else if (id === 'announcement') go('/coach/announcements')
   }
   const rows: MorphRow[] = [
     // Imad, 16 Oct (Kostas's item 9): assessing is one of the coach's quick actions.
     { id: 'assess', label: t('coachSchedule:assessPlayer'), icon: <ClipboardPen /> },
     { id: 'event', label: t('coachSchedule:newEvent'), icon: <CalendarPlus /> },
     ...(tasksOn ? [{ id: 'task', label: t('coachTasks:sendTask'), icon: <ListChecks /> }] : []),
+    ...(announcementsOn ? [{ id: 'announcement', label: t('coachTasks:postAnnouncement'), icon: <Megaphone /> }] : []),
   ]
 
   // In the tab bar the pickers open upward: opening down ran off the screen (Imad, 16 Oct).
@@ -164,7 +168,7 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
       onChange={d => { if (d) { setDate(dateAsDay(d)); setError(null) } }} placeholder={t('coachSchedule:pickDate')}
       format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale={dates} />
     <TimePicker label={kind === 'match' ? t('coachSchedule:kickoff') : t('coachSchedule:start')} className="arc-trak-field" value={time}
-      onChange={picked => { setTime(picked); setError(null) }} minuteStep={5} format="12h" placeholder={t('coachSchedule:pickTime')} emptyAt="17:00" />
+      onChange={picked => { setTime(picked); setError(null) }} minuteStep={5} format="24h" placeholder={t('coachSchedule:pickTime')} emptyAt="17:00" />
     {/* TRAK-127: New event is for what's coming. TRAK-499: a past day no longer offers the old logs. */}
     {(datePassed ?? error) && <p role="alert" className="text-[12px] text-danger">{datePassed ?? error}</p>}
     <div className="flex gap-2">

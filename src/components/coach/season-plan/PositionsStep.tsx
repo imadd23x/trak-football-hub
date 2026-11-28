@@ -173,7 +173,7 @@ export function PositionsStep({ coachId, squad, plan, onBack, onNext }: {
       {/* A floor for the name, so on a phone the buttons drop to their own line rather than hide who it is. */}
       <button type="button" onClick={() => setOpenId(player.id)} aria-haspopup="dialog"
         className="flex flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-        <PlayerFace name={player.player_name} size="sm" />
+        <PlayerFace name={player.player_name} playerId={player.id} size="sm" />
         <span className="grid min-w-[9rem] flex-1">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-medium text-ink">{player.player_name}</span>

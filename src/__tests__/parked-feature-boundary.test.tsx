@@ -80,8 +80,8 @@ describe('TRAK-47 parked feature boundary', () => {
     renderApp('/coach/schedule')
     expect((await screen.findAllByText(/Events/, {}, { timeout: 4000 })).length).toBeGreaterThan(0) // TRAK-255: was Calendar; TRAK-449: Events
     // TRAK-283: the coach's frame also asks for Games, to show its tab; TRAK-294 for Training; coach–player P18 for
-    // tasks, to offer Send a task in "+".
-    await waitFor(() => expect([...new Set(asked)].sort()).toEqual(['events', 'games', 'tasks', 'training']))
+    // tasks, to offer Send a task in "+"; TRAK-602 for announcements, to offer Post announcement.
+    await waitFor(() => expect([...new Set(asked)].sort()).toEqual(['announcements', 'events', 'games', 'tasks', 'training']))
     await waitFor(() => expect(screen.queryByRole('note', { name: 'This screen is coming soon' })).toBeNull())
   })
 

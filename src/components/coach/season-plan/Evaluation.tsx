@@ -184,7 +184,7 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, lastReportDay, 
           <ChevronLeft size={16} aria-hidden="true" />All players
         </button>
         <header className="flex items-center gap-4">
-          <PlayerFace name={open.name} size="lg" aria-hidden />
+          <PlayerFace name={open.name} playerId={open.id} size="lg" aria-hidden />
           <div className="grid gap-1">
             <p className="text-sm text-ink-3">Report · due {evalDay(dueOn)}</p>
             <h2 className="text-[22px] font-medium tracking-[-0.01em] text-ink">{open.name}</h2>
@@ -236,7 +236,7 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, lastReportDay, 
             : <ul aria-label="Players" className="m-0 grid list-none gap-0 divide-y divide-line rounded-2xl border border-line bg-surface px-4 py-1">
               {players.map(p => {
                 if (sent.has(p.id)) return <li key={p.id} className="flex min-h-14 items-center gap-3 py-2">
-                  <PlayerFace name={p.name} size="sm" aria-hidden />
+                  <PlayerFace name={p.name} playerId={p.id} size="sm" aria-hidden />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{p.name}</span>
                   <Badge tone="success" size="sm">Sent</Badge>
                 </li>
@@ -249,7 +249,7 @@ export function EvaluationSteps({ coachId, planId, squad, dueOn, lastReportDay, 
                 return <li key={p.id}>
                   <button type="button" onClick={() => { setSentOne(null); setOpenId(p.id) }}
                     className="flex min-h-14 w-full items-center gap-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                    <PlayerFace name={p.name} size="sm" aria-hidden />
+                    <PlayerFace name={p.name} playerId={p.id} size="sm" aria-hidden />
                     <span className="grid min-w-0 flex-1">
                       <span className="truncate text-sm font-medium text-ink">{p.name}</span>
                       <span className={`truncate text-xs ${entry.rated ? 'text-ink-3' : 'text-warning'}`}>{line}</span>
@@ -351,7 +351,7 @@ function SendStep({ players, everyone, entries, latest, waiting, unrated, object
           {changed.length === 0 ? <p className="text-sm text-ink-2">Nothing changed. Everyone stays where they were last time.</p>
             : <ul className="m-0 grid list-none gap-2 p-0">{changed.map(({ p, now, before, move }) => (
               <li key={p.id} className="flex items-center gap-3">
-                <PlayerFace name={p.name} size="sm" aria-hidden />
+                <PlayerFace name={p.name} playerId={p.id} size="sm" aria-hidden />
                 <span className="grid min-w-0 flex-1">
                   <span className="truncate text-sm font-medium text-ink">{p.name}</span>
                   <span className="text-xs text-ink-3">{move ? `${bandOf(before!).word} → ${bandOf(now).word}` : `Same band · ${average(before!)} → ${average(now)}`}</span>

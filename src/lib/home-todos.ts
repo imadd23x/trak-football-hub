@@ -76,7 +76,9 @@ export type HomeMatch = {
 }
 
 /** TRAK-612: one of the coach's own to-dos (coach_todos): its text, the academy day it's for, and when it was ticked. */
-export type HomeOwnTodo = { id: string; title: string; dueOn: string; urgent: boolean; doneAt: string | null; createdAt: string }
+export type HomeOwnTodo = { id: string; title: string; dueOn: string; urgent: boolean; doneAt: string | null; createdAt: string
+  /** TRAK-622: the event it was added from (Add to To-do), or null. */
+  eventId?: string | null }
 
 /** A squad whose report day has come (TRAK-364, TRAK-531): `since` is the academy day it fell due. */
 export type HomeReport = { squad: string; since: string }
@@ -207,7 +209,8 @@ export function homeTodos({ trainings, matches, reports = [], own = [], now, zon
   // midnight. Rank 9, after Trak's; an urgent one goes up with the urgent. Under every squad, as they're the coach's.
   for (const o of own) {
     if (o.doneAt ? !doneToday(o.doneAt) : o.dueOn > today) continue
-    add('own', o.id, { squad: null, eventId: null, at: parse(o.createdAt), done: !!o.doneAt, urgent: o.urgent && !o.doneAt,
+    // TRAK-624: one added from an event (Add to To-do) carries it, so its line names the event.
+    add('own', o.id, { squad: null, eventId: o.eventId ?? null, at: parse(o.createdAt), done: !!o.doneAt, urgent: o.urgent && !o.doneAt,
       opensAt: null, leavesAt: null, title: o.title })
   }
 

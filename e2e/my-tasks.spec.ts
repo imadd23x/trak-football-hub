@@ -26,6 +26,7 @@ async function backend(context: BrowserContext, unexpected: string[], answers: s
     const path = url.pathname
     if (path === '/rest/v1/telemetry_events' && req.method() === 'POST') return route.fulfill({ status: 201, body: '' })
     if (path === '/auth/v1/user') return json(user)
+    if (path === '/rest/v1/rpc/my_announcements') return json([]) // TRAK-603: no announcements
     if (path === '/rest/v1/profiles') return rows([{ id: playerId, user_id: playerId, role: 'player', full_name: 'Theodoros Zagorakis' }])
     if (path === '/rest/v1/player_details') return rows([{ user_id: playerId, position: 'Midfielder', age_group: 'U16', current_club: 'Synthetic FC' }])
     if (path === '/rest/v1/rpc/my_session_is_live') return json(true)

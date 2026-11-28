@@ -46,8 +46,10 @@ describe('TRAK-220: every Arc panel opened into <body> carries the arc class', (
     // TRAK-353: a player's position, roles and Can also play. TRAK-354: a player's objectives. TRAK-357: New formation and Rename. TRAK-360: Use for matches. TRAK-365: a stuck objective's choices.
     expect(files.sort()).toEqual(['src/components/coach/CoachWeekStrip.tsx',
       'src/components/coach/DraftsReview.tsx', // TRAK-154: Events' drafts to publish.
+      'src/components/coach/EventTodo.tsx', // TRAK-622: an Other event's Add to To-do.
       'src/components/coach/games/LineUpAndJobs.tsx',
       'src/components/coach/season-plan/PlayerObjectivesSheet.tsx', 'src/components/coach/season-plan/StuckSheet.tsx',
+      'src/components/coach/squad/PlayerAvatarEditor.tsx', // TRAK-617: a player's avatar.
       'src/components/coach/squad/PlayerFactsEditor.tsx', 'src/components/coach/squad/PositionAndRolesSheet.tsx',
       'src/components/coach/squad/formations/NameSheet.tsx', 'src/components/coach/squad/formations/UseForMatchesSheet.tsx',
       'src/components/coach/training/PastPlanSheet.tsx', 'src/components/coach/training/PlannerSheets.tsx', 'src/components/coach/training/RegisterSheet.tsx',

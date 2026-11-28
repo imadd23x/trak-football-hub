@@ -13,6 +13,8 @@ export interface BellAlert {
   action?: NotificationItem['action']
   /** TRAK-530: already read elsewhere on this device (a report opened from Home). */
   read?: boolean
+  /** TRAK-603: read once the bell has been opened and closed (an announcement); other alerts wait to be marked read. */
+  readOnClose?: boolean
 }
 
 /**
@@ -49,7 +51,12 @@ export function AlertsBell({ alerts, storageKey, notice, onOpen }: {
   return (
     <div className="arc">
       <NotificationCenter label="Alerts" notifications={items} notice={notice}
-        onOpenChange={open => { if (open) onOpen?.() }}
+        onOpenChange={open => {
+          if (open) { onOpen?.(); return }
+          const seen = shown.filter(alert => alert.readOnClose && !isAlertRead(alert, state))
+          seen.forEach(alert => setAlertRead(storageKey, alert, true))
+          if (seen.length) stored()
+        }}
         onReadChange={(item, read) => { const alert = byId.get(item.id); if (alert) { setAlertRead(storageKey, alert, read); stored() } }}
         onDismiss={item => { const alert = byId.get(item.id); if (alert) { dismissAlert(storageKey, alert); stored() } }} />
     </div>

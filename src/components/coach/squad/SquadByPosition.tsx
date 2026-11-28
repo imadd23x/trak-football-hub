@@ -66,7 +66,7 @@ export function SquadByPosition({ players, waiting, flags, onOpen }: {
                   : t('coachSquad:playerTileNoShirt', { name: p.player_name })}
                 className={`group grid justify-items-center gap-2 rounded-xl p-1 transition-transform hover:scale-105 ${FOCUS} ${group.key === 'WAITING' ? 'opacity-60' : ''}`}>
                 <span className="relative block size-16 rounded-full border-2 border-line bg-surface shadow-sm transition-colors group-hover:border-ink sm:size-[72px]">
-                  <FaceDrawing name={p.player_name} />
+                  <FaceDrawing name={p.player_name} playerId={p.id} />
                   {flags?.get(p.id) && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap [&>*]:shadow-sm">{flags.get(p.id)}</span>}
                 </span>
                 <span aria-hidden="true"

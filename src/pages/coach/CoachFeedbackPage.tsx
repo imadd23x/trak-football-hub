@@ -161,7 +161,7 @@ export default function CoachFeedbackPage() {
                   style={{ background: 'rgb(var(--t-raised))', borderLeft: `3px solid ${LEVEL[row.level].color}` }}
                   // TRAK-179: the player's profile, as Squad → Open profile.
                   {...openable(t('coachAssess:openProfileLevel', { name: row.name, level: t(LEVEL[row.level].word) }), () => navigate(`/coach/squad/player/${row.playerId}`))}>
-                  <PlayerFace name={row.name} size="sm" className="arc flex-shrink-0" aria-hidden />
+                  <PlayerFace name={row.name} playerId={row.playerId} size="sm" className="arc flex-shrink-0" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-[13px] font-medium text-ink" style={{ fontFamily: 'var(--t-font)' }}>{row.name}</span>
@@ -220,7 +220,7 @@ function FeedbackTable({ rows, show, onShow, onOpen, onAssess }: {
               <td className="py-2.5 pr-3">
                 <button type="button" onClick={() => onOpen(row.playerId)} aria-label={t('coachAssess:openProfile', { name: row.name })}
                   className="flex items-center gap-3 text-left text-[13px] font-medium text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
-                  <PlayerFace name={row.name} size="sm" className="arc flex-shrink-0" aria-hidden />
+                  <PlayerFace name={row.name} playerId={row.playerId} size="sm" className="arc flex-shrink-0" aria-hidden />
                   {row.name}
                 </button>
               </td>

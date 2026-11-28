@@ -76,7 +76,7 @@ export function ObjectivesStep({ coachId, squad, plan, seasonObjectives, onBack,
     return <li key={player.id}>
       <button type="button" onClick={() => setOpenId(player.id)} aria-haspopup="dialog"
         className="flex w-full items-center gap-3 rounded-lg py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-        <PlayerFace name={player.player_name} size="sm" />
+        <PlayerFace name={player.player_name} playerId={player.id} size="sm" />
         <span className="grid min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-medium text-ink">{player.player_name}</span>

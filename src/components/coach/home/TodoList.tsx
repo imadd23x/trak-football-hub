@@ -8,13 +8,17 @@ import { LoadingSkeleton } from '@/components/trak/LoadingSkeleton'
 import { MatchAction } from '@/components/coach/games/MatchAction'
 import { gameTitle } from '@/components/coach/games/useGames'
 import { NextStep } from '@/components/coach/CoachWeekStrip'
+import { EventSheetCoach } from '@/components/coach/EventSheetCoach'
+import { EventSheet } from '@/components/trak/EventSheet'
+import { toPlayerEvent } from '@/lib/player-events'
+import { venueParts } from '@/lib/venue-link'
 import { NEXT_STEP_SIZE, NEXT_STEP_WIDTH } from '@/components/coach/next-step'
 import { phoneEventTime } from '@/lib/event-time'
 import { evalDay } from '@/lib/evaluation'
 import { planPath, herePath } from '@/lib/training/plans'
 import { squadName, type WeekItem } from '@/lib/coach-week'
 import { dateLocale, useTranslation } from '@/lib/i18n'
-import type { EventRow } from '@/lib/coach-events'
+import { isCancelled, type EventRow } from '@/lib/coach-events'
 import type { HomeTodoEvent } from './useHomeTodos'
 import { TodoPreview, type PreviewKind } from './TodoPreview'
 import { useAddTodo, useTickTodo } from './useOwnTodos'
@@ -80,7 +84,9 @@ export function TodoList({ items, failed, onRetry, coachId, showSquad, onChanged
             <span className={`text-base font-medium ${todo.done ? 'text-ink-2' : 'text-ink'}`}>
               {todo.urgent && !todo.done && <span className="sr-only">{t('coachHome:urgent')}</span>}{title(todo, row, t)}
             </span>
-            <span className="text-sm text-ink-2">{[showSquad && todo.kind !== 'own' ? squadName(todo.squad) : null, line(todo, row, t)].filter(Boolean).join(' · ')}</span>
+            {todo.kind === 'own' && row
+              ? <OwnEventLine row={row} coachId={coachId} onChanged={onChanged} />
+              : <span className="text-sm text-ink-2">{[showSquad && todo.kind !== 'own' ? squadName(todo.squad) : null, line(todo, row, t)].filter(Boolean).join(' · ')}</span>}
             {row && previewOf(todo) && <PreviewToggle kind={previewOf(todo)!} open={open.has(todo.key)} onToggle={() => toggle(todo.key)} />}
             {row && previewOf(todo) && open.has(todo.key) && <TodoPreview kind={previewOf(todo)!} eventId={row.id} theme={row.training_theme ?? null} />}
           </span>
@@ -191,6 +197,24 @@ function AddTodo({ today }: { today: string }) {
       </div>
     </form>
   </li>
+}
+
+/** TRAK-624 (Other events → To-do 4/6): a to-do added from an event says which event, as TRAK-615 does for trainings and
+ *  matches: "Drinks · Sat 28 Nov · 19:00 · Café Nikos". A tap opens the event's sheet. A cancelled event says so first. */
+function OwnEventLine({ row, coachId, onChanged }: { row: EventRow; coachId: string; onChanged: () => void }) {
+  const { t } = useTranslation()
+  const event = toPlayerEvent(row as unknown as Record<string, unknown>)
+  const time = when(row)
+  const cancelled = isCancelled(row)
+  const text = [row.title, time?.date ? evalDay(time.date) : null, time?.time, row.venue ? venueParts(row.venue).text || null : null].filter(Boolean).join(' · ')
+  const label = <>{cancelled && <span className="font-medium text-danger">{t('coachHome:noteCancelled')} · </span>}{text}</>
+  if (!event) return <span className="text-sm text-ink-2">{label}</span>
+  return <EventSheet event={event} role="coach" trigger={
+    <button type="button" className="justify-self-start rounded text-left text-sm text-ink-2 underline decoration-line underline-offset-[3px] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      {label}
+    </button>}>
+    <EventSheetCoach event={event} coachId={coachId} onChanged={onChanged} />
+  </EventSheet>
 }
 
 function SuggestionRow({ title, line, action }: { title: string; line: string; action: ReactNode }) {

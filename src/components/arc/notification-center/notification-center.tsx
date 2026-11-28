@@ -119,7 +119,8 @@ export function NotificationCenter({ notifications: initial, label = "Notificati
   const [items, setItems] = useState(initial);
   // Trak (TRAK-163): alerts load after mount and change with the data, so follow
   // the prop whenever its rows or read states change (Arc only read it once).
-  const incoming = initial.map((item) => `${item.id}:${item.read ? 1 : 0}`).join("|");
+  // TRAK-603: and its action, so a Got it answered elsewhere (My tasks) shows here too.
+  const incoming = initial.map((item) => `${item.id}:${item.read ? 1 : 0}:${item.action?.label ?? ""}`).join("|");
   useEffect(() => { setItems(initial); }, [incoming]); // eslint-disable-line react-hooks/exhaustive-deps
   const [view, setView] = useState<View>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);

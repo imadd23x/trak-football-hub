@@ -36,6 +36,7 @@ async function loginFixture(page: Page, context: BrowserContext, role: 'parent' 
     if (url.origin !== backendOrigin) { unexpected.push(request.url()); return route.abort() }
     if (request.method() !== 'GET') writes.push({ path: url.pathname, body: request.postData() ? request.postDataJSON() : null })
     if (url.pathname === '/auth/v1/user' && request.method() === 'GET') return json(user)
+    if (url.pathname === '/rest/v1/rpc/my_announcements') return json([]) // TRAK-603: no announcements
     if (url.pathname === '/rest/v1/profiles') {
       const profile = { id, user_id: id, full_name: role === 'parent' ? 'Synthetic Parent' : 'Ana Synthetic', role, nationality: null }
       return json(role === 'player' && !provisioned ? []

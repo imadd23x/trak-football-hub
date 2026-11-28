@@ -27,6 +27,7 @@ async function playerBackend(context: BrowserContext, hasMatches: boolean, unexp
     const path = url.pathname
     if (path === '/rest/v1/telemetry_events' && req.method() === 'POST') return route.fulfill({ status: 201, body: '' })
     if (path === '/auth/v1/user') return json(user)
+    if (path === '/rest/v1/rpc/my_announcements') return json([]) // TRAK-603: no announcements
     if (path === '/rest/v1/profiles') return rows([
       { id: playerId, user_id: playerId, role: 'player', full_name: 'Manos Synthetic' },
       { id: 'coach-189', user_id: 'coach-189', role: 'coach', full_name: 'Synthetic Coach' },

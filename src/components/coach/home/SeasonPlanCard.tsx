@@ -246,7 +246,7 @@ function SharedBody({ coachId, squad, plan }: { coachId: string; squad: string; 
           </h4>
           <ul className="m-0 grid list-none gap-2 p-0">{group.players.map(p => (
             <li key={p.id} className="flex items-center gap-2.5">
-              <PlayerFace name={p.player_name} size="sm" />
+              <PlayerFace name={p.player_name} playerId={p.id} size="sm" />
               <span className="grid min-w-0">
                 <span className="truncate text-sm text-ink">{p.player_name}</span>
                 <span className="truncate text-xs text-ink-3">{held.of(p.id).length ? [TREND[String(status.get(p.id)?.trend)], held.of(p.id).map(o => o.title).join(' · ')].filter(Boolean).join(' · ')

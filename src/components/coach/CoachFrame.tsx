@@ -15,6 +15,7 @@ import { CoachFrameContext, useCoachFrame, type CoachFrame as Frame } from '@/co
 import { SquadSwitcher } from '@/components/coach/SquadSwitcher'
 import { useSideMenuScreen } from '@/lib/side-menu-screen'
 import { BARLESS, COACH_SCREEN_PATH, placeOf, tabOf, type CoachScreen } from '@/lib/coach-places'
+import { PlayerAvatarsProvider } from '@/components/coach/squad/usePlayerAvatars'
 import { CoachTrailProvider, TrailLink, type Trail } from '@/components/coach/CoachTrail'
 import { useTranslation } from '@/lib/i18n'
 import { useOwnAvatarUrl } from '@/hooks/use-own-avatar-url'
@@ -120,7 +121,8 @@ function Framed({ userId, name }: { userId: string; name: string }) {
       active={screen ?? ''} onSelect={select} foldKey="trak.coach.railFolded"
       afterBrand={switcher}
       actions={<><CoachAlertsBell coachId={userId} /><CoachCreate placement="top" onSaved={saved} /></>}>
-      <Suspense fallback={<div className="min-h-screen bg-ground" />}><Outlet /></Suspense>
+      {/* TRAK-617: every coach screen draws a player with the avatar the coach selected. */}
+      <PlayerAvatarsProvider coachId={userId}><Suspense fallback={<div className="min-h-screen bg-ground" />}><Outlet /></Suspense></PlayerAvatarsProvider>
     </SidebarRail>
     {!wide && !barred && <div className="arc fixed inset-x-0 z-50 px-3 pointer-events-none" style={{ bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
       {/* TRAK-498 (Imad, 20 Nov): a page under a tab (Season plan under Home, a match under Matches) keeps its tab

@@ -100,7 +100,7 @@ export function EventSheet({ event, role, trigger, squad, children }: {
   const Icon = status?.tone === 'cancelled' ? Ban : status?.tone === 'draft' ? CircleDashed : CircleCheck
   const color = status?.tone === 'cancelled' ? CANCELLED_COLOR : status?.tone === 'draft' ? 'rgb(var(--t-ink-2))' : 'rgb(var(--t-success))'
 
-  const date = format(parseISO(event.date), 'EEE MMM d')
+  const date = format(parseISO(event.date), 'EEE d MMM')
   // TRAK-554: the date at top right, and under it "Published" when the coach's part says so.
   const aside = state === 'published' && !cancelled
     ? <span className="grid justify-items-end gap-1.5">{date}<Badge pill tone="success" size="sm" icon={<Check size={12} aria-hidden="true" />}>Published</Badge></span>

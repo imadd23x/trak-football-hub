@@ -119,7 +119,7 @@ export function SquadDirectory({ title, players, summary, onOpen }: {
                 exit={{ opacity: 0, transition: { duration: reduce ? 0 : motionTokens.duration.exit } }}
                 transition={{ layout: listTransition, opacity: { duration: reduce ? 0 : motionTokens.duration.fast } }}>
                 <button type="button" className={styles.personRow} onClick={() => onOpen(player)}>
-                  <PlayerFace name={player.name} />
+                  <PlayerFace name={player.name} playerId={player.id} />
                   <span className={styles.personText}><span className={styles.personName}>{player.name}</span><span className={styles.personRole}>{player.position}{player.shirt != null ? ` · #${player.shirt}` : ""}</span></span>
                   {player.flag}
                   {/* Design standard step 3 (Dimos, 24 Nov): no ratings graph beside a player; a waiting player still says so. */}

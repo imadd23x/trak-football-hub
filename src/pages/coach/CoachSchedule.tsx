@@ -18,6 +18,7 @@ import { useCoachSquad } from '@/lib/coach-squad'
 import { squadName } from '@/lib/coach-week'
 import { askToEmailFamilies } from '@/lib/event-emails'
 import { useAuth } from '@/contexts/AuthContext'
+import { EventTodoSlot } from '@/components/coach/EventTodo'
 import { CoachMenuButton } from '@/components/coach/CoachFrame'
 import { ABOVE_TAB_BAR } from '@/components/coach/coach-frame-context'
 import { PhoneBack } from '@/components/coach/CoachTrail'
@@ -754,6 +755,8 @@ export default function CoachSchedule() {
                 const evaluateState = row && steps.some(item => item.id === 'match' && item.content === t('coachHome:evaluate'))
                   ? (evaluations.data?.get(row.id) ? 'evaluationDraft' as const : 'fullTime' as const) : null
                 // TRAK-272: the card opens the same event sheet as coach Home's week (CoachWeekStrip).
+                // TRAK-623: an "Other" event can go into the coach's To-do from its card.
+                const todoOffered = !!row && row.event_type === 'other' && !cancelled
                 const sheetSource = row ?? { id: `session:${ev.id}`, published: true, title: ev.title, event_date: ev.date, event_type: ev.type, ...(ev.venue && { venue: ev.venue }) }
                 const base = toPlayerEvent(sheetSource as unknown as Record<string, unknown>)
                 const sheetEvent: StripEvent | null = base && { ...base, draft: !!row && !row.published, sessionId: row ? undefined : ev.id }
@@ -854,9 +857,11 @@ export default function CoachSchedule() {
                       )}
                       {/* TRAK-508 (Imad, 20 Nov): the card's actions at its bottom right; the next steps green (TRAK-497),
                           Edit, Delete and Cancel a quiet outline group of icons (TRAK-275). */}
-                      {items.length > 0 && (
+                      {(items.length > 0 || todoOffered) && (
                         <div className="arc mt-3 flex flex-wrap items-center justify-end gap-2">
                           {groupItems.length > 0 && <ButtonGroup label={t('coachSchedule:actionsFor', { title: ev.title })} items={groupItems} variant="outline" size="md" />}
+                          {/* TRAK-623 (Kostas's 28 Nov mockup): Add to To-do beside the next steps, without opening the event. */}
+                          {todoOffered && row && <EventTodoSlot row={row} coachId={user?.id} variant="secondary" size={NEXT_STEP_SMALL} />}
                           {steps.map(item => item.id === 'match' && evaluateState && row
                             ? <MatchAction key={item.id} state={evaluateState} eventId={row.id} />
                             : <Button key={item.id} size={NEXT_STEP_SMALL} aria-label={item.label} title={item.label} onClick={item.onSelect}>

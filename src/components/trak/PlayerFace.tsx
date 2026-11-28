@@ -1,5 +1,6 @@
+import { createContext, useContext } from 'react'
 import { Avatar, type AvatarProps } from '@/components/arc/avatar/avatar'
-import { hairOf } from '@/lib/player-face'
+import { hairOf, type HairPick } from '@/lib/player-face'
 
 /* TRAK-349: a player's drawn face, from the season objectives mockup (2 Nov), in place of their initials. Every child
    has the same neutral, non-realistic skin tone, never one chosen per child (Tarek, 3 Nov). Only the hair varies,
@@ -16,9 +17,15 @@ const HAIR_STYLES = [
   <g key="curls"><circle cx="13.6" cy="14" r="3" /><circle cx="16.8" cy="10.6" r="3.3" /><circle cx="21" cy="9.6" r="3.4" /><circle cx="25" cy="11.2" r="3.1" /><circle cx="27" cy="14.8" r="2.6" /></g>,
 ]
 
-/** The drawing alone. It fills the nearest positioned box, clipped to a circle. */
-export function FaceDrawing({ name }: { name: string }) {
-  const hair = hairOf(name)
+/** TRAK-617: the hair each of the coach's players has where the coach selected it, by squad player id. The coach's frame
+ *  provides it; anywhere else (a player's or parent's screen, a test) it is empty and every face comes from the name. */
+export const PlayerFaces = createContext<ReadonlyMap<string, HairPick>>(new Map())
+
+/** The drawing alone. It fills the nearest positioned box, clipped to a circle. With `playerId`, the hair the coach
+ *  selected for that player, if any. */
+export function FaceDrawing({ name, playerId, hair: chosen }: { name: string; playerId?: string; hair?: HairPick | null }) {
+  const picks = useContext(PlayerFaces)
+  const hair = hairOf(name, chosen !== undefined ? chosen : playerId ? picks.get(playerId) : null)
   return (
     <svg viewBox="0 0 40 40" aria-hidden="true" focusable="false" data-face=""
       className="pointer-events-none absolute inset-0 size-full [clip-path:circle(50%)]">
@@ -32,9 +39,9 @@ export function FaceDrawing({ name }: { name: string }) {
   )
 }
 
-export type PlayerFaceProps = Omit<AvatarProps, 'src' | 'fallback'>
+export type PlayerFaceProps = Omit<AvatarProps, 'src' | 'fallback'> & { /** The squad player, for the coach's selection. */ playerId?: string }
 
 /** A player's avatar: Arc's frame, label and status, with the drawn face instead of initials. It takes no photo. */
-export function PlayerFace(props: PlayerFaceProps) {
-  return <Avatar {...props} fallback={<FaceDrawing name={props.name} />} />
+export function PlayerFace({ playerId, ...props }: PlayerFaceProps) {
+  return <Avatar {...props} fallback={<FaceDrawing name={props.name} playerId={playerId} />} />
 }

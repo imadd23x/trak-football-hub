@@ -385,5 +385,21 @@
   "openReportName": "Open {{name}}’s {{month}} report",
   "reportNote": "Σημείωση του προπονητή",
   "reportNotFound": "This report isn’t here.",
-  "reportMovedUp": "Moved up: {{areas}}"
+  "reportMovedUp": "Moved up: {{areas}}",
+  "avatarTitle": "Άβαταρ: {{name}}",
+  "editAvatarOf": "Επεξεργασία άβαταρ: {{name}}",
+  "avatarOnlyYou": "Ένα σχέδιο, ποτέ φωτογραφία. Το βλέπετε μόνο εσείς.",
+  "avatarPreview": "Άβαταρ: {{name}}",
+  "avatarAutomatic": "Αυτόματο",
+  "hairStyle": "Μαλλιά",
+  "hairCrop": "Κοντό κούρεμα",
+  "hairShort": "Κοντά",
+  "hairCurls": "Σγουρά",
+  "hairColour": "Χρώμα μαλλιών",
+  "hairBlack": "Μαύρο",
+  "hairDarkBrown": "Σκούρο καστανό",
+  "hairBrown": "Καστανό",
+  "hairLightBrown": "Ανοιχτό καστανό",
+  "hairCharcoal": "Ανθρακί",
+  "savedAvatar": "Το άβαταρ αποθηκεύτηκε: {{name}}"
 }

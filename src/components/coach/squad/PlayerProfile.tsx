@@ -10,6 +10,7 @@ import { ATTRIBUTES } from '@/lib/squad/attributes'
 import { bornLine } from '@/lib/squad/format'
 import { loadPlayerAssessments } from '@/lib/coach-assessments'
 import { PlayerFactsEditor } from './PlayerFactsEditor'
+import { PlayerAvatarEditor } from './PlayerAvatarEditor'
 import type { PlayerFacts } from './usePlayerFacts'
 import { MorphBlock, SkeletonMorph } from '@/components/arc/skeleton-morph/skeleton-morph'
 import { PlayerObjectivesSection } from '@/components/coach/season-plan/PlayerObjectivesSection'
@@ -93,14 +94,16 @@ export function PlayerProfile({ player, squad, coachId, facts, factsFailed, onRe
     objectives={assessments.data?.objectives?.[assessment.id]} objectivesFailed={!!assessments.data && assessments.data.objectives === undefined}
     onChanged={() => { void client.invalidateQueries({ queryKey: key }) }} />
 
+  // TRAK-617: the coach selects the face's avatar from it, except for a player still waiting for consent.
+  const face = <span className="relative block size-20 shrink-0 rounded-full border-2 border-ink bg-surface shadow-sm sm:size-24">
+    <FaceDrawing name={player.name} playerId={player.id} />
+    {player.shirt != null && <span className="absolute -bottom-1 -right-1 min-w-8 rounded-lg border-2 border-surface bg-brand px-1.5 py-0.5 text-center text-sm font-black tabular-nums text-on-brand">
+      <span className="sr-only">{t('coachSquad:shirtNumber')} </span>{player.shirt}
+    </span>}
+  </span>
   // The season plan's look: the face large, its shirt number on it, the name in black, position and squad as badges.
   const header = <div className={`${INNER} flex flex-wrap items-center gap-4 sm:gap-5`}>
-    <span className="relative block size-20 shrink-0 rounded-full border-2 border-ink bg-surface shadow-sm sm:size-24">
-      <FaceDrawing name={player.name} />
-      {player.shirt != null && <span className="absolute -bottom-1 -right-1 min-w-8 rounded-lg border-2 border-surface bg-brand px-1.5 py-0.5 text-center text-sm font-black tabular-nums text-on-brand">
-        <span className="sr-only">{t('coachSquad:shirtNumber')} </span>{player.shirt}
-      </span>}
-    </span>
+    {player.waiting ? face : <PlayerAvatarEditor playerId={player.id} name={player.name} coachId={coachId}>{face}</PlayerAvatarEditor>}
     <div className="grid min-w-0 gap-2">
       {/* TRAK-428: a long name wraps beside the band, never cut ("Giourkas Sei…" on a phone). */}
       <h3 className="break-words text-2xl font-black tracking-tight text-ink sm:text-3xl">{player.name}</h3>

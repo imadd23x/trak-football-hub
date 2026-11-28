@@ -26,8 +26,8 @@ export function useParked() {
    feature all count as off. TRAK-283: Games is switched on the same way, and
    TRAK-294 Training, and TRAK-350 the season plan. TRAK-441: family_look is
    the family app in the coach's look, read for a player or parent through
-   family_feature_on (feature_on knows only a coach's academy). */
-export type Feature = 'events' | 'games' | 'training' | 'season_plan' | 'family_look' | 'tasks'
+   family_feature_on (feature_on knows only a coach's academy). TRAK-602: announcements, a coach's posts to a squad. */
+export type Feature = 'events' | 'games' | 'training' | 'season_plan' | 'family_look' | 'tasks' | 'announcements'
 
 export function useFeature(feature?: Feature): boolean {
   return useFeatureState(feature).on

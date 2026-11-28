@@ -29,6 +29,8 @@ vi.mock('@/components/trak/parked', () => ({ useFeature: (feature?: string) => f
 // TRAK-367: Training's Notes have their own tests; none here.
 vi.mock('@/components/coach/training/useTraining', () => ({ useNotedTrainings: () => new Set<string>() }))
 vi.mock('@/integrations/supabase/client', () => ({
+  // TRAK-623: the event sheet's Add to To-do reaches the sign-in code, which reads this at load.
+  SUPABASE_FUNCTIONS_URL: 'https://test.supabase.co/functions/v1',
   supabase: {
     rpc: (name: string) => database.rpc(name),
     from: (table: string) => {

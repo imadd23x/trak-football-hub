@@ -69,6 +69,8 @@ INSERT INTO public.squad_players(id,coach_user_id,player_name,age_group,linked_p
  (pg_temp.t580id(41),pg_temp.t580id(10),'Synthetic Player Kai','U16',pg_temp.t580id(21)),
  (pg_temp.t580id(42),pg_temp.t580id(10),'Synthetic Player Zed','U14',pg_temp.t580id(22)),
  (pg_temp.t580id(44),pg_temp.t580id(12),'Synthetic Player Max','U16',pg_temp.t580id(24));
+-- Academies start with tasks on (20261128200000). This suite switches it by hand, as an operator still can.
+DELETE FROM public.academy_features WHERE feature = 'tasks';
 INSERT INTO public.academy_features(organization_id,feature) VALUES
  (pg_temp.t580id(100),'events'),(pg_temp.t580id(101),'events'),(pg_temp.t580id(100),'tasks')
  ON CONFLICT DO NOTHING;

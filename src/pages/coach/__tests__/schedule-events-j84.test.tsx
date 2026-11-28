@@ -244,7 +244,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
       await eventStep(sheet, 'What')
       expect(within(sheet).getByLabelText('Venue')).toHaveValue('Academy Pitch 1')
       await eventStep(sheet, 'When')
-      expect(timeShown('Start')).toBe('5:00 PM')
+      expect(timeShown('Start')).toBe('17:00')
     })
 
   it('publishes a draft', async () => {
@@ -310,7 +310,7 @@ describe('J8.4: the coach creates, edits and cancels events', { timeout: 20_000 
     expect(sheet.querySelector('[aria-current="step"]')).toHaveTextContent('What')
     expect(within(sheet).getByLabelText('Opponent')).toHaveValue('Synthetic Rovers')
     await eventStep(sheet, 'When')
-    expect(timeShown('Kickoff')).toBe('6:30 PM')
+    expect(timeShown('Kickoff')).toBe('18:30')
     // A published event has no Publish or draft.
     await eventStep(sheet, 'Review')
     // TRAK-516 (Imad, 20 Nov): no "Families see the change as soon as you save." line.

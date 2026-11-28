@@ -93,7 +93,7 @@ describe('TRAK-182: the event sheet', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/home')
     // Imad, 16 Oct: Away under the opponent, the date at top right, Kick-off over the time.
     expect(within(sheet).getByText('Away')).toBeInTheDocument()
-    expect(within(sheet).getByText(format(parseISO(day), 'EEE MMM d'))).toBeInTheDocument()
+    expect(within(sheet).getByText(format(parseISO(day), 'EEE d MMM'))).toBeInTheDocument()
     expect(within(sheet).getByText('Kick-off')).toBeInTheDocument()
     expect(within(sheet).getByText('17:00')).toBeInTheDocument()
     // TRAK-223: the meet line says how long before kick-off it is.
@@ -132,7 +132,7 @@ describe('TRAK-182: the event sheet', () => {
     expect(await screen.findByRole('dialog', { name: 'vs Rivals FC' })).toBeInTheDocument()
     // TRAK-427: a state (Arc's pill), not a disabled button. TRAK-554: it appears at the top right, with the date.
     const published = await within(screen.getByRole('dialog')).findByText('Published')
-    expect(published.closest('span.grid')).toHaveTextContent(format(parseISO(day), 'EEE MMM d'))
+    expect(published.closest('span.grid')).toHaveTextContent(format(parseISO(day), 'EEE d MMM'))
     expect(within(screen.getByRole('dialog')).queryByRole('button', { name: 'Published' })).toBeNull()
   })
 
@@ -148,7 +148,7 @@ describe('TRAK-182: the event sheet', () => {
     expect(within(sheet).queryByRole('button', { name: 'Published' })).toBeNull()
     // TRAK-554 (Kostas, 23 Nov): at the top right under the date, not in the row of buttons with Share.
     const published = within(sheet).getByText('Published')
-    expect(published.closest('span.grid')).toHaveTextContent(format(parseISO(day), 'EEE MMM d'))
+    expect(published.closest('span.grid')).toHaveTextContent(format(parseISO(day), 'EEE d MMM'))
     const buttons = (await within(sheet).findByRole('button', { name: 'Share' })).parentElement!
     expect(buttons).not.toContainElement(published)
     // J8.16's pre-written message, with the event's own link, not a bare link to paste.

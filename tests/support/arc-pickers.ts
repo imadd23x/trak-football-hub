@@ -8,10 +8,10 @@ import { screen, waitFor, within } from '@testing-library/react'
 /** userEvent itself, or a userEvent.setup() instance. */
 type User = { click: (element: Element) => Promise<void> }
 
-/** "18:00" → "6:00 PM", as the picker lists it. */
+/** "9:30" → "09:30", as the picker lists it: Trak's times are 24-hour (TRAK-627). */
 export function shownTime(hhmm: string): string {
   const [h, m] = hhmm.split(':').map(Number)
-  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
 /** Opens the time field named `label` ("Start", "Kickoff", "Meet time…") and picks `hhmm`. */
@@ -23,7 +23,7 @@ export async function pickTime(user: User, label: string | RegExp, hhmm: string)
   await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
 }
 
-/** What the time field named `label` shows: "6:00 PM", or its placeholder. */
+/** What the time field named `label` shows: "18:00", or its placeholder. */
 export function timeShown(label: string | RegExp): string {
   const name = typeof label === 'string' ? new RegExp(`^${label}\\b`) : label
   const button = screen.getByRole('button', { name })

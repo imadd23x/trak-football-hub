@@ -154,7 +154,7 @@ export function ShareAt({ game, initial, cta, busy, ready, onSchedule, onCancel 
         <DatePicker label={t('coachMatches:day')} className="arc-trak-field min-w-0" value={dayAsDate(day)} clearable={false} placeholder={t('coachMatches:pickDay')}
           onChange={date => { if (date) setDay(dateAsDay(date)) }} minDate={dayAsDate(localTodayISO())}
           maxDate={dayAsDate(displayEventTime(game).date)} format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale={dates()} />
-        <TimePicker label={t('coachMatches:time')} className="arc-trak-field min-w-0" value={time} onChange={setTime} minuteStep={5} format="12h"
+        <TimePicker label={t('coachMatches:time')} className="arc-trak-field min-w-0" value={time} onChange={setTime} minuteStep={5} format="24h"
           placeholder={t('coachSchedule:pickTime')} emptyAt="19:00" />
       </div>
       <p className="text-sm text-ink-3">{t('coachMatches:anyTimeBefore')}</p>

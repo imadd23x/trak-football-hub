@@ -309,14 +309,14 @@ export function EventEditSheet({ sheet, onChange, onClose, onSave, saving, venue
           <ArcField>
             <TimePicker label={sheet.form.kind === 'match' ? t('coachSchedule:kickoff') : t('coachSchedule:start')} className="arc-trak-field"
               value={sheet.form.time} onChange={time => setForm({ time })}
-              minuteStep={5} format="12h" placeholder={t('coachSchedule:pickStartTime')} emptyAt="17:00" />
+              minuteStep={5} format="24h" placeholder={t('coachSchedule:pickStartTime')} emptyAt="17:00" />
           </ArcField>
 
           {/* Optional: empty means meet at the start time. */}
           <ArcField>
             <TimePicker label={t('coachSchedule:meetTimeEarlier')} className="arc-trak-field"
               value={sheet.form.meetTime} onChange={meetTime => setForm({ meetTime })}
-              minuteStep={5} format="12h" placeholder={t('coachSchedule:sameAsStart')} emptyAt={halfHourBefore(sheet.form.time)}
+              minuteStep={5} format="24h" placeholder={t('coachSchedule:sameAsStart')} emptyAt={halfHourBefore(sheet.form.time)}
               disabled={!sheet.form.time} />
             {sheet.form.meetTime && (
               <button type="button" onClick={() => setForm({ meetTime: '' })}

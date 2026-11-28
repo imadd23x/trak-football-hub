@@ -95,7 +95,7 @@ export function CantMakeItButton({ event, child, self = false }: { event: Player
   const [open, setOpen] = useState(false)
   if (event.absent || closed(event)) return null
   return <BottomSheet open={open} onOpenChange={setOpen} title="Can't make it" description={eventHeading(event)}
-    aside={format(parseISO(event.date), 'EEE MMM d')} className="arc"
+    aside={format(parseISO(event.date), 'EEE d MMM')} className="arc"
     trigger={<ArcButton variant="danger" size="sm">Can't make it</ArcButton>}>
     <div className="pb-4"><CantMakeIt event={event} child={child} self={self} onDone={() => setOpen(false)} /></div>
   </BottomSheet>

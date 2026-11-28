@@ -79,7 +79,7 @@ test('coach saves squad kits, publishes a kit event and reopens its announcement
   await form.getByRole('group', { name: 'Competition' }).getByRole('button', { name: 'League' }).click()
   await form.getByRole('button', { name: 'Next', exact: true }).click()
   await form.getByRole('button', { name: /^Kickoff\b/ }).click()
-  await page.getByRole('option', { name: '4:00 PM', exact: true }).click()
+  await page.getByRole('option', { name: '16:00', exact: true }).click()
   await form.getByRole('button', { name: 'Next', exact: true }).click()
   await form.getByRole('button', { name: 'Set up team kits' }).click()
   await form.getByLabel('Start with a color set').selectOption('burgundy-gold')

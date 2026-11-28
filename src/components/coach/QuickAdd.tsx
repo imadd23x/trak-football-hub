@@ -168,7 +168,7 @@ export function CoachCreate({ placement, onSaved }: { placement: 'bar' | 'top'; 
       onChange={d => { if (d) { setDate(dateAsDay(d)); setError(null) } }} placeholder={t('coachSchedule:pickDate')}
       format={{ weekday: 'short', day: 'numeric', month: 'short' }} locale={dates} />
     <TimePicker label={kind === 'match' ? t('coachSchedule:kickoff') : t('coachSchedule:start')} className="arc-trak-field" value={time}
-      onChange={picked => { setTime(picked); setError(null) }} minuteStep={5} format="12h" placeholder={t('coachSchedule:pickTime')} emptyAt="17:00" />
+      onChange={picked => { setTime(picked); setError(null) }} minuteStep={5} format="24h" placeholder={t('coachSchedule:pickTime')} emptyAt="17:00" />
     {/* TRAK-127: New event is for what's coming. TRAK-499: a past day no longer offers the old logs. */}
     {(datePassed ?? error) && <p role="alert" className="text-[12px] text-danger">{datePassed ?? error}</p>}
     <div className="flex gap-2">

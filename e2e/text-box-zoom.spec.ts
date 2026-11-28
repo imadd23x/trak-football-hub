@@ -74,7 +74,7 @@ test.describe('TRAK-178 on a phone', () => {
     const eventForm = await boxSizes(page)
     await sheet.getByRole('button', { name: 'Next' }).click()
     await sheet.getByRole('button', { name: /^Start\b/ }).click()
-    await page.getByRole('listbox').getByRole('option', { name: '5:00 PM' }).click()
+    await page.getByRole('listbox').getByRole('option', { name: '17:00' }).click()
     await sheet.getByRole('button', { name: 'Next' }).click()
     await expect(sheet.getByLabel('Kit', { exact: true })).toBeVisible()
     eventForm.push(...await boxSizes(page))

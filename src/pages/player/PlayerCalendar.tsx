@@ -13,6 +13,7 @@ import { CantMakeIt } from '@/components/parent/CantMakeIt'
 import { CANCELLED_COLOR, EVENT_COLOR } from '@/lib/coach-events'
 import { toPlayerEvent } from '@/lib/player-events'
 import { SeenOnOpen } from '@/lib/tasks'
+import { PlanInSheet } from '@/components/player/TrainingPlan'
 
 const day = (date: Date) => format(date, 'yyyy-MM-dd')
 
@@ -81,6 +82,7 @@ export default function PlayerCalendar() {
               ? <DayEvents day={selected} events={onDay(selected)} renderSheet={(event, trigger) => (
                   <EventSheet event={event} role="player" trigger={trigger}>
                     <SeenOnOpen eventId={event.id} />
+                    <PlanInSheet event={event} />
                     {forThemselves && user && <CantMakeIt event={event} child={{ id: user.id, name: 'you' }} self />}
                   </EventSheet>
                 )} />

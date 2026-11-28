@@ -20,6 +20,8 @@ import { OwnConsentCard } from '@/components/player/OwnConsentCard'
 import { MySeasonCard } from '@/components/player/MySeasonCard'
 import { MyTasks } from '@/components/player/MyTasks'
 import { SeenOnOpen, unseenEventChanges, useMyTasks } from '@/lib/tasks'
+import { usePlansReady } from '@/lib/player-plans'
+import { PlanInSheet } from '@/components/player/TrainingPlan'
 import { LatestReport } from '@/components/player/LatestEvaluation'
 import { SeasonSoFar } from '@/components/player/SeasonSoFar'
 import { ParentAssessmentCarousel } from '@/components/parent/ParentAssessmentCarousel'
@@ -32,6 +34,8 @@ export default function PlayerHome() {
   const look = useFamilyLook()
   // TRAK-580: events the coach changed since the player opened them, from the same read as My tasks.
   const changedEvents = unseenEventChanges(useMyTasks().data)
+  // TRAK-601: the trainings with a plan, "Plan ready" in the week.
+  const plansReady = usePlansReady().data?.events
   const navigate = useNavigate()
   const location = useLocation()
   const [loading, setLoading] = useState(true)
@@ -317,8 +321,9 @@ export default function PlayerHome() {
         </p>}
         <div className={look ? 'grid grid-cols-[minmax(0,1fr)] gap-5 laptop:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] laptop:items-start laptop:gap-6' : ''}>
         <div className={look ? 'grid grid-cols-[minmax(0,1fr)] content-start gap-5' : ''}>
-        {user && <LoadedWeekStrip key={user.id} loadKey={user.id} absentFor={user.id} picker={look} changed={changedEvents} renderSheet={(event, trigger) => <EventSheet event={event} role="player" trigger={trigger}>
+        {user && <LoadedWeekStrip key={user.id} loadKey={user.id} absentFor={user.id} picker={look} changed={changedEvents} planned={plansReady} renderSheet={(event, trigger) => <EventSheet event={event} role="player" trigger={trigger}>
           <SeenOnOpen eventId={event.id} />
+          <PlanInSheet event={event} />
           {reportsForSelf && <CantMakeIt event={event} child={{ id: user.id, name: 'you' }} self />}
         </EventSheet>}
           renderPrimary={reportsForSelf ? event => <CantMakeItButton event={event} child={{ id: user.id, name: 'you' }} self /> : undefined}

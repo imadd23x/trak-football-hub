@@ -14,6 +14,7 @@ import { useEventBack } from '@/lib/event-back'
 import { useFamilyLook } from '@/components/trak/FamilyFrame'
 import { FamilyMatch } from '@/components/player/FamilyMatch'
 import { useSeenOnOpen } from '@/lib/tasks'
+import { TrainingPlan } from '@/components/player/TrainingPlan'
 import { dateLocale, useTranslation } from '@/lib/i18n'
 import { format, parseISO } from 'date-fns'
 
@@ -91,6 +92,7 @@ export default function PlayerEvent() {
   } else {
     body = <>
       <EventDetails event={current.event} changes={changes} />
+      <TrainingPlan event={current.event} />
       {/* TRAK-289: once the coach publishes, After the game, with the coach's note to them. */}
       {user && <SharedGameReview event={current.event} childId={user.id} childName="" as="player" />}
       {/* TRAK-286: the coach's game plan, once shared: the goals, their job and the note to them. */}
@@ -104,7 +106,9 @@ export default function PlayerEvent() {
   return (
     <MobileShell width={inLook ? 'wide' : 'page'}>
       {inLook ? <div className="pb-28"><FamilyMatch event={inLook} changes={changes} child={{ id: user!.id, name: '' }} as="player" back={backTo}
-        cantMakeIt={forThemselves && <CantMakeIt event={inLook} child={{ id: user!.id, name: 'you' }} self />} /></div>
+        cantMakeIt={forThemselves && <CantMakeIt event={inLook} child={{ id: user!.id, name: 'you' }} self />}>
+        <TrainingPlan event={inLook} />
+      </FamilyMatch></div>
         : <div className="pt-12 pb-28 space-y-5">
           {back}
           {body}

@@ -73,6 +73,8 @@ INSERT INTO public.squad_players(id,coach_user_id,player_name,age_group,linked_p
  (pg_temp.t578id(42),pg_temp.t578id(10),'Synthetic Player Kai','U16',pg_temp.t578id(22)),
  (pg_temp.t578id(46),pg_temp.t578id(10),'Synthetic Player Leo','U16',pg_temp.t578id(26)),
  (pg_temp.t578id(44),pg_temp.t578id(12),'Synthetic Player Max','U16',pg_temp.t578id(24));
+-- Academies start with tasks on (20261128200000). This suite switches it by hand, as an operator still can.
+DELETE FROM public.academy_features WHERE feature = 'tasks';
 INSERT INTO public.academy_features(organization_id,feature) VALUES (pg_temp.t578id(100),'tasks'),(pg_temp.t578id(101),'tasks');
 UPDATE public.organizations SET time_zone = 'Europe/Athens' WHERE id = pg_temp.t578id(101);
 SELECT pg_temp.t578check((SELECT count(*) FROM public.squad_players WHERE id IN (pg_temp.t578id(40),pg_temp.t578id(42),pg_temp.t578id(46))

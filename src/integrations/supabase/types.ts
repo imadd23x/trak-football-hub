@@ -2683,6 +2683,26 @@ export type Database = {
           title: string
         }[]
       }
+      my_training_plans: {
+        Args: never
+        Returns: {
+          area: string
+          conditions: string
+          direction: string
+          event_date: string
+          event_id: string
+          how: string
+          minutes: number
+          name: string
+          numbers: string
+          part: string
+          position: number
+          session_id: string | null
+          targets: string
+          trak_drill: string | null
+          trak_level: number | null
+        }[]
+      }
       respond_to_task: {
         Args: { p_child?: string; p_task_id: string }
         Returns: undefined
